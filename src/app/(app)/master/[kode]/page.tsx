@@ -207,7 +207,11 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
             </span>
           </div>
           <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 8 }}>
-            Biaya perolehan lahan dikelola di halaman Landbank.
+            Biaya perolehan lahan dikelola di{" "}
+            <Link href={`/landbank/${kodeProyek}`} style={{ color: "var(--teal)", fontWeight: 600 }}>
+              halaman Landbank
+            </Link>
+            .
           </div>
         </div>
 
