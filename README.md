@@ -18,18 +18,49 @@ Tampilan sengaja diperlakukan sebagai sekali pakai.
 
 ## Menjalankan
 
+Prasyarat: **Node.js 20.9 atau lebih baru** (`node -v` untuk memeriksa) dan Git.
+
 ```bash
+git clone <url-repo>
+cd property-management-system
+git checkout claude/artifact-review-cn2c4f
+
 npm install
-cp .env.example .env          # lalu isi SESSION_SECRET
-npm run db:reset              # buat database + semai data demo
+cp .env.example .env
+```
+
+Buka `.env`, lalu ganti nilai `SESSION_SECRET` dengan string acak minimal 32
+karakter. Aplikasi menolak berjalan bila nilainya masih bawaan.
+
+```bash
+# macOS / Linux
+openssl rand -base64 32
+
+# Windows PowerShell
+[Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Max 256 }))
+```
+
+Lalu siapkan database dan jalankan:
+
+```bash
+npm run db:reset     # buat database + semai data demo
 npm run dev
 ```
 
-Bangkitkan `SESSION_SECRET` dengan:
+Buka **http://localhost:3000** — akan langsung diarahkan ke halaman masuk.
 
-```bash
-openssl rand -base64 32
-```
+### Perintah lain
+
+| Perintah | Kegunaan |
+|---|---|
+| `npm run dev` | mode pengembangan, perubahan kode langsung termuat |
+| `npm run db:reset` | kembalikan data ke kondisi awal — aman diulang kapan saja |
+| `npm run db:studio` | Prisma Studio, melihat & mengubah isi tabel langsung |
+| `npm run build && npm start` | mode produksi, untuk mengukur performa sebenarnya |
+| `npm run typecheck` | periksa tipe tanpa membangun |
+
+Database demo berupa satu berkas `prisma/dev.db` dan tidak ikut masuk repo.
+Bila terhapus, cukup jalankan `npm run db:reset`.
 
 ### Akun demo
 
