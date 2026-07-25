@@ -1,82 +1,95 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpRight, MapPin } from "lucide-react";
 import { ambilPengguna } from "@/lib/auth/rbac";
-import { daftarProyek } from "@/lib/data/proyek";
+import { daftarProyek, kpiMaster, luasTotal } from "@/lib/data/proyek";
 import { m2 } from "@/lib/format";
-import { Badge, JudulHalaman, WARNA_STATUS } from "@/components/ui";
+import { Badge, TabelHead, WARNA_STATUS } from "@/components/ui";
 
 export default async function MasterProyek() {
   const pengguna = await ambilPengguna();
   if (!pengguna) redirect("/login");
 
-  const proyek = await daftarProyek(pengguna);
+  const [proyek, kpi] = await Promise.all([daftarProyek(pengguna), kpiMaster(pengguna)]);
+
+  const angka: [string, number][] = [
+    ["Total Proyek", kpi.proyek],
+    ["Total Unit", kpi.unit],
+    ["Tipe Unit Terdaftar", kpi.tipeUnit],
+    ["Item Sarana & Prasarana", kpi.sarpras],
+  ];
 
   return (
-    <div style={{ padding: "26px 28px 40px" }}>
-      <JudulHalaman
-        judul="Master Proyek"
-        keterangan="Deskripsi lahan, legalitas, tipe unit, dan daftar unit per proyek."
-      />
+    <div style={{ padding: 24 }}>
+      <div className="eyebrow">Master Data · pelaksanaan konstruksi</div>
+      <h2 className="disp" style={{ margin: "4px 0 0", fontSize: 20 }}>
+        Master Proyek
+      </h2>
 
-      {proyek.length === 0 && (
-        <div className="terbatas">Belum ada proyek yang dapat Anda akses.</div>
-      )}
+      <div className="grid grid4" style={{ marginTop: 16 }}>
+        {angka.map(([label, nilai]) => (
+          <div key={label} className="card kpi">
+            <div className="eyebrow">{label}</div>
+            <div className="v" style={{ fontSize: 24 }}>
+              {nilai}
+            </div>
+          </div>
+        ))}
+      </div>
 
-      <div className="grid grid3">
-        {proyek.map((p) => {
-          const luasTotal =
-            p.luasKavlingEfektif + p.luasSarana + p.luasPrasarana + p.luasRth;
-
-          return (
-            <Link
-              key={p.id}
-              href={`/master/${p.kode}`}
-              className="card"
-              style={{ padding: 18, textDecoration: "none", color: "inherit", display: "block" }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 10 }}>
-                <div>
-                  <div className="disp" style={{ fontWeight: 700, fontSize: 16, color: "var(--ink)" }}>
-                    {p.nama}
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{p.kode}</div>
-                </div>
-                <ArrowUpRight size={16} style={{ color: "var(--muted)", flexShrink: 0 }} />
-              </div>
-
-              <div style={{ margin: "12px 0" }}>
-                <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
-              </div>
-
-              <div
-                style={{
-                  display: "flex", alignItems: "center", gap: 5,
-                  fontSize: 12, color: "var(--muted)", marginBottom: 12,
-                }}
-              >
-                <MapPin size={13} />
-                {p.kecamatan}, {p.kota}
-              </div>
-
-              <div
-                style={{
-                  display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
-                  borderTop: "1px solid var(--line)", paddingTop: 12,
-                }}
-              >
-                <div>
-                  <div className="eyebrow" style={{ fontSize: 10 }}>Unit</div>
-                  <div className="num" style={{ fontSize: 15, marginTop: 2 }}>{p._count.units}</div>
-                </div>
-                <div>
-                  <div className="eyebrow" style={{ fontSize: 10 }}>Luas total</div>
-                  <div className="num" style={{ fontSize: 15, marginTop: 2 }}>{m2(luasTotal)}</div>
-                </div>
-              </div>
-            </Link>
-          );
-        })}
+      <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
+        <TabelHead
+          judul="Daftar Proyek"
+          keterangan="Klik nama proyek untuk membuka detailnya."
+        />
+        <div className="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Proyek</th>
+                <th>Kecamatan / Kota</th>
+                <th style={{ textAlign: "right" }}>Luas Total</th>
+                <th style={{ textAlign: "right" }}>Unit</th>
+                <th>Fase</th>
+                <th style={{ textAlign: "right" }}>Sarpras</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {proyek.map((p) => (
+                <tr key={p.id}>
+                  <td>
+                    <Link
+                      href={`/master/${p.kode}`}
+                      style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+                    >
+                      {p.nama}
+                    </Link>
+                    <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{p.kode}</div>
+                  </td>
+                  <td style={{ color: "var(--muted)" }}>
+                    {p.kecamatan}, {p.kota}
+                  </td>
+                  <td style={{ textAlign: "right" }}>{m2(luasTotal(p))}</td>
+                  <td style={{ textAlign: "right" }}>{p._count.units}</td>
+                  <td style={{ color: "var(--muted)" }}>
+                    {p.fases.map((f) => f.kode).join(", ")}
+                  </td>
+                  <td style={{ textAlign: "right" }}>{p._count.infrastructures}</td>
+                  <td>
+                    <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
+                  </td>
+                </tr>
+              ))}
+              {proyek.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ color: "var(--muted)", textAlign: "center", padding: 20 }}>
+                    Belum ada proyek yang dapat Anda akses.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

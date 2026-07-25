@@ -88,6 +88,72 @@ export function Terbatas({ apa }: { apa: string }) {
   );
 }
 
+/** Baris label–nilai di dalam kartu. Mengikuti InfoRow pada artifact. */
+export function InfoRow({ label, nilai }: { label: string; nilai: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: "flex", justifyContent: "space-between", gap: 12,
+        padding: "7px 0", borderBottom: "1px solid #eef2f3", fontSize: 12.5,
+        alignItems: "center",
+      }}
+    >
+      <span style={{ color: "var(--muted)" }}>{label}</span>
+      <span style={{ fontWeight: 600, textAlign: "right" }}>{nilai}</span>
+    </div>
+  );
+}
+
+/** Kepala kartu: judul eyebrow di kiri, tombol aksi di kanan. */
+export function CardHead({
+  judul,
+  aksi,
+}: {
+  judul: string;
+  aksi?: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        marginBottom: 10, gap: 8,
+      }}
+    >
+      <div className="eyebrow">{judul}</div>
+      {aksi && <div style={{ display: "flex", gap: 6 }}>{aksi}</div>}
+    </div>
+  );
+}
+
+/** Kepala tabel dalam kartu: judul + keterangan di kiri, tombol di kanan. */
+export function TabelHead({
+  judul,
+  keterangan,
+  aksi,
+}: {
+  judul: string;
+  keterangan?: string;
+  aksi?: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        padding: "12px 16px", borderBottom: "1px solid var(--line)",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        flexWrap: "wrap", gap: 8,
+      }}
+    >
+      <div>
+        <div className="eyebrow">{judul}</div>
+        {keterangan && (
+          <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>{keterangan}</div>
+        )}
+      </div>
+      {aksi}
+    </div>
+  );
+}
+
 export function JudulHalaman({
   judul,
   keterangan,

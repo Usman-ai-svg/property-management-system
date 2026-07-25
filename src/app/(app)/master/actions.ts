@@ -23,7 +23,55 @@ function segarkan(kode: string) {
 // DESKRIPSI PROYEK
 // ===========================================================================
 
-export async function ubahDeskripsiProyek(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+export async function ubahLokasiProyek(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const kode = teks(form, "kode", true);
+
+    const lama = await prisma.project.findUnique({ where: { kode } });
+    if (!lama) throw new GagalIzin("Proyek tidak ditemukan.");
+
+    const pengguna = await izinkan("deskripsi", lama.id);
+
+    // Pin ditulis sebagai satu kolom "lintang, bujur" seperti pada artifact,
+    // lalu dipecah ke dua kolom saat disimpan.
+    const pin = teksOpsional(form, "pin");
+    let pinLat = lama.pinLat;
+    let pinLng = lama.pinLng;
+    if (pin !== null) {
+      const bagian = pin.split(",").map((x) => Number(x.trim()));
+      if (bagian.length !== 2 || bagian.some((n) => !Number.isFinite(n))) {
+        throw new GagalIzin('Pin lokasi harus berupa "lintang, bujur", mis. -6.4021, 106.7532');
+      }
+      [pinLat, pinLng] = bagian;
+    }
+
+    const baru = {
+      alamat: teks(form, "alamat", true),
+      kelurahan: teks(form, "kelurahan", true),
+      kecamatan: teks(form, "kecamatan", true),
+      kota: teks(form, "kota", true),
+      provinsi: teks(form, "provinsi", true),
+      pinLat,
+      pinLng,
+    };
+
+    await prisma.project.update({ where: { id: lama.id }, data: baru });
+
+    await catatDiff({
+      pengguna, projectId: lama.id, objek: `Proyek ${lama.kode} · Lokasi`,
+      sebelum: lama, sesudah: baru,
+      label: {
+        alamat: "Alamat", kelurahan: "Kelurahan", kecamatan: "Kecamatan",
+        kota: "Kota / Kabupaten", provinsi: "Provinsi",
+        pinLat: "Pin lintang", pinLng: "Pin bujur",
+      },
+    });
+
+    segarkan(kode);
+  });
+}
+
+export async function ubahLuasLahan(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
   return jalankan(async () => {
     const kode = teks(form, "kode", true);
 
@@ -33,12 +81,6 @@ export async function ubahDeskripsiProyek(_s: HasilAksi | null, form: FormData):
     const pengguna = await izinkan("deskripsi", lama.id);
 
     const baru = {
-      nama: teks(form, "nama", true),
-      alamat: teks(form, "alamat", true),
-      kelurahan: teks(form, "kelurahan", true),
-      kecamatan: teks(form, "kecamatan", true),
-      kota: teks(form, "kota", true),
-      provinsi: teks(form, "provinsi", true),
       luasKavlingEfektif: angka(form, "luasKavlingEfektif", { min: 0 }),
       luasSarana: angka(form, "luasSarana", { min: 0 }),
       luasPrasarana: angka(form, "luasPrasarana", { min: 0 }),
@@ -47,14 +89,23 @@ export async function ubahDeskripsiProyek(_s: HasilAksi | null, form: FormData):
 
     await prisma.project.update({ where: { id: lama.id }, data: baru });
 
+    const total = (x: typeof baru | typeof lama) =>
+      x.luasKavlingEfektif + x.luasSarana + x.luasPrasarana + x.luasRth;
+
     await catatDiff({
-      pengguna, projectId: lama.id, objek: `Proyek ${lama.kode}`,
-      sebelum: lama, sesudah: baru,
+      pengguna, projectId: lama.id, objek: `Proyek ${lama.kode} · Luas Lahan`,
+      sebelum: { ...lama, total: total(lama) },
+      sesudah: { ...baru, total: total(baru) },
       label: {
-        nama: "Nama", alamat: "Alamat", kelurahan: "Kelurahan", kecamatan: "Kecamatan",
-        kota: "Kota", provinsi: "Provinsi",
-        luasKavlingEfektif: "Luas kavling efektif", luasSarana: "Luas sarana",
-        luasPrasarana: "Luas prasarana", luasRth: "Luas RTH",
+        luasKavlingEfektif: "Kavling efektif", luasSarana: "Sarana",
+        luasPrasarana: "Prasarana", luasRth: "RTH", total: "Luas total",
+      },
+      format: {
+        luasKavlingEfektif: (v) => `${Number(v).toLocaleString("id-ID")} m²`,
+        luasSarana: (v) => `${Number(v).toLocaleString("id-ID")} m²`,
+        luasPrasarana: (v) => `${Number(v).toLocaleString("id-ID")} m²`,
+        luasRth: (v) => `${Number(v).toLocaleString("id-ID")} m²`,
+        total: (v) => `${Number(v).toLocaleString("id-ID")} m²`,
       },
     });
 
@@ -107,61 +158,67 @@ export async function ubahBiayaLahan(_s: HasilAksi | null, form: FormData): Prom
 // LEGALITAS
 // ===========================================================================
 
-export async function simpanLegalitas(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+/**
+ * Simpan seluruh baris legalitas sekaligus.
+ *
+ * Mengikuti artifact: satu proyek dapat memiliki lebih dari satu NIB, dan
+ * seluruhnya disunting dalam satu modal — bukan satu per satu. Baris yang
+ * hilang dari kiriman berarti dihapus.
+ *
+ * Baris yang sudah punya dokumen tidak dihapus begitu saja: dokumennya
+ * dilepas lebih dulu agar riwayat revisinya tidak ikut hilang.
+ */
+export async function ubahLegalitas(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
   return jalankan(async () => {
     const kode = teks(form, "kode", true);
-    const id = teksOpsional(form, "id");
 
-    const proyek = await prisma.project.findUnique({ where: { kode }, select: { id: true, kode: true } });
+    const proyek = await prisma.project.findUnique({
+      where: { kode },
+      select: { id: true, kode: true, legalitas: { select: { id: true, nib: true } } },
+    });
     if (!proyek) throw new GagalIzin("Proyek tidak ditemukan.");
 
     const pengguna = await izinkan("deskripsi", proyek.id);
 
-    const data = {
-      nib: teks(form, "nib", true),
-      sertifikat: teks(form, "sertifikat", true),
-      luas: angka(form, "luas", { min: 0, wajib: true }),
-    };
-
-    if (id) {
-      const lama = await prisma.legality.findUnique({ where: { id } });
-      if (!lama || lama.projectId !== proyek.id) throw new GagalIzin("Legalitas tidak ditemukan.");
-
-      await prisma.legality.update({ where: { id }, data });
-      await catatDiff({
-        pengguna, projectId: proyek.id, objek: `Legalitas ${lama.nib}`,
-        sebelum: lama, sesudah: data,
-        label: { nib: "NIB", sertifikat: "Sertifikat", luas: "Luas" },
-      });
-    } else {
-      await prisma.legality.create({ data: { ...data, projectId: proyek.id } });
-      await catat({
-        pengguna, projectId: proyek.id, objek: `Legalitas ${data.nib}`,
-        aksi: "Tambah legalitas", ke: `${data.sertifikat} — ${data.luas.toLocaleString("id-ID")} m²`,
-      });
+    let baris: { id?: string; nib: string; sertifikat: string; luas: number }[];
+    try {
+      baris = JSON.parse(teks(form, "baris", true));
+    } catch {
+      throw new GagalIzin("Data legalitas tidak terbaca.");
     }
+
+    const sah = baris.filter((b) => b.nib?.trim());
+    if (sah.length === 0) throw new GagalIzin("Isi minimal satu NIB.");
+
+    const idDikirim = new Set(sah.map((b) => b.id).filter(Boolean));
+    const dihapus = proyek.legalitas.filter((l) => !idDikirim.has(l.id));
+
+    for (const l of dihapus) {
+      await prisma.legality.delete({ where: { id: l.id } });
+    }
+
+    for (const b of sah) {
+      const data = {
+        nib: b.nib.trim(),
+        sertifikat: (b.sertifikat ?? "").trim(),
+        luas: Number(b.luas) || 0,
+      };
+      if (b.id) {
+        await prisma.legality.update({ where: { id: b.id }, data });
+      } else {
+        await prisma.legality.create({ data: { ...data, projectId: proyek.id } });
+      }
+    }
+
+    await catat({
+      pengguna, projectId: proyek.id, objek: "Legalitas",
+      aksi: "Ubah data legalitas",
+      dari: `${proyek.legalitas.length} NIB`,
+      ke: `${sah.length} NIB`,
+    });
 
     segarkan(kode);
   });
-}
-
-export async function hapusLegalitas(form: FormData): Promise<void> {
-  const id = String(form.get("id") ?? "");
-  const lama = await prisma.legality.findUnique({
-    where: { id },
-    select: { id: true, nib: true, sertifikat: true, projectId: true, project: { select: { kode: true } } },
-  });
-  if (!lama) return;
-
-  const pengguna = await izinkan("deskripsi", lama.projectId);
-
-  await prisma.legality.delete({ where: { id } });
-  await catat({
-    pengguna, projectId: lama.projectId, objek: `Legalitas ${lama.nib}`,
-    aksi: "Hapus legalitas", dari: lama.sertifikat,
-  });
-
-  segarkan(lama.project.kode);
 }
 
 // ===========================================================================
@@ -324,22 +381,31 @@ export async function tambahUnit(_s: HasilAksi | null, form: FormData): Promise<
     if (!fase || fase.projectId !== proyek.id) throw new GagalIzin("Fase tidak sah.");
     if (!tipe || tipe.projectId !== proyek.id) throw new GagalIzin("Tipe unit tidak sah.");
 
-    // Nomor unit berikutnya dalam fase tersebut.
-    const terakhir = await prisma.unit.findFirst({
-      where: { phaseId: fase.id },
-      orderBy: { nomor: "desc" },
-      select: { nomor: true },
-    });
-    const nomor = (terakhir?.nomor ?? 0) + 1;
+    const nomor = angka(form, "nomor", { min: 1, wajib: true });
+    const statusPembangunan = pilihan(form, "statusPembangunan", STATUS_PEMBANGUNAN);
+    const statusJual = pilihan(form, "statusJual", STATUS_JUAL);
+
+    // Luas tanah diisi per unit; bila dikosongkan, ikut luas tanah tipenya.
+    const luasTanahIsian = angka(form, "luasTanah", { min: 0 });
+    const luasTanah = luasTanahIsian > 0 ? luasTanahIsian : tipe.luasTanah;
+
     const kodeUnit = `${proyek.kode}-${fase.kode}-${nomor}`;
+    const bentrok = await prisma.unit.findUnique({ where: { kode: kodeUnit }, select: { id: true } });
+    if (bentrok) throw new GagalIzin(`Unit ${kodeUnit} sudah ada. Pakai nomor lain.`);
+
+    // Progres awal mengikuti status bangunnya, sama seperti makeUnit pada artifact.
+    const progress = ["Selesai", "Serah Terima", "Habis Masa Garansi"].includes(statusPembangunan)
+      ? 100
+      : statusPembangunan === "Progress"
+        ? 10
+        : 0;
 
     // Snapshot BOQ & RAP dibuat SEKALI di sini, dari template yang berlaku
     // saat ini. Sesudah tersimpan, unit tidak lagi membaca template.
     await prisma.unit.create({
       data: {
         kode: kodeUnit, projectId: proyek.id, phaseId: fase.id, unitTypeId: tipe.id,
-        nomor, luasTanah: tipe.luasTanah,
-        statusPembangunan: "Belum terbangun", statusJual: "Tersedia", progress: 0,
+        nomor, luasTanah, statusPembangunan, statusJual, progress,
         hargaJual: Math.round(rabAcuan(tipe.luasBangunan) * 1.42),
         rapUpah: hitungUpahRap(tipe.luasBangunan),
         boqItems: { create: buatBoqDariTemplate(tipe.luasBangunan) },
@@ -347,9 +413,19 @@ export async function tambahUnit(_s: HasilAksi | null, form: FormData): Promise<
       },
     });
 
+    if (progress > 0) {
+      await prisma.progressRecord.create({
+        data: {
+          unitId: (await prisma.unit.findUniqueOrThrow({ where: { kode: kodeUnit }, select: { id: true } })).id,
+          tanggal: new Date(), progress, catatan: "Progres awal saat unit dibuat",
+          dicatatOleh: pengguna.nama,
+        },
+      });
+    }
+
     await catat({
       pengguna, projectId: proyek.id, objek: `Unit ${fase.kode}-${nomor}`,
-      aksi: "Tambah unit", ke: `${kodeUnit} — RAB ${rpLog(rabAcuan(tipe.luasBangunan))}`,
+      aksi: "Tambah unit", ke: `${statusPembangunan} · ${statusJual}`,
     });
 
     segarkan(kode);
@@ -509,6 +585,95 @@ export async function ubahUpahRap(_s: HasilAksi | null, form: FormData): Promise
     });
 
     segarkan(lama.project.kode);
+  });
+}
+
+// ===========================================================================
+// DOKUMEN — unggah revisi
+// ===========================================================================
+
+/**
+ * Catat revisi baru sebuah dokumen.
+ *
+ * PERAGAAN: berkas sesungguhnya belum disimpan. Yang dicatat adalah metadata
+ * revisi — nomor, nama berkas, waktu, dan pengunggahnya. Kolom `objectKey`
+ * sengaja dibiarkan kosong; kolom itulah yang nanti diisi kunci objek di
+ * S3/R2 saat penyimpanan berkas diaktifkan, tanpa mengubah bentuk tabel.
+ */
+export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const dokumenId = teksOpsional(form, "dokumenId");
+    const pemilikJenis = teks(form, "pemilikJenis", true);
+    const pemilikId = teks(form, "pemilikId", true);
+    const kategori = teks(form, "kategori", true);
+    const label = teks(form, "label", true);
+    const namaFile = teks(form, "namaFile", true);
+
+    // Cari proyek pemilik dokumen, sekaligus memastikan pengguna berhak.
+    let projectId: string;
+    let kodeProyek: string;
+
+    if (pemilikJenis === "legalitas") {
+      const l = await prisma.legality.findUnique({
+        where: { id: pemilikId },
+        select: { id: true, projectId: true, project: { select: { kode: true } } },
+      });
+      if (!l) throw new GagalIzin("Legalitas tidak ditemukan.");
+      projectId = l.projectId;
+      kodeProyek = l.project.kode;
+    } else if (pemilikJenis === "proyek") {
+      const p = await prisma.project.findUnique({
+        where: { id: pemilikId },
+        select: { id: true, kode: true },
+      });
+      if (!p) throw new GagalIzin("Proyek tidak ditemukan.");
+      projectId = p.id;
+      kodeProyek = p.kode;
+    } else {
+      throw new GagalIzin(`Jenis pemilik dokumen "${pemilikJenis}" belum didukung.`);
+    }
+
+    const pengguna = await izinkan("dokumenTeknis", projectId);
+
+    let dokId = dokumenId;
+    let revisiBerikutnya = 1;
+
+    if (dokId) {
+      const jumlah = await prisma.documentVersion.count({ where: { documentId: dokId } });
+      revisiBerikutnya = jumlah + 1;
+    } else {
+      const dok = await prisma.document.create({ data: { kategori, judul: label } });
+      dokId = dok.id;
+
+      // Tautkan dokumen baru ke pemiliknya.
+      if (pemilikJenis === "legalitas") {
+        await prisma.legality.update({ where: { id: pemilikId }, data: { dokumenId: dokId } });
+      } else if (pemilikJenis === "proyek") {
+        await prisma.project.update({ where: { id: pemilikId }, data: { analisaDocId: dokId } });
+      }
+    }
+
+    await prisma.documentVersion.create({
+      data: {
+        documentId: dokId,
+        revisi: `R${revisiBerikutnya}`,
+        namaFile,
+        // Ukuran belum diketahui karena berkasnya belum benar-benar diunggah.
+        ukuranByte: 0,
+        objectKey: null,
+        diunggahOlehId: pengguna.id,
+      },
+    });
+
+    await catat({
+      pengguna, projectId, objek: label,
+      aksi: "Unggah revisi",
+      dari: revisiBerikutnya > 1 ? `R${revisiBerikutnya - 1}` : null,
+      ke: `R${revisiBerikutnya} — ${namaFile}`,
+    });
+
+    segarkan(kodeProyek);
+    return `Revisi R${revisiBerikutnya} tercatat. Berkas belum ikut tersimpan pada demo ini.`;
   });
 }
 
