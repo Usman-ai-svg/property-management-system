@@ -62,11 +62,18 @@ Buka **http://localhost:3000** — akan langsung diarahkan ke halaman masuk.
 | `npm run dev` | mode pengembangan, perubahan kode langsung termuat |
 | `npm run db:reset` | kembalikan data ke kondisi awal — aman diulang kapan saja |
 | `npm run db:studio` | Prisma Studio, melihat & mengubah isi tabel langsung |
+| `npm run db:generate` | bangkitkan ulang Prisma Client setelah schema diubah |
 | `npm run build && npm start` | mode produksi, untuk mengukur performa sebenarnya |
 | `npm run typecheck` | periksa tipe tanpa membangun |
 
-Database demo berupa satu berkas `prisma/dev.db` dan tidak ikut masuk repo.
-Bila terhapus, cukup jalankan `npm run db:reset`.
+Dua hal yang tidak ikut masuk repo dan dibuat ulang di tiap mesin:
+
+- **`prisma/dev.db`** — database demo. Bila terhapus, jalankan `npm run db:reset`.
+- **`src/generated/prisma`** — Prisma Client hasil generate. Dibuat otomatis oleh
+  `postinstall` setelah `npm install`, dan diperbarui tiap kali `npm run build`,
+  `npm run db:push`, atau `npm run db:reset` dijalankan. Bila muncul galat
+  `Cannot find module '../src/generated/prisma/client'`, jalankan
+  `npm run db:generate`.
 
 ### Akun demo
 
