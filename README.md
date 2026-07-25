@@ -226,16 +226,47 @@ yang sudah selesai sejak 2023.
 
 ---
 
+## Modul
+
+Seluruh modul dari prototipe sudah diporting.
+
+| Modul | Isi |
+|---|---|
+| **Master Proyek** | Empat tingkat: daftar proyek → detail proyek → detail unit → detail sarpras. Termasuk BOQ/RAP yang bisa disunting dan dokumen berversi. |
+| **Konstruksi** | Dashboard, progres per proyek dengan penyaring fase, dan opname mingguan unit & sarpras. |
+| **Keuangan Proyek** | Tren pengeluaran, komposisi biaya, pengeluaran per unit dengan alokasi kontrak, dan pencatatan pengeluaran. |
+| **Vendor Management** | Daftar vendor, kontrak dengan Variation Order dan retensi, tender, progres pekerjaan, dan pembayaran. |
+| **Equipment & Asset** | Peralatan dengan kepemilikan, penempatan, pemakaian, dan jadwal servis. |
+| **Landbank** | Portofolio, perbandingan proyek, feasibility study, dan business plan. |
+| **Plan vs Realisasi** | HPP, penjualan, operasional, dan rencana laba — realisasi diturunkan dari data yang tercatat. |
+| **Admin** | Pengelolaan proyek, matriks hak akses yang bisa disunting, kelola user, dan log perubahan. |
+
+### Catatan tentang Plan vs Realisasi
+
+Prototipe menghitung realisasi sebagai `rencana × progres × faktor acak`.
+Di sini realisasi diturunkan dari data yang benar-benar tercatat: pengeluaran,
+pembayaran kontrak, dan penerimaan penjualan. Tiap baris HPP menyebutkan sumber
+angkanya.
+
+Konsekuensinya, pos yang belum punya transaksi menunjukkan nol — biaya
+operasional misalnya, karena pemasaran dan umum-administrasi belum punya modul
+pencatatan sendiri. Pada laporan yang dipakai mengambil keputusan, angka yang
+dikarang lebih berbahaya daripada angka yang kosong.
+
+---
+
 ## Yang belum dikerjakan
 
-Modul Konstruksi, Keuangan Proyek, Vendor, Equipment, Landbank, Plan vs
-Realisasi, dan Admin baru berupa halaman penanda. Model data dan rumusnya sudah
-tersedia — yang tersisa membangun tampilannya, mengikuti pola pada
-`src/app/(app)/master/`.
-
-Yang juga masih terbuka:
-
-- Menyunting kerja tambah (kini tampil, belum bisa diubah)
-- Unggah dokumen — perlu object storage lebih dulu
-- Halaman Admin untuk mengubah matriks hak akses lewat antarmuka
-- Pengujian otomatis untuk fungsi di `src/lib/calc/`
+- **Unggah berkas dan impor Excel** masih peragaan. Alur, nomor revisi, dan
+  jejak auditnya sudah berjalan; yang belum ada penyimpanan berkasnya. Kolom
+  `objectKey` pada `document_versions` menunggu diisi saat object storage
+  diaktifkan.
+- **Menyunting kerja tambah** — judul dan dokumennya belum bisa diubah setelah
+  dibuat, meski tabel BOQ dan RAP-nya sudah bisa.
+- **Pencatatan biaya operasional** (pemasaran, umum & administrasi, bunga &
+  pajak) — belum punya modul sendiri, sehingga kolom realisasinya nol di Plan
+  vs Realisasi.
+- **Pengujian otomatis** untuk fungsi di `src/lib/calc/`. Sejauh ini verifikasi
+  dilakukan lewat browser.
+- **Tabel Tipe Unit di Master Proyek** adalah tambahan yang tidak ada di
+  prototipe — perlu diputuskan apakah dipertahankan, dibuang, atau dipindah.

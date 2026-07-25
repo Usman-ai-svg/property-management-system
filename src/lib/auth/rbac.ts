@@ -122,6 +122,21 @@ export const bolehAksesProyek = (u: Pengguna, projectId: string): boolean =>
   u.semuaProyek || u.proyekIds.includes(projectId);
 
 /**
+ * Klausa untuk tabel yang `projectId`-nya boleh kosong — jejak audit misalnya,
+ * karena sebagian aksi (perubahan hak akses, status pengguna) tidak menempel
+ * pada proyek mana pun.
+ *
+ * Ditulis lewat kolom projectId, bukan filter relasi: `{ project: {} }` tidak
+ * berarti "proyek mana saja" bagi Prisma dan justru menyaring habis hasilnya.
+ */
+export function filterProjectIdOpsional(
+  u: Pengguna,
+): { OR: ({ projectId: null } | { projectId: { in: string[] } })[] } | Record<string, never> {
+  if (u.semuaProyek) return {};
+  return { OR: [{ projectId: null }, { projectId: { in: u.proyekIds } }] };
+}
+
+/**
  * Bangun `select` Prisma untuk Unit sesuai hak akses.
  *
  * Inilah wujud nyata aturan nomor 1: bila pengguna tidak berhak atas

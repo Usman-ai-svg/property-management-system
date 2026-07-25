@@ -1,0 +1,149 @@
+import { prisma } from "@/lib/db";
+import { filterProyek, type Pengguna } from "@/lib/auth/rbac";
+import { ringkasKontrak } from "@/lib/calc/keuangan";
+
+/**
+ * Perbandingan rencana dan realisasi.
+ *
+ * Rencana berasal dari Business Plan. Realisasi diturunkan dari data yang
+ * benar-benar tercatat — pengeluaran, pembayaran kontrak, dan penerimaan
+ * penjualan — bukan dari perkiraan "rencana × progres" seperti prototipe.
+ *
+ * Konsekuensinya, pos yang belum punya transaksi akan menunjukkan nol.
+ * Itu memang keadaannya: pada laporan yang dipakai mengambil keputusan,
+ * angka yang dikarang lebih berbahaya daripada angka yang kosong.
+ */
+
+/** Peruntukan pengeluaran yang membiayai tiap pos HPP. */
+const SUMBER_HPP: Record<string, string[]> = {
+  "Perolehan Tanah": [],
+  "Pengolahan Lahan": ["Pengolahan Lahan"],
+  "Perijinan & Legalitas": ["Perijinan & Ormas"],
+  "Prasarana & Sarana": ["Prasarana & Sarana"],
+  "Konstruksi Rumah": ["Unit (rumah dijual)"],
+};
+
+export async function daftarProyekPlanReal(u: Pengguna) {
+  return prisma.project.findMany({
+    where: { ...filterProyek(u), businessPlan: { isNot: null } },
+    orderBy: { kode: "asc" },
+    select: { id: true, kode: true, nama: true },
+  });
+}
+
+export async function planVsRealisasi(u: Pengguna, kode: string) {
+  const proyek = await prisma.project.findUnique({
+    where: { kode },
+    select: {
+      id: true, kode: true, nama: true, statusLahan: true,
+      biayaPembelian: true, biayaNotaris: true, biayaBalikNama: true, biayaLegalLain: true,
+      units: {
+        orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
+        select: {
+          id: true, nomor: true, luasTanah: true, hargaJual: true,
+          statusJual: true, progress: true,
+          phase: { select: { kode: true } },
+          unitType: { select: { nama: true, luasBangunan: true } },
+          penerimaan: { select: { nominal: true } },
+        },
+      },
+      expenses: { select: { peruntukan: true, total: true } },
+      contracts: {
+        where: { jenis: "Sarpras" },
+        select: {
+          nominal: true, retensiPct: true,
+          pembayaran: { select: { nominal: true } },
+          variationOrders: { select: { nominal: true, status: true } },
+        },
+      },
+    },
+  });
+
+  if (!proyek) return null;
+
+  const rencana = await prisma.businessPlan.findUnique({
+    where: { projectId: proyek.id },
+    select: {
+      hpp: { orderBy: { urutan: "asc" }, select: { id: true, nama: true, nilai: true } },
+      omzet: { select: { jumlah: true, harga: true } },
+      operasional: { orderBy: { urutan: "asc" }, select: { id: true, nama: true, nilai: true } },
+    },
+  });
+  if (!rencana) return null;
+
+  const perolehanLahan =
+    proyek.biayaPembelian + proyek.biayaNotaris + proyek.biayaBalikNama + proyek.biayaLegalLain;
+
+  const sarprasTerbayar = proyek.contracts.reduce((s, k) => s + ringkasKontrak(k).terbayar, 0);
+
+  const perPeruntukan = new Map<string, number>();
+  for (const e of proyek.expenses) {
+    perPeruntukan.set(e.peruntukan, (perPeruntukan.get(e.peruntukan) ?? 0) + e.total);
+  }
+
+  const biaya = rencana.hpp.map((h, i) => {
+    let real = 0;
+    let sumber: string;
+
+    if (h.nama === "Perolehan Tanah") {
+      real = perolehanLahan;
+      sumber = "biaya perolehan lahan di Landbank";
+    } else if (h.nama === "Prasarana & Sarana") {
+      // Sarpras dibiayai lewat kontrak dan pengeluaran langsung.
+      real = sarprasTerbayar + (perPeruntukan.get("Prasarana & Sarana") ?? 0);
+      sumber = "pembayaran kontrak sarpras + pengeluaran";
+    } else {
+      const peruntukan = SUMBER_HPP[h.nama] ?? [];
+      real = peruntukan.reduce((s, p) => s + (perPeruntukan.get(p) ?? 0), 0);
+      sumber = peruntukan.length ? `pengeluaran · ${peruntukan.join(", ")}` : "belum ada sumber data";
+    }
+
+    return { kode: String.fromCharCode(65 + i), nama: h.nama, plan: h.nilai, real, sumber };
+  });
+
+  // Biaya operasional belum punya pencatatan sendiri di sistem ini — pemasaran,
+  // umum & administrasi, serta bunga & pajak dicatat di luar modul proyek.
+  const ops = rencana.operasional.map((o) => ({ nama: o.nama, plan: o.nilai, real: 0 }));
+
+  const sales = proyek.units.map((x) => {
+    const akad = x.statusJual === "Akad" || x.statusJual === "Serah Terima";
+    return {
+      id: x.id,
+      no: `${x.phase.kode}-${x.nomor}`,
+      tipe: x.unitType.nama,
+      luasBangunan: x.unitType.luasBangunan,
+      luasTanah: x.luasTanah,
+      target: x.hargaJual,
+      akad,
+      real: akad ? x.hargaJual : 0,
+      pencairan: akad ? x.hargaJual : 0,
+      sudahCair: x.penerimaan.reduce((s, p) => s + p.nominal, 0),
+    };
+  });
+
+  const penjualanPlan = rencana.omzet.reduce((s, o) => s + o.jumlah * o.harga, 0);
+  const penjualanReal = sales.reduce((s, x) => s + x.sudahCair, 0);
+
+  const hppPlan = biaya.reduce((s, x) => s + x.plan, 0);
+  const hppReal = biaya.reduce((s, x) => s + x.real, 0);
+  const opsPlan = ops.reduce((s, x) => s + x.plan, 0);
+  const opsReal = ops.reduce((s, x) => s + x.real, 0);
+
+  const progres = proyek.units.length
+    ? proyek.units.reduce((s, x) => s + x.progress, 0) / proyek.units.length / 100
+    : 0;
+
+  return {
+    proyek: { id: proyek.id, kode: proyek.kode, nama: proyek.nama, statusLahan: proyek.statusLahan },
+    progres,
+    biaya, ops, sales,
+    penjualanPlan, penjualanReal,
+    hppPlan, hppReal, opsPlan, opsReal,
+    labaKotorPlan: penjualanPlan - hppPlan,
+    labaKotorReal: penjualanReal - hppReal,
+    labaBersihPlan: penjualanPlan - hppPlan - opsPlan,
+    labaBersihReal: penjualanReal - hppReal - opsReal,
+    marginPlan: penjualanPlan ? (penjualanPlan - hppPlan - opsPlan) / penjualanPlan : 0,
+    marginReal: penjualanReal ? (penjualanReal - hppReal - opsReal) / penjualanReal : 0,
+  };
+}
