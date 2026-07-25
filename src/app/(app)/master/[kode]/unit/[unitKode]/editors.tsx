@@ -1,89 +1,183 @@
 "use client";
 
-import { BarisField, Field, FormModal, TombolIkon, TombolUbah } from "@/components/form";
-import { ubahBarisBoq, ubahBarisRap, ubahUpahRap } from "../../../actions";
+import { BarisField, Field, FormModal, TombolHapus, TombolTambah, TombolUbah } from "@/components/form";
+import { BoqTable, type BarisBoqUI } from "@/components/boq-table";
+import { RapTable, type BarisRapUI } from "@/components/rap-table";
+import { STATUS_JUAL, STATUS_PEMBANGUNAN } from "@/lib/domain/enums";
+import { ubahUnit } from "../../../actions";
+import {
+  hapusKerjaTambah, simpanBoqKerjaTambah, simpanBoqUnit,
+  simpanRapKerjaTambah, simpanRapUnit, tambahKerjaTambah,
+} from "../../../tabel-actions";
 
-export function EditBarisBoq({
-  data,
+/* ===================== DESKRIPSI UNIT ===================== */
+
+export function EditDeskripsiUnit({
+  unit,
+  fases,
+  tipes,
 }: {
-  data: {
-    id: string; uraian: string; satuan: string; volume: number;
-    hargaSatuan: number; spesifikasi: string | null;
+  unit: {
+    id: string; nomor: number; luasTanah: number; phaseId: string; unitTypeId: string;
+    statusPembangunan: string; statusJual: string; progress: number;
   };
+  fases: { id: string; kode: string }[];
+  tipes: { id: string; nama: string; luasBangunan: number }[];
 }) {
   return (
     <FormModal
-      judul="Ubah baris BOQ"
-      keterangan="Perubahan hanya berlaku untuk unit ini. Unit lain memiliki salinan barisnya sendiri."
-      aksi={ubahBarisBoq}
-      pemicu={(buka) => <TombolIkon onClick={buka} judul={`Ubah ${data.uraian}`} />}
-      lebar={620}
-    >
-      <input type="hidden" name="id" value={data.id} />
-      <BarisField kolom={1}>
-        <Field label="Uraian pekerjaan" nama="uraian" nilai={data.uraian} wajib />
-      </BarisField>
-      <BarisField kolom={3}>
-        <Field label="Satuan" nama="satuan" nilai={data.satuan} wajib />
-        <Field label="Volume" nama="volume" nilai={data.volume} tipe="number" wajib />
-        <Field label="Harga satuan" nama="hargaSatuan" nilai={data.hargaSatuan} tipe="number" satuan="Rp" wajib />
-      </BarisField>
-      <BarisField kolom={1}>
-        <Field label="Spesifikasi" nama="spesifikasi" nilai={data.spesifikasi} tipe="textarea" />
-      </BarisField>
-    </FormModal>
-  );
-}
-
-export function EditBarisRap({
-  data,
-}: {
-  data: {
-    id: string; nama: string; satuan: string; volume: number;
-    hargaSatuan: number; keterangan: string | null;
-  };
-}) {
-  return (
-    <FormModal
-      judul="Ubah baris RAP"
-      keterangan="Rincian material untuk unit ini."
-      aksi={ubahBarisRap}
-      pemicu={(buka) => <TombolIkon onClick={buka} judul={`Ubah ${data.nama}`} />}
-      lebar={620}
-    >
-      <input type="hidden" name="id" value={data.id} />
-      <BarisField kolom={1}>
-        <Field label="Nama material" nama="nama" nilai={data.nama} wajib />
-      </BarisField>
-      <BarisField kolom={3}>
-        <Field label="Satuan" nama="satuan" nilai={data.satuan} wajib />
-        <Field label="Volume" nama="volume" nilai={data.volume} tipe="number" wajib />
-        <Field label="Harga satuan" nama="hargaSatuan" nilai={data.hargaSatuan} tipe="number" satuan="Rp" wajib />
-      </BarisField>
-      <BarisField kolom={1}>
-        <Field label="Keterangan" nama="keterangan" nilai={data.keterangan} />
-      </BarisField>
-    </FormModal>
-  );
-}
-
-export function EditUpahDanHarga({
-  data,
-}: {
-  data: { id: string; rapUpah: number; hargaJual: number };
-}) {
-  return (
-    <FormModal
-      judul="Ubah upah RAP & harga jual"
-      keterangan="Upah tenaga kerja adalah pasangan dari rincian material pada RAP."
-      aksi={ubahUpahRap}
+      judul="Ubah Deskripsi Unit"
+      aksi={ubahUnit}
       pemicu={(buka) => <TombolUbah onClick={buka} />}
+      lebar={600}
     >
-      <input type="hidden" name="id" value={data.id} />
+      <input type="hidden" name="id" value={unit.id} />
+
       <BarisField>
-        <Field label="Upah tenaga kerja (RAP)" nama="rapUpah" nilai={data.rapUpah} tipe="number" satuan="Rp" />
-        <Field label="Harga jual" nama="hargaJual" nilai={data.hargaJual} tipe="number" satuan="Rp" />
+        <Field label="Nomor Unit" nama="nomor" nilai={unit.nomor} tipe="number" wajib />
+        <div>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>Fase</label>
+          <select name="phaseId" className="inp" defaultValue={unit.phaseId}>
+            {fases.map((f) => (
+              <option key={f.id} value={f.id}>{f.kode}</option>
+            ))}
+          </select>
+        </div>
+      </BarisField>
+
+      <BarisField>
+        <div>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>Tipe Unit</label>
+          <select name="unitTypeId" className="inp" defaultValue={unit.unitTypeId}>
+            {tipes.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.nama} · LB {t.luasBangunan} m²
+              </option>
+            ))}
+          </select>
+        </div>
+        <Field label="Luas Tanah" nama="luasTanah" nilai={unit.luasTanah} tipe="number" satuan="m²" wajib />
+      </BarisField>
+
+      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: "0 0 14px" }}>
+        Tipe menentukan luas bangunan dan dokumen. Luas tanah diisi per unit karena
+        bisa berbeda meski tipenya sama. Mengubah tipe tidak menghitung ulang baris
+        BOQ dan RAP unit ini — keduanya salinan milik unit.
+      </p>
+
+      <BarisField>
+        <Field label="Status Bangun" nama="statusPembangunan" nilai={unit.statusPembangunan} pilihan={STATUS_PEMBANGUNAN} />
+        <Field label="Status Jual" nama="statusJual" nilai={unit.statusJual} pilihan={STATUS_JUAL} />
+      </BarisField>
+
+      <BarisField kolom={1}>
+        <Field label="Progres" nama="progress" nilai={unit.progress} tipe="number" satuan="%" />
       </BarisField>
     </FormModal>
+  );
+}
+
+/* ===================== KERJA TAMBAH ===================== */
+
+export function TambahKerjaTambah({ unitId }: { unitId: string }) {
+  return (
+    <FormModal
+      judul="Tambah Kerja Tambah"
+      aksi={tambahKerjaTambah}
+      labelSimpan="Buat Kerja Tambah"
+      pemicu={(buka) => <TombolTambah onClick={buka} label="Tambah Kerja Tambah" />}
+    >
+      <input type="hidden" name="unitId" value={unitId} />
+      <BarisField kolom={1}>
+        <Field label="Judul Kerja Tambah" nama="judul" wajib petunjuk="mis. Kanopi carport & pagar depan" />
+      </BarisField>
+      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+        Satu unit boleh punya beberapa kerja tambah. Tiap kerja tambah punya dokumen
+        sendiri (Desain, 3D Model, Gambar Kerja) serta tabel BOQ dan RAP-nya sendiri.
+      </p>
+    </FormModal>
+  );
+}
+
+export function HapusKerjaTambah({ id, judul }: { id: string; judul: string }) {
+  return <TombolHapus aksi={hapusKerjaTambah} id={id} nama={judul} />;
+}
+
+/* ===================== TABEL ===================== */
+
+export function TabelBoqUnit({
+  unitId, baris, bolehHarga, bolehUbah, konteks, judul,
+}: {
+  unitId: string; baris: BarisBoqUI[]; bolehHarga: boolean;
+  bolehUbah: boolean; konteks: string; judul: string;
+}) {
+  return (
+    <BoqTable
+      judul={judul}
+      baris={baris}
+      bolehHarga={bolehHarga}
+      bolehUbah={bolehUbah}
+      konteksImpor={konteks}
+      aksiSimpan={(json) => simpanBoqUnit(unitId, json)}
+    />
+  );
+}
+
+export function TabelRapUnit({
+  unitId, baris, upah, bolehHarga, bolehUbah, konteks, keterangan,
+}: {
+  unitId: string; baris: BarisRapUI[]; upah: number; bolehHarga: boolean;
+  bolehUbah: boolean; konteks: string; keterangan: string;
+}) {
+  return (
+    <RapTable
+      judul="RAP Unit · rincian material & upah"
+      keterangan={keterangan}
+      baris={baris}
+      upah={upah}
+      bolehHarga={bolehHarga}
+      bolehUbah={bolehUbah}
+      konteksImpor={konteks}
+      aksiSimpan={(json) => simpanRapUnit(unitId, json)}
+    />
+  );
+}
+
+export function TabelBoqKt({
+  ktId, judul, baris, bolehHarga, bolehUbah, konteks,
+}: {
+  ktId: string; judul: string; baris: BarisBoqUI[];
+  bolehHarga: boolean; bolehUbah: boolean; konteks: string;
+}) {
+  return (
+    <BoqTable
+      judul={`Tabel RAB Kerja Tambah · ${judul}`}
+      baris={baris}
+      bolehHarga={bolehHarga}
+      bolehUbah={bolehUbah}
+      konteksImpor={konteks}
+      grupBaru="Kerja Tambah"
+      aksiSimpan={(json) => simpanBoqKerjaTambah(ktId, json)}
+    />
+  );
+}
+
+export function TabelRapKt({
+  ktId, judul, baris, upah, bolehHarga, bolehUbah, konteks,
+}: {
+  ktId: string; judul: string; baris: BarisRapUI[]; upah: number;
+  bolehHarga: boolean; bolehUbah: boolean; konteks: string;
+}) {
+  return (
+    <RapTable
+      judul={`RAP Kerja Tambah · ${judul}`}
+      keterangan={`Rencana Anggaran Pelaksana — ${judul}`}
+      baris={baris}
+      upah={upah}
+      bolehHarga={bolehHarga}
+      bolehUbah={bolehUbah}
+      konteksImpor={konteks}
+      aksiSimpan={(json) => simpanRapKerjaTambah(ktId, json)}
+    />
   );
 }

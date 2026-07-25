@@ -453,6 +453,8 @@ model Infrastructure {
   status    String @default("Belum terbangun")
   progress  Int    @default(0)
   rab       Float
+  /// Upah tenaga kerja pada RAP (material ada di InfrastructureRapItem)
+  rapUpah   Float  @default(0)
 
   docModel3dId     String?
   docGambarKerjaId String?
@@ -462,10 +464,29 @@ model Infrastructure {
   docGambarKerja Document? @relation("InfraGambarKerja", fields: [docGambarKerjaId], references: [id])
 
   boqItems        InfrastructureBoqItem[]
+  rapItems        InfrastructureRapItem[]
   progressRecords ProgressRecord[]
   contractItems   ContractInfrastructure[]
 
   @@map("infrastructures")
+}
+
+/// SNAPSHOT rincian material RAP milik satu item sarana/prasarana.
+model InfrastructureRapItem {
+  id               String  @id @default(cuid())
+  infrastructureId String
+  grup             String
+  nama             String
+  satuan           String
+  volume           Float
+  hargaSatuan      Float
+  keterangan       String?
+  urutan           Int     @default(0)
+
+  infrastructure Infrastructure @relation(fields: [infrastructureId], references: [id], onDelete: Cascade)
+
+  @@index([infrastructureId])
+  @@map("infrastructure_rap_items")
 }
 
 model InfrastructureBoqItem {

@@ -123,6 +123,44 @@ export function kelompokkanRap<T extends { grup: string; volume: number; hargaSa
 }
 
 /**
+ * RAP kasar untuk pekerjaan yang belum punya rincian material sendiri —
+ * kerja tambah dan sarana/prasarana.
+ *
+ * Dari total, 62% dianggap material dan sisanya upah. Material lalu dipecah
+ * ke tiga kelompok besar. Angka ini hanya titik awal yang wajar; setelah
+ * disunting lewat aplikasi, rinciannya menjadi milik pekerjaan itu sendiri.
+ */
+export function rapGenerik(total: number): { upah: number; items: BarisRap[] } {
+  const material = Math.round(total * 0.62);
+  const struktur = Math.round(material * 0.46);
+  const finishing = Math.round(material * 0.34);
+
+  return {
+    upah: total - material,
+    items: [
+      {
+        grup: "Material Struktur & Dinding",
+        nama: "Bata ringan, semen, pasir, besi",
+        satuan: "ls", volume: 1, hargaSatuan: struktur, keterangan: null, urutan: 0,
+      },
+      {
+        grup: "Material Finishing",
+        nama: "Keramik, cat, plafon",
+        satuan: "ls", volume: 1, hargaSatuan: finishing, keterangan: null, urutan: 1,
+      },
+      {
+        grup: "Material MEP & Lain-lain",
+        nama: "Pipa, kabel, aksesoris",
+        // Sisa dihitung dari pengurangan, bukan persentase, supaya jumlah
+        // ketiganya persis sama dengan nilai material.
+        satuan: "ls", volume: 1, hargaSatuan: material - struktur - finishing,
+        keterangan: null, urutan: 2,
+      },
+    ],
+  };
+}
+
+/**
  * BOQ standar untuk item sarana/prasarana yang belum punya rincian sendiri.
  * Dipecah proporsional dari nilai RAB-nya.
  */

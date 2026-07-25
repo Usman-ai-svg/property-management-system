@@ -6,7 +6,7 @@ import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
 } from "@/lib/actions/guard";
-import { bolehUbah } from "@/lib/auth/rbac";
+import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
 import {
   JENIS_SARPRAS, STATUS_JUAL, STATUS_PEMBANGUNAN, STATUS_SARPRAS,
 } from "@/lib/domain/enums";
@@ -327,12 +327,50 @@ export async function ubahUnit(_s: HasilAksi | null, form: FormData): Promise<Ha
 
     const pengguna = await izinkan("progress", lama.projectId);
 
-    const baru = {
+    const baru: {
+      statusPembangunan: string; statusJual: string; progress: number; luasTanah: number;
+      nomor?: number; phaseId?: string; unitTypeId?: string; kode?: string;
+    } = {
       statusPembangunan: pilihan(form, "statusPembangunan", STATUS_PEMBANGUNAN),
       statusJual: pilihan(form, "statusJual", STATUS_JUAL),
       progress: angka(form, "progress", { min: 0, max: 100 }),
       luasTanah: angka(form, "luasTanah", { min: 1, wajib: true }),
     };
+
+    // Nomor, fase, dan tipe hanya ikut bila formulir mengirimnya — daftar unit
+    // hanya menyunting status, sedangkan halaman detail menyunting semuanya.
+    const phaseId = teksOpsional(form, "phaseId");
+    const unitTypeId = teksOpsional(form, "unitTypeId");
+    const nomorIsian = String(form.get("nomor") ?? "").trim();
+
+    if (phaseId || unitTypeId || nomorIsian) {
+      // Mengubah tipe TIDAK menghitung ulang baris BOQ/RAP unit ini. Baris
+      // tersebut adalah snapshot; yang berubah hanya rujukan tipenya.
+      const [fase, tipe] = await Promise.all([
+        phaseId
+          ? prisma.phase.findUnique({ where: { id: phaseId }, select: { id: true, kode: true, projectId: true } })
+          : null,
+        unitTypeId
+          ? prisma.unitType.findUnique({ where: { id: unitTypeId }, select: { id: true, projectId: true } })
+          : null,
+      ]);
+      if (phaseId && (!fase || fase.projectId !== lama.projectId)) throw new GagalIzin("Fase tidak sah.");
+      if (unitTypeId && (!tipe || tipe.projectId !== lama.projectId)) throw new GagalIzin("Tipe unit tidak sah.");
+
+      const nomor = nomorIsian ? angka(form, "nomor", { min: 1 }) : lama.nomor;
+      const kodeFase = fase?.kode ?? lama.phase.kode;
+      const kodeBaru = `${lama.project.kode}-${kodeFase}-${nomor}`;
+
+      if (kodeBaru !== lama.kode) {
+        const bentrok = await prisma.unit.findUnique({ where: { kode: kodeBaru }, select: { id: true } });
+        if (bentrok) throw new GagalIzin(`Unit ${kodeBaru} sudah ada. Pakai nomor atau fase lain.`);
+        baru.kode = kodeBaru;
+      }
+
+      baru.nomor = nomor;
+      if (fase) baru.phaseId = fase.id;
+      if (tipe) baru.unitTypeId = tipe.id;
+    }
 
     await prisma.unit.update({ where: { id }, data: baru });
 
@@ -354,6 +392,8 @@ export async function ubahUnit(_s: HasilAksi | null, form: FormData): Promise<Ha
       label: {
         statusPembangunan: "Status bangun", statusJual: "Status jual",
         progress: "Progres", luasTanah: "Luas tanah",
+        nomor: "Nomor unit", kode: "Kode unit",
+        phaseId: "Fase", unitTypeId: "Tipe unit",
       },
       format: { progress: (v) => `${v}%` },
     });
@@ -629,6 +669,30 @@ export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promis
       if (!p) throw new GagalIzin("Proyek tidak ditemukan.");
       projectId = p.id;
       kodeProyek = p.kode;
+    } else if (pemilikJenis === "tipeUnit") {
+      const t = await prisma.unitType.findUnique({
+        where: { id: pemilikId },
+        select: { id: true, projectId: true, project: { select: { kode: true } } },
+      });
+      if (!t) throw new GagalIzin("Tipe unit tidak ditemukan.");
+      projectId = t.projectId;
+      kodeProyek = t.project.kode;
+    } else if (pemilikJenis === "kerjaTambah") {
+      const k = await prisma.customWork.findUnique({
+        where: { id: pemilikId },
+        select: { id: true, unit: { select: { projectId: true, project: { select: { kode: true } } } } },
+      });
+      if (!k) throw new GagalIzin("Kerja tambah tidak ditemukan.");
+      projectId = k.unit.projectId;
+      kodeProyek = k.unit.project.kode;
+    } else if (pemilikJenis === "sarpras") {
+      const s = await prisma.infrastructure.findUnique({
+        where: { id: pemilikId },
+        select: { id: true, projectId: true, project: { select: { kode: true } } },
+      });
+      if (!s) throw new GagalIzin("Item sarpras tidak ditemukan.");
+      projectId = s.projectId;
+      kodeProyek = s.project.kode;
     } else {
       throw new GagalIzin(`Jenis pemilik dokumen "${pemilikJenis}" belum didukung.`);
     }
@@ -645,11 +709,31 @@ export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promis
       const dok = await prisma.document.create({ data: { kategori, judul: label } });
       dokId = dok.id;
 
-      // Tautkan dokumen baru ke pemiliknya.
+      // Tautkan dokumen baru ke pemiliknya. Nama kolomnya berbeda-beda, jadi
+      // dipetakan secara eksplisit alih-alih dibangun dari string.
+      const kolomTipe: Record<string, "docModel3dId" | "docGambarKerjaId" | "docRenderId" | "docSpekId"> = {
+        model3d: "docModel3dId", gambarKerja: "docGambarKerjaId",
+        render: "docRenderId", spek: "docSpekId",
+      };
+      const kolomKt: Record<string, "docDesainId" | "docModel3dId" | "docGambarKerjaId"> = {
+        desain: "docDesainId", model3d: "docModel3dId", gambarKerja: "docGambarKerjaId",
+      };
+
       if (pemilikJenis === "legalitas") {
         await prisma.legality.update({ where: { id: pemilikId }, data: { dokumenId: dokId } });
       } else if (pemilikJenis === "proyek") {
         await prisma.project.update({ where: { id: pemilikId }, data: { analisaDocId: dokId } });
+      } else if (pemilikJenis === "tipeUnit") {
+        const kolom = kolomTipe[kategori];
+        if (!kolom) throw new GagalIzin(`Kategori dokumen "${kategori}" tidak dikenal untuk tipe unit.`);
+        await prisma.unitType.update({ where: { id: pemilikId }, data: { [kolom]: dokId } });
+      } else if (pemilikJenis === "kerjaTambah") {
+        const kolom = kolomKt[kategori];
+        if (!kolom) throw new GagalIzin(`Kategori dokumen "${kategori}" tidak dikenal untuk kerja tambah.`);
+        await prisma.customWork.update({ where: { id: pemilikId }, data: { [kolom]: dokId } });
+      } else if (pemilikJenis === "sarpras") {
+        const kolom = kategori === "model3d" ? "docModel3dId" : "docGambarKerjaId";
+        await prisma.infrastructure.update({ where: { id: pemilikId }, data: { [kolom]: dokId } });
       }
     }
 
@@ -674,6 +758,30 @@ export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promis
 
     segarkan(kodeProyek);
     return `Revisi R${revisiBerikutnya} tercatat. Berkas belum ikut tersimpan pada demo ini.`;
+  });
+}
+
+/**
+ * Impor tabel dari Excel.
+ *
+ * PERAGAAN: berkas belum dibaca. Percobaan impor dicatat ke jejak audit
+ * supaya alurnya bisa dinilai lebih dulu sebelum pembacaan berkas dibangun.
+ */
+export async function imporPeragaan(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const jenis = teks(form, "jenis", true);
+    const konteks = teks(form, "konteks", true);
+
+    const pengguna = await ambilPengguna();
+    if (!pengguna) throw new GagalIzin("Sesi Anda sudah berakhir. Silakan masuk kembali.");
+
+    await catat({
+      pengguna, objek: `${konteks} · ${jenis}`,
+      aksi: "Impor dari Excel",
+      ke: "percobaan impor — berkas belum diproses",
+    });
+
+    return "Alur impor tercatat. Pembacaan berkas Excel belum aktif pada demo ini.";
   });
 }
 

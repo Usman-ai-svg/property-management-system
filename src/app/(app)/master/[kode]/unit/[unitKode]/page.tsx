@@ -2,10 +2,20 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
-import { kelompokkanRap, totalBaris } from "@/lib/calc/boq";
-import { pct, rp } from "@/lib/format";
-import { Badge, JudulHalaman, Kpi, Terbatas, WARNA_STATUS } from "@/components/ui";
-import { EditBarisBoq, EditBarisRap, EditUpahDanHarga } from "./editors";
+import { Badge, CardHead, InfoRow, Terbatas, WARNA_STATUS } from "@/components/ui";
+import { FileRow } from "@/components/file-row";
+import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
+import { rp } from "@/lib/format";
+import {
+  EditDeskripsiUnit, HapusKerjaTambah, TabelBoqKt, TabelBoqUnit,
+  TabelRapKt, TabelRapUnit, TambahKerjaTambah,
+} from "./editors";
+
+const pilihVersi = {
+  select: { revisi: true, namaFile: true, ukuranByte: true, diunggahPada: true },
+  orderBy: { diunggahPada: "desc" as const },
+};
+const pilihDokumen = { select: { id: true, kategori: true, versions: pilihVersi } };
 
 export default async function RincianUnit({
   params,
@@ -18,50 +28,79 @@ export default async function RincianUnit({
   const { kode, unitKode } = await params;
   const kodeProyek = kode.toUpperCase();
 
-  // Halaman ini seluruhnya berisi angka harga. Peran yang tidak berhak tidak
-  // diberi versi "kosong" — halamannya memang tidak ada untuk mereka.
-  if (!bolehLihat(pengguna, "hargaRabRap")) {
-    return (
-      <div style={{ padding: "26px 28px 40px" }}>
-        <Link href={`/master/${kodeProyek}`} style={{ fontSize: 12, color: "var(--muted)", textDecoration: "none" }}>
-          ← {kodeProyek}
-        </Link>
-        <div style={{ marginTop: 16 }}>
-          <Terbatas apa="Rincian RAB dan RAP unit" />
-        </div>
-      </div>
-    );
-  }
+  const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
+  const ubahHarga = bolehUbah(pengguna, "hargaRabRap");
+  const ubahData = bolehUbah(pengguna, "daftarUnit");
+  const ubahProgres = bolehUbah(pengguna, "progress");
+  const ubahTeknis = bolehUbah(pengguna, "dokumenTeknis");
+  const bolehDokumen = bolehLihat(pengguna, "dokumenTeknis");
 
   const unit = await prisma.unit.findUnique({
     where: { kode: decodeURIComponent(unitKode).toUpperCase() },
     select: {
       id: true, kode: true, nomor: true, luasTanah: true, projectId: true,
+      phaseId: true, unitTypeId: true,
       statusPembangunan: true, statusJual: true, progress: true,
-      hargaJual: true, rapUpah: true,
       phase: { select: { kode: true } },
-      project: { select: { kode: true, nama: true } },
-      unitType: { select: { kode: true, nama: true, luasBangunan: true } },
-      boqItems: {
-        orderBy: { urutan: "asc" },
+      project: {
         select: {
-          id: true, grup: true, uraian: true, satuan: true,
-          volume: true, hargaSatuan: true, spesifikasi: true,
+          kode: true, nama: true,
+          fases: { select: { id: true, kode: true }, orderBy: { urutan: "asc" } },
+          unitTypes: {
+            select: { id: true, nama: true, luasBangunan: true },
+            orderBy: { luasBangunan: "asc" },
+          },
         },
       },
-      rapItems: {
-        orderBy: { urutan: "asc" },
+      unitType: {
         select: {
-          id: true, grup: true, nama: true, satuan: true,
-          volume: true, hargaSatuan: true, keterangan: true,
+          kode: true, nama: true, luasBangunan: true,
+          docModel3d: pilihDokumen,
+          docGambarKerja: pilihDokumen,
+          docRender: pilihDokumen,
+          docSpek: pilihDokumen,
         },
       },
+      ...(bolehHarga
+        ? {
+            hargaJual: true,
+            rapUpah: true,
+            boqItems: {
+              orderBy: { urutan: "asc" as const },
+              select: {
+                id: true, grup: true, uraian: true, satuan: true,
+                volume: true, hargaSatuan: true, spesifikasi: true,
+              },
+            },
+            rapItems: {
+              orderBy: { urutan: "asc" as const },
+              select: {
+                id: true, grup: true, nama: true, satuan: true,
+                volume: true, hargaSatuan: true, keterangan: true,
+              },
+            },
+          }
+        : {}),
       customWorks: {
+        orderBy: { judul: "asc" as const },
         select: {
           id: true, judul: true, rapUpah: true,
+          docDesain: pilihDokumen,
+          docModel3d: pilihDokumen,
+          docGambarKerja: pilihDokumen,
           boqItems: {
-            orderBy: { urutan: "asc" },
-            select: { id: true, uraian: true, satuan: true, volume: true, hargaSatuan: true, spesifikasi: true },
+            orderBy: { urutan: "asc" as const },
+            select: {
+              id: true, uraian: true, satuan: true, volume: true,
+              hargaSatuan: true, spesifikasi: true,
+            },
+          },
+          rapItems: {
+            orderBy: { urutan: "asc" as const },
+            select: {
+              id: true, grup: true, nama: true, satuan: true,
+              volume: true, hargaSatuan: true, keterangan: true,
+            },
           },
         },
       },
@@ -71,241 +110,256 @@ export default async function RincianUnit({
   if (!unit || unit.project.kode !== kodeProyek) notFound();
   if (!bolehAksesProyek(pengguna, unit.projectId)) notFound();
 
-  const bisaUbah = bolehUbah(pengguna, "hargaRabRap");
+  const kontrak = await prisma.contract.findMany({
+    where: { units: { some: { unitId: unit.id } } },
+    select: {
+      id: true, nominal: true, retensiPct: true, deskripsi: true,
+      vendor: { select: { nama: true } },
+      pembayaran: { select: { nominal: true } },
+      variationOrders: { select: { nominal: true, status: true } },
+    },
+  });
+
   const label = `${unit.phase.kode}-${unit.nomor}`;
+  const kts = unit.customWorks;
+  const konteksImpor = `Unit ${unit.nomor} · ${unit.unitType.nama}`;
 
-  const rabStandar = totalBaris(unit.boqItems);
-  const kerjaTambah = unit.customWorks.reduce((s, c) => s + totalBaris(c.boqItems), 0);
-  const rab = rabStandar + kerjaTambah;
-
-  const rapMaterial = totalBaris(unit.rapItems);
-  const rap = rapMaterial + unit.rapUpah;
-  const grupRap = kelompokkanRap(unit.rapItems);
-
-  const margin = unit.hargaJual ? (unit.hargaJual - rab) / unit.hargaJual : 0;
+  const boqItems = "boqItems" in unit ? unit.boqItems : [];
+  const rapItems = "rapItems" in unit ? unit.rapItems : [];
+  const rapUpah = "rapUpah" in unit ? unit.rapUpah : 0;
 
   return (
-    <div style={{ padding: "26px 28px 40px" }}>
-      <Link href={`/master/${kodeProyek}`} style={{ fontSize: 12, color: "var(--muted)", textDecoration: "none" }}>
-        ← {unit.project.nama}
-      </Link>
-
-      <div style={{ marginTop: 12 }}>
-        <JudulHalaman
-          judul={`Unit ${label}`}
-          keterangan={`${unit.unitType.nama} · LB ${unit.unitType.luasBangunan} m² / LT ${unit.luasTanah} m² · ${unit.kode}`}
-          kanan={
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Badge nilai={unit.statusPembangunan} peta={WARNA_STATUS.bangun} />
-              <Badge nilai={unit.statusJual} peta={WARNA_STATUS.jual} />
-            </div>
-          }
-        />
+    <div style={{ padding: 24 }}>
+      <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10 }}>
+        <Link href="/master" style={{ color: "inherit", textDecoration: "none" }}>Master Proyek</Link>
+        {" / "}
+        <Link href={`/master/${kodeProyek}`} style={{ color: "inherit", textDecoration: "none" }}>
+          {unit.project.nama}
+        </Link>
+        {" / "}
+        <b style={{ color: "var(--text)" }}>Unit {unit.nomor}</b>
       </div>
 
-      <div className="grid grid4">
-        <Kpi
-          label="RAB"
-          nilai={rp(rab)}
-          catatan={kerjaTambah > 0 ? `termasuk kerja tambah ${rp(kerjaTambah)}` : "dari baris BOQ tersimpan"}
-        />
-        <Kpi label="RAP" nilai={rp(rap)} catatan={`material ${rp(rapMaterial)} + upah ${rp(unit.rapUpah)}`} />
-        <Kpi label="Harga jual" nilai={rp(unit.hargaJual)} catatan={`margin kotor ${pct(margin, 1)}`} />
-        <Kpi label="Progres" nilai={`${unit.progress}%`} catatan={unit.statusPembangunan} />
-      </div>
-
-      {/* ---------- BOQ ---------- */}
-      <div className="sectitle" style={{ justifyContent: "space-between" }}>
-        <span>Bill of Quantity (RAB)</span>
-        {bisaUbah && (
-          <EditUpahDanHarga data={{ id: unit.id, rapUpah: unit.rapUpah, hargaJual: unit.hargaJual }} />
-        )}
-      </div>
-
-      <div className="card" style={{ padding: "10px 14px", marginBottom: 10, fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
-        Baris di bawah adalah <strong style={{ color: "var(--text)" }}>salinan milik unit ini</strong>, dibuat
-        saat unit dibentuk. Mengubahnya tidak memengaruhi unit lain, dan mengubah template harga tidak
-        memengaruhi baris ini.
-      </div>
-
-      <div className="card tablewrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Grup</th>
-              <th>Uraian</th>
-              <th>Satuan</th>
-              <th style={{ textAlign: "right" }}>Volume</th>
-              <th style={{ textAlign: "right" }}>Harga satuan</th>
-              <th style={{ textAlign: "right" }}>Subtotal</th>
-              <th style={{ textAlign: "right" }}>Bobot</th>
-              {bisaUbah && <th style={{ width: 44 }} />}
-            </tr>
-          </thead>
-          <tbody>
-            {unit.boqItems.map((b) => {
-              const sub = b.volume * b.hargaSatuan;
-              return (
-                <tr key={b.id}>
-                  <td style={{ color: "var(--muted)", fontSize: 11.5 }}>{b.grup}</td>
-                  <td>
-                    <div style={{ fontWeight: 500 }}>{b.uraian}</div>
-                    {b.spesifikasi && (
-                      <div
-                        style={{
-                          fontSize: 11, color: "var(--muted)", marginTop: 2,
-                          whiteSpace: "normal", maxWidth: 380, lineHeight: 1.45,
-                        }}
-                      >
-                        {b.spesifikasi}
-                      </div>
-                    )}
-                  </td>
-                  <td>{b.satuan}</td>
-                  <td style={{ textAlign: "right" }} className="num">
-                    {b.volume.toLocaleString("id-ID")}
-                  </td>
-                  <td style={{ textAlign: "right" }} className="num">{rp(b.hargaSatuan)}</td>
-                  <td style={{ textAlign: "right" }} className="num">{rp(sub)}</td>
-                  <td style={{ textAlign: "right" }} className="num">
-                    {rabStandar ? pct(sub / rabStandar, 1) : "—"}
-                  </td>
-                  {bisaUbah && (
-                    <td><EditBarisBoq data={b} /></td>
-                  )}
-                </tr>
-              );
-            })}
-            <tr style={{ background: "#f6f9fa", fontWeight: 600 }}>
-              <td colSpan={5}>Total RAB standar</td>
-              <td style={{ textAlign: "right" }} className="num">{rp(rabStandar)}</td>
-              <td style={{ textAlign: "right" }} className="num">100%</td>
-              {bisaUbah && <td />}
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* ---------- kerja tambah ---------- */}
-      {unit.customWorks.map((kt) => (
-        <div key={kt.id}>
-          <div className="sectitle">
-            Kerja tambah — {kt.judul}
-          </div>
-          <div className="card tablewrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Uraian</th>
-                  <th>Satuan</th>
-                  <th style={{ textAlign: "right" }}>Volume</th>
-                  <th style={{ textAlign: "right" }}>Harga satuan</th>
-                  <th style={{ textAlign: "right" }}>Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {kt.boqItems.map((b) => (
-                  <tr key={b.id}>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{b.uraian}</div>
-                      {b.spesifikasi && (
-                        <div
-                          style={{
-                            fontSize: 11, color: "var(--muted)", marginTop: 2,
-                            whiteSpace: "normal", maxWidth: 420, lineHeight: 1.45,
-                          }}
-                        >
-                          {b.spesifikasi}
-                        </div>
-                      )}
-                    </td>
-                    <td>{b.satuan}</td>
-                    <td style={{ textAlign: "right" }} className="num">{b.volume.toLocaleString("id-ID")}</td>
-                    <td style={{ textAlign: "right" }} className="num">{rp(b.hargaSatuan)}</td>
-                    <td style={{ textAlign: "right" }} className="num">{rp(b.volume * b.hargaSatuan)}</td>
-                  </tr>
-                ))}
-                <tr style={{ background: "#f6f9fa", fontWeight: 600 }}>
-                  <td colSpan={4}>Total kerja tambah</td>
-                  <td style={{ textAlign: "right" }} className="num">{rp(totalBaris(kt.boqItems))}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+      <div
+        style={{
+          display: "flex", justifyContent: "space-between", alignItems: "flex-end",
+          flexWrap: "wrap", gap: 12, marginBottom: 16,
+        }}
+      >
+        <div>
+          <div className="eyebrow">Detail Data Unit · database per unit</div>
+          <h3 className="disp" style={{ margin: "4px 0 0", fontSize: 19 }}>
+            {unit.project.nama} — Unit {unit.nomor}
+          </h3>
         </div>
-      ))}
-
-      {/* ---------- RAP ---------- */}
-      <div className="sectitle">Rencana Anggaran Pelaksanaan (RAP)</div>
-      <div className="card tablewrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Material</th>
-              <th>Satuan</th>
-              <th style={{ textAlign: "right" }}>Volume</th>
-              <th style={{ textAlign: "right" }}>Harga satuan</th>
-              <th style={{ textAlign: "right" }}>Subtotal</th>
-              {bisaUbah && <th style={{ width: 44 }} />}
-            </tr>
-          </thead>
-          <tbody>
-            {grupRap.map((g) => (
-              <>
-                <tr key={g.nama} style={{ background: "#fafcfc" }}>
-                  <td colSpan={bisaUbah ? 6 : 5} style={{ fontWeight: 600, fontSize: 11.5, color: "var(--teal)" }}>
-                    {g.nama}
-                    <span style={{ color: "var(--muted)", fontWeight: 500, marginLeft: 8 }}>
-                      {rp(g.total)}
-                    </span>
-                  </td>
-                </tr>
-                {g.items.map((r) => (
-                  <tr key={r.id}>
-                    <td style={{ paddingLeft: 22 }}>
-                      {r.nama}
-                      {r.keterangan && (
-                        <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 6 }}>
-                          ({r.keterangan})
-                        </span>
-                      )}
-                    </td>
-                    <td>{r.satuan}</td>
-                    <td style={{ textAlign: "right" }} className="num">{r.volume.toLocaleString("id-ID")}</td>
-                    <td style={{ textAlign: "right" }} className="num">{rp(r.hargaSatuan)}</td>
-                    <td style={{ textAlign: "right" }} className="num">{rp(r.volume * r.hargaSatuan)}</td>
-                    {bisaUbah && (
-                      <td>
-                        <EditBarisRap
-                          data={{
-                            id: r.id, nama: r.nama, satuan: r.satuan,
-                            volume: r.volume, hargaSatuan: r.hargaSatuan, keterangan: r.keterangan,
-                          }}
-                        />
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </>
-            ))}
-            <tr style={{ fontWeight: 600 }}>
-              <td colSpan={4}>Total material</td>
-              <td style={{ textAlign: "right" }} className="num">{rp(rapMaterial)}</td>
-              {bisaUbah && <td />}
-            </tr>
-            <tr style={{ fontWeight: 600 }}>
-              <td colSpan={4}>Upah tenaga kerja</td>
-              <td style={{ textAlign: "right" }} className="num">{rp(unit.rapUpah)}</td>
-              {bisaUbah && <td />}
-            </tr>
-            <tr style={{ background: "#f6f9fa", fontWeight: 600 }}>
-              <td colSpan={4}>Total RAP</td>
-              <td style={{ textAlign: "right" }} className="num">{rp(rap)}</td>
-              {bisaUbah && <td />}
-            </tr>
-          </tbody>
-        </table>
+        <div style={{ display: "flex", gap: 6 }}>
+          <Badge nilai={unit.statusPembangunan} peta={WARNA_STATUS.bangun} />
+          <Badge nilai={unit.statusJual} peta={WARNA_STATUS.jual} />
+        </div>
       </div>
+
+      {/* ---------- baris 1: Deskripsi | Dokumen ---------- */}
+      <div className="grid grid2">
+        <div className="card" style={{ padding: "16px 20px" }}>
+          <CardHead
+            judul="Deskripsi Unit"
+            aksi={
+              (ubahProgres || ubahData) && (
+                <EditDeskripsiUnit
+                  unit={{
+                    id: unit.id, nomor: unit.nomor, luasTanah: unit.luasTanah,
+                    phaseId: unit.phaseId, unitTypeId: unit.unitTypeId,
+                    statusPembangunan: unit.statusPembangunan,
+                    statusJual: unit.statusJual, progress: unit.progress,
+                  }}
+                  fases={unit.project.fases}
+                  tipes={unit.project.unitTypes}
+                />
+              )
+            }
+          />
+          <InfoRow label="Kode Unit" nilai={unit.kode} />
+          <InfoRow label="Fase" nilai={unit.phase.kode} />
+          <InfoRow label="Tipe" nilai={unit.unitType.nama} />
+          <InfoRow label="Luas Bangunan" nilai={`${unit.unitType.luasBangunan} m²`} />
+          <InfoRow label="Luas Tanah" nilai={`${unit.luasTanah} m²`} />
+          <InfoRow label="Progres" nilai={`${unit.progress}%`} />
+          <InfoRow
+            label="Status Bangun"
+            nilai={<Badge nilai={unit.statusPembangunan} peta={WARNA_STATUS.bangun} />}
+          />
+          <InfoRow
+            label="Status Jual"
+            nilai={<Badge nilai={unit.statusJual} peta={WARNA_STATUS.jual} />}
+          />
+        </div>
+
+        <div className="card" style={{ padding: "16px 20px" }}>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>Dokumen Unit</div>
+          {!bolehDokumen ? (
+            <Terbatas apa="Dokumen teknis" />
+          ) : (
+            <>
+              <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 6 }}>
+                Diturunkan dari Tipe Unit {unit.unitType.nama} · unggah revisi menyimpan versi lama.
+              </div>
+              {(
+                [
+                  ["3D Model", unit.unitType.docModel3d, "model3d"],
+                  ["Gambar Kerja", unit.unitType.docGambarKerja, "gambarKerja"],
+                  ["Render", unit.unitType.docRender, "render"],
+                  ["Spesifikasi Material", unit.unitType.docSpek, "spek"],
+                ] as const
+              ).map(([judul, dok, kategori]) => (
+                <FileRow
+                  key={kategori}
+                  label={judul}
+                  dokumen={dok ? { id: dok.id, kategori: dok.kategori, versi: dok.versions } : null}
+                  bolehUbah={ubahTeknis}
+                  konteks={`${judul} · Tipe ${unit.unitType.nama}`}
+                  pemilik={{ jenis: "tipeUnit", id: unit.unitTypeId, kategori }}
+                />
+              ))}
+
+              {kts.map((kt) => (
+                <div key={kt.id}>
+                  <div className="eyebrow" style={{ margin: "14px 0 4px" }}>Dokumen Kerja Tambah</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 4 }}>{kt.judul}</div>
+                  {(
+                    [
+                      ["Desain (disetujui)", kt.docDesain, "desain"],
+                      ["3D Model", kt.docModel3d, "model3d"],
+                      ["Gambar Kerja", kt.docGambarKerja, "gambarKerja"],
+                    ] as const
+                  ).map(([judul, dok, kategori]) => (
+                    <FileRow
+                      key={kategori}
+                      label={judul}
+                      dokumen={dok ? { id: dok.id, kategori: dok.kategori, versi: dok.versions } : null}
+                      bolehUbah={ubahTeknis}
+                      konteks={`${judul} · ${kt.judul}`}
+                      pemilik={{ jenis: "kerjaTambah", id: kt.id, kategori }}
+                    />
+                  ))}
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ---------- baris 2: Konfigurasi | Kontrak ---------- */}
+      <div className="grid grid2" style={{ marginTop: 16 }}>
+        <div className="card" style={{ padding: "16px 20px" }}>
+          <div
+            style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              marginBottom: 8, gap: 8,
+            }}
+          >
+            <div className="eyebrow">Konfigurasi Unit</div>
+            {kts.length > 0 ? (
+              <span className="chip" style={{ background: "#fff3df", color: "var(--amber)" }}>
+                Custom · {kts.length} kerja tambah
+              </span>
+            ) : (
+              <span className="chip" style={{ background: "#eef2f3", color: "var(--muted)" }}>
+                Default
+              </span>
+            )}
+          </div>
+
+          {kts.length === 0 && (
+            <div style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, marginBottom: 10 }}>
+              Unit Default memakai BOQ, RAB, dan RAP tipe standar tanpa tambahan.
+            </div>
+          )}
+
+          {kts.map((kt) => (
+            <div
+              key={kt.id}
+              style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                gap: 8, padding: "7px 0", borderBottom: "1px solid #eef2f3",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600 }}>{kt.judul}</div>
+                {bolehHarga && (
+                  <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
+                    {rp(kt.boqItems.reduce((s, b) => s + b.volume * b.hargaSatuan, 0))}
+                  </div>
+                )}
+              </div>
+              {ubahData && <HapusKerjaTambah id={kt.id} judul={kt.judul} />}
+            </div>
+          ))}
+
+          {ubahData && (
+            <div style={{ marginTop: 10 }}>
+              <TambahKerjaTambah unitId={unit.id} />
+            </div>
+          )}
+        </div>
+
+        <div className="card" style={{ padding: "16px 20px" }}>
+          <KontrakBacaSaja
+            daftar={kontrak}
+            bolehHarga={bolehHarga}
+            kosong="Unit ini belum tercakup kontrak vendor mana pun."
+          />
+        </div>
+      </div>
+
+      {/* ---------- RAB & RAP unit ---------- */}
+      {!bolehHarga ? (
+        <div style={{ marginTop: 16 }}>
+          <Terbatas apa="Tabel RAB dan RAP unit" />
+        </div>
+      ) : (
+        <>
+          <TabelBoqUnit
+            unitId={unit.id}
+            judul={`Tabel RAB Unit · dasar Tipe ${unit.unitType.nama}`}
+            baris={boqItems}
+            bolehHarga={bolehHarga}
+            bolehUbah={ubahHarga}
+            konteks={konteksImpor}
+          />
+
+          <TabelRapUnit
+            unitId={unit.id}
+            baris={rapItems}
+            upah={rapUpah}
+            bolehHarga={bolehHarga}
+            bolehUbah={ubahHarga}
+            konteks={konteksImpor}
+            keterangan={`Rencana Anggaran Pelaksana — Tipe ${unit.unitType.nama} (LB ${unit.unitType.luasBangunan} m²)`}
+          />
+
+          {kts.map((kt) => (
+            <div key={kt.id} style={{ marginTop: 20, paddingTop: 16, borderTop: "2px solid var(--line)" }}>
+              <TabelBoqKt
+                ktId={kt.id}
+                judul={kt.judul}
+                baris={kt.boqItems}
+                bolehHarga={bolehHarga}
+                bolehUbah={ubahHarga}
+                konteks={`Unit ${unit.nomor} · ${kt.judul}`}
+              />
+              <TabelRapKt
+                ktId={kt.id}
+                judul={kt.judul}
+                baris={kt.rapItems}
+                upah={kt.rapUpah}
+                bolehHarga={bolehHarga}
+                bolehUbah={ubahHarga}
+                konteks={`Unit ${unit.nomor} · ${kt.judul}`}
+              />
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }

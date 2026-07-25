@@ -317,6 +317,50 @@ select.inp {
   border-color: var(--line);
 }
 
+/* Tombol kecil di kepala tabel BOQ / RAP. */
+.btn-garis {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--teal);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.btn-garis:hover {
+  background: #f6f9fa;
+}
+
+.btn-utama {
+  border: none;
+  background: #fff;
+  color: var(--teal);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.btn-utama.aktif {
+  background: var(--teal);
+  color: #fff;
+  box-shadow: none;
+}
+
+.btn-utama:disabled,
+.btn-garis:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* ---------- KPI ---------- */
 .kpi {
   padding: 14px 16px;

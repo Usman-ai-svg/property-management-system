@@ -13,7 +13,7 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/lib/auth/password";
-import { buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap, rabAcuan, rapAcuan, totalBaris, boqSarprasDefault } from "../src/lib/calc/boq";
+import { buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap, rabAcuan, rapAcuan, totalBaris, boqSarprasDefault, rapGenerik } from "../src/lib/calc/boq";
 import { parseUkuran } from "../src/lib/format";
 import {
   ACL_AWAL, ACL_UBAH, ASET, BIAYA_UMUM, KERJA_TAMBAH, KONTRAK, LOG_AWAL,
@@ -75,6 +75,7 @@ async function main() {
   await prisma.unitRapItem.deleteMany();
   await prisma.unit.deleteMany();
   await prisma.infrastructureBoqItem.deleteMany();
+  await prisma.infrastructureRapItem.deleteMany();
   await prisma.infrastructure.deleteMany();
   await prisma.unitType.deleteMany();
   await prisma.phase.deleteMany();
@@ -256,16 +257,29 @@ async function main() {
 
         // Kerja tambah
         if (kt) {
+          // Kerja tambah yang belum punya rincian RAP sendiri diberi rincian
+          // kasar dari nilainya, supaya tabel RAP-nya tidak kosong dan bisa
+          // langsung disunting.
+          const generik = kt.rap ? null : rapGenerik(Math.round(nilaiTambah * 0.9));
+
           await prisma.customWork.create({
             data: {
-              unitId: u.id, judul: kt.judul, rapUpah: kt.rap?.upah ?? 0,
+              unitId: u.id, judul: kt.judul,
+              rapUpah: kt.rap?.upah ?? generik?.upah ?? 0,
               docDesainId: await buatDokumen("desain", kt.docs.desain),
               docModel3dId: await buatDokumen("model3d", kt.docs.model3d),
               docGambarKerjaId: await buatDokumen("gambarKerja", kt.docs.gambarKerja),
               boqItems: { create: kt.boq.map((b, k) => ({ uraian: b.uraian, satuan: b.sat, volume: b.vol, hargaSatuan: b.harga, spesifikasi: b.spek, urutan: k })) },
-              rapItems: kt.rap
-                ? { create: kt.rap.groups.flatMap((g, gi) => g.items.map((it, ii) => ({ grup: g.nama, nama: it.nama, satuan: it.sat, volume: it.vol, hargaSatuan: it.harga, keterangan: it.ket ?? null, urutan: gi * 100 + ii }))) }
-                : undefined,
+              rapItems: {
+                create: kt.rap
+                  ? kt.rap.groups.flatMap((g, gi) =>
+                      g.items.map((it, ii) => ({
+                        grup: g.nama, nama: it.nama, satuan: it.sat, volume: it.vol,
+                        hargaSatuan: it.harga, keterangan: it.ket ?? null, urutan: gi * 100 + ii,
+                      })),
+                    )
+                  : generik!.items,
+              },
             },
           });
         }
@@ -313,13 +327,18 @@ async function main() {
     const pid = projectId.get(kodeProyek);
     if (!pid) continue;
     for (const S of list) {
+      // RAP sarpras ditaksir 90% dari RAB, lalu dipecah jadi rincian kasar —
+      // sama seperti artifact. Sesudah tersimpan, rinciannya bisa disunting.
+      const rap = rapGenerik(Math.round(S.rab * 0.9));
+
       const s = await prisma.infrastructure.create({
         data: {
           kode: S.id, projectId: pid, nama: S.nama, jenis: S.jenis, volume: S.vol,
-          status: S.status, progress: S.progress, rab: S.rab,
+          status: S.status, progress: S.progress, rab: S.rab, rapUpah: rap.upah,
           docModel3dId: await buatDokumen("model3d", S.docs.model3d),
           docGambarKerjaId: await buatDokumen("gambarKerja", S.docs.gambarKerja),
           boqItems: { create: boqSarprasDefault(S.nama, S.jenis, S.rab) },
+          rapItems: { create: rap.items },
         },
       });
       infraId.set(S.id, s.id);

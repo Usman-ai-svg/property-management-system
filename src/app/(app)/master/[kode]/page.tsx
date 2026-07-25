@@ -406,7 +406,14 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                     const n = bolehHarga ? nilaiSarpras(s) : null;
                     return (
                       <tr key={s.id}>
-                        <td style={{ fontWeight: 600 }}>{s.nama}</td>
+                        <td>
+                          <Link
+                            href={`/master/${kodeProyek}/sarpras/${s.kode}`}
+                            style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+                          >
+                            {s.nama}
+                          </Link>
+                        </td>
                         <td style={{ color: "var(--muted)" }}>{s.jenis}</td>
                         <td>{s.volume}</td>
                         <td><Badge nilai={s.status} peta={WARNA_STATUS.bangun} /></td>
