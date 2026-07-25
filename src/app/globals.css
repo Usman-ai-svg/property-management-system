@@ -1,0 +1,384 @@
+/*
+ * Gaya global — dipindahkan dari blok CSS di dalam artifact.
+ *
+ * Perbedaan dari artifact: font tidak lagi diambil lewat @import ke Google
+ * Fonts saat halaman dibuka. next/font mengunduhnya sekali saat build dan
+ * menyajikannya dari domain sendiri — halaman tetap tampil benar tanpa
+ * koneksi keluar, dan tidak ada permintaan pihak ketiga dari browser staf.
+ */
+
+:root {
+  --ink: #12212e;
+  --ink2: #1b3040;
+  --teal: #1f4e5f;
+  --brass: #b8863b;
+  --canvas: #eef2f4;
+  --card: #fff;
+  --line: #dce4e7;
+  --red: #c0392b;
+  --green: #1c8a56;
+  --amber: #c2861a;
+  --blue: #2f6fb0;
+  --text: #1b2a33;
+  --muted: #67787f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  color: var(--text);
+  background: var(--canvas);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+.disp {
+  font-family: var(--font-grotesk), var(--font-inter), sans-serif;
+}
+
+.num {
+  font-family: var(--font-grotesk), sans-serif;
+  font-weight: 600;
+}
+
+/* ---------- kerangka ---------- */
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.side {
+  width: 238px;
+  background: var(--ink);
+  color: #cdd9de;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 14px;
+}
+
+.main {
+  flex: 1;
+  overflow: auto;
+  min-width: 0;
+}
+
+/* ---------- navigasi ---------- */
+.navitem {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #a9bcc3;
+  margin-bottom: 2px;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  text-decoration: none;
+  font-family: inherit;
+}
+
+.navitem:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.navitem.active {
+  background: var(--teal);
+  color: #fff;
+}
+
+.navitem.parent-active {
+  color: #fff;
+}
+
+.navitem.subitem {
+  padding-left: 38px;
+  font-size: 13px;
+}
+
+.roleSel {
+  appearance: none;
+  background: var(--ink2);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-family: var(--font-grotesk), sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 30px 8px 11px;
+  border-radius: 9px;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* ---------- komponen ---------- */
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.sectitle {
+  font-family: var(--font-grotesk), sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 26px 0 12px;
+}
+
+.chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.tabbar {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  padding: 7px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  text-decoration: none;
+  display: inline-block;
+  font-family: inherit;
+}
+
+.tab.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+.pill {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  white-space: nowrap;
+  text-decoration: none;
+  font-family: inherit;
+}
+
+.pill.active {
+  background: var(--teal);
+  color: #fff;
+  border-color: var(--teal);
+}
+
+.track {
+  position: relative;
+  height: 22px;
+  background: #eef3f4;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  flex: 1 1 auto;
+  min-width: 60px;
+}
+
+.fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  transition: width 0.5s;
+}
+
+.marker {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--ink);
+}
+
+.marker::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--ink);
+}
+
+/* ---------- tabel ---------- */
+.tablewrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  background: #fff;
+  white-space: nowrap;
+}
+
+td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eef2f3;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+tbody tr:hover {
+  background: #f6f9fa;
+}
+
+/* ---------- form ---------- */
+.inp {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  width: 100%;
+}
+
+select.inp {
+  appearance: none;
+  padding-right: 26px;
+}
+
+.btn {
+  padding: 9px 16px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--teal);
+  background: var(--teal);
+  color: #fff;
+  font-family: inherit;
+}
+
+.btn:hover {
+  background: #1a4251;
+}
+
+.btn.ghost {
+  background: #fff;
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+/* ---------- KPI ---------- */
+.kpi {
+  padding: 14px 16px;
+}
+
+.kpi .v {
+  font-family: var(--font-grotesk), sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--ink);
+  margin-top: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grid {
+  display: grid;
+  gap: 12px;
+}
+
+.grid4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.grid3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.grid2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* Pemberitahuan bahwa suatu bagian disembunyikan oleh hak akses. */
+.terbatas {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+  background: #f8fafb;
+}
+
+@media (max-width: 980px) {
+  .grid4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .shell {
+    flex-direction: column;
+  }
+  .side {
+    width: 100%;
+  }
+  .grid4,
+  .grid3,
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
+}

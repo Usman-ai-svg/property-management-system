@@ -1,0 +1,158 @@
+# Nanoland Management System
+
+Sistem manajemen pengembang properti untuk penggunaan internal. Repositori ini
+adalah **demo** — sasaran akhirnya adalah melebur ke website ERP perusahaan yang
+sudah ada.
+
+Karena itu prioritas repositori ini bukan aplikasinya, melainkan tiga hal yang
+akan ikut pindah ke ERP:
+
+1. **Model data** — `prisma/schema.prisma`
+2. **Rumus bisnis** — `src/lib/calc/`, fungsi murni tanpa dependensi framework
+3. **Aturan hak akses** — `src/lib/auth/rbac.ts`, dengan matriks izin tersimpan
+   sebagai data
+
+Tampilan sengaja diperlakukan sebagai sekali pakai.
+
+---
+
+## Menjalankan
+
+```bash
+npm install
+cp .env.example .env          # lalu isi SESSION_SECRET
+npm run db:reset              # buat database + semai data demo
+npm run dev
+```
+
+Bangkitkan `SESSION_SECRET` dengan:
+
+```bash
+openssl rand -base64 32
+```
+
+### Akun demo
+
+Kata sandi seluruh akun: `nanoland2026`
+
+| Email | Peran | Untuk memperagakan |
+|---|---|---|
+| `h.nugroho@nanoland.id` | Komisaris, BOD | akses penuh termasuk angka finansial |
+| `budi.hartono@nanoland.id` | Quantity Surveyor, Procurement | boleh harga, terbatas pada NT4 & NT2 |
+| `fajar.ramadhan@nanoland.id` | Arsitek | **tidak** boleh melihat harga |
+| `maya.larasati@nanoland.id` | Customer Care | terbatas pada NT2 saja |
+
+Masuk sebagai Arsitek lalu buka Master Proyek → Nano Town 4: kolom RAB, RAP, dan
+harga jual tidak muncul. Periksa source HTML-nya — angka itu memang tidak ada di
+sana, bukan disembunyikan dengan CSS.
+
+---
+
+## Dua koreksi terhadap prototipe
+
+Repositori ini berangkat dari prototipe satu-file `NanolandManagementSystem.jsx`
+(3.921 baris, seluruh data hardcoded). Dua hal diperbaiki karena keduanya akan
+menjadi cacat serius bila ikut terbawa ke ERP.
+
+### 1. Hak akses dipindah ke server
+
+Prototipe memakai `can(acl, role, sec)` di dalam komponen React. Data yang
+dibatasi tetap dikirim ke browser dan hanya tidak digambar — siapa pun yang
+membuka DevTools bisa membacanya. Untuk angka RAB/RAP dan business plan, itu
+kebocoran yang sesungguhnya.
+
+Sekarang `selectUnit()` menyusun klausa `SELECT` berdasarkan izin: bila peran
+tidak berhak, kolom harga dan relasi BOQ/RAP tidak ikut diambil dari database.
+Penyaringan menu di sidebar hanyalah kenyamanan — halaman yang tidak muncul di
+menu juga menolak akses langsung lewat URL.
+
+### 2. Harga BOQ di-snapshot per unit
+
+Prototipe menghitung RAB dari template global setiap kali dirender:
+
+```js
+const rabOf = (lb) => boqSum(boqOf(lb));   // selalu membaca BOQ_TPL terkini
+```
+
+Artinya mengubah satu harga satuan akan menggeser RAB **seluruh unit di seluruh
+proyek** — termasuk NT2 yang sudah selesai dan habis masa garansi sejak 2023.
+Log bawaan prototipe bahkan mencontohkan kejadian ini: QS mengubah keramik dari
+Rp 285.000 menjadi Rp 298.000/m².
+
+Sekarang template hanya dipakai saat unit **dibuat**; hasilnya disimpan ke
+`unit_boq_items`, dan RAB dihitung dari baris tersebut. Perubahan harga menjadi
+revisi baru dan tidak menyentuh riwayat.
+
+---
+
+## Susunan
+
+```
+prisma/
+  schema.prisma        30 model — acuan tabel untuk ERP
+  seed-data.ts         data demo, dipindahkan apa adanya dari artifact
+  seed.ts              penyemaian
+
+src/
+  lib/
+    calc/              rumus murni: BOQ/RAB/RAP, opname, plan vs realisasi
+    domain/            enum dan template harga
+    auth/              session, hash sandi, penegakan hak akses
+    data/              query yang sudah sadar hak akses
+  app/
+    login/             halaman masuk
+    (app)/             kerangka aplikasi + halaman
+  components/          komponen tampilan bersama
+```
+
+### Mengapa fungsi hitung dipisah
+
+`src/lib/calc/` tidak mengimpor React, Next, maupun Prisma. Tujuannya agar tim
+ERP bisa membacanya sebagai spesifikasi dan memindahkannya ke bahasa apa pun.
+Nilai keluarannya sudah diverifikasi identik dengan prototipe untuk seluruh tipe
+unit (LB 36, 45, 50, 60, dan 72).
+
+---
+
+## Catatan untuk porting ke ERP
+
+**Nilai uang memakai `Float`.** Prisma `Int` adalah 32-bit (maks ~2,1 miliar) —
+tidak cukup, karena cashflow NT4 mencapai Rp 32.010.000.000. `Float` (double)
+menyimpan bilangan bulat secara eksak sampai 2^53. Di ERP, petakan ke `BIGINT`
+atau `NUMERIC(18,2)`.
+
+**Enum ditulis sebagai `String`.** SQLite tidak mendukung enum di Prisma. Nilai
+yang sah ada di `src/lib/domain/enums.ts` dan bisa dinaikkan menjadi enum asli
+di Postgres.
+
+**Dokumen baru berupa metadata.** Tabel `documents` dan `document_versions`
+menyimpan nama file, ukuran, dan revisi — tetapi belum ada object storage. Saat
+diaktifkan, berkas harus masuk S3/R2 (berkas `.skp` di proyek ini berukuran
+24–38 MB, jangan sekali-kali disimpan di database), dengan unggah memakai
+presigned PUT dan unduh memakai presigned GET ber-TTL pendek setelah hak akses
+diperiksa.
+
+**Pindah ke Postgres:** ubah `provider` di `prisma/schema.prisma`, ganti adapter
+di `src/lib/db.ts` dan `prisma.config.ts` dengan `@prisma/adapter-pg`, lalu
+sesuaikan `DATABASE_URL`.
+
+**Lapisan auth sengaja minimal.** `src/lib/auth/session.ts` sekitar 60 baris
+memakai `jose`, dan hash sandi memakai `scrypt` bawaan Node. Tidak ada
+dependensi auth pihak ketiga, supaya saat dilebur ke ERP lapisan ini tinggal
+dibuang dan diganti mekanisme milik ERP tanpa menyentuh bagian lain.
+
+---
+
+## Yang belum dikerjakan
+
+Modul Konstruksi, Keuangan Proyek, Vendor, Equipment, Landbank, Plan vs
+Realisasi, dan Admin baru berupa halaman penanda. Model data dan rumusnya sudah
+tersedia — yang tersisa membangun tampilannya, mengikuti pola pada
+`src/app/(app)/master/[kode]/page.tsx`.
+
+Yang juga masih terbuka:
+
+- Server Action untuk mengubah data (saat ini seluruh halaman baca-saja)
+- Pencatatan `audit_logs` saat perubahan terjadi (tabelnya sudah ada)
+- Object storage untuk dokumen
+- Pengujian otomatis untuk fungsi di `src/lib/calc/`
