@@ -1,15 +1,213 @@
-import { Segera } from "@/components/segera";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { prisma } from "@/lib/db";
+import { ambilPengguna, bolehUbah, filterProyek } from "@/lib/auth/rbac";
+import { keuanganPerProyek, komposisi, trenBulanan, WARNA_JENIS } from "@/lib/data/keuangan";
+import { rp, rpRingkas, tanggal } from "@/lib/format";
+import { Donut, LegendaDonut, RvsRAP, TrenChart } from "@/components/charts";
+import { TabelHead } from "@/components/ui";
+import { CatatPengeluaran } from "./catat";
 
-export default function Keuangan() {
+export default async function DashboardKeuangan({
+  searchParams,
+}: {
+  searchParams: Promise<{ donat?: string }>;
+}) {
+  const pengguna = await ambilPengguna();
+  if (!pengguna) redirect("/login");
+
+  const { donat = "jenis" } = await searchParams;
+  const mode = donat === "peruntukan" ? "peruntukan" : "jenis";
+
+  const [proyek, tren, expenses] = await Promise.all([
+    keuanganPerProyek(pengguna),
+    trenBulanan(pengguna),
+    prisma.expense.findMany({
+      where: { project: filterProyek(pengguna) },
+      orderBy: { tanggal: "desc" },
+      select: {
+        id: true, tanggal: true, jenis: true, peruntukan: true, total: true,
+        uraian: true, pic: true,
+        project: { select: { nama: true } },
+      },
+    }),
+  ]);
+
+  const bolehCatat = bolehUbah(pengguna, "keuangan");
+
+  const proyekUntukForm = bolehCatat
+    ? await prisma.project.findMany({
+        where: filterProyek(pengguna),
+        orderBy: { kode: "asc" },
+        select: {
+          id: true, nama: true,
+          units: {
+            orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
+            select: { id: true, nomor: true, phase: { select: { kode: true } } },
+          },
+        },
+      })
+    : [];
+
+  const batas = new Date(Date.now() - 30 * 864e5);
+  const total30 = expenses.filter((e) => e.tanggal >= batas).reduce((s, e) => s + e.total, 0);
+
+  const aktif = proyek.filter((p) => p.status === "Dalam Pembangunan").length;
+  const over = proyek.filter((p) => p.rap && p.realisasi / p.rap > 1).length;
+  const komp = komposisi(expenses, mode);
+
+  const kpi: [string, string][] = [
+    ["Total Pengeluaran (30 hari)", rp(total30)],
+    ["Proyek Aktif", `${aktif} / ${proyek.length}`],
+    ["Melebihi RAP", String(over)],
+    ["Kategori Terbesar", komp[0]?.label ?? "—"],
+  ];
+
   return (
-    <Segera
-      judul="Keuangan Proyek"
-      keterangan="Realisasi biaya operasional per proyek, unit, dan jenis pengeluaran."
-      tersedia={[
-        "Tabel expenses — 554 transaksi tersemai, tertaut ke proyek dan unit",
-        "Pos HPP pada tiap transaksi, siap dibandingkan dengan business plan",
-        "statusSerapan() untuk menandai pengeluaran yang mendahului progres fisik",
-      ]}
-    />
+    <div style={{ padding: 24 }}>
+      <div
+        style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          flexWrap: "wrap", gap: 10, marginBottom: 8,
+        }}
+      >
+        <div>
+          <div className="eyebrow">Manajemen Proyek · Keuangan Proyek</div>
+          <h2 className="disp" style={{ margin: "4px 0 0", fontSize: 20 }}>Keuangan Proyek</h2>
+        </div>
+        {bolehCatat && (
+          <CatatPengeluaran
+            proyek={proyekUntukForm.map((p) => ({
+              id: p.id, nama: p.nama,
+              units: p.units.map((u) => ({ id: u.id, label: `${u.phase.kode}-${u.nomor}` })),
+            }))}
+          />
+        )}
+      </div>
+
+      <div className="grid grid4" style={{ marginTop: 16 }}>
+        {kpi.map(([label, nilai]) => (
+          <div key={label} className="card kpi">
+            <div className="eyebrow">{label}</div>
+            <div className="v" style={{ fontSize: 15 }}>{nilai}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card" style={{ padding: "16px 20px", marginTop: 16 }}>
+        <div className="eyebrow" style={{ marginBottom: 6 }}>Tren Pengeluaran · 12 bulan</div>
+        <TrenChart data={tren} />
+      </div>
+
+      <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
+        <TabelHead
+          judul="Pengeluaran per Proyek"
+          keterangan="Klik nama proyek untuk membuka rincian pengeluarannya · diurut dari yang paling boros."
+        />
+        <div className="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Proyek</th>
+                <th style={{ textAlign: "right" }}>Nilai Kontrak</th>
+                <th style={{ textAlign: "right" }}>RAP</th>
+                <th style={{ textAlign: "right" }}>Realisasi</th>
+                <th style={{ minWidth: 210 }}>% vs RAP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...proyek]
+                .filter((p) => p.jumlahUnit)
+                .sort((a, b) => (b.rap ? b.realisasi / b.rap : 0) - (a.rap ? a.realisasi / a.rap : 0))
+                .map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <Link
+                        href={`/keuangan/${p.kode}`}
+                        style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+                      >
+                        {p.nama}
+                      </Link>
+                      <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
+                        {p.kode} · {p.statusLahan}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: "right" }}>{rp(p.nilaiKontrak)}</td>
+                    <td style={{ textAlign: "right", color: "var(--muted)" }}>{rp(p.rap)}</td>
+                    <td style={{ textAlign: "right" }}>{rp(p.realisasi)}</td>
+                    <td>
+                      <RvsRAP realisasi={p.realisasi} rap={p.rap} denganLabel />
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="grid grid2" style={{ marginTop: 16 }}>
+        <div className="card" style={{ padding: "16px 20px" }}>
+          <div
+            style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              marginBottom: 8, gap: 8, flexWrap: "wrap",
+            }}
+          >
+            <div className="disp" style={{ fontWeight: 600, fontSize: 15 }}>Breakdown Kategori</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              <Link href="?donat=jenis" className={"pill" + (mode === "jenis" ? " active" : "")}>Jenis</Link>
+              <Link href="?donat=peruntukan" className={"pill" + (mode === "peruntukan" ? " active" : "")}>
+                Peruntukan
+              </Link>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
+            <Donut data={komp} />
+            <LegendaDonut data={komp} />
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: "16px 20px" }}>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Aktivitas Terbaru</div>
+          <div style={{ maxHeight: 300, overflow: "auto" }}>
+            {expenses.slice(0, 8).map((e) => (
+              <div
+                key={e.id}
+                style={{
+                  display: "grid", gridTemplateColumns: "34px 1fr auto", gap: 10,
+                  alignItems: "center", padding: "8px 0", borderBottom: "1px solid #eef2f3",
+                }}
+              >
+                <div
+                  style={{
+                    width: 30, height: 30, borderRadius: 8, background: "var(--ink)",
+                    color: "#fff", display: "grid", placeItems: "center",
+                    fontSize: 10, fontWeight: 600,
+                  }}
+                >
+                  {(e.pic ?? "—").split(" ").map((x) => x[0]).join("").slice(0, 2)}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5 }}>
+                    <b>{(e.pic ?? "Seseorang").split(" ")[0]}</b> mencatat {e.uraian}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                    {e.project.nama} ·{" "}
+                    <span style={{ color: WARNA_JENIS[e.jenis] ?? "var(--muted)" }}>■</span> {e.jenis}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div className="num" style={{ fontSize: 12.5 }}>{rpRingkas(e.total)}</div>
+                  <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{tanggal(e.tanggal)}</div>
+                </div>
+              </div>
+            ))}
+            {expenses.length === 0 && (
+              <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Belum ada pengeluaran tercatat.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

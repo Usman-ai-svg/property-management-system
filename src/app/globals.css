@@ -280,6 +280,30 @@ tbody tr:hover {
   background: #f6f9fa;
 }
 
+/*
+ * Kolom beku pada tabel opname mingguan.
+ *
+ * Tabel itu punya sembilan kolom angka di kanan; tanpa membekukan uraian
+ * pekerjaan, pembaca kehilangan konteks begitu menggeser ke kanan.
+ */
+.frz {
+  position: sticky;
+  background: #fff;
+  z-index: 2;
+}
+
+thead .frz {
+  z-index: 3;
+}
+
+.frzedge {
+  box-shadow: 1px 0 0 var(--line);
+}
+
+tbody tr:hover .frz {
+  background: #f6f9fa;
+}
+
 /* ---------- form ---------- */
 .inp {
   border: 1px solid var(--line);

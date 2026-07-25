@@ -18,7 +18,7 @@ import { parseUkuran } from "../src/lib/format";
 import {
   ACL_AWAL, ACL_UBAH, ASET, BIAYA_UMUM, KERJA_TAMBAH, KONTRAK, LOG_AWAL,
   PORSI_BIAYA_UNIT, POS_HPP, PROYEK, ROLE_GRUP, SARPRAS, SEMUA_PERAN,
-  TENDER, TIPE_UNIT, USERS, VENDOR, type Dok, tgl, tglPendek,
+  TENDER, TIPE_UNIT, USERS, VENDOR, type Dok, tgl,
 } from "./seed-data";
 
 const prisma = new PrismaClient({
@@ -416,12 +416,29 @@ async function main() {
   // ---------------------------------------------------------------------
   let jmlBiaya = 0;
 
+  // Kontrak ditautkan lewat nama vendornya, seperti pada artifact.
+  const kontrakPerVendor = new Map(
+    (
+      await prisma.contract.findMany({
+        select: { id: true, projectId: true, vendor: { select: { nama: true } } },
+      })
+    ).map((k) => [`${k.projectId}|${k.vendor.nama}`, k.id]),
+  );
+
   for (const B of BIAYA_UMUM) {
+    const pid = projectId.get(B.proyek)!;
+    // Biaya yang menyebut nomor unit ditautkan ke unitnya, supaya rincian
+    // per unit di modul Keuangan tidak perlu menebak dari teks uraian.
+    const unitIdTerkait = B.unit ? unitId.get(`${B.proyek}-${B.fase}-${B.unit}`) ?? null : null;
+
     await prisma.expense.create({
       data: {
-        projectId: projectId.get(B.proyek)!, tanggal: tglPendek(B.tgl),
+        projectId: pid, unitId: unitIdTerkait, tanggal: tgl(B.tgl)!,
         peruntukan: B.peruntukan, jenis: B.jenis, metode: B.metode,
-        uraian: B.uraian, total: B.total, status: B.status, posHpp: POS_HPP[B.peruntukan],
+        uraian: B.uraian, total: B.total, status: B.status,
+        pic: B.pic, bukti: B.bukti || null,
+        posHpp: POS_HPP[B.peruntukan],
+        contractId: B.kontrak ? kontrakPerVendor.get(`${pid}|${B.kontrak}`) ?? null : null,
       },
     });
     jmlBiaya++;
