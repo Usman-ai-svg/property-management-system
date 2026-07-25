@@ -143,16 +143,55 @@ dibuang dan diganti mekanisme milik ERP tanpa menyentuh bagian lain.
 
 ---
 
+## Menyunting data
+
+Master Proyek sudah bisa diubah isinya. Setiap perubahan melewati tiga lapis:
+
+1. Tombol hanya digambar bila peran berhak — kenyamanan, bukan pengamanan.
+2. `izinkan(section, projectId)` di baris pertama Server Action — inilah yang
+   benar-benar menahan, karena Server Action bisa dipanggil langsung tanpa
+   melalui tombol mana pun.
+3. Perubahan dicatat ke `audit_logs`, satu baris per field yang berubah,
+   lengkap dengan nilai sebelum dan sesudah.
+
+Yang bisa diubah, beserta izin yang dibutuhkan:
+
+| Bagian | Izin | Catatan |
+|---|---|---|
+| Deskripsi & luas lahan | `deskripsi` | |
+| Biaya perolehan lahan | `hargaRabRap` | terpisah dari deskripsi |
+| Legalitas | `deskripsi` | tambah, ubah, hapus |
+| Tipe unit | `dokumenTeknis` | tak bisa dihapus bila masih dipakai unit |
+| Unit: status & progres | `progress` | progres tersimpan sebagai titik riwayat |
+| Unit: tambah & hapus | `daftarUnit` | unit dengan progres > 0 tidak bisa dihapus |
+| Baris BOQ & RAP | `hargaRabRap` | per unit, tidak memengaruhi unit lain |
+| Upah RAP & harga jual | `hargaRabRap` | |
+| Sarana & prasarana | `daftarSarpras` | kolom RAB butuh `hargaRabRap` terpisah |
+
+### Membuktikan snapshot bekerja
+
+Masuk sebagai `budi.hartono@nanoland.id` (Quantity Surveyor), lalu:
+
+1. Buka Master Proyek → Nano Town 4 → klik ikon roda gigi pada unit **F1-1**
+2. Ubah harga satuan "Pek. Lantai & Keramik" dari 285.000 menjadi 298.000
+3. Total RAB unit itu naik dari Rp 253.790.800 menjadi Rp 254.726.800
+4. Sekarang buka unit **F2-4** — harganya **tetap Rp 285.000**
+
+Pada prototipe, langkah 4 akan ikut berubah, begitu pula seluruh unit di NT2
+yang sudah selesai sejak 2023.
+
+---
+
 ## Yang belum dikerjakan
 
 Modul Konstruksi, Keuangan Proyek, Vendor, Equipment, Landbank, Plan vs
 Realisasi, dan Admin baru berupa halaman penanda. Model data dan rumusnya sudah
 tersedia — yang tersisa membangun tampilannya, mengikuti pola pada
-`src/app/(app)/master/[kode]/page.tsx`.
+`src/app/(app)/master/`.
 
 Yang juga masih terbuka:
 
-- Server Action untuk mengubah data (saat ini seluruh halaman baca-saja)
-- Pencatatan `audit_logs` saat perubahan terjadi (tabelnya sudah ada)
-- Object storage untuk dokumen
+- Menyunting kerja tambah (kini tampil, belum bisa diubah)
+- Unggah dokumen — perlu object storage lebih dulu
+- Halaman Admin untuk mengubah matriks hak akses lewat antarmuka
 - Pengujian otomatis untuk fungsi di `src/lib/calc/`

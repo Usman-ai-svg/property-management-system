@@ -48,8 +48,15 @@ export async function detailProyek(u: Pengguna, kode: string) {
         orderBy: { nib: "asc" as const },
       },
       unitTypes: {
-        select: { id: true, kode: true, nama: true, luasBangunan: true, luasTanah: true },
+        select: {
+          id: true, kode: true, nama: true, luasBangunan: true, luasTanah: true,
+          _count: { select: { units: true } },
+        },
         orderBy: { luasBangunan: "asc" as const },
+      },
+      fases: {
+        select: { id: true, kode: true },
+        orderBy: { urutan: "asc" as const },
       },
     },
   });
@@ -95,6 +102,7 @@ export async function detailProyek(u: Pengguna, kode: string) {
         select: {
           id: true, kode: true, nama: true, jenis: true, volume: true,
           status: true, progress: true,
+          _count: { select: { contractItems: true } },
           ...(bolehHarga ? { rab: true } : {}),
         },
       })

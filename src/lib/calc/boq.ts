@@ -106,8 +106,10 @@ export function hitungUpahRap(luasBangunan: number): number {
  * Kelompokkan baris RAP per grup untuk ditampilkan.
  * Urutan grup mengikuti kemunculan pertama, bukan alfabetis.
  */
-export function kelompokkanRap(rows: BarisRap[]): { nama: string; items: BarisRap[]; total: number }[] {
-  const peta = new Map<string, BarisRap[]>();
+export function kelompokkanRap<T extends { grup: string; volume: number; hargaSatuan: number }>(
+  rows: T[],
+): { nama: string; items: T[]; total: number }[] {
+  const peta = new Map<string, T[]>();
   for (const r of rows) {
     const list = peta.get(r.grup);
     if (list) list.push(r);
