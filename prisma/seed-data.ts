@@ -54,16 +54,22 @@ export const ACL_AWAL: Record<string, string[]> = {
   progress: ["BOD", "Head Operation Project", "Project Manager", "Supervisor", "Quantity Surveyor", "Arsitek", "Procurement"],
 };
 
-/** Peran yang boleh MENGUBAH (bukan sekadar melihat) tiap sub-bagian. */
+/**
+ * Peran yang boleh MENGUBAH (bukan sekadar melihat) tiap sub-bagian.
+ *
+ * BOD sengaja tercantum pada seluruh sub-bagian: sebagai pemegang keputusan
+ * tertinggi, BOD tidak boleh terhalang saat perlu mengoreksi apa pun. Pada
+ * artifact, BOD belum punya hak ubah atas dokumen teknis dan progres.
+ */
 export const ACL_UBAH: Record<string, string[]> = {
   deskripsi: ["BOD", "Business Development", "Head Operation Office"],
   daftarUnit: ["BOD", "Head Operation Office", "Head Operation Project", "Project Manager"],
   daftarSarpras: ["BOD", "Head Operation Office", "Head Operation Project", "Project Manager"],
-  dokumenTeknis: ["Arsitek", "Head Operation Project", "Project Manager"],
-  hargaRabRap: ["Quantity Surveyor", "Head Operation Office", "BOD"],
+  dokumenTeknis: ["BOD", "Arsitek", "Head Operation Project", "Project Manager"],
+  hargaRabRap: ["BOD", "Quantity Surveyor", "Head Operation Office"],
   businessPlan: ["BOD", "Business Development"],
-  keuangan: ["Finance", "Admin", "Head Operation Office", "BOD"],
-  progress: ["Project Manager", "Supervisor", "Head Operation Project"],
+  keuangan: ["BOD", "Finance", "Admin", "Head Operation Office"],
+  progress: ["BOD", "Project Manager", "Supervisor", "Head Operation Project"],
 };
 
 export const USERS = [

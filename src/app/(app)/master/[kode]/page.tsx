@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { MapPin } from "lucide-react";
+import { ExternalLink, MapPin } from "lucide-react";
 import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
 import { detailProyek, luasTotal, nilaiSarpras, nilaiUnit } from "@/lib/data/proyek";
 import { m2, pct, rp } from "@/lib/format";
@@ -30,8 +30,13 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
   const ubahSarprasData = bolehUbah(pengguna, "daftarSarpras");
 
   const total = luasTotal(proyek);
-  const pin =
-    proyek.pinLat != null && proyek.pinLng != null ? `${proyek.pinLat}, ${proyek.pinLng}` : "—";
+  const adaPin = proyek.pinLat != null && proyek.pinLng != null;
+  const pin = adaPin ? `${proyek.pinLat}, ${proyek.pinLng}` : "—";
+  // Titik koordinat dipakai apa adanya, bukan nama proyek, supaya peta membuka
+  // lokasi yang benar-benar tersimpan — bukan hasil tebakan pencarian Maps.
+  const petaUrl = adaPin
+    ? `https://www.google.com/maps/search/?api=1&query=${proyek.pinLat},${proyek.pinLng}`
+    : null;
 
   const totalBersertifikat = proyek.legalitas.reduce((a, l) => a + (l.luas || 0), 0);
   const nomorBerikutnya = unit.length + 1;
@@ -100,10 +105,28 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
               }}
             >
               <span style={{ color: "var(--muted)" }}>Pin Lokasi</span>
-              <span className="chip" style={{ background: "#e7f0f4", color: "var(--teal)" }}>
-                <MapPin size={11} />
-                {pin}
-              </span>
+              {petaUrl ? (
+                <a
+                  href={petaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Buka di Google Maps"
+                  className="chip"
+                  style={{
+                    background: "#e7f0f4", color: "var(--teal)",
+                    textDecoration: "none", fontWeight: 600,
+                  }}
+                >
+                  <MapPin size={11} />
+                  {pin}
+                  <ExternalLink size={10} style={{ opacity: 0.75 }} />
+                </a>
+              ) : (
+                <span className="chip" style={{ background: "#e7f0f4", color: "var(--teal)" }}>
+                  <MapPin size={11} />
+                  {pin}
+                </span>
+              )}
             </div>
           </div>
 
@@ -189,6 +212,9 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
               <div key={label}>
                 <div style={{ fontSize: 11, color: "var(--muted)" }}>{label}</div>
                 <div className="num" style={{ fontSize: 15 }}>{m2(nilai)}</div>
+                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+                  {total ? `${pct(nilai / total, 1)} dari luas total` : "—"}
+                </div>
               </div>
             ))}
           </div>
@@ -199,12 +225,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
             }}
           >
             <span style={{ fontWeight: 600, fontSize: 13 }}>Luas Total</span>
-            <span>
-              <span className="num" style={{ fontSize: 16 }}>{m2(total)}</span>
-              <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 8 }}>
-                kavling efektif {total ? pct(proyek.luasKavlingEfektif / total, 1) : "—"}
-              </span>
-            </span>
+            <span className="num" style={{ fontSize: 16 }}>{m2(total)}</span>
           </div>
           <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 8 }}>
             Biaya perolehan lahan dikelola di{" "}

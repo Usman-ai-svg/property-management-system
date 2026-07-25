@@ -344,9 +344,10 @@ kode itu benar.
 
 ## Tambahan di luar prototipe
 
-Selain dua koreksi di atas, ada satu tabel yang memang tidak ada di prototipe
-dan sengaja ditambahkan atas persetujuan: **Tipe Unit** pada Master Proyek
-tingkat 2.
+Tiga hal berikut tidak ada pada prototipe dan sengaja ditambahkan atas
+persetujuan.
+
+### Tabel Tipe Unit
 
 Prototipe menuliskan tipe unit sebagai teks di dalam tiap baris unit, jadi tipe
 tidak punya tempat untuk dikelola: menambah tipe baru, mengoreksi luas
@@ -356,6 +357,27 @@ tipe, dan tipe yang masih dipakai ditolak saat hendak dihapus.
 
 Mengubah tipe sebuah unit **tidak** menghitung ulang BOQ dan RAP unit itu,
 sesuai keputusan snapshot di atas.
+
+### Pin lokasi tertaut ke Google Maps
+
+Koordinat pada kartu Lokasi Proyek menjadi tautan yang membuka Google Maps di
+tab baru. Yang dikirim adalah koordinat tersimpan, bukan nama proyek, supaya
+peta membuka titik yang benar-benar tercatat alih-alih hasil tebakan pencarian.
+
+### BOD berhak mengubah seluruh sub-bagian
+
+Pada prototipe, BOD belum berhak mengubah dokumen teknis dan progres. Kini BOD
+tercantum pada kedelapan sub-bagian di `ACL_UBAH`, karena pemegang keputusan
+tertinggi tidak boleh terhalang saat perlu mengoreksi apa pun.
+
+Perubahan ini ada di data semaian, jadi hanya berlaku setelah
+`npm run db:reset`. Matriksnya tetap bisa diubah kapan saja dari **Admin →
+Matriks Hak Akses** tanpa menyentuh kode.
+
+Perlu diingat hak akses mengikuti **peran aktif**, bukan gabungan seluruh peran
+yang dimiliki seseorang. `h.nugroho@nanoland.id` memegang Komisaris dan BOD;
+selama peran aktifnya masih Komisaris, halaman Keuangan tetap tertutup. Ganti
+peran aktif lewat pemilih di bilah samping.
 
 ---
 
