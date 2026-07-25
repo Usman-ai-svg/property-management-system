@@ -319,11 +319,25 @@ kode itu benar.
 
 ---
 
+## Tambahan di luar prototipe
+
+Selain dua koreksi di atas, ada satu tabel yang memang tidak ada di prototipe
+dan sengaja ditambahkan atas persetujuan: **Tipe Unit** pada Master Proyek
+tingkat 2.
+
+Prototipe menuliskan tipe unit sebagai teks di dalam tiap baris unit, jadi tipe
+tidak punya tempat untuk dikelola: menambah tipe baru, mengoreksi luas
+bangunannya, atau menghapus tipe yang salah tidak bisa dilakukan dari mana pun.
+Tabel ini yang menjadi tempatnya — lengkap dengan jumlah unit yang memakai tiap
+tipe, dan tipe yang masih dipakai ditolak saat hendak dihapus.
+
+Mengubah tipe sebuah unit **tidak** menghitung ulang BOQ dan RAP unit itu,
+sesuai keputusan snapshot di atas.
+
+---
+
 ## Yang belum dikerjakan
 
-- **Tabel Tipe Unit di Master Proyek** adalah tambahan yang tidak ada di
-  prototipe — perlu diputuskan apakah dipertahankan, dibuang, atau dipindah ke
-  halaman detail proyek.
 - **Dokumen kerja tambah** belum bisa diganti setelah dibuat; judul serta tabel
   BOQ dan RAP-nya sudah bisa.
 - **Biaya operasional** kini sudah bisa dicatat lewat Plan vs Realisasi, tetapi
