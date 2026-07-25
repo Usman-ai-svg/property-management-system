@@ -55,6 +55,29 @@ npm run dev
 
 Buka **http://localhost:3000** — akan langsung diarahkan ke halaman masuk.
 
+### Setelah `git pull`
+
+`git pull` membawa daftar dependensi dan bentuk tabel, bukan isinya. Bila ada
+yang berubah, dua perintah ini yang menyusulkannya:
+
+```bash
+npm install          # bila package.json berubah
+npm run db:reset     # bila prisma/schema.prisma berubah
+```
+
+Gejala yang menandakan langkah ini terlewat:
+
+| Pesan galat | Perintah yang belum dijalankan |
+|---|---|
+| `Module not found: Can't resolve '<paket>'` | `npm install` |
+| `The table ... does not exist in the current database` | `npm run db:reset` |
+| `Cannot find module '../src/generated/prisma/client'` | `npm run db:generate` |
+
+`npm run db:reset` membuang database demo dan menyemainya ulang, jadi data
+percobaan Anda ikut hilang. Untuk demo ini justru itu yang diinginkan; kalau
+suatu saat ada data yang perlu dipertahankan, pakai `npm run db:push` yang
+menambahkan tabel baru tanpa menghapus isi yang lama.
+
 ### Perintah lain
 
 | Perintah | Kegunaan |
