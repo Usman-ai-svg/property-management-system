@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "rm -f prisma/dev.db && prisma db push && prisma db seed",
+    "db:reset": "node scripts/hapus-db.mjs && prisma db push && prisma db seed",
     "db:studio": "prisma studio"
   },
   "dependencies": {

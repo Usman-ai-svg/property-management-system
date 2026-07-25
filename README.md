@@ -26,7 +26,13 @@ cd property-management-system
 git checkout claude/artifact-review-cn2c4f
 
 npm install
-cp .env.example .env
+```
+
+Salin berkas contoh environment:
+
+```bash
+cp .env.example .env       # macOS / Linux
+copy .env.example .env     # Windows
 ```
 
 Buka `.env`, lalu ganti nilai `SESSION_SECRET` dengan string acak minimal 32
