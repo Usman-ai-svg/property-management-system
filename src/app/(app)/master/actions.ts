@@ -7,6 +7,7 @@ import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
 } from "@/lib/actions/guard";
 import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
+import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
 import {
   JENIS_SARPRAS, STATUS_JUAL, STATUS_PEMBANGUNAN, STATUS_SARPRAS,
 } from "@/lib/domain/enums";
@@ -633,12 +634,10 @@ export async function ubahUpahRap(_s: HasilAksi | null, form: FormData): Promise
 // ===========================================================================
 
 /**
- * Catat revisi baru sebuah dokumen.
+ * Catat revisi baru sebuah dokumen beserta berkasnya.
  *
- * PERAGAAN: berkas sesungguhnya belum disimpan. Yang dicatat adalah metadata
- * revisi — nomor, nama berkas, waktu, dan pengunggahnya. Kolom `objectKey`
- * sengaja dibiarkan kosong; kolom itulah yang nanti diisi kunci objek di
- * S3/R2 saat penyimpanan berkas diaktifkan, tanpa mengubah bentuk tabel.
+ * Berkas ditulis ke penyimpanan lebih dulu, baru metadatanya dicatat — bila
+ * penulisan gagal, tidak ada baris revisi yang menunjuk ke berkas yang tak ada.
  */
 export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
   return jalankan(async () => {
@@ -647,7 +646,14 @@ export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promis
     const pemilikId = teks(form, "pemilikId", true);
     const kategori = teks(form, "kategori", true);
     const label = teks(form, "label", true);
-    const namaFile = teks(form, "namaFile", true);
+
+    const berkas = form.get("berkas");
+    if (!(berkas instanceof File) || berkas.size === 0) {
+      throw new GagalIzin("Pilih berkas yang akan diunggah.");
+    }
+
+    const namaFile = bersihkanNamaFile(berkas.name);
+    periksaBerkas(namaFile, berkas.type, berkas.size);
 
     // Cari proyek pemilik dokumen, sekaligus memastikan pengguna berhak.
     let projectId: string;
@@ -737,14 +743,15 @@ export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promis
       }
     }
 
+    const tersimpan = await simpanBerkas(await berkas.arrayBuffer(), namaFile);
+
     await prisma.documentVersion.create({
       data: {
         documentId: dokId,
         revisi: `R${revisiBerikutnya}`,
         namaFile,
-        // Ukuran belum diketahui karena berkasnya belum benar-benar diunggah.
-        ukuranByte: 0,
-        objectKey: null,
+        ukuranByte: tersimpan.ukuranByte,
+        objectKey: tersimpan.objectKey,
         diunggahOlehId: pengguna.id,
       },
     });
@@ -753,11 +760,11 @@ export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promis
       pengguna, projectId, objek: label,
       aksi: "Unggah revisi",
       dari: revisiBerikutnya > 1 ? `R${revisiBerikutnya - 1}` : null,
-      ke: `R${revisiBerikutnya} — ${namaFile}`,
+      ke: `R${revisiBerikutnya} — ${namaFile} (${(tersimpan.ukuranByte / 1024 / 1024).toFixed(1)} MB)`,
     });
 
     segarkan(kodeProyek);
-    return `Revisi R${revisiBerikutnya} tercatat. Berkas belum ikut tersimpan pada demo ini.`;
+    return `Revisi R${revisiBerikutnya} tersimpan.`;
   });
 }
 

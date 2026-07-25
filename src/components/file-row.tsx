@@ -2,23 +2,24 @@
 
 import { useState } from "react";
 import { FileText } from "lucide-react";
-import { BarisField, Field, FormModal } from "@/components/form";
+import { BarisField, FormModal } from "@/components/form";
 import { unggahRevisi } from "@/app/(app)/master/actions";
 import { tanggal, ukuranFile } from "@/lib/format";
 
 /**
  * Baris dokumen dengan nomor revisi dan riwayat versi.
- * Meniru komponen FileRow pada artifact.
  *
- * Catatan: berkas belum benar-benar diunggah. Yang dicatat adalah metadata
- * revisi — nama berkas, nomor revisi, tanggal, dan siapa yang mengunggah.
- * Penyimpanan berkas sungguhan menyusul sebelum peluncuran.
+ * Berkas benar-benar diunggah dan disimpan. Tautan "Lihat" mengarah ke rute
+ * yang memeriksa hak akses lebih dulu, bukan ke berkas statis — supaya tautan
+ * gambar kerja tidak bisa diteruskan ke siapa pun tanpa pemeriksaan.
  */
 
 export interface VersiDokumen {
+  id: string;
   revisi: string;
   namaFile: string;
   ukuranByte: number;
+  objectKey: string | null;
   diunggahPada: string | Date;
 }
 
@@ -26,6 +27,29 @@ export interface DokumenTampil {
   id: string;
   kategori: string;
   versi: VersiDokumen[];
+}
+
+function TautanLihat({ versi }: { versi: VersiDokumen }) {
+  if (!versi.objectKey) {
+    return (
+      <span
+        style={{ color: "var(--muted)", fontSize: 11 }}
+        title="Revisi ini tercatat sebelum penyimpanan berkas aktif"
+      >
+        berkas tidak tersedia
+      </span>
+    );
+  }
+  return (
+    <a
+      href={`/api/dokumen/${versi.id}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ color: "var(--teal)", fontSize: 12, fontWeight: 600, textDecoration: "none" }}
+    >
+      Lihat
+    </a>
+  );
 }
 
 export function FileRow({
@@ -38,9 +62,7 @@ export function FileRow({
   label: string;
   dokumen: DokumenTampil | null;
   bolehUbah: boolean;
-  /** Keterangan yang muncul di modal dan log, mis. "Sertifikat NIB 8120…". */
   konteks: string;
-  /** Menentukan dokumen ini menempel pada apa, dipakai saat membuat dokumen baru. */
   pemilik: { jenis: string; id: string; kategori: string };
 }) {
   const [bukaVersi, setBukaVersi] = useState(false);
@@ -48,10 +70,6 @@ export function FileRow({
   const versiTerbaru = dokumen?.versi[0] ?? null;
   const versiLama = dokumen?.versi.slice(1) ?? [];
   const revisi = versiTerbaru?.revisi ?? null;
-
-  const namaBerikutnya = versiTerbaru
-    ? versiTerbaru.namaFile.replace(/(-R\d+)?\.(\w+)$/, `-R${dokumen!.versi.length + 1}.$2`)
-    : "dokumen-baru.pdf";
 
   return (
     <div style={{ borderBottom: "1px solid #eef2f3" }}>
@@ -83,13 +101,17 @@ export function FileRow({
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}
             >
-              {versiTerbaru.namaFile} · {ukuranFile(versiTerbaru.ukuranByte)} ·{" "}
+              {versiTerbaru.namaFile}
+              {versiTerbaru.ukuranByte > 0 && ` · ${ukuranFile(versiTerbaru.ukuranByte)}`}
+              {" · "}
               {tanggal(versiTerbaru.diunggahPada)}
             </div>
           ) : (
             <div style={{ fontSize: 10.5, color: "var(--amber)" }}>Belum diunggah</div>
           )}
         </div>
+
+        {versiTerbaru && <TautanLihat versi={versiTerbaru} />}
 
         {bolehUbah && (
           <FormModal
@@ -118,23 +140,25 @@ export function FileRow({
             <input type="hidden" name="label" value={konteks} />
 
             <BarisField kolom={1}>
-              <Field label="Nama berkas" nama="namaFile" nilai={namaBerikutnya} wajib />
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+                  Berkas <span style={{ color: "var(--red)" }}>*</span>
+                </label>
+                <input
+                  className="inp"
+                  type="file"
+                  name="berkas"
+                  required
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.docx,.skp,.dwg,.rvt"
+                  style={{ padding: "8px 10px" }}
+                />
+              </div>
             </BarisField>
 
-            <div
-              className="inp"
-              style={{
-                textAlign: "center", color: "var(--muted)", padding: 22,
-                border: "1px dashed var(--line)", marginBottom: 14,
-              }}
-            >
-              ⬆ Pemilihan berkas belum aktif pada demo ini
-            </div>
-
             <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
-              Versi sebelumnya tetap tersimpan dan bisa dilihat lewat daftar
-              &ldquo;versi sebelumnya&rdquo;. Berkas sesungguhnya belum ikut tersimpan —
-              yang dicatat baru nomor revisi, nama berkas, dan waktunya.
+              Nomor revisi ditentukan otomatis dan versi sebelumnya tetap tersimpan —
+              unggahan baru tidak pernah menimpa yang lama. Maksimum 64 MB.
+              Diterima: PDF, JPG, PNG, WEBP, XLSX, DOCX, SKP, DWG, RVT.
             </p>
           </FormModal>
         )}
@@ -155,7 +179,7 @@ export function FileRow({
           {bukaVersi &&
             versiLama.map((v) => (
               <div
-                key={v.revisi}
+                key={v.id}
                 style={{
                   display: "flex", justifyContent: "space-between", gap: 10,
                   fontSize: 11, color: "var(--muted)", padding: "3px 0 3px 14px",
@@ -164,7 +188,10 @@ export function FileRow({
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {v.revisi} · {v.namaFile}
                 </span>
-                <span style={{ whiteSpace: "nowrap" }}>{tanggal(v.diunggahPada)}</span>
+                <span style={{ whiteSpace: "nowrap", display: "flex", gap: 8 }}>
+                  {tanggal(v.diunggahPada)}
+                  <TautanLihat versi={v} />
+                </span>
               </div>
             ))}
         </div>

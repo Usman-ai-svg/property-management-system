@@ -39,6 +39,8 @@ export function BoqTable({
   bolehUbah,
   aksiSimpan,
   konteksImpor,
+  sasaranImpor,
+  idImpor,
   grupBaru = "Tambahan",
 }: {
   judul: string;
@@ -48,6 +50,9 @@ export function BoqTable({
   /** Menerima seluruh baris sebagai JSON dan menyimpannya. */
   aksiSimpan: (barisJson: string) => Promise<HasilAksi>;
   konteksImpor: string;
+  /** Sasaran dan id untuk impor Excel. */
+  sasaranImpor: "unit" | "kerjaTambah" | "sarpras";
+  idImpor: string;
   grupBaru?: string;
 }) {
   const [sunting, setSunting] = useState(false);
@@ -112,7 +117,13 @@ export function BoqTable({
         <div className="eyebrow">{judul}</div>
         {bolehHarga && bolehUbah && (
           <div style={{ display: "flex", gap: 6 }}>
-            <ModalImpor jenis="BOQ / RAB" konteks={konteksImpor} kolom="Uraian Pekerjaan · Volume · Satuan · Harga Satuan · Spesifikasi" />
+            <ModalImpor
+              jenis="BOQ / RAB"
+              konteks={konteksImpor}
+              kolom="Grup · Uraian Pekerjaan · Satuan · Volume · Harga Satuan · Spesifikasi"
+              sasaran={sasaranImpor}
+              id={idImpor}
+            />
             {sunting && (
               <button
                 type="button"

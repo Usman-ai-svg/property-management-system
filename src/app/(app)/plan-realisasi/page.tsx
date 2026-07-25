@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
-import { ambilPengguna, bolehLihat } from "@/lib/auth/rbac";
+import { ambilPengguna, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { daftarProyekPlanReal, planVsRealisasi } from "@/lib/data/plan-real";
 import { pct, rp } from "@/lib/format";
 import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
+import { CatatBiayaOperasional } from "./catat-ops";
 
 const TAB = [
   ["hpp", "HPP"],
@@ -136,6 +137,8 @@ export default async function PlanRealisasi({
 
   const d = await planVsRealisasi(pengguna, kode);
   if (!d) redirect("/plan-realisasi");
+
+  const bolehCatatOps = bolehUbah(pengguna, "businessPlan");
 
   const targetJual = d.sales.reduce((s, x) => s + x.target, 0);
   const realJual = d.sales.filter((x) => x.akad).reduce((s, x) => s + x.real, 0);
@@ -325,12 +328,27 @@ export default async function PlanRealisasi({
       {/* ================= OPERASIONAL ================= */}
       {tabAktif === "operasional" && (
         <div className="card" style={{ padding: "16px 20px" }}>
-          <div className="eyebrow" style={{ marginBottom: 4 }}>
-            Biaya Operasional · plan vs realisasi
-          </div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, lineHeight: 1.6 }}>
-            Di luar HPP: pemasaran, umum &amp; administrasi, bunga &amp; pajak. Ketiganya belum punya
-            pencatatan sendiri di sistem ini — realisasinya masih nol sampai modul pencatatannya ada.
+          <div
+            style={{
+              display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+              flexWrap: "wrap", gap: 10, marginBottom: 10,
+            }}
+          >
+            <div>
+              <div className="eyebrow" style={{ marginBottom: 4 }}>
+                Biaya Operasional · plan vs realisasi
+              </div>
+              <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+                Di luar HPP: pemasaran, umum &amp; administrasi, bunga &amp; pajak.
+              </div>
+            </div>
+            {bolehCatatOps && (
+              <CatatBiayaOperasional
+                projectId={d.proyek.id}
+                namaProyek={d.proyek.nama}
+                pos={d.ops.map((o) => o.nama)}
+              />
+            )}
           </div>
           {d.ops.map((o) => (
             <Meter key={o.nama} nama={o.nama} plan={o.plan} real={o.real} progres={d.progres} />

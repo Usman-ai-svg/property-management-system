@@ -8,11 +8,11 @@ import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
 import { rp } from "@/lib/format";
 import {
   EditDeskripsiUnit, HapusKerjaTambah, TabelBoqKt, TabelBoqUnit,
-  TabelRapKt, TabelRapUnit, TambahKerjaTambah,
+  TabelRapKt, TabelRapUnit, TambahKerjaTambah, UbahJudulKerjaTambah,
 } from "./editors";
 
 const pilihVersi = {
-  select: { revisi: true, namaFile: true, ukuranByte: true, diunggahPada: true },
+  select: { id: true, revisi: true, namaFile: true, ukuranByte: true, objectKey: true, diunggahPada: true },
   orderBy: { diunggahPada: "desc" as const },
 };
 const pilihDokumen = { select: { id: true, kategori: true, versions: pilihVersi } };
@@ -291,7 +291,12 @@ export default async function RincianUnit({
                   </div>
                 )}
               </div>
-              {ubahData && <HapusKerjaTambah id={kt.id} judul={kt.judul} />}
+              {ubahData && (
+                <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
+                  <UbahJudulKerjaTambah id={kt.id} judul={kt.judul} />
+                  <HapusKerjaTambah id={kt.id} judul={kt.judul} />
+                </div>
+              )}
             </div>
           ))}
 

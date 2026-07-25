@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { HasilAksi } from "@/lib/actions/guard";
 import { rp } from "@/lib/format";
@@ -58,6 +58,8 @@ export function RapTable({
   bolehUbah,
   aksiSimpan,
   konteksImpor,
+  sasaranImpor,
+  idImpor,
 }: {
   judul: string;
   keterangan?: string;
@@ -68,6 +70,8 @@ export function RapTable({
   /** Menerima kelompok + upah sebagai JSON. */
   aksiSimpan: (dataJson: string) => Promise<HasilAksi>;
   konteksImpor: string;
+  sasaranImpor: "unit" | "kerjaTambah" | "sarpras";
+  idImpor: string;
 }) {
   const [sunting, setSunting] = useState(false);
   const [draft, setDraft] = useState<Kelompok[]>(() => kelompokkan(baris));
@@ -153,6 +157,8 @@ export function RapTable({
               jenis="RAP"
               konteks={konteksImpor}
               kolom="Kelompok · Material · Satuan · Volume · Harga · Keterangan · Upah Tenaga Kerja"
+              sasaran={sasaranImpor}
+              id={idImpor}
             />
             {sunting && (
               <button type="button" className="btn-garis" style={{ color: "var(--muted)" }} onClick={batal}>
@@ -211,8 +217,10 @@ export function RapTable({
           </thead>
           <tbody>
             {kelompok.map((g, gi) => (
-              <>
-                <tr key={`grup-${gi}`} style={{ background: "#eef3f4" }}>
+              // Fragment ini yang memegang key-nya — bukan <tr> di dalamnya —
+              // karena elemen inilah yang jadi anak langsung dari <tbody>.
+              <Fragment key={`grup-${gi}`}>
+                <tr style={{ background: "#eef3f4" }}>
                   <td style={{ fontWeight: 700 }}>{ROMAWI[gi] ?? gi + 1}</td>
                   <td
                     colSpan={sunting ? 7 : 6}
@@ -290,7 +298,7 @@ export function RapTable({
                 ))}
 
                 {sunting && (
-                  <tr key={`tambah-${gi}`}>
+                  <tr>
                     <td />
                     <td colSpan={7}>
                       <button
@@ -312,7 +320,7 @@ export function RapTable({
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             ))}
 
             {sunting && (

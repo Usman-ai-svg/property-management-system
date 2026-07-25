@@ -213,6 +213,7 @@ model Project {
   businessPlan    BusinessPlan?
   contracts       Contract[]
   expenses        Expense[]
+  biayaOperasional OperationalCost[]
   tenders         Tender[]
   equipments      Equipment[]
   aksesUser       UserProjectAccess[]
@@ -680,6 +681,32 @@ model Expense {
 
   @@index([projectId, tanggal])
   @@map("expenses")
+}
+
+/// Biaya operasional perusahaan yang dibebankan ke sebuah proyek.
+///
+/// Terpisah dari `Expense` karena kedudukannya memang berbeda: Expense adalah
+/// harga pokok penjualan (masuk HPP), sedangkan ini biaya di luar HPP —
+/// pemasaran, umum & administrasi, bunga & pajak. Keduanya bertemu kembali
+/// pada perhitungan laba bersih di Plan vs Realisasi.
+model OperationalCost {
+  id        String   @id @default(cuid())
+  projectId String
+  tanggal   DateTime
+  /// Harus cocok dengan nama pos pada BpOperasionalItem agar bisa
+  /// dibandingkan rencana lawan realisasinya.
+  kategori  String
+  uraian    String
+  nominal   Float
+  /// Lunas | DP | Belum
+  status    String   @default("Lunas")
+  pic       String?
+  bukti     String?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, tanggal])
+  @@map("operational_costs")
 }
 
 /// Penerimaan dari pembeli (DP, cair KPR, pelunasan) — dasar angka realisasi

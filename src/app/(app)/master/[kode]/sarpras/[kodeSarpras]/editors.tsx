@@ -54,6 +54,8 @@ export function TabelBoqSarpras({
       bolehHarga={bolehHarga}
       bolehUbah={bolehUbah}
       konteksImpor={konteks}
+      sasaranImpor="sarpras"
+      idImpor={id}
       aksiSimpan={(json) => simpanBoqSarpras(id, json)}
     />
   );
@@ -74,6 +76,8 @@ export function TabelRapSarpras({
       bolehHarga={bolehHarga}
       bolehUbah={bolehUbah}
       konteksImpor={konteks}
+      sasaranImpor="sarpras"
+      idImpor={id}
       aksiSimpan={(json) => simpanRapSarpras(id, json)}
     />
   );

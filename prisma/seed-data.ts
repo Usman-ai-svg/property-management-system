@@ -426,6 +426,24 @@ export const BIAYA_UMUM = [
   { tgl: "10 Jun 2026", proyek: "NT4", fase: "F3", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Upah Borongan", metode: "Transfer", uraian: "Borongan struktur Tesla", total: 95000000, status: "Lunas", pic: "Budi Hartono", bukti: "ba-tesla.pdf", kontrak: "" },
 ];
 
+/**
+ * Biaya operasional yang sudah terjadi — di luar HPP.
+ * `kategori` harus cocok dengan nama pos pada business plan proyeknya.
+ */
+export const BIAYA_OPERASIONAL = [
+  { tgl: "10 Jul 2026", proyek: "NT4", kategori: "Pemasaran", uraian: "Iklan properti & billboard kuartal III", nominal: 420000000, status: "Lunas", pic: "Rudi Hartawan" },
+  { tgl: "05 Jul 2026", proyek: "NT4", kategori: "Pemasaran", uraian: "Komisi agen — 6 unit akad", nominal: 285000000, status: "Lunas", pic: "Lina Marlina" },
+  { tgl: "30 Jun 2026", proyek: "NT4", kategori: "Umum & Administrasi", uraian: "Gaji staf proyek & kantor kuartal II", nominal: 640000000, status: "Lunas", pic: "Rina Safitri" },
+  { tgl: "28 Jun 2026", proyek: "NT4", kategori: "Bunga & Pajak", uraian: "Bunga pinjaman konstruksi kuartal II", nominal: 512000000, status: "Lunas", pic: "Sinta Dewi" },
+  { tgl: "20 Jun 2026", proyek: "NT4", kategori: "Umum & Administrasi", uraian: "Sewa kantor pemasaran & utilitas", nominal: 96000000, status: "Lunas", pic: "Rina Safitri" },
+  { tgl: "12 Jul 2026", proyek: "GN2", kategori: "Pemasaran", uraian: "Brosur, pameran, dan digital ads", nominal: 118000000, status: "Lunas", pic: "Rudi Hartawan" },
+  { tgl: "30 Jun 2026", proyek: "GN2", kategori: "Umum & Administrasi", uraian: "Gaji staf proyek kuartal II", nominal: 174000000, status: "Lunas", pic: "Rina Safitri" },
+  { tgl: "25 Jun 2026", proyek: "GN2", kategori: "Bunga & Pajak", uraian: "PPh final & bunga pinjaman", nominal: 143000000, status: "DP", pic: "Sinta Dewi" },
+  { tgl: "18 Mar 2023", proyek: "NT2", kategori: "Pemasaran", uraian: "Pemasaran seluruh masa penjualan", nominal: 498000000, status: "Lunas", pic: "Rudi Hartawan" },
+  { tgl: "20 Des 2023", proyek: "NT2", kategori: "Umum & Administrasi", uraian: "Umum & administrasi seluruh masa proyek", nominal: 321000000, status: "Lunas", pic: "Rina Safitri" },
+  { tgl: "20 Des 2023", proyek: "NT2", kategori: "Bunga & Pajak", uraian: "Bunga & pajak seluruh masa proyek", nominal: 476000000, status: "Lunas", pic: "Sinta Dewi" },
+];
+
 /** Warna kategori pada diagram donat dan penanda jenis biaya. */
 export const WARNA_JENIS: Record<string, string> = {
   "Upah Borongan": "#3b82c4",

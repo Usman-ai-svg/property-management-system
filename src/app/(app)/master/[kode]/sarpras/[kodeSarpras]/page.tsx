@@ -9,7 +9,7 @@ import { rp, tanggalJam } from "@/lib/format";
 import { EditDeskripsiSarpras, TabelBoqSarpras, TabelRapSarpras } from "./editors";
 
 const pilihVersi = {
-  select: { revisi: true, namaFile: true, ukuranByte: true, diunggahPada: true },
+  select: { id: true, revisi: true, namaFile: true, ukuranByte: true, objectKey: true, diunggahPada: true },
   orderBy: { diunggahPada: "desc" as const },
 };
 const pilihDokumen = { select: { id: true, kategori: true, versions: pilihVersi } };

@@ -48,6 +48,7 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
         },
       },
       expenses: { select: { peruntukan: true, total: true } },
+      biayaOperasional: { select: { kategori: true, nominal: true } },
       contracts: {
         where: { jenis: "Sarpras" },
         select: {
@@ -101,9 +102,18 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
     return { kode: String.fromCharCode(65 + i), nama: h.nama, plan: h.nilai, real, sumber };
   });
 
-  // Biaya operasional belum punya pencatatan sendiri di sistem ini — pemasaran,
-  // umum & administrasi, serta bunga & pajak dicatat di luar modul proyek.
-  const ops = rencana.operasional.map((o) => ({ nama: o.nama, plan: o.nilai, real: 0 }));
+  // Realisasi biaya operasional dicocokkan lewat nama kategorinya, yang memang
+  // dipilih dari daftar pos pada business plan saat pencatatan.
+  const perKategori = new Map<string, number>();
+  for (const b of proyek.biayaOperasional) {
+    perKategori.set(b.kategori, (perKategori.get(b.kategori) ?? 0) + b.nominal);
+  }
+
+  const ops = rencana.operasional.map((o) => ({
+    nama: o.nama,
+    plan: o.nilai,
+    real: perKategori.get(o.nama) ?? 0,
+  }));
 
   const sales = proyek.units.map((x) => {
     const akad = x.statusJual === "Akad" || x.statusJual === "Serah Terima";

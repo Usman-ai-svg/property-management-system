@@ -18,7 +18,7 @@ const BP_TAB = [
 ] as const;
 
 const pilihVersi = {
-  select: { revisi: true, namaFile: true, ukuranByte: true, diunggahPada: true },
+  select: { id: true, revisi: true, namaFile: true, ukuranByte: true, objectKey: true, diunggahPada: true },
   orderBy: { diunggahPada: "desc" as const },
 };
 

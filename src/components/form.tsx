@@ -155,6 +155,11 @@ export function TombolIkon({
  * Modal ditutup sendiri hanya bila aksi mengembalikan ok. Bila gagal, pesan
  * galat ditampilkan di dalam modal dan isian tetap utuh — pengguna tidak
  * kehilangan apa yang sudah diketik.
+ *
+ * Bila aksi mengembalikan pesan saat berhasil, pesan itu ditampilkan di tempat
+ * pemicunya setelah modal tertutup. Ada aksi yang perlu memberi tahu sesuatu
+ * yang tidak terlihat dari layar — misalnya impor yang mempertahankan nilai
+ * upah lama karena berkasnya tidak memuat baris upah.
  */
 export function FormModal({
   judul,
@@ -174,11 +179,14 @@ export function FormModal({
   lebar?: number;
 }) {
   const [terbuka, setTerbuka] = useState(false);
+  const [catatan, setCatatan] = useState<string | null>(null);
   const [hasil, kirim] = useActionState(aksi, null);
   const dialog = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (hasil?.ok) setTerbuka(false);
+    if (!hasil?.ok) return;
+    setTerbuka(false);
+    setCatatan(hasil.pesan ?? null);
   }, [hasil]);
 
   useEffect(() => {
@@ -191,7 +199,31 @@ export function FormModal({
 
   return (
     <>
-      {pemicu(() => setTerbuka(true))}
+      {pemicu(() => {
+        setCatatan(null);
+        setTerbuka(true);
+      })}
+
+      {catatan && (
+        <div
+          role="status"
+          style={{
+            display: "flex", alignItems: "flex-start", gap: 8, marginTop: 8,
+            padding: "9px 12px", borderRadius: 9, background: "#e8f5ef",
+            color: "var(--teal)", fontSize: 12.5, lineHeight: 1.5, whiteSpace: "pre-line",
+          }}
+        >
+          <span style={{ flex: 1 }}>{catatan}</span>
+          <button
+            type="button"
+            onClick={() => setCatatan(null)}
+            aria-label="Tutup pesan"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", padding: 0 }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {terbuka && (
         <div
@@ -243,6 +275,9 @@ export function FormModal({
                     display: "flex", alignItems: "flex-start", gap: 8, marginTop: 4, marginBottom: 14,
                     padding: "9px 12px", borderRadius: 9, background: "#fbeae8",
                     color: "var(--red)", fontSize: 12.5, lineHeight: 1.5,
+                    // Impor melaporkan satu baris per kesalahan; tanpa ini
+                    // semuanya menyatu jadi satu paragraf yang sulit dibaca.
+                    whiteSpace: "pre-line",
                   }}
                 >
                   <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />

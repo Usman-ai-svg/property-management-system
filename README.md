@@ -65,6 +65,7 @@ Buka **http://localhost:3000** — akan langsung diarahkan ke halaman masuk.
 | `npm run db:generate` | bangkitkan ulang Prisma Client setelah schema diubah |
 | `npm run build && npm start` | mode produksi, untuk mengukur performa sebenarnya |
 | `npm run typecheck` | periksa tipe tanpa membangun |
+| `npm test` | jalankan pengujian fungsi hitung dan pembaca Excel |
 
 Dua hal yang tidak ikut masuk repo dan dibuat ulang di tiap mesin:
 
@@ -143,10 +144,15 @@ src/
     domain/            enum dan template harga
     auth/              session, hash sandi, penegakan hak akses
     data/              query yang sudah sadar hak akses
+    storage.ts         penyimpanan berkas, berbentuk seperti object storage
+    impor-excel.ts     pembaca tabel BOQ & RAP dari .xlsx
   app/
     login/             halaman masuk
     (app)/             kerangka aplikasi + halaman
+    api/dokumen/       pengunduhan dokumen, diperiksa hak aksesnya
   components/          komponen tampilan bersama
+
+storage/               berkas unggahan — tidak masuk repo
 ```
 
 ### Mengapa fungsi hitung dipisah
@@ -208,9 +214,12 @@ Yang bisa diubah, beserta izin yang dibutuhkan:
 | Tipe unit | `dokumenTeknis` | tak bisa dihapus bila masih dipakai unit |
 | Unit: status & progres | `progress` | progres tersimpan sebagai titik riwayat |
 | Unit: tambah & hapus | `daftarUnit` | unit dengan progres > 0 tidak bisa dihapus |
-| Baris BOQ & RAP | `hargaRabRap` | per unit, tidak memengaruhi unit lain |
+| Baris BOQ & RAP | `hargaRabRap` | per unit, tidak memengaruhi unit lain — bisa disunting langsung atau diimpor dari Excel |
 | Upah RAP & harga jual | `hargaRabRap` | |
+| Kerja tambah | `daftarUnit` | judul, tabel BOQ, dan tabel RAP-nya |
 | Sarana & prasarana | `daftarSarpras` | kolom RAB butuh `hargaRabRap` terpisah |
+| Dokumen teknis | `dokumenTeknis` | unggah revisi baru, nomor revisi naik sendiri |
+| Biaya operasional | `businessPlan` | lewat Plan vs Realisasi |
 
 ### Membuktikan snapshot bekerja
 
@@ -248,25 +257,75 @@ Di sini realisasi diturunkan dari data yang benar-benar tercatat: pengeluaran,
 pembayaran kontrak, dan penerimaan penjualan. Tiap baris HPP menyebutkan sumber
 angkanya.
 
-Konsekuensinya, pos yang belum punya transaksi menunjukkan nol — biaya
-operasional misalnya, karena pemasaran dan umum-administrasi belum punya modul
-pencatatan sendiri. Pada laporan yang dipakai mengambil keputusan, angka yang
+Biaya operasional kini punya pencatatan sendiri (`operational_costs`), dicocokkan
+ke pos business plan lewat nama kategorinya. Pos yang belum punya transaksi tetap
+menunjukkan nol. Pada laporan yang dipakai mengambil keputusan, angka yang
 dikarang lebih berbahaya daripada angka yang kosong.
+
+---
+
+## Unggah berkas dan impor Excel
+
+Keduanya sudah benar-benar berjalan, bukan peragaan lagi.
+
+**Unggah dokumen.** Berkas disimpan ke direktori `storage/` dengan nama acak,
+dikelompokkan per tahun. Ukuran dibatasi 64 MB dan jenisnya dibatasi daftar
+putih (PDF, gambar, Office, DWG, ZIP) — dicek dari isi berkasnya, bukan dari
+nama. Pengunduhan lewat `/api/dokumen/{versiId}`, yang memeriksa sesi, izin
+`dokumenTeknis`, dan akses proyek sebelum mengirim isinya; dokumen yatim
+ditolak, bukan dibiarkan lewat.
+
+Antarmuka `src/lib/storage.ts` sengaja dibentuk seperti object storage
+(`simpanBerkas` / `bacaBerkas` / `hapusBerkas` dengan kunci objek), supaya
+penggantinya di ERP cukup mengganti isi berkas itu saja.
+
+**Impor Excel** tersedia pada tiap tabel BOQ dan RAP — unit, kerja tambah, dan
+sarpras. Yang dikenali:
+
+- Baris judul dicari otomatis sampai baris ke-10, jadi berkas berkop tetap bisa
+  dibaca.
+- Nama kolom tidak harus persis: `Vol`, `Qty`, dan `Kuantitas` sama-sama
+  dikenali, begitu pula `Uraian` / `Pekerjaan` / `Deskripsi`.
+- Angka boleh berupa rumus, teks berformat Indonesia (`1.250.000`), atau
+  berawalan `Rp`.
+- Baris `Total`, `Jumlah`, dan `Sub Total` dilewati.
+- Pada RAP, baris yang namanya memuat "upah" dibaca sebagai upah tenaga kerja,
+  bukan sebagai material. Bila berkas tidak memuat baris upah, nilai upah yang
+  sudah tersimpan **dipertahankan** — mengimpor material tidak boleh diam-diam
+  menghapus upah menjadi nol.
+
+Impor bersifat semua-atau-tidak-sama-sekali: seluruh baris divalidasi lebih
+dulu, dan bila ada yang tidak sah tidak ada yang disimpan, sementara seluruh
+kesalahannya dilaporkan sekaligus supaya bisa diperbaiki dalam satu putaran.
+Impor yang berhenti di tengah meninggalkan tabel campur aduk yang lebih sulit
+diperbaiki daripada mengulang dari awal.
+
+---
+
+## Pengujian
+
+```bash
+npm test
+```
+
+71 pengujian untuk fungsi hitung di `src/lib/calc/` (BOQ, opname, keuangan) dan
+pembaca Excel di `src/lib/impor-excel.ts`. Berkas Excel ujinya dibangun di
+memori, jadi tidak ada berkas biner yang ikut dirawat di repositori.
+
+Pengujian BOQ menyimpan salinan rumus prototipe dan membandingkannya dengan
+hasil fungsi di sini — bukan menyalin keluaran fungsinya sendiri jadi angka
+harapan, karena cara itu hanya menguji bahwa kode tidak berubah, bukan bahwa
+kode itu benar.
 
 ---
 
 ## Yang belum dikerjakan
 
-- **Unggah berkas dan impor Excel** masih peragaan. Alur, nomor revisi, dan
-  jejak auditnya sudah berjalan; yang belum ada penyimpanan berkasnya. Kolom
-  `objectKey` pada `document_versions` menunggu diisi saat object storage
-  diaktifkan.
-- **Menyunting kerja tambah** — judul dan dokumennya belum bisa diubah setelah
-  dibuat, meski tabel BOQ dan RAP-nya sudah bisa.
-- **Pencatatan biaya operasional** (pemasaran, umum & administrasi, bunga &
-  pajak) — belum punya modul sendiri, sehingga kolom realisasinya nol di Plan
-  vs Realisasi.
-- **Pengujian otomatis** untuk fungsi di `src/lib/calc/`. Sejauh ini verifikasi
-  dilakukan lewat browser.
 - **Tabel Tipe Unit di Master Proyek** adalah tambahan yang tidak ada di
-  prototipe — perlu diputuskan apakah dipertahankan, dibuang, atau dipindah.
+  prototipe — perlu diputuskan apakah dipertahankan, dibuang, atau dipindah ke
+  halaman detail proyek.
+- **Dokumen kerja tambah** belum bisa diganti setelah dibuat; judul serta tabel
+  BOQ dan RAP-nya sudah bisa.
+- **Biaya operasional** kini sudah bisa dicatat lewat Plan vs Realisasi, tetapi
+  hanya pos yang ada pada business plan proyeknya. Pos baru masih harus
+  ditambahkan lebih dulu dari business plan.

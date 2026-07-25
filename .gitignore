@@ -27,3 +27,6 @@ next-env.d.ts
 # Prisma Client hasil generate — dibangun ulang oleh `prisma generate`
 # (sudah dipanggil di skrip build), jadi tidak perlu masuk repo.
 src/generated/
+
+# Berkas unggahan. Isinya milik pengguna, bukan bagian dari kode.
+storage/

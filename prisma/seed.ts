@@ -16,7 +16,7 @@ import { hashPassword } from "../src/lib/auth/password";
 import { buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap, rabAcuan, rapAcuan, totalBaris, boqSarprasDefault, rapGenerik } from "../src/lib/calc/boq";
 import { parseUkuran } from "../src/lib/format";
 import {
-  ACL_AWAL, ACL_UBAH, ASET, BIAYA_UMUM, KERJA_TAMBAH, KONTRAK, LOG_AWAL,
+  ACL_AWAL, ACL_UBAH, ASET, BIAYA_OPERASIONAL, BIAYA_UMUM, KERJA_TAMBAH, KONTRAK, LOG_AWAL,
   PORSI_BIAYA_UNIT, POS_HPP, PROYEK, ROLE_GRUP, SARPRAS, SEMUA_PERAN,
   TENDER, TIPE_UNIT, USERS, VENDOR, type Dok, tgl,
 } from "./seed-data";
@@ -59,6 +59,7 @@ async function main() {
   await prisma.auditLog.deleteMany();
   await prisma.salesPayment.deleteMany();
   await prisma.expense.deleteMany();
+  await prisma.operationalCost.deleteMany();
   await prisma.tenderParticipant.deleteMany();
   await prisma.tender.deleteMany();
   await prisma.variationOrder.deleteMany();
@@ -470,7 +471,17 @@ async function main() {
       }
     }
   }
-  console.log(`  ${jmlBiaya} transaksi biaya`);
+  for (const B of BIAYA_OPERASIONAL) {
+    await prisma.operationalCost.create({
+      data: {
+        projectId: projectId.get(B.proyek)!, tanggal: tgl(B.tgl)!,
+        kategori: B.kategori, uraian: B.uraian, nominal: B.nominal,
+        status: B.status, pic: B.pic,
+      },
+    });
+  }
+
+  console.log(`  ${jmlBiaya} transaksi biaya, ${BIAYA_OPERASIONAL.length} biaya operasional`);
 
   // ---------------------------------------------------------------------
   // 9. PENGGUNA

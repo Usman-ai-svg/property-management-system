@@ -1,13 +1,13 @@
 "use client";
 
-import { BarisField, Field, FormModal, TombolHapus, TombolTambah, TombolUbah } from "@/components/form";
+import { BarisField, Field, FormModal, TombolHapus, TombolIkon, TombolTambah, TombolUbah } from "@/components/form";
 import { BoqTable, type BarisBoqUI } from "@/components/boq-table";
 import { RapTable, type BarisRapUI } from "@/components/rap-table";
 import { STATUS_JUAL, STATUS_PEMBANGUNAN } from "@/lib/domain/enums";
 import { ubahUnit } from "../../../actions";
 import {
   hapusKerjaTambah, simpanBoqKerjaTambah, simpanBoqUnit,
-  simpanRapKerjaTambah, simpanRapUnit, tambahKerjaTambah,
+  simpanRapKerjaTambah, simpanRapUnit, tambahKerjaTambah, ubahJudulKerjaTambah,
 } from "../../../tabel-actions";
 
 /* ===================== DESKRIPSI UNIT ===================== */
@@ -99,6 +99,24 @@ export function TambahKerjaTambah({ unitId }: { unitId: string }) {
   );
 }
 
+export function UbahJudulKerjaTambah({ id, judul }: { id: string; judul: string }) {
+  return (
+    <FormModal
+      judul="Ubah Judul Kerja Tambah"
+      aksi={ubahJudulKerjaTambah}
+      pemicu={(buka) => <TombolIkon onClick={buka} judul={`Ubah judul ${judul}`} />}
+    >
+      <input type="hidden" name="id" value={id} />
+      <BarisField kolom={1}>
+        <Field label="Judul Kerja Tambah" nama="judul" nilai={judul} wajib />
+      </BarisField>
+      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+        Tabel BOQ dan RAP kerja tambah ini disunting langsung dari tabelnya di bawah.
+      </p>
+    </FormModal>
+  );
+}
+
 export function HapusKerjaTambah({ id, judul }: { id: string; judul: string }) {
   return <TombolHapus aksi={hapusKerjaTambah} id={id} nama={judul} />;
 }
@@ -118,6 +136,8 @@ export function TabelBoqUnit({
       bolehHarga={bolehHarga}
       bolehUbah={bolehUbah}
       konteksImpor={konteks}
+      sasaranImpor="unit"
+      idImpor={unitId}
       aksiSimpan={(json) => simpanBoqUnit(unitId, json)}
     />
   );
@@ -138,6 +158,8 @@ export function TabelRapUnit({
       bolehHarga={bolehHarga}
       bolehUbah={bolehUbah}
       konteksImpor={konteks}
+      sasaranImpor="unit"
+      idImpor={unitId}
       aksiSimpan={(json) => simpanRapUnit(unitId, json)}
     />
   );
@@ -156,6 +178,8 @@ export function TabelBoqKt({
       bolehHarga={bolehHarga}
       bolehUbah={bolehUbah}
       konteksImpor={konteks}
+      sasaranImpor="kerjaTambah"
+      idImpor={ktId}
       grupBaru="Kerja Tambah"
       aksiSimpan={(json) => simpanBoqKerjaTambah(ktId, json)}
     />
@@ -177,6 +201,8 @@ export function TabelRapKt({
       bolehHarga={bolehHarga}
       bolehUbah={bolehUbah}
       konteksImpor={konteks}
+      sasaranImpor="kerjaTambah"
+      idImpor={ktId}
       aksiSimpan={(json) => simpanRapKerjaTambah(ktId, json)}
     />
   );
