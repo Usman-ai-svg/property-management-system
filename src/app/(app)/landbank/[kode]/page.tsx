@@ -7,6 +7,10 @@ import { luasTotal } from "@/lib/data/proyek";
 import { m2, pct, rp } from "@/lib/format";
 import { Badge, CardHead, InfoRow, TabelHead, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
+import {
+  FormCashflow, FormPembanding, FormPosHpp, FormPosOmzet, FormPosOperasional,
+  HapusCashflow, HapusPembanding, HapusPosHpp, HapusPosOmzet, HapusPosOperasional,
+} from "../editors-bp";
 import { EditBiayaLahan } from "./editors";
 
 const BP_TAB = [
@@ -41,6 +45,7 @@ export default async function DetailLandbank({
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
   const ubahHarga = bolehUbah(pengguna, "hargaRabRap");
   const bolehBp = bolehLihat(pengguna, "businessPlan");
+  const bolehUbahBp = bolehUbah(pengguna, "businessPlan");
   const ubahTeknis = bolehUbah(pengguna, "dokumenTeknis");
 
   const proyek = await prisma.project.findUnique({
@@ -75,6 +80,7 @@ export default async function DetailLandbank({
     ? await prisma.businessPlan.findUnique({
         where: { projectId: proyek.id },
         select: {
+          id: true,
           hpp: { orderBy: { urutan: "asc" }, select: { id: true, nama: true, nilai: true } },
           omzet: { orderBy: { urutan: "asc" }, select: { id: true, tipe: true, jumlah: true, harga: true } },
           operasional: { orderBy: { urutan: "asc" }, select: { id: true, nama: true, nilai: true } },
@@ -207,6 +213,7 @@ export default async function DetailLandbank({
             <TabelHead
               judul="Market Research"
               keterangan={`Proyek pembanding radius ±5 km · ${proyek.marketComparables.length} proyek`}
+              aksi={bolehUbahBp && <FormPembanding kodeProyek={proyek.kode} />}
             />
             <div className="tablewrap" style={{ maxHeight: 400, overflowY: "auto" }}>
               <table>
@@ -218,6 +225,7 @@ export default async function DetailLandbank({
                     <th style={{ textAlign: "right" }}>Luas Unit</th>
                     <th style={{ textAlign: "right" }}>Luas Lahan</th>
                     <th style={{ textAlign: "right" }}>Harga</th>
+                    {bolehUbahBp && <th style={{ width: 74 }} />}
                   </tr>
                 </thead>
                 <tbody>
@@ -240,12 +248,27 @@ export default async function DetailLandbank({
                         <td style={{ textAlign: "right" }}>{t.luasUnit} m²</td>
                         <td style={{ textAlign: "right" }}>{t.luasLahan} m²</td>
                         <td className="num" style={{ textAlign: "right" }}>{rp(t.harga)}</td>
+                        {bolehUbahBp && (
+                          <td>
+                            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                              <FormPembanding
+                                kodeProyek={proyek.kode}
+                                data={{
+                                  id: t.id, nama: mp.nama, jarak: mp.jarak, tipe: t.tipe,
+                                  jumlah: t.jumlah, luasUnit: t.luasUnit,
+                                  luasLahan: t.luasLahan, harga: t.harga,
+                                }}
+                              />
+                              <HapusPembanding id={t.id} nama={`${mp.nama} · ${t.tipe}`} />
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     )),
                   )}
                   {proyek.marketComparables.length === 0 && (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: "center", color: "var(--muted)", padding: 22 }}>
+                      <td colSpan={bolehUbahBp ? 7 : 6} style={{ textAlign: "center", color: "var(--muted)", padding: 22 }}>
                         Belum ada proyek pembanding.
                       </td>
                     </tr>
@@ -299,13 +322,18 @@ export default async function DetailLandbank({
             </div>
 
             {bpAktif === "hpp" && (
-              <div className="card tablewrap">
+              <div className="card" style={{ overflow: "hidden" }}>
+                {bolehUbahBp && (
+                  <TabelHead judul="Rencana HPP" aksi={<FormPosHpp businessPlanId={rencana.id} />} />
+                )}
+                <div className="tablewrap">
                 <table>
                   <thead>
                     <tr>
                       <th>Komponen</th>
                       <th style={{ textAlign: "right" }}>Anggaran</th>
                       <th style={{ textAlign: "right" }}>Porsi</th>
+                      {bolehUbahBp && <th style={{ width: 74 }} />}
                     </tr>
                   </thead>
                   <tbody>
@@ -316,20 +344,34 @@ export default async function DetailLandbank({
                         <td style={{ textAlign: "right", color: "var(--muted)" }}>
                           {totalHpp ? pct(h.nilai / totalHpp, 1) : "—"}
                         </td>
+                        {bolehUbahBp && (
+                          <td>
+                            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                              <FormPosHpp businessPlanId={rencana.id} pos={h} />
+                              <HapusPosHpp id={h.id} nama={h.nama} />
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                     <tr style={{ fontWeight: 700, background: "#f6f9fa" }}>
                       <td>TOTAL HPP</td>
                       <td className="num" style={{ textAlign: "right" }}>{rp(totalHpp)}</td>
                       <td style={{ textAlign: "right" }}>100%</td>
+                      {bolehUbahBp && <td />}
                     </tr>
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
 
             {bpAktif === "omzet" && (
-              <div className="card tablewrap">
+              <div className="card" style={{ overflow: "hidden" }}>
+                {bolehUbahBp && (
+                  <TabelHead judul="Rencana Omset" aksi={<FormPosOmzet businessPlanId={rencana.id} />} />
+                )}
+                <div className="tablewrap">
                 <table>
                   <thead>
                     <tr>
@@ -337,6 +379,7 @@ export default async function DetailLandbank({
                       <th style={{ textAlign: "right" }}>Jumlah</th>
                       <th style={{ textAlign: "right" }}>Harga Satuan</th>
                       <th style={{ textAlign: "right" }}>Subtotal</th>
+                      {bolehUbahBp && <th style={{ width: 74 }} />}
                     </tr>
                   </thead>
                   <tbody>
@@ -346,25 +389,44 @@ export default async function DetailLandbank({
                         <td style={{ textAlign: "right" }}>{o.jumlah}</td>
                         <td className="num" style={{ textAlign: "right" }}>{rp(o.harga)}</td>
                         <td className="num" style={{ textAlign: "right" }}>{rp(o.jumlah * o.harga)}</td>
+                        {bolehUbahBp && (
+                          <td>
+                            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                              <FormPosOmzet businessPlanId={rencana.id} pos={o} />
+                              <HapusPosOmzet id={o.id} tipe={o.tipe} />
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                     <tr style={{ fontWeight: 700, background: "#f6f9fa" }}>
                       <td colSpan={3}>TOTAL OMSET</td>
                       <td className="num" style={{ textAlign: "right" }}>{rp(totalOmzet)}</td>
+                      {bolehUbahBp && <td />}
                     </tr>
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
 
             {bpAktif === "ops" && (
-              <div className="card tablewrap">
+              <div className="card" style={{ overflow: "hidden" }}>
+                {bolehUbahBp && (
+                  <TabelHead
+                    judul="Rencana Biaya Operasional"
+                    keterangan="Nama pos dipakai untuk mencocokkan biaya operasional yang dicatat di Plan vs Realisasi."
+                    aksi={<FormPosOperasional businessPlanId={rencana.id} />}
+                  />
+                )}
+                <div className="tablewrap">
                 <table>
                   <thead>
                     <tr>
                       <th>Komponen</th>
                       <th style={{ textAlign: "right" }}>Anggaran</th>
                       <th style={{ textAlign: "right" }}>Porsi terhadap Omset</th>
+                      {bolehUbahBp && <th style={{ width: 74 }} />}
                     </tr>
                   </thead>
                   <tbody>
@@ -375,6 +437,14 @@ export default async function DetailLandbank({
                         <td style={{ textAlign: "right", color: "var(--muted)" }}>
                           {totalOmzet ? pct(o.nilai / totalOmzet, 1) : "—"}
                         </td>
+                        {bolehUbahBp && (
+                          <td>
+                            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                              <FormPosOperasional businessPlanId={rencana.id} pos={o} />
+                              <HapusPosOperasional id={o.id} nama={o.nama} />
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                     <tr style={{ fontWeight: 700, background: "#f6f9fa" }}>
@@ -383,9 +453,11 @@ export default async function DetailLandbank({
                       <td style={{ textAlign: "right" }}>
                         {totalOmzet ? pct(totalOps / totalOmzet, 1) : "—"}
                       </td>
+                      {bolehUbahBp && <td />}
                     </tr>
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
 
@@ -428,7 +500,11 @@ export default async function DetailLandbank({
             )}
 
             {bpAktif === "cash" && (
-              <div className="card tablewrap">
+              <div className="card" style={{ overflow: "hidden" }}>
+                {bolehUbahBp && (
+                  <TabelHead judul="Rencana Cashflow" aksi={<FormCashflow businessPlanId={rencana.id} />} />
+                )}
+                <div className="tablewrap">
                 <table>
                   <thead>
                     <tr>
@@ -437,6 +513,7 @@ export default async function DetailLandbank({
                       <th style={{ textAlign: "right" }}>Kas Keluar</th>
                       <th style={{ textAlign: "right" }}>Net</th>
                       <th style={{ textAlign: "right" }}>Kumulatif</th>
+                      {bolehUbahBp && <th style={{ width: 74 }} />}
                     </tr>
                   </thead>
                   <tbody>
@@ -470,11 +547,20 @@ export default async function DetailLandbank({
                             {kumulatif < 0 ? "−" : ""}
                             {rp(Math.abs(kumulatif))}
                           </td>
+                          {bolehUbahBp && (
+                            <td>
+                              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                                <FormCashflow businessPlanId={rencana.id} baris={c} />
+                                <HapusCashflow id={c.id} periode={c.periode} />
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
           </>

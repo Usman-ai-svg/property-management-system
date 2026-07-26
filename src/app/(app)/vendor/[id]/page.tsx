@@ -6,6 +6,7 @@ import { ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Badge, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { TambahPembayaran, TambahVo } from "./editors";
+import { HapusKontrak, TambahKontrak, UbahKontrak } from "../editors-vendor";
 
 const TAB = [
   ["kontrak", "Kontrak"],
@@ -96,6 +97,29 @@ export default async function DetailVendor({
 
   if (!vendor) notFound();
 
+  // Proyek beserta unit dan sarprasnya, untuk memilih cakupan kontrak baru.
+  const proyekUntukKontrak = bolehUbahKontrak
+    ? (
+        await prisma.project.findMany({
+          where: filterProyek(pengguna),
+          orderBy: { kode: "asc" },
+          select: {
+            kode: true, nama: true,
+            units: {
+              orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
+              select: { id: true, nomor: true, phase: { select: { kode: true } }, unitType: { select: { nama: true } } },
+            },
+            infrastructures: { orderBy: { kode: "asc" }, select: { id: true, nama: true, jenis: true } },
+          },
+        })
+      ).map((p) => ({
+        kode: p.kode,
+        nama: p.nama,
+        units: p.units.map((u) => ({ id: u.id, nama: `Unit ${u.phase.kode}-${u.nomor} · ${u.unitType.nama}` })),
+        sarpras: p.infrastructures.map((s) => ({ id: s.id, nama: `${s.nama} · ${s.jenis}` })),
+      }))
+    : [];
+
   // Kontrak dikelompokkan per proyek, seperti pada artifact.
   const perProyek = new Map<string, typeof vendor.contracts>();
   for (const k of vendor.contracts) {
@@ -137,12 +161,22 @@ export default async function DetailVendor({
         </div>
       </div>
 
-      <div className="tabbar" style={{ marginBottom: 16 }}>
-        {TAB.map(([id2, label]) => (
-          <Link key={id2} href={`?tab=${id2}`} className={"tab" + (tabAktif === id2 ? " active" : "")}>
-            {label}
-          </Link>
-        ))}
+      <div
+        style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          gap: 12, flexWrap: "wrap", marginBottom: 16,
+        }}
+      >
+        <div className="tabbar" style={{ marginBottom: 0 }}>
+          {TAB.map(([id2, label]) => (
+            <Link key={id2} href={`?tab=${id2}`} className={"tab" + (tabAktif === id2 ? " active" : "")}>
+              {label}
+            </Link>
+          ))}
+        </div>
+        {tabAktif === "kontrak" && bolehUbahKontrak && (
+          <TambahKontrak vendorId={vendor.id} namaVendor={vendor.nama} proyek={proyekUntukKontrak} />
+        )}
       </div>
 
       {/* ================= KONTRAK ================= */}
@@ -204,15 +238,30 @@ export default async function DetailVendor({
                             {tanggal(k.mulai)}
                           </div>
                         </div>
-                        <span
-                          className="chip"
-                          style={{
-                            background: adaOverride ? "#fff3df" : "#eef2f3",
-                            color: adaOverride ? "var(--amber)" : "var(--muted)",
-                          }}
-                        >
-                          {k.jenis === "Unit" ? (adaOverride ? "Override manual" : "Bagi rata") : "Sarpras"}
-                        </span>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <span
+                            className="chip"
+                            style={{
+                              background: adaOverride ? "#fff3df" : "#eef2f3",
+                              color: adaOverride ? "var(--amber)" : "var(--muted)",
+                            }}
+                          >
+                            {k.jenis === "Unit" ? (adaOverride ? "Override manual" : "Bagi rata") : "Sarpras"}
+                          </span>
+                          {bolehUbahKontrak && (
+                            <>
+                              <UbahKontrak
+                                kontrak={{
+                                  id: k.id, kode: k.kode, deskripsi: k.deskripsi,
+                                  nominal: k.nominal, retensiPct: k.retensiPct,
+                                  jatuhTempoBln: k.jatuhTempoBln,
+                                  mulai: k.mulai.toISOString().slice(0, 10),
+                                }}
+                              />
+                              <HapusKontrak id={k.id} kode={k.kode} />
+                            </>
+                          )}
+                        </div>
                       </div>
 
                       {bolehHarga && (

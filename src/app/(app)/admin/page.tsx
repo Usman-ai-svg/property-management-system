@@ -7,6 +7,10 @@ import { luasTotal } from "@/lib/data/proyek";
 import { m2, tanggalJam } from "@/lib/format";
 import { Badge, TabelHead, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { SelIzin, TombolStatusUser } from "./matriks";
+import {
+  HapusFase, HapusProyek, HapusUser, KelolaFase, TambahProyek, TambahUser,
+  UbahFase, UbahProyek, UbahUser,
+} from "./editors-admin";
 
 const TAB = [
   ["proyek", "Pengelolaan Proyek"],
@@ -50,6 +54,10 @@ export default async function Admin({
       select: {
         id: true, kode: true, nama: true, status: true, statusLahan: true,
         luasKavlingEfektif: true, luasSarana: true, luasPrasarana: true, luasRth: true,
+        fases: {
+          orderBy: { urutan: "asc" as const },
+          select: { id: true, kode: true, nama: true, urutan: true, _count: { select: { units: true } } },
+        },
         _count: { select: { units: true, infrastructures: true, contracts: true } },
       },
     }),
@@ -65,8 +73,8 @@ export default async function Admin({
       orderBy: { nama: "asc" },
       select: {
         id: true, nama: true, inisial: true, email: true, aktif: true, semuaProyek: true,
-        roles: { select: { role: { select: { nama: true, grup: true } } } },
-        aksesProyek: { select: { project: { select: { kode: true } } } },
+        roles: { select: { role: { select: { id: true, nama: true, grup: true } } } },
+        aksesProyek: { select: { project: { select: { id: true, kode: true } } } },
       },
     }),
     prisma.auditLog.findMany({
@@ -109,7 +117,8 @@ export default async function Admin({
         <div className="card" style={{ overflow: "hidden" }}>
           <TabelHead
             judul={`Pengelolaan Proyek · ${proyek.length} proyek`}
-            keterangan="Ringkasan isi tiap proyek. Penyuntingan dilakukan dari Master Proyek."
+            keterangan="Fase dikelola di sini. Lokasi, luas, unit, dan sarpras disunting dari Master Proyek."
+            aksi={bisaKelola && <TambahProyek />}
           />
           <div className="tablewrap">
             <table>
@@ -122,6 +131,7 @@ export default async function Admin({
                   <th style={{ textAlign: "right" }}>Unit</th>
                   <th style={{ textAlign: "right" }}>Sarpras</th>
                   <th style={{ textAlign: "right" }}>Kontrak</th>
+                  <th style={{ minWidth: 150 }}>Fase</th>
                   <th />
                 </tr>
               </thead>
@@ -141,12 +151,47 @@ export default async function Admin({
                     <td style={{ textAlign: "right" }}>{p._count.infrastructures}</td>
                     <td style={{ textAlign: "right" }}>{p._count.contracts}</td>
                     <td>
-                      <Link
-                        href={`/master/${p.kode}`}
-                        style={{ color: "var(--teal)", fontSize: 12, fontWeight: 600, textDecoration: "none" }}
-                      >
-                        Buka →
-                      </Link>
+                      <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+                        {p.fases.map((f) => (
+                          <span key={f.id} style={{ display: "flex", alignItems: "center" }}>
+                            <span className="chip" style={{ background: "#eef3f4", color: "var(--muted)" }}>
+                              {f.kode}
+                            </span>
+                            {bisaKelola && (
+                              <>
+                                <UbahFase fase={f} />
+                                <HapusFase id={f.id} kode={f.kode} />
+                              </>
+                            )}
+                          </span>
+                        ))}
+                        {bisaKelola && (
+                          <KelolaFase
+                            projectId={p.id}
+                            kodeProyek={p.kode}
+                            fases={p.fases.map((f) => ({
+                              id: f.id, kode: f.kode, nama: f.nama,
+                              urutan: f.urutan, jumlahUnit: f._count.units,
+                            }))}
+                          />
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                        <Link
+                          href={`/master/${p.kode}`}
+                          style={{ color: "var(--teal)", fontSize: 12, fontWeight: 600, textDecoration: "none" }}
+                        >
+                          Buka →
+                        </Link>
+                        {bisaKelola && (
+                          <>
+                            <UbahProyek proyek={p} />
+                            <HapusProyek id={p.id} kode={p.kode} />
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -232,6 +277,14 @@ export default async function Admin({
                 ? "Klik status untuk mengaktifkan atau menonaktifkan akun."
                 : "Peran Anda hanya dapat melihat daftar ini."
             }
+            aksi={
+              bisaKelola && (
+                <TambahUser
+                  peran={peran.map((r) => ({ id: r.id, nama: r.nama }))}
+                  proyek={proyek.map((p) => ({ id: p.id, kode: p.kode, nama: p.nama }))}
+                />
+              )
+            }
           />
           <div className="tablewrap">
             <table>
@@ -242,6 +295,7 @@ export default async function Admin({
                   <th>Peran</th>
                   <th>Akses Proyek</th>
                   <th>Status</th>
+                  {bisaKelola && <th style={{ width: 74 }} />}
                 </tr>
               </thead>
               <tbody>
@@ -284,6 +338,23 @@ export default async function Admin({
                     <td>
                       <TombolStatusUser userId={u.id} aktif={u.aktif} bolehUbah={bisaKelola} />
                     </td>
+                    {bisaKelola && (
+                      <td>
+                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                          <UbahUser
+                            user={{
+                              id: u.id, nama: u.nama, email: u.email, inisial: u.inisial,
+                              semuaProyek: u.semuaProyek,
+                              peranIds: u.roles.map((r) => r.role.id),
+                              proyekIds: u.aksesProyek.map((a) => a.project.id),
+                            }}
+                            peran={peran.map((r) => ({ id: r.id, nama: r.nama }))}
+                            proyek={proyek.map((p) => ({ id: p.id, kode: p.kode, nama: p.nama }))}
+                          />
+                          <HapusUser id={u.id} nama={u.nama} />
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

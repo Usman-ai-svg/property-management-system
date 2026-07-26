@@ -1,10 +1,14 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { ambilPengguna, bolehLihat, filterProyek } from "@/lib/auth/rbac";
+import { ambilPengguna, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
 import { ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
+import {
+  HapusTender, HapusVendor, TambahPeserta, TambahTender, TambahVendor,
+  UbahStatusTender, UbahVendor,
+} from "./editors-vendor";
 
 const WARNA_TENDER: Record<string, [string, string]> = {
   Dibuka: ["#e7f0f4", "var(--teal)"],
@@ -26,13 +30,14 @@ export default async function VendorManagement() {
   }
 
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
+  const bolehKelola = bolehUbah(pengguna, "progress");
 
   // Hanya kontrak pada proyek yang boleh diakses pengguna yang ikut dihitung —
   // vendor yang sama bisa mengerjakan proyek di luar jangkauannya.
   const vendor = await prisma.vendor.findMany({
     orderBy: { nama: "asc" },
     select: {
-      id: true, nama: true, bidang: true, status: true, sejak: true,
+      id: true, nama: true, bidang: true, kontak: true, alamat: true, status: true, sejak: true,
       contracts: {
         where: { project: filterProyek(pengguna) },
         select: {
@@ -61,10 +66,21 @@ export default async function VendorManagement() {
     orderBy: { tanggal: "desc" },
     select: {
       id: true, kode: true, pekerjaan: true, tanggal: true, hps: true, status: true,
+      pemenangVendorId: true,
       project: { select: { kode: true } },
-      peserta: { select: { nilai: true } },
+      peserta: { select: { vendorId: true, nilai: true, vendor: { select: { nama: true } } } },
     },
   });
+
+  // Proyek dan vendor untuk formulir tender.
+  const daftarProyek = bolehKelola
+    ? await prisma.project.findMany({
+        where: filterProyek(pengguna),
+        orderBy: { kode: "asc" },
+        select: { kode: true, nama: true },
+      })
+    : [];
+  const vendorAktif = vendor.filter((v) => v.status === "Aktif").map((v) => ({ id: v.id, nama: v.nama }));
 
   const totalNilai = baris.reduce((s, v) => s + v.nilai, 0);
   const totalTerbayar = baris.reduce((s, v) => s + v.terbayar, 0);
@@ -99,6 +115,7 @@ export default async function VendorManagement() {
         <TabelHead
           judul="Daftar Vendor"
           keterangan="Klik nama vendor untuk membuka kontrak, penawaran, dan riwayat pembayarannya."
+          aksi={bolehKelola && <TambahVendor />}
         />
         <div className="tablewrap">
           <table>
@@ -112,6 +129,7 @@ export default async function VendorManagement() {
                 {bolehHarga && <th style={{ textAlign: "right" }}>Terbayar</th>}
                 {bolehHarga && <th style={{ minWidth: 170 }}>Progres Bayar</th>}
                 <th>Status</th>
+                {bolehKelola && <th style={{ width: 74 }} />}
               </tr>
             </thead>
             <tbody>
@@ -162,6 +180,19 @@ export default async function VendorManagement() {
                       {v.status}
                     </span>
                   </td>
+                  {bolehKelola && (
+                    <td>
+                      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                        <UbahVendor
+                          vendor={{
+                            id: v.id, nama: v.nama, bidang: v.bidang, kontak: v.kontak,
+                            alamat: v.alamat, sejak: v.sejak, status: v.status,
+                          }}
+                        />
+                        <HapusVendor id={v.id} nama={v.nama} />
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -170,7 +201,10 @@ export default async function VendorManagement() {
       </div>
 
       <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
-        <TabelHead judul="Tender / Penawaran Berjalan" />
+        <TabelHead
+          judul="Tender / Penawaran Berjalan"
+          aksi={bolehKelola && <TambahTender proyek={daftarProyek} />}
+        />
         <div className="tablewrap">
           <table>
             <thead>
@@ -183,6 +217,7 @@ export default async function VendorManagement() {
                 <th style={{ textAlign: "right" }}>Peserta</th>
                 {bolehHarga && <th style={{ textAlign: "right" }}>Penawaran Terendah</th>}
                 <th>Status</th>
+                {bolehKelola && <th style={{ width: 120 }} />}
               </tr>
             </thead>
             <tbody>
@@ -204,12 +239,29 @@ export default async function VendorManagement() {
                     <td>
                       <Badge nilai={t.status} peta={WARNA_TENDER} />
                     </td>
+                    {bolehKelola && (
+                      <td>
+                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                          <TambahPeserta tenderId={t.id} kodeTender={t.kode} vendor={vendorAktif} />
+                          <UbahStatusTender
+                            tender={{
+                              id: t.id, kode: t.kode, status: t.status,
+                              pemenangVendorId: t.pemenangVendorId,
+                              peserta: t.peserta.map((p) => ({
+                                vendorId: p.vendorId, nama: p.vendor.nama, nilai: p.nilai,
+                              })),
+                            }}
+                          />
+                          <HapusTender id={t.id} kode={t.kode} />
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
               {tender.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", color: "var(--muted)", padding: 22 }}>
+                  <td colSpan={bolehKelola ? 9 : 8} style={{ textAlign: "center", color: "var(--muted)", padding: 22 }}>
                     Belum ada tender berjalan.
                   </td>
                 </tr>

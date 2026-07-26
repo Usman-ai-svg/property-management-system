@@ -40,6 +40,11 @@ export const JENIS_KONTRAK = ["Unit", "Sarpras"] as const;
 
 export const STATUS_VO = ["Diajukan", "Disetujui", "Ditolak"] as const;
 
+export const STATUS_VENDOR = ["Aktif", "Nonaktif"] as const;
+
+/** Kelengkapan dokumen peserta tender. */
+export const DOKUMEN_TENDER = ["Lengkap", "Kurang dokumen"] as const;
+
 export const STATUS_TENDER = ["Dibuka", "Evaluasi", "Ditetapkan", "Batal"] as const;
 
 export const PERUNTUKAN_BIAYA = [
@@ -64,6 +69,8 @@ export const STATUS_BAYAR = ["Lunas", "DP", "Belum"] as const;
 export const STATUS_ASET = ["Tersedia", "Digunakan", "Pemeliharaan", "Rusak"] as const;
 
 export const KEPEMILIKAN_ASET = ["Milik Sendiri", "Sewa"] as const;
+/** Satuan pemakaian alat: alat berat dihitung per jam, alat bantu per hari. */
+export const SATUAN_PAKAI = ["jam", "hari"] as const;
 
 /** Sub-bagian yang hak aksesnya diatur terpisah di Admin → Kelola Hak Akses. */
 export const SECTIONS = [
@@ -75,6 +82,7 @@ export const SECTIONS = [
   "businessPlan",
   "keuangan",
   "progress",
+  "aset",
 ] as const;
 
 export const SECTION_LABELS: Record<Section, string> = {
@@ -86,6 +94,7 @@ export const SECTION_LABELS: Record<Section, string> = {
   businessPlan: "Business Plan / Margin",
   keuangan: "Keuangan Operasional",
   progress: "Progress & Kontrak",
+  aset: "Equipment & Asset",
 };
 
 /** Peran. Satu user boleh memegang lebih dari satu. */
@@ -145,12 +154,15 @@ export type JenisSarpras = (typeof JENIS_SARPRAS)[number];
 export type JenisKontrak = (typeof JENIS_KONTRAK)[number];
 export type StatusVo = (typeof STATUS_VO)[number];
 export type StatusTender = (typeof STATUS_TENDER)[number];
+export type StatusVendor = (typeof STATUS_VENDOR)[number];
+export type DokumenTender = (typeof DOKUMEN_TENDER)[number];
 export type PeruntukanBiaya = (typeof PERUNTUKAN_BIAYA)[number];
 export type JenisBiaya = (typeof JENIS_BIAYA)[number];
 export type MetodeBayar = (typeof METODE_BAYAR)[number];
 export type StatusBayar = (typeof STATUS_BAYAR)[number];
 export type StatusAset = (typeof STATUS_ASET)[number];
 export type KepemilikanAset = (typeof KEPEMILIKAN_ASET)[number];
+export type SatuanPakai = (typeof SATUAN_PAKAI)[number];
 export type Section = (typeof SECTIONS)[number];
 export type Role = (typeof ROLES)[number];
 export type RoleGroup =

@@ -44,7 +44,10 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
           statusJual: true, progress: true,
           phase: { select: { kode: true } },
           unitType: { select: { nama: true, luasBangunan: true } },
-          penerimaan: { select: { nominal: true } },
+          penerimaan: {
+            orderBy: { tanggal: "asc" as const },
+            select: { id: true, tanggal: true, uraian: true, nominal: true },
+          },
         },
       },
       expenses: { select: { peruntukan: true, total: true } },
@@ -128,6 +131,14 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
       real: akad ? x.hargaJual : 0,
       pencairan: akad ? x.hargaJual : 0,
       sudahCair: x.penerimaan.reduce((s, p) => s + p.nominal, 0),
+      // Riwayat ikut dibawa supaya pencairannya bisa disunting dari tabel
+      // penjualan tanpa query tambahan per baris.
+      penerimaan: x.penerimaan.map((p) => ({
+        id: p.id,
+        tanggal: p.tanggal.toISOString().slice(0, 10),
+        uraian: p.uraian,
+        nominal: p.nominal,
+      })),
     };
   });
 

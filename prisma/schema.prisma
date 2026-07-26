@@ -187,16 +187,18 @@ model Project {
 
   // --- luas (m²) ---
   luasKavlingEfektif Float
-  luasSarana         Float
-  luasPrasarana      Float
-  luasRth            Float
+  luasSarana         Float @default(0)
+  luasPrasarana      Float @default(0)
+  luasRth            Float @default(0)
 
   // --- biaya perolehan lahan (Rp) ---
-  hargaPerM2     Float
-  biayaPembelian Float
-  biayaNotaris   Float
-  biayaBalikNama Float
-  biayaLegalLain Float
+  // Bawaan nol karena proyek yang baru dibuat belum tahu angkanya; diisi
+  // kemudian dari halaman Landbank.
+  hargaPerM2     Float @default(0)
+  biayaPembelian Float @default(0)
+  biayaNotaris   Float @default(0)
+  biayaBalikNama Float @default(0)
+  biayaLegalLain Float @default(0)
 
   analisaDocId String?   @unique
   analisaDoc   Document? @relation("ProjectAnalisa", fields: [analisaDocId], references: [id])

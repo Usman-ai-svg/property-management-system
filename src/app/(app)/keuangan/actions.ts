@@ -253,31 +253,33 @@ async function labelSarpras(id: string | null): Promise<string | null> {
  * nominalnya — jadi penghapusan tetap bisa ditelusuri walau datanya tidak ada
  * lagi. Jejak audit bersifat append-only dan tidak ikut terhapus.
  */
-export async function hapusPengeluaran(form: FormData): Promise<void> {
-  const id = String(form.get("id") ?? "");
+export async function hapusPengeluaran(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = String(form.get("id") ?? "");
 
-  const lama = await prisma.expense.findUnique({
-    where: { id },
-    select: {
-      id: true, projectId: true, uraian: true, total: true, peruntukan: true,
-      project: { select: { kode: true } },
-    },
+    const lama = await prisma.expense.findUnique({
+      where: { id },
+      select: {
+        id: true, projectId: true, uraian: true, total: true, peruntukan: true,
+        project: { select: { kode: true } },
+      },
+    });
+    if (!lama) return;
+
+    const pengguna = await izinkan("keuangan", lama.projectId);
+
+    await prisma.expense.delete({ where: { id } });
+
+    await catat({
+      pengguna, projectId: lama.projectId,
+      objek: `Pengeluaran · ${lama.peruntukan}`,
+      aksi: "Hapus pengeluaran",
+      dari: `${lama.uraian} — ${rpLog(lama.total)}`,
+      ke: "dihapus",
+    });
+
+    revalidatePath("/keuangan");
+    revalidatePath(`/keuangan/${lama.project.kode}`);
+    revalidatePath("/");
   });
-  if (!lama) return;
-
-  const pengguna = await izinkan("keuangan", lama.projectId);
-
-  await prisma.expense.delete({ where: { id } });
-
-  await catat({
-    pengguna, projectId: lama.projectId,
-    objek: `Pengeluaran · ${lama.peruntukan}`,
-    aksi: "Hapus pengeluaran",
-    dari: `${lama.uraian} — ${rpLog(lama.total)}`,
-    ke: "dihapus",
-  });
-
-  revalidatePath("/keuangan");
-  revalidatePath(`/keuangan/${lama.project.kode}`);
-  revalidatePath("/");
 }

@@ -281,35 +281,37 @@ export async function simpanTipeUnit(_s: HasilAksi | null, form: FormData): Prom
   });
 }
 
-export async function hapusTipeUnit(form: FormData): Promise<void> {
-  const id = String(form.get("id") ?? "");
-  const lama = await prisma.unitType.findUnique({
-    where: { id },
-    select: {
-      id: true, kode: true, nama: true, projectId: true,
-      project: { select: { kode: true } },
-      _count: { select: { units: true } },
-    },
+export async function hapusTipeUnit(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = String(form.get("id") ?? "");
+    const lama = await prisma.unitType.findUnique({
+      where: { id },
+      select: {
+        id: true, kode: true, nama: true, projectId: true,
+        project: { select: { kode: true } },
+        _count: { select: { units: true } },
+      },
+    });
+    if (!lama) return;
+
+    const pengguna = await izinkan("dokumenTeknis", lama.projectId);
+
+    // Tipe yang masih dipakai unit tidak boleh dihapus — menghapusnya akan
+    // memutus rujukan unit ke luas bangunan dan namanya.
+    if (lama._count.units > 0) {
+      throw new GagalIzin(
+        `Tipe "${lama.nama}" masih dipakai ${lama._count.units} unit. Hapus atau pindahkan unit tersebut lebih dulu.`,
+      );
+    }
+
+    await prisma.unitType.delete({ where: { id } });
+    await catat({
+      pengguna, projectId: lama.projectId, objek: `Tipe unit ${lama.kode}`,
+      aksi: "Hapus tipe unit", dari: lama.nama,
+    });
+
+    segarkan(lama.project.kode);
   });
-  if (!lama) return;
-
-  const pengguna = await izinkan("dokumenTeknis", lama.projectId);
-
-  // Tipe yang masih dipakai unit tidak boleh dihapus — menghapusnya akan
-  // memutus rujukan unit ke luas bangunan dan namanya.
-  if (lama._count.units > 0) {
-    throw new GagalIzin(
-      `Tipe "${lama.nama}" masih dipakai ${lama._count.units} unit. Hapus atau pindahkan unit tersebut lebih dulu.`,
-    );
-  }
-
-  await prisma.unitType.delete({ where: { id } });
-  await catat({
-    pengguna, projectId: lama.projectId, objek: `Tipe unit ${lama.kode}`,
-    aksi: "Hapus tipe unit", dari: lama.nama,
-  });
-
-  segarkan(lama.project.kode);
 }
 
 // ===========================================================================
@@ -474,32 +476,34 @@ export async function tambahUnit(_s: HasilAksi | null, form: FormData): Promise<
   });
 }
 
-export async function hapusUnit(form: FormData): Promise<void> {
-  const id = String(form.get("id") ?? "");
-  const lama = await prisma.unit.findUnique({
-    where: { id },
-    select: {
-      id: true, kode: true, nomor: true, projectId: true, progress: true,
-      phase: { select: { kode: true } }, project: { select: { kode: true } },
-    },
+export async function hapusUnit(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = String(form.get("id") ?? "");
+    const lama = await prisma.unit.findUnique({
+      where: { id },
+      select: {
+        id: true, kode: true, nomor: true, projectId: true, progress: true,
+        phase: { select: { kode: true } }, project: { select: { kode: true } },
+      },
+    });
+    if (!lama) return;
+
+    const pengguna = await izinkan("daftarUnit", lama.projectId);
+
+    if (lama.progress > 0) {
+      throw new GagalIzin(
+        `Unit ${lama.kode} sudah berjalan ${lama.progress}%. Unit yang sudah dibangun tidak boleh dihapus — ubah statusnya bila perlu.`,
+      );
+    }
+
+    await prisma.unit.delete({ where: { id } });
+    await catat({
+      pengguna, projectId: lama.projectId, objek: `Unit ${lama.phase.kode}-${lama.nomor}`,
+      aksi: "Hapus unit", dari: lama.kode,
+    });
+
+    segarkan(lama.project.kode);
   });
-  if (!lama) return;
-
-  const pengguna = await izinkan("daftarUnit", lama.projectId);
-
-  if (lama.progress > 0) {
-    throw new GagalIzin(
-      `Unit ${lama.kode} sudah berjalan ${lama.progress}%. Unit yang sudah dibangun tidak boleh dihapus — ubah statusnya bila perlu.`,
-    );
-  }
-
-  await prisma.unit.delete({ where: { id } });
-  await catat({
-    pengguna, projectId: lama.projectId, objek: `Unit ${lama.phase.kode}-${lama.nomor}`,
-    aksi: "Hapus unit", dari: lama.kode,
-  });
-
-  segarkan(lama.project.kode);
 }
 
 // ===========================================================================
@@ -860,31 +864,33 @@ export async function simpanSarpras(_s: HasilAksi | null, form: FormData): Promi
   });
 }
 
-export async function hapusSarpras(form: FormData): Promise<void> {
-  const id = String(form.get("id") ?? "");
-  const lama = await prisma.infrastructure.findUnique({
-    where: { id },
-    select: {
-      id: true, nama: true, progress: true, projectId: true,
-      project: { select: { kode: true } },
-      _count: { select: { contractItems: true } },
-    },
+export async function hapusSarpras(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = String(form.get("id") ?? "");
+    const lama = await prisma.infrastructure.findUnique({
+      where: { id },
+      select: {
+        id: true, nama: true, progress: true, projectId: true,
+        project: { select: { kode: true } },
+        _count: { select: { contractItems: true } },
+      },
+    });
+    if (!lama) return;
+
+    const pengguna = await izinkan("daftarSarpras", lama.projectId);
+
+    if (lama._count.contractItems > 0) {
+      throw new GagalIzin(
+        `"${lama.nama}" masih tercakup dalam ${lama._count.contractItems} kontrak. Lepaskan dari kontrak lebih dulu.`,
+      );
+    }
+
+    await prisma.infrastructure.delete({ where: { id } });
+    await catat({
+      pengguna, projectId: lama.projectId, objek: `Sarpras · ${lama.nama}`,
+      aksi: "Hapus sarpras", dari: `progres ${lama.progress}%`,
+    });
+
+    segarkan(lama.project.kode);
   });
-  if (!lama) return;
-
-  const pengguna = await izinkan("daftarSarpras", lama.projectId);
-
-  if (lama._count.contractItems > 0) {
-    throw new GagalIzin(
-      `"${lama.nama}" masih tercakup dalam ${lama._count.contractItems} kontrak. Lepaskan dari kontrak lebih dulu.`,
-    );
-  }
-
-  await prisma.infrastructure.delete({ where: { id } });
-  await catat({
-    pengguna, projectId: lama.projectId, objek: `Sarpras · ${lama.nama}`,
-    aksi: "Hapus sarpras", dari: `progres ${lama.progress}%`,
-  });
-
-  segarkan(lama.project.kode);
 }

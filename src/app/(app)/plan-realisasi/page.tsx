@@ -6,6 +6,7 @@ import { daftarProyekPlanReal, planVsRealisasi } from "@/lib/data/plan-real";
 import { pct, rp } from "@/lib/format";
 import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { CatatBiayaOperasional } from "./catat-ops";
+import { HapusPembayaranJual, KelolaPembayaranJual, UbahPembayaranJual } from "./bayar-jual";
 
 const TAB = [
   ["hpp", "HPP"],
@@ -139,6 +140,7 @@ export default async function PlanRealisasi({
   if (!d) redirect("/plan-realisasi");
 
   const bolehCatatOps = bolehUbah(pengguna, "businessPlan");
+  const bolehCatatCair = bolehUbah(pengguna, "keuangan");
 
   const targetJual = d.sales.reduce((s, x) => s + x.target, 0);
   const realJual = d.sales.filter((x) => x.akad).reduce((s, x) => s + x.real, 0);
@@ -273,6 +275,7 @@ export default async function PlanRealisasi({
                     <th style={{ textAlign: "right" }}>Sudah Cair</th>
                     <th style={{ textAlign: "right" }}>Belum Cair</th>
                     <th>Status</th>
+                    {bolehCatatCair && <th style={{ minWidth: 130 }}>Pencairan</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -315,6 +318,24 @@ export default async function PlanRealisasi({
                         <td>
                           <Badge nilai={s.akad ? "Akad" : "Tersedia"} peta={WARNA_STATUS.jual} />
                         </td>
+                        {bolehCatatCair && (
+                          <td>
+                            <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+                              <KelolaPembayaranJual
+                                unitId={s.id}
+                                labelUnit={s.no}
+                                hargaJual={s.target}
+                                riwayat={s.penerimaan}
+                              />
+                              {s.penerimaan.map((p) => (
+                                <span key={p.id} style={{ display: "flex", alignItems: "center" }}>
+                                  <UbahPembayaranJual bayar={p} labelUnit={s.no} />
+                                  <HapusPembayaranJual id={p.id} uraian={p.uraian} />
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}

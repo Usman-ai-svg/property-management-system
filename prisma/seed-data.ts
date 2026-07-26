@@ -52,6 +52,7 @@ export const ACL_AWAL: Record<string, string[]> = {
   businessPlan: ["Komisaris", "BOD", "Business Development"],
   keuangan: ["BOD", "Business Development", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor", "Admin", "Finance", "Consultant Finance"],
   progress: ["BOD", "Head Operation Project", "Project Manager", "Supervisor", "Quantity Surveyor", "Arsitek", "Procurement"],
+  aset: SEMUA_PERAN,
 };
 
 /**
@@ -70,6 +71,7 @@ export const ACL_UBAH: Record<string, string[]> = {
   businessPlan: ["BOD", "Business Development"],
   keuangan: ["BOD", "Finance", "Admin", "Head Operation Office"],
   progress: ["BOD", "Project Manager", "Supervisor", "Head Operation Project"],
+  aset: ["BOD", "Head Operation Office", "Head Operation Project", "Project Manager", "Procurement"],
 };
 
 export const USERS = [

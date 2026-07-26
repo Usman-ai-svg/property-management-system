@@ -245,6 +245,13 @@ Yang bisa diubah, beserta izin yang dibutuhkan:
 | Biaya operasional | `businessPlan` | lewat Plan vs Realisasi |
 | Transaksi pengeluaran | `keuangan` | catat, sunting, dan hapus — tiap field yang berubah masuk Log Perubahan |
 | VO & pembayaran kontrak | `progress` / `keuangan` | lewat Vendor Management, tab Kontrak dan Pembayaran |
+| Vendor, kontrak, tender | `progress` | tambah, ubah, hapus — termasuk peserta dan pemenang tender |
+| Peralatan & aset | `aset` | seksi izin baru; tambah, ubah, hapus |
+| Business plan | `businessPlan` | pos HPP, omzet, operasional, dan cashflow |
+| Pembanding pasar | `businessPlan` | pada Feasibility Study |
+| Pembayaran penjualan | `keuangan` | lewat Plan vs Realisasi, tab Penjualan |
+| Proyek & fase | `deskripsi` | lewat Admin → Pengelolaan Proyek |
+| Pengguna | `deskripsi` | tambah, ubah peran & akses proyek, setel ulang sandi |
 
 ### Membuktikan snapshot bekerja
 
@@ -437,10 +444,34 @@ peran aktif lewat pemilih di bilah samping.
 
 ---
 
+## Rambu penghapusan
+
+Data yang sudah punya jejak tidak boleh dihapus begitu saja. Aturan yang
+ditegakkan di server, bukan sekadar disembunyikan tombolnya:
+
+| Yang dihapus | Ditolak bila |
+|---|---|
+| Vendor | masih punya kontrak, tender, atau alat sewa — pakai status Nonaktif |
+| Kontrak | sudah punya pembayaran atau pengeluaran terkait |
+| Tender | sudah ditetapkan pemenangnya — pakai status Batal |
+| Proyek | masih berisi unit, sarpras, kontrak, atau transaksi |
+| Fase | masih dipakai unit |
+| Tipe unit | masih dipakai unit |
+| Pos operasional | sudah punya biaya tercatat |
+| Pengguna | sudah punya entri di Log Perubahan — nonaktifkan saja |
+
+Penolakannya tampil sebagai pesan di sebelah tombolnya. Rambu pengaman yang
+menghasilkan galat 500 lebih buruk daripada tidak ada rambu, karena pengguna
+tidak tahu apa yang terjadi.
+
+---
+
 ## Yang belum dikerjakan
 
 - **Dokumen kerja tambah** belum bisa diganti setelah dibuat; judul serta tabel
   BOQ dan RAP-nya sudah bisa.
-- **Biaya operasional** kini sudah bisa dicatat lewat Plan vs Realisasi, tetapi
-  hanya pos yang ada pada business plan proyeknya. Pos baru masih harus
-  ditambahkan lebih dulu dari business plan.
+- **Cakupan unit/sarpras pada kontrak** hanya ditetapkan saat kontrak dibuat.
+  Mengubahnya menggeser alokasi biaya yang sudah tercatat, jadi itu keputusan
+  tersendiri yang belum dibuatkan alurnya.
+- **Bukti transaksi** masih tersimpan sebagai nama berkas, belum berkas
+  sungguhan seperti dokumen teknis.

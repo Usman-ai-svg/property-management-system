@@ -1,8 +1,12 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { ambilPengguna, bolehLihat } from "@/lib/auth/rbac";
+import { ambilPengguna, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
 import { rp, tanggal } from "@/lib/format";
 import { Badge, TabelHead } from "@/components/ui";
+import { HapusAset, TambahAset, UbahAset } from "./editors";
+
+/** Tanggal untuk <input type="date">: YYYY-MM-DD. */
+const isoTanggal = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 
 const WARNA_ASET: Record<string, [string, string]> = {
   Tersedia: ["#eef2f3", "var(--muted)"],
@@ -16,6 +20,7 @@ export default async function EquipmentAsset() {
   if (!pengguna) redirect("/login");
 
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
+  const bolehKelola = bolehUbah(pengguna, "aset");
 
   const aset = await prisma.equipment.findMany({
     orderBy: { kode: "asc" },
@@ -24,10 +29,24 @@ export default async function EquipmentAsset() {
       jumlah: true, satuan: true, kepemilikan: true, status: true,
       satuanPakai: true, pemakaian: true, nilai: true,
       servisTerakhir: true, servisBerikut: true, penanggungJawab: true,
+      vendorId: true, projectId: true,
       vendor: { select: { nama: true } },
       project: { select: { kode: true } },
     },
   });
+
+  // Pilihan untuk formulir. Vendor tidak dibatasi proyek karena satu vendor
+  // bisa menyewakan alat ke proyek mana pun.
+  const [daftarVendor, daftarProyek] = bolehKelola
+    ? await Promise.all([
+        prisma.vendor.findMany({ orderBy: { nama: "asc" }, select: { id: true, nama: true } }),
+        prisma.project.findMany({
+          where: filterProyek(pengguna),
+          orderBy: { kode: "asc" },
+          select: { id: true, nama: true },
+        }),
+      ])
+    : [[], []];
 
   const milikSendiri = aset.filter((a) => a.kepemilikan === "Milik Sendiri");
   const perluPerhatian = aset.filter((a) => a.status === "Rusak" || a.status === "Pemeliharaan").length;
@@ -62,6 +81,7 @@ export default async function EquipmentAsset() {
         <TabelHead
           judul={`Daftar Peralatan · ${aset.length} jenis`}
           keterangan="Aset sewa menampilkan tarif, bukan nilai perolehan."
+          aksi={bolehKelola && <TambahAset vendor={daftarVendor} proyek={daftarProyek} />}
         />
         <div className="tablewrap">
           <table>
@@ -78,6 +98,7 @@ export default async function EquipmentAsset() {
                 <th>Servis Berikut</th>
                 {bolehHarga && <th style={{ textAlign: "right" }}>Nilai / Tarif</th>}
                 <th>Status</th>
+                {bolehKelola && <th style={{ width: 74 }} />}
               </tr>
             </thead>
             <tbody>
@@ -138,6 +159,27 @@ export default async function EquipmentAsset() {
                     <td>
                       <Badge nilai={a.status} peta={WARNA_ASET} />
                     </td>
+                    {bolehKelola && (
+                      <td>
+                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                          <UbahAset
+                            aset={{
+                              id: a.id, kode: a.kode, nama: a.nama, kategori: a.kategori,
+                              merk: a.merk, jumlah: a.jumlah, satuan: a.satuan,
+                              kepemilikan: a.kepemilikan, vendorId: a.vendorId,
+                              projectId: a.projectId, penanggungJawab: a.penanggungJawab,
+                              status: a.status, satuanPakai: a.satuanPakai, pemakaian: a.pemakaian,
+                              servisTerakhir: isoTanggal(a.servisTerakhir),
+                              servisBerikut: isoTanggal(a.servisBerikut),
+                              nilai: a.nilai,
+                            }}
+                            vendor={daftarVendor}
+                            proyek={daftarProyek}
+                          />
+                          <HapusAset id={a.id} kode={a.kode} />
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

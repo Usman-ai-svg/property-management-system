@@ -23,7 +23,7 @@ export function Field({
   label: string;
   nama: string;
   nilai?: string | number | null;
-  tipe?: "text" | "number" | "textarea";
+  tipe?: "text" | "number" | "textarea" | "tanggal";
   satuan?: string;
   petunjuk?: string;
   wajib?: boolean;
@@ -66,7 +66,7 @@ export function Field({
             id={id}
             name={nama}
             className="inp"
-            type="text"
+            type={tipe === "tanggal" ? "date" : "text"}
             inputMode={tipe === "number" ? "decimal" : undefined}
             defaultValue={nilai ?? ""}
             required={wajib}
@@ -335,16 +335,25 @@ export function TombolTambah({ onClick, label }: { onClick: () => void; label: s
  * Klik pertama mengubah tombol jadi "Yakin?"; klik kedua baru mengirim.
  * Konfirmasi otomatis batal setelah 4 detik agar tidak tertinggal aktif.
  */
+/**
+ * Tombol hapus dua langkah.
+ *
+ * Aksinya mengembalikan `HasilAksi`, bukan void, supaya penolakan — "vendor ini
+ * masih punya kontrak" — tampil sebagai pesan yang bisa dibaca alih-alih
+ * halaman galat. Rambu pengaman yang menghasilkan galat 500 lebih buruk
+ * daripada tidak ada rambu, karena pengguna tidak tahu apa yang terjadi.
+ */
 export function TombolHapus({
   aksi,
   id,
   nama,
 }: {
-  aksi: (form: FormData) => Promise<void> | void;
+  aksi: (sebelumnya: HasilAksi | null, form: FormData) => Promise<HasilAksi>;
   id: string;
   nama: string;
 }) {
   const [siap, setSiap] = useState(false);
+  const [hasil, kirim] = useActionState(aksi, null);
 
   useEffect(() => {
     if (!siap) return;
@@ -352,22 +361,44 @@ export function TombolHapus({
     return () => clearTimeout(t);
   }, [siap]);
 
-  if (!siap) {
-    return <TombolIkon jenis="hapus" judul={`Hapus ${nama}`} onClick={() => setSiap(true)} />;
-  }
+  // Setelah aksinya selesai — berhasil maupun ditolak — tombol kembali ke
+  // keadaan semula supaya tidak menggantung di "Yakin?".
+  useEffect(() => {
+    if (hasil) setSiap(false);
+  }, [hasil]);
 
   return (
-    <form action={aksi} style={{ display: "inline" }}>
-      <input type="hidden" name="id" value={id} />
-      <button
-        type="submit"
-        style={{
-          background: "var(--red)", color: "#fff", border: "none", borderRadius: 6,
-          fontSize: 11, fontWeight: 600, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit",
-        }}
-      >
-        Yakin?
-      </button>
-    </form>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      {siap ? (
+        <form action={kirim} style={{ display: "inline" }}>
+          <input type="hidden" name="id" value={id} />
+          <button
+            type="submit"
+            style={{
+              background: "var(--red)", color: "#fff", border: "none", borderRadius: 6,
+              fontSize: 11, fontWeight: 600, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Yakin?
+          </button>
+        </form>
+      ) : (
+        <TombolIkon jenis="hapus" judul={`Hapus ${nama}`} onClick={() => setSiap(true)} />
+      )}
+
+      {hasil && !hasil.ok && (
+        <span
+          role="alert"
+          style={{
+            display: "inline-flex", alignItems: "flex-start", gap: 5, maxWidth: 320,
+            padding: "5px 9px", borderRadius: 8, background: "#fbeae8",
+            color: "var(--red)", fontSize: 11, lineHeight: 1.45, whiteSpace: "normal",
+          }}
+        >
+          <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 1 }} />
+          {hasil.error}
+        </span>
+      )}
+    </span>
   );
 }

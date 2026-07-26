@@ -531,30 +531,32 @@ export async function ubahJudulKerjaTambah(_s: HasilAksi | null, form: FormData)
   });
 }
 
-export async function hapusKerjaTambah(form: FormData): Promise<void> {
-  const id = String(form.get("id") ?? "");
-  const kt = await prisma.customWork.findUnique({
-    where: { id },
-    select: {
-      id: true, judul: true,
-      unit: {
-        select: {
-          nomor: true, projectId: true,
-          phase: { select: { kode: true } }, project: { select: { kode: true } },
+export async function hapusKerjaTambah(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = String(form.get("id") ?? "");
+    const kt = await prisma.customWork.findUnique({
+      where: { id },
+      select: {
+        id: true, judul: true,
+        unit: {
+          select: {
+            nomor: true, projectId: true,
+            phase: { select: { kode: true } }, project: { select: { kode: true } },
+          },
         },
       },
-    },
+    });
+    if (!kt) return;
+
+    const pengguna = await izinkan("daftarUnit", kt.unit.projectId);
+
+    await prisma.customWork.delete({ where: { id } });
+    await catat({
+      pengguna, projectId: kt.unit.projectId,
+      objek: `Unit ${kt.unit.phase.kode}-${kt.unit.nomor}`,
+      aksi: "Hapus kerja tambah", dari: kt.judul, ke: "dihapus",
+    });
+
+    revalidatePath(`/master/${kt.unit.project.kode}`);
   });
-  if (!kt) return;
-
-  const pengguna = await izinkan("daftarUnit", kt.unit.projectId);
-
-  await prisma.customWork.delete({ where: { id } });
-  await catat({
-    pengguna, projectId: kt.unit.projectId,
-    objek: `Unit ${kt.unit.phase.kode}-${kt.unit.nomor}`,
-    aksi: "Hapus kerja tambah", dari: kt.judul, ke: "dihapus",
-  });
-
-  revalidatePath(`/master/${kt.unit.project.kode}`);
 }
