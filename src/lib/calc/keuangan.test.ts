@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { alokasiKontrak, bagiRata, ringkasKontrak, statusSerapan, totalVoDisetujui } from "./keuangan";
+import {
+  alokasiKontrak, bagiRata, periksaAlokasi, ringkasKontrak, statusSerapan, totalVoDisetujui,
+} from "./keuangan";
 
 describe("statusSerapan", () => {
   it("menandai Over ketika biaya mendahului progres", () => {
@@ -137,5 +139,59 @@ describe("bagiRata", () => {
 
   it("mengembalikan daftar kosong bila tidak ada penerima", () => {
     assert.deepEqual(bagiRata(70_000_000, 0), []);
+  });
+});
+
+describe("periksaAlokasi", () => {
+  const u = (nominal: number, unitId = "u1") => ({ unitId, nominal });
+
+  it("menerima pembebanan yang jumlahnya persis sama dengan total", () => {
+    assert.equal(periksaAlokasi(70_000_000, [u(14_000_000, "a"), u(56_000_000, "b")]), null);
+  });
+
+  it("menerima pembagian tidak rata", () => {
+    assert.equal(
+      periksaAlokasi(100_000_000, [u(20_000_000, "a"), u(30_000_000, "b"), u(50_000_000, "c")]),
+      null,
+    );
+  });
+
+  it("menolak bila jumlahnya kurang, dan menyebutkan selisihnya", () => {
+    const p = periksaAlokasi(70_000_000, [u(14_000_000, "a"), u(50_000_000, "b")]);
+    assert.match(p ?? "", /kurang Rp 6\.000\.000/);
+  });
+
+  it("menolak bila jumlahnya lebih", () => {
+    const p = periksaAlokasi(70_000_000, [u(40_000_000, "a"), u(40_000_000, "b")]);
+    assert.match(p ?? "", /lebih Rp 10\.000\.000/);
+  });
+
+  it("menolak selisih satu rupiah sekalipun", () => {
+    assert.notEqual(periksaAlokasi(1_000_000, [u(999_999)]), null);
+  });
+
+  it("menolak pembebanan kosong", () => {
+    assert.match(periksaAlokasi(70_000_000, []) ?? "", /setidaknya satu tujuan/);
+  });
+
+  it("menolak baris yang membebani unit sekaligus sarpras", () => {
+    const p = periksaAlokasi(1_000_000, [{ unitId: "u1", infrastructureId: "s1", nominal: 1_000_000 }]);
+    assert.match(p ?? "", /ATAU/);
+  });
+
+  it("menolak nominal nol atau negatif", () => {
+    assert.notEqual(periksaAlokasi(1_000_000, [u(1_000_000, "a"), u(0, "b")]), null);
+    assert.notEqual(periksaAlokasi(1_000_000, [u(1_500_000, "a"), u(-500_000, "b")]), null);
+  });
+
+  it("menerima pembebanan level proyek tanpa unit maupun sarpras", () => {
+    assert.equal(periksaAlokasi(5_000_000, [{ nominal: 5_000_000 }]), null);
+  });
+
+  it("bekerja sama dengan bagiRata untuk berapa pun pembaginya", () => {
+    for (const [total, n] of [[70_000_000, 5], [1_000_000, 3], [12_345_678, 7]] as [number, number][]) {
+      const baris = bagiRata(total, n).map((nominal, i) => u(nominal, `u${i}`));
+      assert.equal(periksaAlokasi(total, baris), null, `${total} dibagi ${n}`);
+    }
   });
 });

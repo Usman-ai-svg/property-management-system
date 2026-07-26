@@ -2,16 +2,16 @@
 
 import { useState } from "react";
 import { BarisField, Field, FormModal, TombolHapus, TombolIkon } from "@/components/form";
+import { AlokasiBiaya } from "@/components/alokasi-biaya";
 import { JENIS_BIAYA, METODE_BAYAR, PERUNTUKAN_BIAYA, STATUS_BAYAR } from "@/lib/domain/enums";
 import { hapusPengeluaran, ubahPengeluaran } from "../actions";
 
 /**
  * Penyuntingan satu baris transaksi pengeluaran.
  *
- * Pembebanan ke unit dan ke sarana & prasarana disatukan dalam satu pemilih,
- * bukan dua pemilih terpisah, karena keduanya saling meniadakan — satu
- * pengeluaran tidak boleh membebani unit sekaligus sarpras, dan dua pemilih
- * terpisah justru mengundang kesalahan itu.
+ * Baris ini adalah satu pembayaran — satu baris mutasi bank. Mengubah totalnya
+ * mengharuskan pembebanannya ikut diseimbangkan, karena keduanya tidak boleh
+ * berbeda: angka per unit harus selalu bisa dijumlahkan balik ke angka bank.
  */
 export function UbahTransaksi({
   transaksi,
@@ -27,20 +27,18 @@ export function UbahTransaksi({
     total: number;
     status: string;
     bukti: string | null;
-    unitId: string | null;
-    infrastructureId: string | null;
+    alokasi: { unitId: string | null; infrastructureId: string | null; nominal: number }[];
   };
   units: { id: string; label: string }[];
   sarpras: { id: string; label: string }[];
 }) {
-  const awal = transaksi.unitId
-    ? `unit:${transaksi.unitId}`
-    : transaksi.infrastructureId
-      ? `sarpras:${transaksi.infrastructureId}`
-      : "";
-  const [beban, setBeban] = useState(awal);
+  const [total, setTotal] = useState(String(transaksi.total));
+  const nominal = Number(total) || 0;
 
-  const [jenisBeban, idBeban] = beban ? beban.split(":") : ["", ""];
+  const awal = transaksi.alokasi.map((a) => ({
+    tujuan: a.unitId ? `unit:${a.unitId}` : a.infrastructureId ? `sarpras:${a.infrastructureId}` : "",
+    nominal: a.nominal,
+  }));
 
   return (
     <FormModal
@@ -51,8 +49,6 @@ export function UbahTransaksi({
       pemicu={(buka) => <TombolIkon onClick={buka} judul={`Ubah transaksi ${transaksi.uraian}`} />}
     >
       <input type="hidden" name="id" value={transaksi.id} />
-      <input type="hidden" name="unitId" value={jenisBeban === "unit" ? idBeban : ""} />
-      <input type="hidden" name="infrastructureId" value={jenisBeban === "sarpras" ? idBeban : ""} />
 
       <BarisField>
         <Field label="Peruntukan" nama="peruntukan" nilai={transaksi.peruntukan} pilihan={PERUNTUKAN_BIAYA} />
@@ -64,7 +60,23 @@ export function UbahTransaksi({
       </BarisField>
 
       <BarisField>
-        <Field label="Total" nama="total" nilai={transaksi.total} tipe="number" satuan="Rp" wajib />
+        <div>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+            Total <span style={{ color: "var(--red)" }}>*</span>
+          </label>
+          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <input
+              className="inp"
+              type="number"
+              name="total"
+              value={total}
+              onChange={(e) => setTotal(e.target.value)}
+              required
+              min={1}
+            />
+            <span style={{ fontSize: 12, color: "var(--muted)" }}>Rp</span>
+          </div>
+        </div>
         <Field label="Status Bayar" nama="status" nilai={transaksi.status} pilihan={STATUS_BAYAR} />
       </BarisField>
 
@@ -78,28 +90,8 @@ export function UbahTransaksi({
           <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
             Dibebankan ke
           </label>
-          <select
-            className="inp"
-            value={beban}
-            onChange={(e) => setBeban(e.target.value)}
-          >
-            <option value="">— biaya level proyek —</option>
-            {units.length > 0 && (
-              <optgroup label="Unit">
-                {units.map((u) => (
-                  <option key={u.id} value={`unit:${u.id}`}>{u.label}</option>
-                ))}
-              </optgroup>
-            )}
-            {sarpras.length > 0 && (
-              <optgroup label="Sarana &amp; Prasarana">
-                {sarpras.map((s) => (
-                  <option key={s.id} value={`sarpras:${s.id}`}>{s.label}</option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, lineHeight: 1.5 }}>
+          <AlokasiBiaya total={nominal} pilihan={{ units, sarpras }} awal={awal} />
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8, lineHeight: 1.6 }}>
             Biaya level proyek adalah yang tidak menempel pada unit maupun sarpras —
             perijinan dan pengolahan lahan.
           </div>

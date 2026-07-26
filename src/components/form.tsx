@@ -156,6 +156,12 @@ export function TombolIkon({
  * galat ditampilkan di dalam modal dan isian tetap utuh — pengguna tidak
  * kehilangan apa yang sudah diketik.
  *
+ * Mempertahankan isian itu perlu usaha: React mengosongkan form tak terkendali
+ * setelah sebuah Server Action selesai, termasuk saat aksinya ditolak. Karena
+ * itu FormData yang dikirim disimpan, lalu nilainya ditulis balik ke tiap
+ * kolom begitu hasilnya diketahui gagal. Tanpa ini, satu kesalahan kecil
+ * memaksa mengetik ulang seluruh formulir.
+ *
  * Bila aksi mengembalikan pesan saat berhasil, pesan itu ditampilkan di tempat
  * pemicunya setelah modal tertutup. Ada aksi yang perlu memberi tahu sesuatu
  * yang tidak terlihat dari layar — misalnya impor yang mempertahankan nilai
@@ -180,13 +186,51 @@ export function FormModal({
 }) {
   const [terbuka, setTerbuka] = useState(false);
   const [catatan, setCatatan] = useState<string | null>(null);
-  const [hasil, kirim] = useActionState(aksi, null);
   const dialog = useRef<HTMLDivElement>(null);
+  const dataTerakhir = useRef<FormData | null>(null);
+
+  const [hasil, kirim] = useActionState(
+    async (sebelumnya: HasilAksi | null, form: FormData) => {
+      dataTerakhir.current = form;
+      return aksi(sebelumnya, form);
+    },
+    null,
+  );
 
   useEffect(() => {
     if (!hasil?.ok) return;
     setTerbuka(false);
     setCatatan(hasil.pesan ?? null);
+  }, [hasil]);
+
+  // Kembalikan isian yang dikosongkan React setelah aksi yang ditolak.
+  //
+  // Nilainya diambil per nama SEKALIGUS per urutan, bukan sekadar yang pertama:
+  // ada formulir yang punya beberapa kolom bernama sama — baris pembebanan
+  // pengeluaran, misalnya — dan mengembalikan nilai baris pertama ke seluruh
+  // baris akan diam-diam mengubah angkanya.
+  //
+  // Kolom berkas dilewati: peramban melarang mengisi <input type="file"> lewat
+  // skrip, jadi berkasnya memang harus dipilih ulang.
+  useEffect(() => {
+    if (!hasil || hasil.ok) return;
+    const data = dataTerakhir.current;
+    const form = dialog.current?.querySelector("form");
+    if (!data || !form) return;
+
+    const urutanPakai = new Map<string, number>();
+
+    for (const el of form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+      "input, select, textarea",
+    )) {
+      if (!el.name || el.type === "file" || el.type === "hidden") continue;
+
+      const ke = urutanPakai.get(el.name) ?? 0;
+      urutanPakai.set(el.name, ke + 1);
+
+      const nilai = data.getAll(el.name)[ke];
+      if (typeof nilai === "string" && el.value !== nilai) el.value = nilai;
+    }
   }, [hasil]);
 
   useEffect(() => {

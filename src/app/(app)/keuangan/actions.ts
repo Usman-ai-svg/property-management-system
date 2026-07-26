@@ -1,13 +1,12 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
 } from "@/lib/actions/guard";
-import { bagiRata } from "@/lib/calc/keuangan";
+import { periksaAlokasi } from "@/lib/calc/keuangan";
 import { JENIS_BIAYA, METODE_BAYAR, PERUNTUKAN_BIAYA, STATUS_BAYAR } from "@/lib/domain/enums";
 
 const POS_HPP: Record<string, string> = {
@@ -18,47 +17,61 @@ const POS_HPP: Record<string, string> = {
 };
 
 /**
- * Baca dan sahkan pembebanan sebuah pengeluaran: ke unit, ke item sarana &
- * prasarana, atau ke tidak keduanya (biaya level proyek).
+ * Baca pembebanan sebuah pembayaran dari formulir.
  *
- * Keduanya saling meniadakan. Membebankan satu pengeluaran ke unit sekaligus
- * ke sarpras akan membuatnya terhitung dua kali pada laporan realisasi.
+ * Formulir mengirim satu baris per tujuan lewat tiga larik sejajar:
+ * `alokasiUnitId`, `alokasiSarprasId`, dan `alokasiNominal`. Satu pembayaran
+ * boleh menanggung beberapa unit sekaligus — upah borongan untuk lima rumah
+ * dibayar sekali — dan tetap tersimpan sebagai satu baris yang cocok dengan
+ * satu baris mutasi bank.
+ *
+ * Jumlah seluruh alokasi wajib sama persis dengan totalnya. Itu diperiksa oleh
+ * `periksaAlokasi`, yang juga menolak baris yang membebani unit sekaligus
+ * sarpras karena akan terhitung dua kali di laporan realisasi.
  */
-async function bebananMasuk(
+async function bacaAlokasi(
   form: FormData,
   projectId: string,
-): Promise<{ unitIds: string[]; infrastructureId: string | null }> {
-  // Pencatatan baru boleh memilih banyak unit sekaligus; penyuntingan satu
-  // baris hanya mengenal satu unit, jadi keduanya sama-sama dibaca.
-  const unitIds = [
-    ...new Set(
-      form.getAll("unitId").map((v) => String(v).trim()).filter(Boolean),
-    ),
-  ];
-  const infrastructureId = teksOpsional(form, "infrastructureId");
+  total: number,
+): Promise<{ unitId: string | null; infrastructureId: string | null; nominal: number }[]> {
+  const unitIds = form.getAll("alokasiUnitId").map((v) => String(v).trim());
+  const sarprasIds = form.getAll("alokasiSarprasId").map((v) => String(v).trim());
+  const nominals = form.getAll("alokasiNominal").map((v) => Number(String(v).trim()));
 
-  if (unitIds.length > 0 && infrastructureId) {
-    throw new GagalIzin(
-      "Satu pengeluaran hanya boleh dibebankan ke unit ATAU ke sarana & prasarana, tidak keduanya.",
-    );
+  const panjang = Math.max(unitIds.length, sarprasIds.length, nominals.length);
+  const baris = Array.from({ length: panjang }, (_, i) => ({
+    unitId: unitIds[i] || null,
+    infrastructureId: sarprasIds[i] || null,
+    nominal: nominals[i] ?? 0,
+  }));
+
+  const galat = periksaAlokasi(total, baris);
+  if (galat) throw new GagalIzin(galat);
+
+  // Satu tujuan tidak boleh muncul dua kali — itu selalu salah ketik, dan
+  // membuat angka per unit ganda tanpa terlihat.
+  const kunci = baris.map((b) => b.unitId ?? b.infrastructureId ?? "proyek");
+  if (new Set(kunci).size !== kunci.length) {
+    throw new GagalIzin("Ada tujuan pembebanan yang tercantum lebih dari sekali.");
   }
 
-  if (unitIds.length > 0) {
-    const sah = await prisma.unit.count({ where: { id: { in: unitIds }, projectId } });
-    if (sah !== unitIds.length) throw new GagalIzin("Ada unit yang tidak sah untuk proyek ini.");
+  const daftarUnit = baris.map((b) => b.unitId).filter((x): x is string => !!x);
+  if (daftarUnit.length > 0) {
+    const sah = await prisma.unit.count({ where: { id: { in: daftarUnit }, projectId } });
+    if (sah !== daftarUnit.length) throw new GagalIzin("Ada unit yang tidak sah untuk proyek ini.");
   }
 
-  if (infrastructureId) {
-    const s = await prisma.infrastructure.findUnique({
-      where: { id: infrastructureId },
-      select: { projectId: true },
+  const daftarSarpras = baris.map((b) => b.infrastructureId).filter((x): x is string => !!x);
+  if (daftarSarpras.length > 0) {
+    const sah = await prisma.infrastructure.count({
+      where: { id: { in: daftarSarpras }, projectId },
     });
-    if (!s || s.projectId !== projectId) {
-      throw new GagalIzin("Item sarana & prasarana tidak sah untuk proyek ini.");
+    if (sah !== daftarSarpras.length) {
+      throw new GagalIzin("Ada item sarana & prasarana yang tidak sah untuk proyek ini.");
     }
   }
 
-  return { unitIds, infrastructureId: infrastructureId || null };
+  return baris;
 }
 
 /**
@@ -80,63 +93,42 @@ export async function catatPengeluaran(_s: HasilAksi | null, form: FormData): Pr
     if (!proyek) throw new GagalIzin("Proyek tidak ditemukan.");
 
     const peruntukan = pilihan(form, "peruntukan", PERUNTUKAN_BIAYA);
-    const { unitIds, infrastructureId } = await bebananMasuk(form, projectId);
     const total = angka(form, "total", { min: 1, wajib: true });
-
+    const alokasi = await bacaAlokasi(form, projectId, total);
     const uraian = teks(form, "uraian", true);
-    const bersama = {
-      projectId,
-      infrastructureId,
-      tanggal: new Date(),
-      peruntukan,
-      jenis: pilihan(form, "jenis", JENIS_BIAYA),
-      metode: pilihan(form, "metode", METODE_BAYAR),
-      uraian,
-      status: pilihan(form, "status", STATUS_BAYAR),
-      pic: pengguna.nama,
-      bukti: teksOpsional(form, "bukti"),
-      posHpp: POS_HPP[peruntukan],
-    };
 
-    // Satu pembayaran untuk beberapa unit disimpan sebagai satu baris per unit.
-    // Alternatifnya — satu baris dengan daftar unit — membuat tiap laporan
-    // realisasi per unit harus membagi ulang nominalnya sendiri, dan cepat atau
-    // lambat ada yang membaginya dengan cara berbeda.
-    if (unitIds.length > 1) {
-      const batchId = randomUUID();
-      const bagian = bagiRata(total, unitIds.length);
+    await prisma.expense.create({
+      data: {
+        projectId,
+        tanggal: new Date(),
+        peruntukan,
+        jenis: pilihan(form, "jenis", JENIS_BIAYA),
+        metode: pilihan(form, "metode", METODE_BAYAR),
+        uraian,
+        total,
+        status: pilihan(form, "status", STATUS_BAYAR),
+        pic: pengguna.nama,
+        bukti: teksOpsional(form, "bukti"),
+        posHpp: POS_HPP[peruntukan],
+        alokasi: { create: alokasi },
+      },
+    });
 
-      await prisma.expense.createMany({
-        data: unitIds.map((unitId, i) => ({
-          ...bersama, unitId, batchId, total: bagian[i],
-        })),
-      });
-
-      await catat({
-        pengguna, projectId,
-        objek: `Pengeluaran · ${peruntukan}`,
-        aksi: "Catat pengeluaran",
-        ke: `${uraian} — ${rpLog(total)} dibagi rata ke ${unitIds.length} unit`,
-      });
-    } else {
-      await prisma.expense.create({
-        data: { ...bersama, unitId: unitIds[0] ?? null, total },
-      });
-
-      await catat({
-        pengguna, projectId,
-        objek: `Pengeluaran · ${peruntukan}`,
-        aksi: "Catat pengeluaran",
-        ke: `${uraian} — ${rpLog(total)}`,
-      });
-    }
+    await catat({
+      pengguna, projectId,
+      objek: `Pengeluaran · ${peruntukan}`,
+      aksi: "Catat pengeluaran",
+      ke:
+        `${uraian} — ${rpLog(total)}` +
+        (alokasi.length > 1 ? ` dibebankan ke ${alokasi.length} tujuan` : ""),
+    });
 
     revalidatePath("/keuangan");
     revalidatePath(`/keuangan/${proyek.kode}`);
     revalidatePath("/");
 
-    if (unitIds.length > 1) {
-      return `${rpLog(total)} dibagi rata menjadi ${unitIds.length} baris, satu per unit.`;
+    if (alokasi.length > 1) {
+      return `Tersimpan sebagai satu transaksi ${rpLog(total)}, dibebankan ke ${alokasi.length} tujuan.`;
     }
   });
 }
@@ -157,9 +149,16 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
     const lama = await prisma.expense.findUnique({
       where: { id },
       select: {
-        id: true, projectId: true, unitId: true, infrastructureId: true,
+        id: true, projectId: true,
         peruntukan: true, jenis: true, metode: true, uraian: true,
         total: true, status: true, bukti: true,
+        alokasi: {
+          select: {
+            nominal: true,
+            unit: { select: { nomor: true, phase: { select: { kode: true } } } },
+            infrastructure: { select: { nama: true } },
+          },
+        },
         project: { select: { kode: true } },
       },
     });
@@ -168,36 +167,32 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
     const pengguna = await izinkan("keuangan", lama.projectId);
 
     const peruntukan = pilihan(form, "peruntukan", PERUNTUKAN_BIAYA);
-    const { unitIds, infrastructureId } = await bebananMasuk(form, lama.projectId);
-    if (unitIds.length > 1) {
-      throw new GagalIzin(
-        "Satu baris transaksi hanya bisa dibebankan ke satu unit. Untuk memecah ke beberapa unit, catat ulang sebagai pengeluaran baru.",
-      );
-    }
-    const unitId = unitIds[0] ?? null;
+    const totalBaru = angka(form, "total", { min: 1, wajib: true });
+    const alokasiBaru = await bacaAlokasi(form, lama.projectId, totalBaru);
 
     const baru = {
       peruntukan,
       jenis: pilihan(form, "jenis", JENIS_BIAYA),
       metode: pilihan(form, "metode", METODE_BAYAR),
       uraian: teks(form, "uraian", true),
-      total: angka(form, "total", { min: 1, wajib: true }),
+      total: totalBaru,
       status: pilihan(form, "status", STATUS_BAYAR),
       bukti: teksOpsional(form, "bukti") || null,
-      unitId,
-      infrastructureId,
       posHpp: POS_HPP[peruntukan],
     };
 
-    await prisma.expense.update({ where: { id }, data: baru });
-
-    // Pembebanan dicatat memakai nama yang terbaca manusia, bukan id acak.
-    const [namaUnitLama, namaUnitBaru, namaSarprasLama, namaSarprasBaru] = await Promise.all([
-      labelUnit(lama.unitId),
-      labelUnit(unitId),
-      labelSarpras(lama.infrastructureId),
-      labelSarpras(infrastructureId),
+    // Alokasi diganti seluruhnya, bukan disunting per baris: pembebanan hanya
+    // sah sebagai satu kesatuan yang jumlahnya pas, jadi menggantinya utuh
+    // lebih aman daripada mencocokkan baris lama dengan baris baru.
+    await prisma.$transaction([
+      prisma.expenseAllocation.deleteMany({ where: { expenseId: id } }),
+      prisma.expense.update({
+        where: { id },
+        data: { ...baru, alokasi: { create: alokasiBaru } },
+      }),
     ]);
+
+    const namaAlokasiBaru = await ringkasAlokasi(alokasiBaru);
 
     const jml = await catatDiff({
       pengguna,
@@ -206,12 +201,12 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
       sebelum: {
         peruntukan: lama.peruntukan, jenis: lama.jenis, metode: lama.metode,
         uraian: lama.uraian, total: lama.total, status: lama.status,
-        bukti: lama.bukti, dibebankanKe: namaUnitLama ?? namaSarprasLama ?? "level proyek",
+        bukti: lama.bukti, dibebankanKe: labelAlokasiTersimpan(lama.alokasi),
       },
       sesudah: {
         peruntukan: baru.peruntukan, jenis: baru.jenis, metode: baru.metode,
         uraian: baru.uraian, total: baru.total, status: baru.status,
-        bukti: baru.bukti, dibebankanKe: namaUnitBaru ?? namaSarprasBaru ?? "level proyek",
+        bukti: baru.bukti, dibebankanKe: namaAlokasiBaru,
       },
       label: {
         uraian: "Keterangan", total: "Total", status: "Status bayar",
@@ -230,20 +225,65 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
   });
 }
 
-/** Nama unit yang enak dibaca, mis. "Unit F1-3". */
-async function labelUnit(id: string | null): Promise<string | null> {
-  if (!id) return null;
-  const u = await prisma.unit.findUnique({
-    where: { id },
-    select: { nomor: true, phase: { select: { kode: true } } },
-  });
-  return u ? `Unit ${u.phase.kode}-${u.nomor}` : null;
+/**
+ * Ringkasan pembebanan untuk jejak audit, memakai nama yang terbaca manusia
+ * beserta nominalnya — "Unit F1-1 Rp 14.000.000 · Unit F1-2 Rp 14.000.000".
+ * Id acak tidak berguna bagi orang yang membaca log setahun kemudian.
+ */
+async function ringkasAlokasi(
+  baris: { unitId: string | null; infrastructureId: string | null; nominal: number }[],
+): Promise<string> {
+  const unitIds = baris.map((b) => b.unitId).filter((x): x is string => !!x);
+  const sarprasIds = baris.map((b) => b.infrastructureId).filter((x): x is string => !!x);
+
+  const [units, sarpras] = await Promise.all([
+    unitIds.length
+      ? prisma.unit.findMany({
+          where: { id: { in: unitIds } },
+          select: { id: true, nomor: true, phase: { select: { kode: true } } },
+        })
+      : [],
+    sarprasIds.length
+      ? prisma.infrastructure.findMany({
+          where: { id: { in: sarprasIds } },
+          select: { id: true, nama: true },
+        })
+      : [],
+  ]);
+
+  const namaUnit = new Map(units.map((u) => [u.id, `Unit ${u.phase.kode}-${u.nomor}`]));
+  const namaSarpras = new Map(sarpras.map((s) => [s.id, `Sarpras ${s.nama}`]));
+
+  return baris
+    .map((b) => {
+      const nama = b.unitId
+        ? namaUnit.get(b.unitId) ?? "unit"
+        : b.infrastructureId
+          ? namaSarpras.get(b.infrastructureId) ?? "sarpras"
+          : "level proyek";
+      return `${nama} ${rpLog(b.nominal)}`;
+    })
+    .join(" · ");
 }
 
-async function labelSarpras(id: string | null): Promise<string | null> {
-  if (!id) return null;
-  const s = await prisma.infrastructure.findUnique({ where: { id }, select: { nama: true } });
-  return s ? `Sarpras · ${s.nama}` : null;
+/** Bentuk yang sama, tetapi dari alokasi yang sudah tersimpan beserta relasinya. */
+function labelAlokasiTersimpan(
+  baris: {
+    nominal: number;
+    unit: { nomor: number; phase: { kode: string } } | null;
+    infrastructure: { nama: string } | null;
+  }[],
+): string {
+  return baris
+    .map((b) => {
+      const nama = b.unit
+        ? `Unit ${b.unit.phase.kode}-${b.unit.nomor}`
+        : b.infrastructure
+          ? `Sarpras ${b.infrastructure.nama}`
+          : "level proyek";
+      return `${nama} ${rpLog(b.nominal)}`;
+    })
+    .join(" · ");
 }
 
 /**

@@ -320,7 +320,7 @@ model Unit {
   customWorks    CustomWork[]
   progressRecords ProgressRecord[]
   contractUnits  ContractUnit[]
-  expenses       Expense[]
+  alokasiBiaya   ExpenseAllocation[]
   penerimaan     SalesPayment[]
 
   @@index([projectId, phaseId])
@@ -470,7 +470,7 @@ model Infrastructure {
   rapItems        InfrastructureRapItem[]
   progressRecords ProgressRecord[]
   contractItems   ContractInfrastructure[]
-  expenses        Expense[]
+  alokasiBiaya    ExpenseAllocation[]
 
   @@map("infrastructures")
 }
@@ -654,16 +654,20 @@ model TenderParticipant {
 // KEUANGAN
 // =============================================================================
 
+/// Satu baris = satu pembayaran = satu baris mutasi bank.
+///
+/// Pembebanan ke unit atau sarpras TIDAK disimpan di sini melainkan di
+/// `ExpenseAllocation`, karena satu pembayaran lazimnya menanggung beberapa
+/// unit sekaligus — upah borongan untuk lima rumah dibayar sekali. Kalau
+/// pembebanan ikut di baris ini, satu pembayaran harus dipecah jadi lima baris
+/// dan nominal tiap barisnya tidak pernah muncul di rekening koran, sehingga
+/// rekonsiliasi bank jadi penjumlahan tebak-tebakan.
+///
+/// Jumlah seluruh alokasi wajib sama persis dengan `total`. Itu yang menjaga
+/// angka per unit selalu bisa dijumlahkan balik ke angka yang keluar dari bank.
 model Expense {
   id        String   @id @default(cuid())
   projectId String
-  /// Unit yang dibebani, bila pengeluaran ini milik satu unit.
-  unitId    String?
-  /// Item sarana/prasarana yang dibebani. Terpisah dari `unitId` karena
-  /// keduanya saling meniadakan: satu pengeluaran membebani unit ATAU sarpras,
-  /// tidak pernah keduanya. Bila dua-duanya kosong, pengeluaran itu biaya
-  /// level proyek (perijinan, pengolahan lahan).
-  infrastructureId String?
   tanggal   DateTime
   /// Unit (rumah dijual) | Prasarana & Sarana | Perijinan & Ormas | Pengolahan Lahan
   peruntukan String
@@ -683,20 +687,39 @@ model Expense {
   bukti      String?
   /// Kontrak vendor yang membiayai pengeluaran ini, bila ada.
   contractId String?
-  /// Penanda satu pembayaran yang dipecah ke beberapa unit. Satu pembayaran
-  /// upah borongan untuk lima unit tersimpan sebagai lima baris dengan
-  /// `batchId` yang sama, supaya tiap unit punya angka realisasinya sendiri
-  /// tanpa kehilangan jejak bahwa asalnya satu transaksi.
-  batchId    String?
 
-  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  unit           Unit?           @relation(fields: [unitId], references: [id])
-  infrastructure Infrastructure? @relation(fields: [infrastructureId], references: [id])
-  contract       Contract?       @relation(fields: [contractId], references: [id])
+  project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contract  Contract?           @relation(fields: [contractId], references: [id])
+  alokasi   ExpenseAllocation[]
 
   @@index([projectId, tanggal])
-  @@index([batchId])
   @@map("expenses")
+}
+
+/// Pembebanan satu pembayaran ke unit atau item sarana & prasarana.
+///
+/// `unitId` dan `infrastructureId` saling meniadakan: satu baris alokasi
+/// membebani unit ATAU sarpras, tidak pernah keduanya, karena itu akan
+/// terhitung dua kali pada laporan realisasi. Bila keduanya kosong, alokasi itu
+/// biaya level proyek — perijinan dan pengolahan lahan.
+///
+/// Nominalnya tidak harus rata. Bagi rata hanyalah pengisian awal di formulir;
+/// upah borongan untuk unit yang tipenya berbeda memang tidak sama besar.
+model ExpenseAllocation {
+  id        String @id @default(cuid())
+  expenseId String
+  unitId           String?
+  infrastructureId String?
+  nominal   Float
+
+  expense        Expense         @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  unit           Unit?           @relation(fields: [unitId], references: [id])
+  infrastructure Infrastructure? @relation(fields: [infrastructureId], references: [id])
+
+  @@index([expenseId])
+  @@index([unitId])
+  @@index([infrastructureId])
+  @@map("expense_allocations")
 }
 
 /// Biaya operasional perusahaan yang dibebankan ke sebuah proyek.

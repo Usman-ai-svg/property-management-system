@@ -58,6 +58,7 @@ async function main() {
   // --- bersihkan (urutan penting karena foreign key) ---
   await prisma.auditLog.deleteMany();
   await prisma.salesPayment.deleteMany();
+  await prisma.expenseAllocation.deleteMany();
   await prisma.expense.deleteMany();
   await prisma.operationalCost.deleteMany();
   await prisma.tenderParticipant.deleteMany();
@@ -434,12 +435,14 @@ async function main() {
 
     await prisma.expense.create({
       data: {
-        projectId: pid, unitId: unitIdTerkait, tanggal: tgl(B.tgl)!,
+        projectId: pid, tanggal: tgl(B.tgl)!,
         peruntukan: B.peruntukan, jenis: B.jenis, metode: B.metode,
         uraian: B.uraian, total: B.total, status: B.status,
         pic: B.pic, bukti: B.bukti || null,
         posHpp: POS_HPP[B.peruntukan],
         contractId: B.kontrak ? kontrakPerVendor.get(`${pid}|${B.kontrak}`) ?? null : null,
+        // Satu pembayaran = satu baris; pembebanannya ada di alokasi.
+        alokasi: { create: [{ unitId: unitIdTerkait, nominal: B.total }] },
       },
     });
     jmlBiaya++;
@@ -460,11 +463,14 @@ async function main() {
         const hari = ((nomor * 7 + k * 11) % 28) + 1;
         await prisma.expense.create({
           data: {
-            projectId: projectId.get(kodeProyek)!, unitId: uid,
+            projectId: projectId.get(kodeProyek)!,
             tanggal: new Date(Date.UTC(2026, (nomor + k) % 7, hari)),
             peruntukan: "Unit (rumah dijual)", jenis, metode, uraian,
             total: Math.round(totalJenis / uraianList.length),
             status: "Lunas", posHpp: POS_HPP["Unit (rumah dijual)"],
+            alokasi: {
+              create: [{ unitId: uid, nominal: Math.round(totalJenis / uraianList.length) }],
+            },
           },
         });
         jmlBiaya++;
@@ -491,12 +497,18 @@ async function main() {
           const hari = ((nomor * 5 + k * 9) % 28) + 1;
           await prisma.expense.create({
             data: {
-              projectId: projectId.get(P.kode)!, infrastructureId: iid,
+              projectId: projectId.get(P.kode)!,
               tanggal: new Date(Date.UTC(2026, (nomor + k) % 7, hari)),
               peruntukan: "Prasarana & Sarana", jenis, metode,
               uraian: `${uraian} · ${S.nama}`,
               total: Math.round(totalJenis / uraianList.length),
               status: "Lunas", posHpp: POS_HPP["Prasarana & Sarana"],
+              alokasi: {
+                create: [{
+                  infrastructureId: iid,
+                  nominal: Math.round(totalJenis / uraianList.length),
+                }],
+              },
             },
           });
           jmlBiaya++;

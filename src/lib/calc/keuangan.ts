@@ -65,20 +65,14 @@ export function ringkasKontrak(k: KontrakLike) {
 }
 
 /**
- * Alokasikan nilai kontrak ke tiap unit/item.
- *
- * Bila sebuah item punya `nilaiOverride`, nilai itu dipakai apa adanya
- * (mis. unit sudut dihargai lebih). Sisa nilai kontrak dibagi rata ke
- * item-item yang tidak di-override.
- */
-/**
  * Bagi satu nominal ke beberapa penerima dalam rupiah bulat.
  *
- * Dipakai saat satu pembayaran — mis. upah borongan untuk lima unit — dipecah
- * menjadi satu baris pengeluaran per unit. Sisa pembagian ditaruh pada baris
- * pertama, bukan dibuang, supaya jumlah seluruh pecahannya **persis** sama
- * dengan nominal aslinya. Selisih satu rupiah pada laporan keuangan adalah
- * selisih yang harus dicari orang, jadi tidak boleh ada.
+ * Dipakai untuk mengisi awal pembebanan satu pembayaran ke beberapa unit.
+ * Hasilnya boleh disunting per baris setelahnya — bagi rata hanyalah titik
+ * awal, bukan aturan. Sisa pembagian ditaruh pada baris pertama, bukan
+ * dibuang, supaya jumlah seluruh pecahannya **persis** sama dengan nominal
+ * aslinya. Selisih satu rupiah pada laporan keuangan adalah selisih yang
+ * harus dicari orang, jadi tidak boleh ada.
  */
 export function bagiRata(nominal: number, banyak: number): number[] {
   if (banyak <= 0) return [];
@@ -90,6 +84,54 @@ export function bagiRata(nominal: number, banyak: number): number[] {
   return bagian;
 }
 
+export interface BarisAlokasi {
+  unitId?: string | null;
+  infrastructureId?: string | null;
+  nominal: number;
+}
+
+/**
+ * Periksa apakah pembebanan sebuah pembayaran sudah seimbang.
+ *
+ * Satu baris pengeluaran adalah satu baris mutasi bank; alokasinya adalah
+ * pembagian ke unit atau sarpras. Jumlah alokasi harus sama **persis** dengan
+ * totalnya — bukan sekadar mendekati — supaya angka per unit selalu bisa
+ * dijumlahkan balik ke angka yang keluar dari bank. Selisih satu rupiah pada
+ * laporan keuangan adalah selisih yang harus dicari orang.
+ *
+ * Mengembalikan pesan kesalahan, atau null bila sudah benar.
+ */
+export function periksaAlokasi(total: number, baris: BarisAlokasi[]): string | null {
+  if (baris.length === 0) return "Pembayaran harus dibebankan ke setidaknya satu tujuan.";
+
+  for (const b of baris) {
+    if (b.unitId && b.infrastructureId) {
+      return "Satu baris pembebanan hanya boleh ke unit ATAU ke sarana & prasarana, tidak keduanya.";
+    }
+    if (!Number.isFinite(b.nominal)) return "Ada nominal pembebanan yang bukan angka.";
+    if (b.nominal <= 0) return "Nominal tiap pembebanan harus lebih dari nol.";
+  }
+
+  const jumlah = baris.reduce((s, b) => s + b.nominal, 0);
+  if (jumlah !== total) {
+    const selisih = jumlah - total;
+    return (
+      `Jumlah pembebanan Rp ${jumlah.toLocaleString("id-ID")} tidak sama dengan total pembayaran ` +
+      `Rp ${total.toLocaleString("id-ID")} — ${selisih > 0 ? "lebih" : "kurang"} Rp ` +
+      `${Math.abs(selisih).toLocaleString("id-ID")}.`
+    );
+  }
+
+  return null;
+}
+
+/**
+ * Alokasikan nilai kontrak ke tiap unit/item.
+ *
+ * Bila sebuah item punya `nilaiOverride`, nilai itu dipakai apa adanya
+ * (mis. unit sudut dihargai lebih). Sisa nilai kontrak dibagi rata ke
+ * item-item yang tidak di-override.
+ */
 export function alokasiKontrak<T extends { nilaiOverride?: number | null }>(
   nilaiKontrak: number,
   items: T[],

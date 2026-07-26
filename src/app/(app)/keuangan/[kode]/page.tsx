@@ -43,7 +43,6 @@ export default async function KeuanganProyek({
           phase: { select: { kode: true } },
           unitType: { select: { nama: true } },
           rapItems: { select: { volume: true, hargaSatuan: true } },
-          expenses: { select: { total: true } },
         },
       },
       infrastructures: {
@@ -59,7 +58,9 @@ export default async function KeuanganProyek({
         select: {
           id: true, tanggal: true, jenis: true, peruntukan: true, metode: true,
           uraian: true, total: true, status: true, pic: true, bukti: true,
-          unitId: true, infrastructureId: true, batchId: true,
+          alokasi: {
+            select: { id: true, unitId: true, infrastructureId: true, nominal: true },
+          },
           contract: { select: { vendor: { select: { nama: true } } } },
         },
       },
@@ -117,12 +118,40 @@ export default async function KeuanganProyek({
   const totalRap = proyek.units.reduce((s, u) => s + totalRapDari(u), 0);
   const totalRealisasi = proyek.expenses.reduce((s, e) => s + e.total, 0);
   const nilaiKontrak = proyek.units.reduce((s, u) => s + u.hargaJual, 0);
-  // Biaya level proyek adalah sisa yang tidak dibebankan ke unit MAUPUN sarpras
-  // — perijinan dan pengolahan lahan.
-  const levelProyek = proyek.expenses
-    .filter((e) => !e.unitId && !e.infrastructureId)
-    .reduce((s, e) => s + e.total, 0);
   const komp = komposisi(proyek.expenses, mode);
+
+  // Satu pembayaran boleh menanggung beberapa unit, jadi angka per unit
+  // dijumlahkan dari baris alokasinya — bukan dari totalnya.
+  const langsungPerUnit = new Map<string, number>();
+  const langsungPerSarpras = new Map<string, number>();
+  let levelProyek = 0;
+
+  for (const e of proyek.expenses) {
+    for (const a of e.alokasi) {
+      if (a.unitId) {
+        langsungPerUnit.set(a.unitId, (langsungPerUnit.get(a.unitId) ?? 0) + a.nominal);
+      } else if (a.infrastructureId) {
+        langsungPerSarpras.set(
+          a.infrastructureId,
+          (langsungPerSarpras.get(a.infrastructureId) ?? 0) + a.nominal,
+        );
+      } else {
+        // Biaya level proyek: perijinan dan pengolahan lahan.
+        levelProyek += a.nominal;
+      }
+    }
+  }
+
+  /** Transaksi yang punya alokasi ke sebuah unit atau item sarpras. */
+  const transaksiUntuk = (kunci: { unitId?: string; sarprasId?: string }) =>
+    proyek.expenses
+      .map((e) => {
+        const a = e.alokasi.find((x) =>
+          kunci.unitId ? x.unitId === kunci.unitId : x.infrastructureId === kunci.sarprasId,
+        );
+        return a ? { ...e, nominalDibebankan: a.nominal, terbagi: e.alokasi.length > 1 } : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
 
   // Unit yang sedang dibuka rinciannya. Dipegang di URL, bukan di state
   // komponen, supaya rincian sebuah unit bisa ditautkan langsung dan tetap
@@ -134,13 +163,6 @@ export default async function KeuanganProyek({
     ? proyek.infrastructures.find((s) => s.kode === sarprasDipilih.toUpperCase())
     : undefined;
   const alamatDasar = `/keuangan/${proyek.kode}?donat=${mode}`;
-
-  // Berapa baris yang berasal dari satu pembayaran yang dipecah ke beberapa
-  // unit — dipakai untuk menandai barisnya agar pemecahan itu terlihat.
-  const jumlahSebatch = new Map<string, number>();
-  for (const e of proyek.expenses) {
-    if (e.batchId) jumlahSebatch.set(e.batchId, (jumlahSebatch.get(e.batchId) ?? 0) + 1);
-  }
 
   const bolehUbahKeuangan = bolehUbah(pengguna, "keuangan");
   const pilihanUnit = proyek.units.map((u) => ({
@@ -237,7 +259,7 @@ export default async function KeuanganProyek({
             <tbody>
               {proyek.units.map((u) => {
                 const rap = totalRapDari(u);
-                const langsung = u.expenses.reduce((s, e) => s + e.total, 0);
+                const langsung = langsungPerUnit.get(u.id) ?? 0;
                 const alokasi = alokasiPerUnit.get(u.id) ?? 0;
                 const total = langsung + alokasi;
                 const rasio = rap ? total / rap : 0;
@@ -302,9 +324,9 @@ export default async function KeuanganProyek({
       {/* ---------- rincian biaya satu unit ---------- */}
       {unitRinci &&
         (() => {
-          const tx = proyek.expenses.filter((e) => e.unitId === unitRinci.id);
+          const tx = transaksiUntuk({ unitId: unitRinci.id });
           const rap = totalRapDari(unitRinci);
-          const terpakai = tx.reduce((s, e) => s + e.total, 0);
+          const terpakai = tx.reduce((s, e) => s + e.nominalDibebankan, 0);
           // Pembagi dijaga agar tidak nol supaya bar tetap tergambar walau unit
           // ini belum punya transaksi sama sekali.
           const pembagi = terpakai || 1;
@@ -312,7 +334,7 @@ export default async function KeuanganProyek({
           const perJenis = Object.keys(WARNA_JENIS)
             .map((j) => ({
               jenis: j,
-              nilai: tx.filter((e) => e.jenis === j).reduce((s, e) => s + e.total, 0),
+              nilai: tx.filter((e) => e.jenis === j).reduce((s, e) => s + e.nominalDibebankan, 0),
             }))
             .filter((x) => x.nilai > 0)
             .sort((a, b) => b.nilai - a.nilai);
@@ -474,9 +496,7 @@ export default async function KeuanganProyek({
             <tbody>
               {proyek.infrastructures.map((s) => {
                 const rap = totalRapDari(s);
-                const langsung = proyek.expenses
-                  .filter((e) => e.infrastructureId === s.id)
-                  .reduce((a, e) => a + e.total, 0);
+                const langsung = langsungPerSarpras.get(s.id) ?? 0;
                 const alokasi = alokasiPerSarpras.get(s.id) ?? 0;
                 const total = langsung + alokasi;
                 const rasio = rap ? total / rap : 0;
@@ -544,15 +564,15 @@ export default async function KeuanganProyek({
       {/* ---------- rincian biaya satu item sarpras ---------- */}
       {sarprasRinci &&
         (() => {
-          const tx = proyek.expenses.filter((e) => e.infrastructureId === sarprasRinci.id);
+          const tx = transaksiUntuk({ sarprasId: sarprasRinci.id });
           const rap = totalRapDari(sarprasRinci);
-          const terpakai = tx.reduce((s, e) => s + e.total, 0);
+          const terpakai = tx.reduce((s, e) => s + e.nominalDibebankan, 0);
           const pembagi = terpakai || 1;
 
           const perJenis = Object.keys(WARNA_JENIS)
             .map((j) => ({
               jenis: j,
-              nilai: tx.filter((e) => e.jenis === j).reduce((s, e) => s + e.total, 0),
+              nilai: tx.filter((e) => e.jenis === j).reduce((s, e) => s + e.nominalDibebankan, 0),
             }))
             .filter((x) => x.nilai > 0)
             .sort((a, b) => b.nilai - a.nilai);
@@ -729,13 +749,13 @@ export default async function KeuanganProyek({
                   <td>
                     <div>
                       {e.uraian}
-                      {e.batchId && (jumlahSebatch.get(e.batchId) ?? 0) > 1 && (
+                      {e.alokasi.length > 1 && (
                         <span
                           className="chip"
-                          title="Satu pembayaran yang dibagi rata ke beberapa unit"
+                          title="Satu pembayaran yang dibebankan ke beberapa tujuan"
                           style={{ background: "#eef3f4", color: "var(--teal)", marginLeft: 6 }}
                         >
-                          1 dari {jumlahSebatch.get(e.batchId)} unit
+                          dibagi ke {e.alokasi.length} tujuan
                         </span>
                       )}
                     </div>
@@ -766,7 +786,9 @@ export default async function KeuanganProyek({
                             id: e.id, peruntukan: e.peruntukan, jenis: e.jenis,
                             metode: e.metode, uraian: e.uraian, total: e.total,
                             status: e.status, bukti: e.bukti,
-                            unitId: e.unitId, infrastructureId: e.infrastructureId,
+                            alokasi: e.alokasi.map((a) => ({
+                              unitId: a.unitId, infrastructureId: a.infrastructureId, nominal: a.nominal,
+                            })),
                           }}
                           units={pilihanUnit}
                           sarpras={pilihanSarpras}

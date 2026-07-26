@@ -284,24 +284,36 @@ Seluruh modul dari prototipe sudah diporting.
 
 ### Satu pembayaran untuk beberapa unit
 
-Upah borongan sering dibayar sekali untuk beberapa unit. Formulir Catat
-Pengeluaran menerima banyak unit sekaligus, lalu menyimpannya sebagai **satu
-baris per unit** dengan `batchId` yang sama.
+Upah borongan sering dibayar sekali untuk beberapa unit, dan mutasi bank datang
+sebagai lumsum. Karena itu pengeluaran dipisah menjadi dua tabel:
 
-Alternatifnya — satu baris memuat daftar unit — membuat tiap laporan realisasi
-per unit harus membagi ulang nominalnya sendiri, dan cepat atau lambat ada yang
-membaginya dengan cara berbeda. Dengan dipecah di muka, angka per unit sudah
-final dan sama di mana pun dibaca.
+```
+Expense              = satu pembayaran = satu baris mutasi bank
+  └─ ExpenseAllocation[]  = pembebanan ke unit / sarpras / level proyek
+```
 
-Pembagiannya rata; sisa pembagian ditaruh pada baris pertama, bukan dibuang,
-supaya jumlah seluruh pecahan **persis** sama dengan nominal aslinya. Selisih
-satu rupiah pada laporan keuangan adalah selisih yang harus dicari orang.
-`bagiRata()` di `src/lib/calc/keuangan.ts` yang menanganinya, beserta
-pengujiannya.
+Satu pengisian formulir menghasilkan **satu** baris transaksi, seberapa pun
+banyak unit yang ditanggungnya. Itu yang membuat baris di aplikasi cocok
+satu-lawan-satu dengan baris di rekening koran. Rancangan sebelumnya memecah
+satu pembayaran menjadi lima baris; nominal tiap barisnya tidak pernah muncul
+di rekening koran, sehingga rekonsiliasi jadi penjumlahan tebak-tebakan.
 
-Baris hasil pemecahan ditandai chip "1 dari N unit" pada tabel Transaksi.
-Menyunting satu baris hanya mengubah bagian unit itu — untuk mengoreksi seluruh
-pembayaran, sunting tiap barisnya atau hapus lalu catat ulang.
+**Jumlah seluruh alokasi wajib sama persis dengan totalnya.** Server menolak
+yang tidak seimbang, dan formulir menampilkan selisihnya terus-menerus supaya
+tidak perlu menunggu ditolak untuk tahu ada yang belum pas. Itulah yang menjaga
+angka per unit selalu bisa dijumlahkan balik ke angka yang keluar dari bank —
+selisih satu rupiah pada laporan keuangan adalah selisih yang harus dicari
+orang. `periksaAlokasi()` di `src/lib/calc/keuangan.ts` yang menegakkannya.
+
+Pembagiannya **tidak harus rata**. Tombol "Bagi rata" hanya mengisi awal; tiap
+baris tetap bisa disunting, karena upah borongan untuk unit yang tipenya
+berbeda memang tidak sama besar. Pola ini sejajar dengan `ContractUnit`
+beserta `nilaiOverride` yang sudah lebih dulu ada.
+
+Konsekuensinya, angka realisasi per unit dijumlahkan dari baris alokasi, bukan
+dari total pembayarannya. Panel rincian per unit menampilkan nominal yang
+dibebankan beserta catatan "bagian dari Rp …" bila pembayarannya memang
+ditanggung beberapa tujuan.
 
 ### Arti "Nilai Kontrak" pada Keuangan Proyek
 
