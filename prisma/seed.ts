@@ -17,7 +17,7 @@ import { buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap, rabAcuan, rapA
 import { parseUkuran } from "../src/lib/format";
 import {
   ACL_AWAL, ACL_UBAH, ASET, BIAYA_OPERASIONAL, BIAYA_UMUM, KERJA_TAMBAH, KONTRAK, LOG_AWAL,
-  PORSI_BIAYA_UNIT, POS_HPP, PROYEK, ROLE_GRUP, SARPRAS, SEMUA_PERAN,
+  PORSI_BIAYA_SARPRAS, PORSI_BIAYA_UNIT, POS_HPP, PROYEK, ROLE_GRUP, SARPRAS, SEMUA_PERAN,
   TENDER, TIPE_UNIT, USERS, VENDOR, type Dok, tgl,
 } from "./seed-data";
 
@@ -471,6 +471,40 @@ async function main() {
       }
     }
   }
+  // Biaya yang menempel pada item sarana & prasarana. Realisasinya diturunkan
+  // dari progres pekerjaan terhadap RAP-nya — bukan angka acak — supaya sejalan
+  // dengan progres yang tampil di modul Konstruksi.
+  for (const P of PROYEK) {
+    for (const S of SARPRAS[P.kode] ?? []) {
+      const iid = infraId.get(S.id);
+      if (!iid || S.progress <= 0) continue;
+
+      // RAP sarpras disemai 90% dari RAB, sama seperti saat itemnya dibuat.
+      const realisasi = Math.round(S.rab * 0.9 * (S.progress / 100));
+      const nomor = Number(S.id.split("-S")[1] ?? "1");
+
+      for (const [jenis, porsi, metode, uraianList] of PORSI_BIAYA_SARPRAS) {
+        const totalJenis = Math.round(realisasi * porsi);
+        if (totalJenis < 100_000) continue;
+
+        for (const [k, uraian] of uraianList.entries()) {
+          const hari = ((nomor * 5 + k * 9) % 28) + 1;
+          await prisma.expense.create({
+            data: {
+              projectId: projectId.get(P.kode)!, infrastructureId: iid,
+              tanggal: new Date(Date.UTC(2026, (nomor + k) % 7, hari)),
+              peruntukan: "Prasarana & Sarana", jenis, metode,
+              uraian: `${uraian} · ${S.nama}`,
+              total: Math.round(totalJenis / uraianList.length),
+              status: "Lunas", posHpp: POS_HPP["Prasarana & Sarana"],
+            },
+          });
+          jmlBiaya++;
+        }
+      }
+    }
+  }
+
   for (const B of BIAYA_OPERASIONAL) {
     await prisma.operationalCost.create({
       data: {

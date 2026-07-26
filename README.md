@@ -243,6 +243,7 @@ Yang bisa diubah, beserta izin yang dibutuhkan:
 | Sarana & prasarana | `daftarSarpras` | kolom RAB butuh `hargaRabRap` terpisah |
 | Dokumen teknis | `dokumenTeknis` | unggah revisi baru, nomor revisi naik sendiri |
 | Biaya operasional | `businessPlan` | lewat Plan vs Realisasi |
+| Transaksi pengeluaran | `keuangan` | catat, sunting, dan hapus — tiap field yang berubah masuk Log Perubahan |
 
 ### Membuktikan snapshot bekerja
 
@@ -272,6 +273,19 @@ Seluruh modul dari prototipe sudah diporting.
 | **Landbank** | Portofolio, perbandingan proyek, feasibility study, dan business plan. |
 | **Plan vs Realisasi** | HPP, penjualan, operasional, dan rencana laba — realisasi diturunkan dari data yang tercatat. |
 | **Admin** | Pengelolaan proyek, matriks hak akses yang bisa disunting, kelola user, dan log perubahan. |
+
+### Arti "Nilai Kontrak" pada Keuangan Proyek
+
+KPI **Nilai Kontrak** di kepala halaman Keuangan Proyek adalah **jumlah harga
+jual seluruh unit** pada proyek itu — nilai kontrak *jual* alias omzet
+rencana, bukan nilai kontrak vendor. Istilah ini dibawa apa adanya dari
+prototipe, yang menghitungnya sebagai `units.reduce((s,u) => s + u.hargaJual)`
+dan sekaligus menamainya `omzet`.
+
+Penamaannya memang mudah disalahpahami, karena "Kontrak" di modul Vendor
+Management berarti kontrak borongan dengan vendor. Bila ingin diperjelas,
+labelnya bisa diganti menjadi "Nilai Jual" atau "Omzet Rencana" tanpa mengubah
+perhitungannya sama sekali.
 
 ### Catatan tentang Plan vs Realisasi
 
@@ -363,6 +377,26 @@ sesuai keputusan snapshot di atas.
 Koordinat pada kartu Lokasi Proyek menjadi tautan yang membuka Google Maps di
 tab baru. Yang dikirim adalah koordinat tersimpan, bukan nama proyek, supaya
 peta membuka titik yang benar-benar tercatat alih-alih hasil tebakan pencarian.
+
+### Pengeluaran sarana & prasarana
+
+Prototipe hanya membebankan pengeluaran ke unit; biaya sarpras jatuh ke satu
+baris "biaya level proyek" bersama perijinan dan pengolahan lahan, sehingga
+tidak bisa ditelusuri per item. Karena modul Konstruksi punya progres per item
+sarpras, Keuangan Proyek sekarang punya realisasinya per item juga.
+
+`Expense.infrastructureId` menampung pembebanan itu. Kolom ini **saling
+meniadakan** dengan `unitId` — satu pengeluaran membebani unit ATAU sarpras,
+tidak pernah keduanya, karena itu akan terhitung dua kali pada laporan
+realisasi. Server menolak kiriman yang mengisi keduanya, dan formulirnya
+memakai satu pemilih gabungan alih-alih dua pemilih terpisah.
+
+Satu hal yang perlu diketahui saat membaca angkanya: **Total Realisasi adalah
+pengeluaran langsung ditambah alokasi kontrak**, mengikuti rumus prototipe.
+Pada data semaian, item yang dikerjakan vendor punya keduanya, sehingga
+persentasenya bisa melampaui 100% — itu penumpukan data demo, bukan
+pembengkakan biaya yang sesungguhnya. Hal yang sama sudah berlaku pada tabel
+per unit sejak awal.
 
 ### BOD berhak mengubah seluruh sub-bagian
 

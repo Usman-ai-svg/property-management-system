@@ -468,6 +468,7 @@ model Infrastructure {
   rapItems        InfrastructureRapItem[]
   progressRecords ProgressRecord[]
   contractItems   ContractInfrastructure[]
+  expenses        Expense[]
 
   @@map("infrastructures")
 }
@@ -654,7 +655,13 @@ model TenderParticipant {
 model Expense {
   id        String   @id @default(cuid())
   projectId String
+  /// Unit yang dibebani, bila pengeluaran ini milik satu unit.
   unitId    String?
+  /// Item sarana/prasarana yang dibebani. Terpisah dari `unitId` karena
+  /// keduanya saling meniadakan: satu pengeluaran membebani unit ATAU sarpras,
+  /// tidak pernah keduanya. Bila dua-duanya kosong, pengeluaran itu biaya
+  /// level proyek (perijinan, pengolahan lahan).
+  infrastructureId String?
   tanggal   DateTime
   /// Unit (rumah dijual) | Prasarana & Sarana | Perijinan & Ormas | Pengolahan Lahan
   peruntukan String
@@ -675,9 +682,10 @@ model Expense {
   /// Kontrak vendor yang membiayai pengeluaran ini, bila ada.
   contractId String?
 
-  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  unit     Unit?     @relation(fields: [unitId], references: [id])
-  contract Contract? @relation(fields: [contractId], references: [id])
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  unit           Unit?           @relation(fields: [unitId], references: [id])
+  infrastructure Infrastructure? @relation(fields: [infrastructureId], references: [id])
+  contract       Contract?       @relation(fields: [contractId], references: [id])
 
   @@index([projectId, tanggal])
   @@map("expenses")

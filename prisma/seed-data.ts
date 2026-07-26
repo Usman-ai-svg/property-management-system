@@ -475,6 +475,21 @@ export const PORSI_BIAYA_UNIT: [string, number, string, string[]][] = [
   ["Lain-lain proyek", 0.03, "Tunai langsung", ["Konsumsi & operasional lapangan"]],
 ];
 
+/**
+ * Pembagian biaya sarana & prasarana, sejajar dengan PORSI_BIAYA_UNIT.
+ *
+ * Susunannya berbeda dari unit karena pekerjaan sarpras memang berbeda: tidak
+ * ada finishing rumah, dan porsi subkon lebih besar karena jalan, drainase,
+ * serta jaringan listrik umumnya dikerjakan pihak ketiga.
+ */
+export const PORSI_BIAYA_SARPRAS: [string, number, string, string[]][] = [
+  ["Subkon", 0.42, "Transfer", ["Termin 1 subkon pekerjaan utama", "Termin 2 subkon pekerjaan utama"]],
+  ["Material", 0.31, "Transfer", ["Material utama & bahan pendukung"]],
+  ["Upah Borongan", 0.16, "Transfer", ["Borongan pemasangan"]],
+  ["Upah Harian", 0.08, "Petty Cash", ["Upah tukang harian"]],
+  ["Lain-lain proyek", 0.03, "Tunai langsung", ["Mobilisasi alat & operasional lapangan"]],
+];
+
 export const LOG_AWAL = [
   { waktu: "22 Jul 2026 16:40", peran: "Quantity Surveyor", oleh: "Budi Hartono", proyek: "NT4", objek: "Unit F2-3 · RAB", aksi: "Ubah baris BOQ", dari: "Pek. Lantai & Keramik — Rp 285.000/m²", ke: "Pek. Lantai & Keramik — Rp 298.000/m²" },
   { waktu: "22 Jul 2026 14:12", peran: "Arsitek", oleh: "Fajar Ramadhan", proyek: "NT4", objek: "Tipe Galileo · Gambar Kerja", aksi: "Unggah revisi", dari: "R2", ke: "R3" },

@@ -105,8 +105,13 @@ export async function trenBulanan(u: Pengguna, projectId?: string) {
   }));
 }
 
-/** Total RAP satu unit, dari baris snapshot-nya. */
-export const rapUnit = (u: {
+/**
+ * Total RAP dari baris snapshot-nya: material ditambah upah.
+ *
+ * Dipakai untuk unit maupun item sarana & prasarana — keduanya menyimpan RAP
+ * dengan bentuk yang sama, jadi rumusnya tidak perlu digandakan.
+ */
+export const totalRapDari = (x: {
   rapUpah: number;
   rapItems: { volume: number; hargaSatuan: number }[];
-}) => u.rapUpah + u.rapItems.reduce((a, r) => a + r.volume * r.hargaSatuan, 0);
+}) => x.rapUpah + x.rapItems.reduce((a, r) => a + r.volume * r.hargaSatuan, 0);

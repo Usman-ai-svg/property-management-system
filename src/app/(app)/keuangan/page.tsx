@@ -45,6 +45,10 @@ export default async function DashboardKeuangan({
             orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
             select: { id: true, nomor: true, phase: { select: { kode: true } } },
           },
+          infrastructures: {
+            orderBy: { kode: "asc" },
+            select: { id: true, nama: true, jenis: true },
+          },
         },
       })
     : [];
@@ -80,6 +84,7 @@ export default async function DashboardKeuangan({
             proyek={proyekUntukForm.map((p) => ({
               id: p.id, nama: p.nama,
               units: p.units.map((u) => ({ id: u.id, label: `${u.phase.kode}-${u.nomor}` })),
+              sarpras: p.infrastructures.map((s) => ({ id: s.id, label: `${s.nama} · ${s.jenis}` })),
             }))}
           />
         )}
