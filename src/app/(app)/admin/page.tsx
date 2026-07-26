@@ -21,15 +21,15 @@ const TAB = [
 
 /** Warna chip peran, mengikuti pengelompokan pada artifact. */
 const WARNA_GRUP: Record<string, [string, string]> = {
-  lead: ["#fbf1e0", "var(--brass)"],
-  ops: ["#e7eefb", "var(--blue)"],
-  biz: ["#fbf1e0", "var(--brass)"],
-  tech: ["#e7f0f4", "var(--teal)"],
-  cc: ["#eef2f3", "var(--muted)"],
-  fin: ["#e7f4ee", "var(--green)"],
-  hr: ["#fff3df", "var(--amber)"],
-  mkt: ["#e7eefb", "var(--blue)"],
-  media: ["#f0eafb", "#8b5cf6"],
+  lead: ["var(--rona-brass)", "var(--brass)"],
+  ops: ["var(--rona-biru)", "var(--blue)"],
+  biz: ["var(--rona-brass)", "var(--brass)"],
+  tech: ["var(--rona-teal2)", "var(--teal)"],
+  cc: ["var(--rona-abu)", "var(--muted)"],
+  fin: ["var(--rona-hijau2)", "var(--green)"],
+  hr: ["var(--rona-amber)", "var(--amber)"],
+  mkt: ["var(--rona-biru)", "var(--blue)"],
+  media: ["var(--rona-ungu)", "#8b5cf6"],
 };
 
 export default async function Admin({
@@ -154,7 +154,7 @@ export default async function Admin({
                       <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
                         {p.fases.map((f) => (
                           <span key={f.id} style={{ display: "flex", alignItems: "center" }}>
-                            <span className="chip" style={{ background: "#eef3f4", color: "var(--muted)" }}>
+                            <span className="chip" style={{ background: "var(--rona-teal)", color: "var(--muted)" }}>
                               {f.kode}
                             </span>
                             {bisaKelola && (
@@ -237,7 +237,7 @@ export default async function Admin({
               </thead>
               <tbody>
                 {peran.map((r) => {
-                  const [bg, warna] = WARNA_GRUP[r.grup] ?? ["#eef2f3", "var(--muted)"];
+                  const [bg, warna] = WARNA_GRUP[r.grup] ?? ["var(--rona-abu)", "var(--muted)"];
                   return (
                     <tr key={r.id}>
                       <td className="frz frzedge" style={{ left: 0, minWidth: 190, width: 190 }}>
@@ -319,7 +319,7 @@ export default async function Admin({
                     <td>
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                         {u.roles.map(({ role }) => {
-                          const [bg, warna] = WARNA_GRUP[role.grup] ?? ["#eef2f3", "var(--muted)"];
+                          const [bg, warna] = WARNA_GRUP[role.grup] ?? ["var(--rona-abu)", "var(--muted)"];
                           return (
                             <span key={role.nama} className="chip" style={{ background: bg, color: warna }}>
                               {role.nama}

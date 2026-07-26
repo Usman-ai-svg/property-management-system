@@ -242,7 +242,7 @@ export default async function DetailVendor({
                           <span
                             className="chip"
                             style={{
-                              background: adaOverride ? "#fff3df" : "#eef2f3",
+                              background: adaOverride ? "var(--rona-amber)" : "var(--rona-abu)",
                               color: adaOverride ? "var(--amber)" : "var(--muted)",
                             }}
                           >
@@ -359,7 +359,7 @@ export default async function DetailVendor({
                                       <span
                                         className="chip"
                                         style={{
-                                          background: v.status === "Disetujui" ? "#e7f4ee" : "#fff3df",
+                                          background: v.status === "Disetujui" ? "var(--rona-hijau2)" : "var(--rona-amber)",
                                           color: v.status === "Disetujui" ? "var(--green)" : "var(--amber)",
                                         }}
                                       >
@@ -426,11 +426,11 @@ export default async function DetailVendor({
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
                     {menang && (
-                      <span className="chip" style={{ background: "#e7f4ee", color: "var(--green)" }}>
+                      <span className="chip" style={{ background: "var(--rona-hijau2)", color: "var(--green)" }}>
                         Pemenang
                       </span>
                     )}
-                    <span className="chip" style={{ background: "#eef3f4", color: "var(--teal)" }}>
+                    <span className="chip" style={{ background: "var(--rona-teal)", color: "var(--teal)" }}>
                       {t.status}
                     </span>
                   </div>

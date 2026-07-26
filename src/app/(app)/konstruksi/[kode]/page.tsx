@@ -139,7 +139,7 @@ export default async function ProgresProyek({
                     <td>
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                         {keteranganPekerjaan(u.progress).map((k) => (
-                          <span key={k} className="chip" style={{ background: "#eef3f4", color: "var(--teal)" }}>
+                          <span key={k} className="chip" style={{ background: "var(--rona-teal)", color: "var(--teal)" }}>
                             {k}
                           </span>
                         ))}

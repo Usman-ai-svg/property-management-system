@@ -5,7 +5,7 @@ import { BoqTable, type BarisBoqUI } from "@/components/boq-table";
 import { RapTable, type BarisRapUI } from "@/components/rap-table";
 import { JENIS_SARPRAS, STATUS_SARPRAS } from "@/lib/domain/enums";
 import { simpanSarpras } from "../../../actions";
-import { simpanBoqSarpras, simpanRapSarpras } from "../../../tabel-actions";
+import { imporTabel, simpanBoqSarpras, simpanRapSarpras } from "../../../tabel-actions";
 
 export function EditDeskripsiSarpras({
   kodeProyek,
@@ -56,6 +56,7 @@ export function TabelBoqSarpras({
       konteksImpor={konteks}
       sasaranImpor="sarpras"
       idImpor={id}
+      aksiImpor={imporTabel}
       aksiSimpan={(json) => simpanBoqSarpras(id, json)}
     />
   );
@@ -78,6 +79,7 @@ export function TabelRapSarpras({
       konteksImpor={konteks}
       sasaranImpor="sarpras"
       idImpor={id}
+      aksiImpor={imporTabel}
       aksiSimpan={(json) => simpanRapSarpras(id, json)}
     />
   );

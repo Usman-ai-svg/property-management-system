@@ -311,7 +311,7 @@ export default async function KeuanganProyek({
                   </tr>
                 );
               })}
-              <tr style={{ fontWeight: 700, background: "#f6f9fa" }}>
+              <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
                 <td colSpan={4}>Biaya level proyek (belum dialokasikan ke unit)</td>
                 <td className="num" style={{ textAlign: "right" }} colSpan={3}>{rp(levelProyek)}</td>
                 <td style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
@@ -476,7 +476,7 @@ export default async function KeuanganProyek({
                       </tr>
                     ))}
                     {tx.length > 0 && (
-                      <tr style={{ fontWeight: 700, background: "#f6f9fa" }}>
+                      <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
                         <td colSpan={4}>JUMLAH DIBEBANKAN KE UNIT INI</td>
                         <td className="num" style={{ textAlign: "right" }}>{rp(terpakai)}</td>
                         <td colSpan={2} style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
@@ -748,7 +748,7 @@ export default async function KeuanganProyek({
                       </tr>
                     ))}
                     {tx.length > 0 && (
-                      <tr style={{ fontWeight: 700, background: "#f6f9fa" }}>
+                      <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
                         <td colSpan={4}>JUMLAH DIBEBANKAN KE ITEM INI</td>
                         <td className="num" style={{ textAlign: "right" }}>{rp(terpakai)}</td>
                         <td colSpan={2} style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
@@ -805,7 +805,7 @@ export default async function KeuanganProyek({
                         <span
                           className="chip"
                           title="Satu pembayaran yang dibebankan ke beberapa tujuan"
-                          style={{ background: "#eef3f4", color: "var(--teal)", marginLeft: 6 }}
+                          style={{ background: "var(--rona-teal)", color: "var(--teal)", marginLeft: 6 }}
                         >
                           dibagi ke {e.alokasi.length} tujuan
                         </span>

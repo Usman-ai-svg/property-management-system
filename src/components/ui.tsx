@@ -3,38 +3,38 @@ import { Lock } from "lucide-react";
 /** Peta warna status — dipindahkan dari artifact. */
 export const WARNA_STATUS: Record<string, Record<string, [string, string]>> = {
   lahan: {
-    "Selesai Terbangun": ["#e7f4ee", "var(--green)"],
-    Pembangunan: ["#e7f0f4", "var(--teal)"],
-    "Proses Legal & Perizinan": ["#fff3df", "var(--amber)"],
-    Perencanaan: ["#eef2f3", "var(--muted)"],
+    "Selesai Terbangun": ["var(--rona-hijau2)", "var(--green)"],
+    Pembangunan: ["var(--rona-teal2)", "var(--teal)"],
+    "Proses Legal & Perizinan": ["var(--rona-amber)", "var(--amber)"],
+    Perencanaan: ["var(--rona-abu)", "var(--muted)"],
   },
   bangun: {
-    "Belum terbangun": ["#eef2f3", "var(--muted)"],
-    Progress: ["#fff3df", "var(--amber)"],
-    Selesai: ["#e7f4ee", "var(--green)"],
-    "Serah Terima": ["#e7f0f4", "var(--teal)"],
-    "Habis Masa Garansi": ["#e7eefb", "var(--blue)"],
+    "Belum terbangun": ["var(--rona-abu)", "var(--muted)"],
+    Progress: ["var(--rona-amber)", "var(--amber)"],
+    Selesai: ["var(--rona-hijau2)", "var(--green)"],
+    "Serah Terima": ["var(--rona-teal2)", "var(--teal)"],
+    "Habis Masa Garansi": ["var(--rona-biru)", "var(--blue)"],
   },
   jual: {
-    Tersedia: ["#eef2f3", "var(--muted)"],
-    Booking: ["#fff3df", "var(--amber)"],
-    Akad: ["#e7eefb", "var(--blue)"],
-    "Serah Terima": ["#e7f4ee", "var(--green)"],
+    Tersedia: ["var(--rona-abu)", "var(--muted)"],
+    Booking: ["var(--rona-amber)", "var(--amber)"],
+    Akad: ["var(--rona-biru)", "var(--blue)"],
+    "Serah Terima": ["var(--rona-hijau2)", "var(--green)"],
   },
   serapan: {
-    Hemat: ["#e7f4ee", "var(--green)"],
-    Sesuai: ["#e7f0f4", "var(--teal)"],
-    Over: ["#fbeae8", "var(--red)"],
+    Hemat: ["var(--rona-hijau2)", "var(--green)"],
+    Sesuai: ["var(--rona-teal2)", "var(--teal)"],
+    Over: ["var(--rona-merah)", "var(--red)"],
   },
   bayar: {
-    Lunas: ["#e7f4ee", "var(--green)"],
-    DP: ["#fff3df", "var(--amber)"],
-    Belum: ["#eef2f3", "var(--muted)"],
+    Lunas: ["var(--rona-hijau2)", "var(--green)"],
+    DP: ["var(--rona-amber)", "var(--amber)"],
+    Belum: ["var(--rona-abu)", "var(--muted)"],
   },
 };
 
 export function Badge({ nilai, peta }: { nilai: string; peta?: Record<string, [string, string]> }) {
-  const [bg, warna] = peta?.[nilai] ?? ["#eef2f3", "var(--muted)"];
+  const [bg, warna] = peta?.[nilai] ?? ["var(--rona-abu)", "var(--muted)"];
   return (
     <span className="chip" style={{ background: bg, color: warna }}>
       {nilai}

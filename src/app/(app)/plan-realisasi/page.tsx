@@ -419,7 +419,7 @@ export default async function PlanRealisasi({
                     key={label}
                     style={{
                       fontWeight: i === 2 || i === 4 ? 700 : 400,
-                      background: i === 4 ? "#f6f9fa" : undefined,
+                      background: i === 4 ? "var(--rona-baris)" : undefined,
                     }}
                   >
                     <td style={{ color: pengurang ? "var(--muted)" : "inherit" }}>{label}</td>

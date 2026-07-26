@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
 import { Badge, CardHead, InfoRow, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
+import { unggahRevisi } from "../../../actions";
 import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
 import { rp, tanggalJam } from "@/lib/format";
 import { EditDeskripsiSarpras, TabelBoqSarpras, TabelRapSarpras } from "./editors";
@@ -182,6 +183,7 @@ export default async function RincianSarpras({
                 bolehUbah={ubahTeknis}
                 konteks={`${judul} · ${item.nama}`}
                 pemilik={{ jenis: "sarpras", id: item.id, kategori }}
+                aksiUnggah={unggahRevisi}
               />
             ))
           )}

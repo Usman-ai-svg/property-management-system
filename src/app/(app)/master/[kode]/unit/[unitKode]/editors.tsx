@@ -6,7 +6,7 @@ import { RapTable, type BarisRapUI } from "@/components/rap-table";
 import { STATUS_JUAL, STATUS_PEMBANGUNAN } from "@/lib/domain/enums";
 import { ubahUnit } from "../../../actions";
 import {
-  hapusKerjaTambah, simpanBoqKerjaTambah, simpanBoqUnit,
+  hapusKerjaTambah, imporTabel, simpanBoqKerjaTambah, simpanBoqUnit,
   simpanRapKerjaTambah, simpanRapUnit, tambahKerjaTambah, ubahJudulKerjaTambah,
 } from "../../../tabel-actions";
 
@@ -138,6 +138,7 @@ export function TabelBoqUnit({
       konteksImpor={konteks}
       sasaranImpor="unit"
       idImpor={unitId}
+      aksiImpor={imporTabel}
       aksiSimpan={(json) => simpanBoqUnit(unitId, json)}
     />
   );
@@ -160,6 +161,7 @@ export function TabelRapUnit({
       konteksImpor={konteks}
       sasaranImpor="unit"
       idImpor={unitId}
+      aksiImpor={imporTabel}
       aksiSimpan={(json) => simpanRapUnit(unitId, json)}
     />
   );
@@ -180,6 +182,7 @@ export function TabelBoqKt({
       konteksImpor={konteks}
       sasaranImpor="kerjaTambah"
       idImpor={ktId}
+      aksiImpor={imporTabel}
       grupBaru="Kerja Tambah"
       aksiSimpan={(json) => simpanBoqKerjaTambah(ktId, json)}
     />
@@ -203,6 +206,7 @@ export function TabelRapKt({
       konteksImpor={konteks}
       sasaranImpor="kerjaTambah"
       idImpor={ktId}
+      aksiImpor={imporTabel}
       aksiSimpan={(json) => simpanRapKerjaTambah(ktId, json)}
     />
   );

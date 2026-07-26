@@ -132,7 +132,7 @@ export function EditLegalitas({
       <input type="hidden" name="baris" value={JSON.stringify(draft)} />
 
       {draft.map((lg, i) => (
-        <div key={i} className="card" style={{ padding: "12px 14px", marginBottom: 10, background: "#f8fafb" }}>
+        <div key={i} className="card" style={{ padding: "12px 14px", marginBottom: 10, background: "var(--rona-panel)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div className="eyebrow">NIB #{i + 1}</div>
             {draft.length > 1 && (

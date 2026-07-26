@@ -8,9 +8,9 @@ import { ubahIzin, ubahStatusUser } from "./actions";
 type Tingkat = "tidak" | "lihat" | "ubah";
 
 const WARNA: Record<Tingkat, [string, string, string]> = {
-  tidak: ["#f2f5f6", "#9aa8ad", "—"],
-  lihat: ["#e7f0f4", "var(--teal)", "Lihat"],
-  ubah: ["#e7f4ee", "var(--green)", "Ubah"],
+  tidak: ["var(--rona-kosong)", "#9aa8ad", "—"],
+  lihat: ["var(--rona-teal2)", "var(--teal)", "Lihat"],
+  ubah: ["var(--rona-hijau2)", "var(--green)", "Ubah"],
 };
 
 /**
@@ -64,7 +64,7 @@ export function SelIzin({
         disabled={menunggu}
         title={galat ?? `Klik untuk mengubah ke "${WARNA[berikutnya[tingkat]][2]}"`}
         style={{
-          background: galat ? "#fbeae8" : bg,
+          background: galat ? "var(--rona-merah)" : bg,
           color: galat ? "var(--red)" : warna,
           border: "none",
           cursor: menunggu ? "default" : "pointer",
@@ -95,7 +95,7 @@ export function TombolStatusUser({
       <span
         className="chip"
         style={{
-          background: aktif ? "#e7f4ee" : "#eef2f3",
+          background: aktif ? "var(--rona-hijau2)" : "var(--rona-abu)",
           color: aktif ? "var(--green)" : "var(--muted)",
         }}
       >
@@ -113,7 +113,7 @@ export function TombolStatusUser({
         disabled={menunggu}
         title={hasil && !hasil.ok ? hasil.error : aktif ? "Klik untuk menonaktifkan" : "Klik untuk mengaktifkan"}
         style={{
-          background: hasil && !hasil.ok ? "#fbeae8" : aktif ? "#e7f4ee" : "#eef2f3",
+          background: hasil && !hasil.ok ? "var(--rona-merah)" : aktif ? "var(--rona-hijau2)" : "var(--rona-abu)",
           color: hasil && !hasil.ok ? "var(--red)" : aktif ? "var(--green)" : "var(--muted)",
           border: "none", cursor: menunggu ? "default" : "pointer",
           fontFamily: "inherit", opacity: menunggu ? 0.5 : 1,

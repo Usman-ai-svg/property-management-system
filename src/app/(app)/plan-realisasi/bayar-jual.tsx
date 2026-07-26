@@ -61,7 +61,7 @@ export function KelolaPembayaranJual({
       </BarisField>
 
       {riwayat.length > 0 && (
-        <div className="card" style={{ padding: "10px 12px", background: "#f8fafb", marginBottom: 12 }}>
+        <div className="card" style={{ padding: "10px 12px", background: "var(--rona-panel)", marginBottom: 12 }}>
           <div className="eyebrow" style={{ marginBottom: 6 }}>
             Riwayat pencairan · {riwayat.length} kali
           </div>

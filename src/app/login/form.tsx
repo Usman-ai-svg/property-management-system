@@ -42,7 +42,7 @@ export function FormLogin() {
           role="alert"
           style={{
             display: "flex", alignItems: "center", gap: 8, marginTop: 14,
-            padding: "9px 12px", borderRadius: 9, background: "#fbeae8",
+            padding: "9px 12px", borderRadius: 9, background: "var(--rona-merah)",
             color: "var(--red)", fontSize: 12.5, fontWeight: 500,
           }}
         >

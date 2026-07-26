@@ -253,7 +253,7 @@ export function FormModal({
           role="status"
           style={{
             display: "flex", alignItems: "flex-start", gap: 8, marginTop: 8,
-            padding: "9px 12px", borderRadius: 9, background: "#e8f5ef",
+            padding: "9px 12px", borderRadius: 9, background: "var(--rona-hijau)",
             color: "var(--teal)", fontSize: 12.5, lineHeight: 1.5, whiteSpace: "pre-line",
           }}
         >
@@ -317,7 +317,7 @@ export function FormModal({
                   role="alert"
                   style={{
                     display: "flex", alignItems: "flex-start", gap: 8, marginTop: 4, marginBottom: 14,
-                    padding: "9px 12px", borderRadius: 9, background: "#fbeae8",
+                    padding: "9px 12px", borderRadius: 9, background: "var(--rona-merah)",
                     color: "var(--red)", fontSize: 12.5, lineHeight: 1.5,
                     // Impor melaporkan satu baris per kesalahan; tanpa ini
                     // semuanya menyatu jadi satu paragraf yang sulit dibaca.
@@ -435,7 +435,7 @@ export function TombolHapus({
           role="alert"
           style={{
             display: "inline-flex", alignItems: "flex-start", gap: 5, maxWidth: 320,
-            padding: "5px 9px", borderRadius: 8, background: "#fbeae8",
+            padding: "5px 9px", borderRadius: 8, background: "var(--rona-merah)",
             color: "var(--red)", fontSize: 11, lineHeight: 1.45, whiteSpace: "normal",
           }}
         >

@@ -1,10 +1,13 @@
 "use client";
 
 import { BarisField, FormModal } from "@/components/form";
-import { imporTabel } from "@/app/(app)/master/tabel-actions";
+import type { HasilAksi } from "@/lib/actions/guard";
 
 /**
  * Modal impor tabel dari Excel.
+ *
+ * Aksi impor diterima lewat prop, bukan diimpor dari `app/` — komponen di
+ * `components/` tidak boleh bergantung pada halaman yang memakainya.
  *
  * Berkas benar-benar dibaca. Bila ada baris yang tidak sah, seluruh
  * kesalahannya dilaporkan sekaligus dan tidak ada yang tersimpan — supaya
@@ -16,6 +19,7 @@ export function ModalImpor({
   kolom,
   sasaran,
   id,
+  aksiImpor,
 }: {
   /** "BOQ / RAB" atau "RAP" — untuk judul modal. */
   jenis: string;
@@ -24,6 +28,7 @@ export function ModalImpor({
   /** unit | kerjaTambah | sarpras */
   sasaran: "unit" | "kerjaTambah" | "sarpras";
   id: string;
+  aksiImpor: (sebelumnya: HasilAksi | null, form: FormData) => Promise<HasilAksi>;
 }) {
   const jenisTabel = jenis.toLowerCase().includes("rap") ? "rap" : "boq";
 
@@ -31,7 +36,7 @@ export function ModalImpor({
     <FormModal
       judul={`Impor ${jenis}`}
       keterangan={konteks}
-      aksi={imporTabel}
+      aksi={aksiImpor}
       labelSimpan="Impor"
       lebar={620}
       pemicu={(buka) => (
@@ -60,7 +65,7 @@ export function ModalImpor({
         </div>
       </BarisField>
 
-      <div className="card" style={{ padding: "12px 14px", background: "#f8fafb", marginBottom: 12 }}>
+      <div className="card" style={{ padding: "12px 14px", background: "var(--rona-panel)", marginBottom: 12 }}>
         <div className="eyebrow" style={{ marginBottom: 6 }}>Kolom yang dikenali</div>
         <div style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.7 }}>{kolom}</div>
         <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.7, marginTop: 8 }}>

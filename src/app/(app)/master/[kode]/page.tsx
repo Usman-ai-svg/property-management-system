@@ -8,6 +8,7 @@ import {
   Badge, CardHead, InfoRow, TabelHead, Terbatas, WARNA_STATUS,
 } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
+import { unggahRevisi } from "../actions";
 import {
   AksiSarpras, AksiTipeUnit, EditLegalitas, EditLokasi, EditLuasLahan, EditUnit,
   HapusUnit, TambahSarpras, TambahTipeUnit, TambahUnit,
@@ -113,7 +114,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                   title="Buka di Google Maps"
                   className="chip"
                   style={{
-                    background: "#e7f0f4", color: "var(--teal)",
+                    background: "var(--rona-teal2)", color: "var(--teal)",
                     textDecoration: "none", fontWeight: 600,
                   }}
                 >
@@ -122,7 +123,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                   <ExternalLink size={10} style={{ opacity: 0.75 }} />
                 </a>
               ) : (
-                <span className="chip" style={{ background: "#e7f0f4", color: "var(--teal)" }}>
+                <span className="chip" style={{ background: "var(--rona-teal2)", color: "var(--teal)" }}>
                   <MapPin size={11} />
                   {pin}
                 </span>
@@ -176,6 +177,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                     bolehUbah={ubahTeknis}
                     konteks={`Sertifikat NIB ${lg.nib}`}
                     pemilik={{ jenis: "legalitas", id: lg.id, kategori: "legalitas" }}
+                    aksiUnggah={unggahRevisi}
                   />
                 )}
               </div>
@@ -345,11 +347,11 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                         <td style={{ textAlign: "right" }}>{u.luasTanah} m²</td>
                         <td>
                           {custom ? (
-                            <span className="chip" style={{ background: "#fff3df", color: "var(--amber)" }}>
+                            <span className="chip" style={{ background: "var(--rona-amber)", color: "var(--amber)" }}>
                               Custom
                             </span>
                           ) : (
-                            <span className="chip" style={{ background: "#eef2f3", color: "var(--muted)" }}>
+                            <span className="chip" style={{ background: "var(--rona-abu)", color: "var(--muted)" }}>
                               Default
                             </span>
                           )}

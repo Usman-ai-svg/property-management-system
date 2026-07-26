@@ -21,6 +21,29 @@
   --blue: #2f6fb0;
   --text: #1b2a33;
   --muted: #67787f;
+
+  /*
+   * Rona latar untuk chip, baris jumlah, dan panel bantu.
+   *
+   * Dipisahkan sebagai variabel supaya seluruh warna aplikasi bisa diambil
+   * alih oleh tema induk hanya dengan menimpa blok ini — tidak perlu menyisir
+   * ratusan style inline. Penamaannya mengikuti maknanya, bukan warnanya,
+   * agar tetap masuk akal ketika temanya diganti gelap.
+   */
+  --rona-teal: #eef3f4;      /* chip netral & kepala kelompok */
+  --rona-abu: #eef2f3;       /* chip tak aktif */
+  --rona-baris: #f6f9fa;     /* baris jumlah / total pada tabel */
+  --rona-panel: #f8fafb;     /* panel bantu di dalam modal */
+  --rona-kosong: #f2f5f6;    /* ikon dokumen yang belum ada isinya */
+  --rona-biru: #e7eefb;      /* chip peran kelompok ops & marketing */
+  --rona-amber: #fff3df;     /* peringatan lunak */
+  --rona-hijau: #e8f5ef;     /* pesan berhasil */
+  --rona-merah: #fbeae8;     /* pesan galat */
+  --rona-ungu: #f0eafb;      /* chip peran kelompok media */
+  --rona-hijau2: #e7f4ee;    /* chip status selesai / lunas */
+  --rona-teal2: #e7f0f4;     /* chip status berjalan */
+  --rona-brass: #fbf1e0;     /* chip peran kelompok pimpinan */
+  --rona-ikon: #c3ccd0;      /* ikon dokumen yang belum ada isinya */
 }
 
 * {

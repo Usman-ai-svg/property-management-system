@@ -184,14 +184,14 @@ export default async function Landbank({
                         {p.analisaDocId ? (
                           <FileText size={14} style={{ color: "var(--teal)" }} />
                         ) : (
-                          <X size={14} style={{ color: "#c3ccd0" }} />
+                          <X size={14} style={{ color: "var(--rona-ikon)" }} />
                         )}
                       </td>
                       <td style={{ textAlign: "center" }}>
                         {p.punyaBp ? (
                           <Check size={14} style={{ color: "var(--green)" }} />
                         ) : (
-                          <X size={14} style={{ color: "#c3ccd0" }} />
+                          <X size={14} style={{ color: "var(--rona-ikon)" }} />
                         )}
                       </td>
                       <td>

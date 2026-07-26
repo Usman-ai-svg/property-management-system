@@ -37,26 +37,26 @@ export function TabelMingguan({
               Sat
             </th>
             <th rowSpan={2} style={{ textAlign: "right" }}>Bobot</th>
-            <th colSpan={kolomBlok} style={{ textAlign: "center", background: "#f2f5f6" }}>
+            <th colSpan={kolomBlok} style={{ textAlign: "center", background: "var(--rona-kosong)" }}>
               Progress Minggu Lalu
             </th>
-            <th colSpan={kolomBlok} style={{ textAlign: "center", background: "#eef3f4" }}>
+            <th colSpan={kolomBlok} style={{ textAlign: "center", background: "var(--rona-teal)" }}>
               Progress Minggu Ini
             </th>
-            <th colSpan={kolomBlok} style={{ textAlign: "center", background: "#e7eefb" }}>
+            <th colSpan={kolomBlok} style={{ textAlign: "center", background: "var(--rona-biru)" }}>
               Progress s.d. Minggu Ini
             </th>
           </tr>
           <tr>
-            <th style={{ textAlign: "right", background: "#f2f5f6" }}>%</th>
-            <th style={{ textAlign: "right", background: "#f2f5f6" }}>Bobot</th>
-            {bolehHarga && <th style={{ textAlign: "right", background: "#f2f5f6" }}>Nilai</th>}
-            <th style={{ textAlign: "right", background: "#eef3f4" }}>%</th>
-            <th style={{ textAlign: "right", background: "#eef3f4" }}>Bobot</th>
-            {bolehHarga && <th style={{ textAlign: "right", background: "#eef3f4" }}>Nilai</th>}
-            <th style={{ background: "#e7eefb", minWidth: 128 }}>Progress</th>
-            <th style={{ textAlign: "right", background: "#e7eefb" }}>Bobot</th>
-            {bolehHarga && <th style={{ textAlign: "right", background: "#e7eefb" }}>Nilai</th>}
+            <th style={{ textAlign: "right", background: "var(--rona-kosong)" }}>%</th>
+            <th style={{ textAlign: "right", background: "var(--rona-kosong)" }}>Bobot</th>
+            {bolehHarga && <th style={{ textAlign: "right", background: "var(--rona-kosong)" }}>Nilai</th>}
+            <th style={{ textAlign: "right", background: "var(--rona-teal)" }}>%</th>
+            <th style={{ textAlign: "right", background: "var(--rona-teal)" }}>Bobot</th>
+            {bolehHarga && <th style={{ textAlign: "right", background: "var(--rona-teal)" }}>Nilai</th>}
+            <th style={{ background: "var(--rona-biru)", minWidth: 128 }}>Progress</th>
+            <th style={{ textAlign: "right", background: "var(--rona-biru)" }}>Bobot</th>
+            {bolehHarga && <th style={{ textAlign: "right", background: "var(--rona-biru)" }}>Nilai</th>}
           </tr>
         </thead>
         <tbody>
@@ -101,13 +101,13 @@ export function TabelMingguan({
                   </td>
                 )}
 
-                <td style={{ background: "#f6f9fa", minWidth: 128 }}>
+                <td style={{ background: "var(--rona-baris)", minWidth: 128 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <Track
                       nilai={r.progresKini}
                       tinggi={9}
                       warna={
-                        r.progresKini === 100 ? "var(--green)" : r.progresKini === 0 ? "#c3ccd0" : "var(--teal)"
+                        r.progresKini === 100 ? "var(--green)" : r.progresKini === 0 ? "var(--rona-ikon)" : "var(--teal)"
                       }
                     />
                     <span
@@ -120,9 +120,9 @@ export function TabelMingguan({
                     </span>
                   </div>
                 </td>
-                <td style={{ textAlign: "right", background: "#f6f9fa" }}>{r.bobotKini.toFixed(2)}</td>
+                <td style={{ textAlign: "right", background: "var(--rona-baris)" }}>{r.bobotKini.toFixed(2)}</td>
                 {bolehHarga && (
-                  <td style={{ textAlign: "right", background: "#f6f9fa" }}>{rp(r.nilaiKini)}</td>
+                  <td style={{ textAlign: "right", background: "var(--rona-baris)" }}>{rp(r.nilaiKini)}</td>
                 )}
               </tr>
             );
@@ -139,10 +139,10 @@ export function TabelMingguan({
             <td />
             <td style={{ textAlign: "right" }}>{total("deltaBobot").toFixed(2)}</td>
             {bolehHarga && <td style={{ textAlign: "right" }}>{rp(total("deltaNilai"))}</td>}
-            <td style={{ background: "#eef3f4" }} />
-            <td style={{ textAlign: "right", background: "#eef3f4" }}>{total("bobotKini").toFixed(2)}</td>
+            <td style={{ background: "var(--rona-teal)" }} />
+            <td style={{ textAlign: "right", background: "var(--rona-teal)" }}>{total("bobotKini").toFixed(2)}</td>
             {bolehHarga && (
-              <td style={{ textAlign: "right", background: "#eef3f4" }}>{rp(total("nilaiKini"))}</td>
+              <td style={{ textAlign: "right", background: "var(--rona-teal)" }}>{rp(total("nilaiKini"))}</td>
             )}
           </tr>
         </tbody>

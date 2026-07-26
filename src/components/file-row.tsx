@@ -3,11 +3,15 @@
 import { useState } from "react";
 import { FileText } from "lucide-react";
 import { BarisField, FormModal } from "@/components/form";
-import { unggahRevisi } from "@/app/(app)/master/actions";
+import type { HasilAksi } from "@/lib/actions/guard";
 import { tanggal, ukuranFile } from "@/lib/format";
 
 /**
  * Baris dokumen dengan nomor revisi dan riwayat versi.
+ *
+ * Aksi unggah diterima lewat prop, bukan diimpor dari `app/`. Komponen di
+ * `components/` tidak boleh bergantung pada halaman yang memakainya — arah
+ * impor yang terbalik membuat komponen ini tidak bisa dipindah sendirian.
  *
  * Berkas benar-benar diunggah dan disimpan. Tautan "Lihat" mengarah ke rute
  * yang memeriksa hak akses lebih dulu, bukan ke berkas statis — supaya tautan
@@ -58,12 +62,14 @@ export function FileRow({
   bolehUbah,
   konteks,
   pemilik,
+  aksiUnggah,
 }: {
   label: string;
   dokumen: DokumenTampil | null;
   bolehUbah: boolean;
   konteks: string;
   pemilik: { jenis: string; id: string; kategori: string };
+  aksiUnggah: (sebelumnya: HasilAksi | null, form: FormData) => Promise<HasilAksi>;
 }) {
   const [bukaVersi, setBukaVersi] = useState(false);
 
@@ -77,9 +83,9 @@ export function FileRow({
         <div
           style={{
             width: 32, height: 32, borderRadius: 8,
-            background: versiTerbaru ? "#e7f0f4" : "#f2f5f6",
+            background: versiTerbaru ? "var(--rona-teal2)" : "var(--rona-kosong)",
             display: "grid", placeItems: "center",
-            color: versiTerbaru ? "var(--teal)" : "#c3ccd0", flexShrink: 0,
+            color: versiTerbaru ? "var(--teal)" : "var(--rona-ikon)", flexShrink: 0,
           }}
         >
           <FileText size={15} />
@@ -89,7 +95,7 @@ export function FileRow({
           <div style={{ fontSize: 12.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
             {label}
             {revisi && (
-              <span className="chip" style={{ background: "#eef3f4", color: "var(--teal)" }}>
+              <span className="chip" style={{ background: "var(--rona-teal)", color: "var(--teal)" }}>
                 {revisi}
               </span>
             )}
@@ -117,7 +123,7 @@ export function FileRow({
           <FormModal
             judul="Unggah Revisi Dokumen"
             keterangan={konteks}
-            aksi={unggahRevisi}
+            aksi={aksiUnggah}
             labelSimpan="Unggah"
             pemicu={(buka) => (
               <button

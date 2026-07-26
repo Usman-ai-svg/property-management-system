@@ -7,6 +7,7 @@ import { luasTotal } from "@/lib/data/proyek";
 import { m2, pct, rp } from "@/lib/format";
 import { Badge, CardHead, InfoRow, TabelHead, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
+import { unggahRevisi } from "../../master/actions";
 import {
   FormCashflow, FormPembanding, FormPosHpp, FormPosOmzet, FormPosOperasional,
   HapusCashflow, HapusPembanding, HapusPosHpp, HapusPosOmzet, HapusPosOperasional,
@@ -205,6 +206,7 @@ export default async function DetailLandbank({
                 bolehUbah={ubahTeknis}
                 konteks={`Analisis Lahan · ${proyek.nama}`}
                 pemilik={{ jenis: "proyek", id: proyek.id, kategori: "analisa" }}
+                aksiUnggah={unggahRevisi}
               />
             </div>
           </div>
@@ -354,7 +356,7 @@ export default async function DetailLandbank({
                         )}
                       </tr>
                     ))}
-                    <tr style={{ fontWeight: 700, background: "#f6f9fa" }}>
+                    <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
                       <td>TOTAL HPP</td>
                       <td className="num" style={{ textAlign: "right" }}>{rp(totalHpp)}</td>
                       <td style={{ textAlign: "right" }}>100%</td>
@@ -399,7 +401,7 @@ export default async function DetailLandbank({
                         )}
                       </tr>
                     ))}
-                    <tr style={{ fontWeight: 700, background: "#f6f9fa" }}>
+                    <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
                       <td colSpan={3}>TOTAL OMSET</td>
                       <td className="num" style={{ textAlign: "right" }}>{rp(totalOmzet)}</td>
                       {bolehUbahBp && <td />}
@@ -447,7 +449,7 @@ export default async function DetailLandbank({
                         )}
                       </tr>
                     ))}
-                    <tr style={{ fontWeight: 700, background: "#f6f9fa" }}>
+                    <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
                       <td>TOTAL OPERASIONAL</td>
                       <td className="num" style={{ textAlign: "right" }}>{rp(totalOps)}</td>
                       <td style={{ textAlign: "right" }}>
@@ -478,7 +480,7 @@ export default async function DetailLandbank({
                         key={label}
                         style={{
                           fontWeight: i === 2 || i === 4 ? 700 : 400,
-                          background: i === 4 ? "#f6f9fa" : undefined,
+                          background: i === 4 ? "var(--rona-baris)" : undefined,
                         }}
                       >
                         <td>{label}</td>

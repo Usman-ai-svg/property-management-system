@@ -60,6 +60,7 @@ export function RapTable({
   konteksImpor,
   sasaranImpor,
   idImpor,
+  aksiImpor,
 }: {
   judul: string;
   keterangan?: string;
@@ -72,6 +73,9 @@ export function RapTable({
   konteksImpor: string;
   sasaranImpor: "unit" | "kerjaTambah" | "sarpras";
   idImpor: string;
+  /** Aksi impor Excel — diterima lewat prop supaya komponen ini tidak
+   *  mengimpor dari `app/`. */
+  aksiImpor: (sebelumnya: HasilAksi | null, form: FormData) => Promise<HasilAksi>;
 }) {
   const [sunting, setSunting] = useState(false);
   const [draft, setDraft] = useState<Kelompok[]>(() => kelompokkan(baris));
@@ -159,6 +163,7 @@ export function RapTable({
               kolom="Kelompok · Material · Satuan · Volume · Harga · Keterangan · Upah Tenaga Kerja"
               sasaran={sasaranImpor}
               id={idImpor}
+              aksiImpor={aksiImpor}
             />
             {sunting && (
               <button type="button" className="btn-garis" style={{ color: "var(--muted)" }} onClick={batal}>
@@ -182,7 +187,7 @@ export function RapTable({
           role="alert"
           style={{
             display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8,
-            padding: "9px 12px", borderRadius: 9, background: "#fbeae8",
+            padding: "9px 12px", borderRadius: 9, background: "var(--rona-merah)",
             color: "var(--red)", fontSize: 12.5, lineHeight: 1.5,
           }}
         >
@@ -220,7 +225,7 @@ export function RapTable({
               // Fragment ini yang memegang key-nya — bukan <tr> di dalamnya —
               // karena elemen inilah yang jadi anak langsung dari <tbody>.
               <Fragment key={`grup-${gi}`}>
-                <tr style={{ background: "#eef3f4" }}>
+                <tr style={{ background: "var(--rona-teal)" }}>
                   <td style={{ fontWeight: 700 }}>{ROMAWI[gi] ?? gi + 1}</td>
                   <td
                     colSpan={sunting ? 7 : 6}
@@ -370,7 +375,7 @@ export function RapTable({
               <td />
               {sunting && <td />}
             </tr>
-            <tr style={{ fontWeight: 700, background: "#f6f9fa" }}>
+            <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
               <td colSpan={5}>TOTAL RAP</td>
               <td className="num" style={{ textAlign: "right", color: "var(--brass)" }}>
                 {rp(material + nilaiUpah)}

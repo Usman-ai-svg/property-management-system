@@ -11,10 +11,10 @@ import {
 } from "./editors-vendor";
 
 const WARNA_TENDER: Record<string, [string, string]> = {
-  Dibuka: ["#e7f0f4", "var(--teal)"],
-  Evaluasi: ["#fff3df", "var(--amber)"],
-  Ditetapkan: ["#e7f4ee", "var(--green)"],
-  Batal: ["#fbeae8", "var(--red)"],
+  Dibuka: ["var(--rona-teal2)", "var(--teal)"],
+  Evaluasi: ["var(--rona-amber)", "var(--amber)"],
+  Ditetapkan: ["var(--rona-hijau2)", "var(--green)"],
+  Batal: ["var(--rona-merah)", "var(--red)"],
 };
 
 export default async function VendorManagement() {
@@ -173,7 +173,7 @@ export default async function VendorManagement() {
                     <span
                       className="chip"
                       style={{
-                        background: v.status === "Aktif" ? "#e7f4ee" : "#eef2f3",
+                        background: v.status === "Aktif" ? "var(--rona-hijau2)" : "var(--rona-abu)",
                         color: v.status === "Aktif" ? "var(--green)" : "var(--muted)",
                       }}
                     >

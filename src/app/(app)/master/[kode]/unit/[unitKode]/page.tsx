@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { Badge, CardHead, InfoRow, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
+import { unggahRevisi } from "../../../actions";
 import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
 import { rp } from "@/lib/format";
 import {
@@ -218,6 +219,7 @@ export default async function RincianUnit({
                   bolehUbah={ubahTeknis}
                   konteks={`${judul} · Tipe ${unit.unitType.nama}`}
                   pemilik={{ jenis: "tipeUnit", id: unit.unitTypeId, kategori }}
+                  aksiUnggah={unggahRevisi}
                 />
               ))}
 
@@ -239,6 +241,7 @@ export default async function RincianUnit({
                       bolehUbah={ubahTeknis}
                       konteks={`${judul} · ${kt.judul}`}
                       pemilik={{ jenis: "kerjaTambah", id: kt.id, kategori }}
+                      aksiUnggah={unggahRevisi}
                     />
                   ))}
                 </div>
@@ -259,11 +262,11 @@ export default async function RincianUnit({
           >
             <div className="eyebrow">Konfigurasi Unit</div>
             {kts.length > 0 ? (
-              <span className="chip" style={{ background: "#fff3df", color: "var(--amber)" }}>
+              <span className="chip" style={{ background: "var(--rona-amber)", color: "var(--amber)" }}>
                 Custom · {kts.length} kerja tambah
               </span>
             ) : (
-              <span className="chip" style={{ background: "#eef2f3", color: "var(--muted)" }}>
+              <span className="chip" style={{ background: "var(--rona-abu)", color: "var(--muted)" }}>
                 Default
               </span>
             )}

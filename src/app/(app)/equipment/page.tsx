@@ -9,10 +9,10 @@ import { HapusAset, TambahAset, UbahAset } from "./editors";
 const isoTanggal = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 
 const WARNA_ASET: Record<string, [string, string]> = {
-  Tersedia: ["#eef2f3", "var(--muted)"],
-  Digunakan: ["#e7f0f4", "var(--teal)"],
-  Pemeliharaan: ["#fff3df", "var(--amber)"],
-  Rusak: ["#fbeae8", "var(--red)"],
+  Tersedia: ["var(--rona-abu)", "var(--muted)"],
+  Digunakan: ["var(--rona-teal2)", "var(--teal)"],
+  Pemeliharaan: ["var(--rona-amber)", "var(--amber)"],
+  Rusak: ["var(--rona-merah)", "var(--red)"],
 };
 
 export default async function EquipmentAsset() {
@@ -120,7 +120,7 @@ export default async function EquipmentAsset() {
                     <td>
                       {a.kepemilikan === "Sewa" ? (
                         <>
-                          <span className="chip" style={{ background: "#fff3df", color: "var(--amber)" }}>
+                          <span className="chip" style={{ background: "var(--rona-amber)", color: "var(--amber)" }}>
                             Sewa
                           </span>
                           {a.vendor && (
@@ -130,7 +130,7 @@ export default async function EquipmentAsset() {
                           )}
                         </>
                       ) : (
-                        <span className="chip" style={{ background: "#eef2f3", color: "var(--muted)" }}>
+                        <span className="chip" style={{ background: "var(--rona-abu)", color: "var(--muted)" }}>
                           Milik Sendiri
                         </span>
                       )}

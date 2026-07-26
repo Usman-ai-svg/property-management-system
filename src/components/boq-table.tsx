@@ -41,6 +41,7 @@ export function BoqTable({
   konteksImpor,
   sasaranImpor,
   idImpor,
+  aksiImpor,
   grupBaru = "Tambahan",
 }: {
   judul: string;
@@ -53,6 +54,9 @@ export function BoqTable({
   /** Sasaran dan id untuk impor Excel. */
   sasaranImpor: "unit" | "kerjaTambah" | "sarpras";
   idImpor: string;
+  /** Aksi impor Excel — diterima lewat prop supaya komponen ini tidak
+   *  mengimpor dari `app/`. */
+  aksiImpor: (sebelumnya: HasilAksi | null, form: FormData) => Promise<HasilAksi>;
   grupBaru?: string;
 }) {
   const [sunting, setSunting] = useState(false);
@@ -123,6 +127,7 @@ export function BoqTable({
               kolom="Grup · Uraian Pekerjaan · Satuan · Volume · Harga Satuan · Spesifikasi"
               sasaran={sasaranImpor}
               id={idImpor}
+              aksiImpor={aksiImpor}
             />
             {sunting && (
               <button
@@ -160,7 +165,7 @@ export function BoqTable({
           role="alert"
           style={{
             display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8,
-            padding: "9px 12px", borderRadius: 9, background: "#fbeae8",
+            padding: "9px 12px", borderRadius: 9, background: "var(--rona-merah)",
             color: "var(--red)", fontSize: 12.5, lineHeight: 1.5,
           }}
         >
