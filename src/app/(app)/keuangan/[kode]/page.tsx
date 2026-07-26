@@ -149,7 +149,9 @@ export default async function KeuanganProyek({
         const a = e.alokasi.find((x) =>
           kunci.unitId ? x.unitId === kunci.unitId : x.infrastructureId === kunci.sarprasId,
         );
-        return a ? { ...e, nominalDibebankan: a.nominal, terbagi: e.alokasi.length > 1 } : null;
+        return a
+          ? { ...e, nominalDibebankan: a.nominal, jumlahTujuan: e.alokasi.length }
+          : null;
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
 
@@ -430,7 +432,8 @@ export default async function KeuanganProyek({
                       <th>Jenis</th>
                       <th style={{ minWidth: 200 }}>Keterangan</th>
                       <th>Metode</th>
-                      <th style={{ textAlign: "right" }}>Total</th>
+                      <th style={{ textAlign: "right" }}>Alokasi ke Sini</th>
+                      <th style={{ textAlign: "right" }}>Total Pembayaran</th>
                       <th>Status</th>
                     </tr>
                   </thead>
@@ -451,15 +454,39 @@ export default async function KeuanganProyek({
                           )}
                         </td>
                         <td style={{ color: "var(--muted)" }}>{e.metode}</td>
-                        <td className="num" style={{ textAlign: "right" }}>{rp(e.total)}</td>
+                        {/* Dua kolom terpisah, bukan satu: "Alokasi ke Sini" adalah
+                            bagian yang ditanggung unit/item ini, sedangkan "Total
+                            Pembayaran" adalah nilai transaksi utuh yang cocok dengan
+                            satu baris mutasi bank. Menggabungkan keduanya membuat
+                            pembayaran lumsum terbaca seolah seluruhnya milik unit ini. */}
+                        <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>
+                          {rp(e.nominalDibebankan)}
+                        </td>
+                        <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
+                          {rp(e.total)}
+                          {e.jumlahTujuan > 1 && (
+                            <div style={{ fontSize: 10, fontWeight: 400 }}>
+                              dibagi ke {e.jumlahTujuan} tujuan
+                            </div>
+                          )}
+                        </td>
                         <td>
                           <Badge nilai={e.status} peta={WARNA_STATUS.bayar} />
                         </td>
                       </tr>
                     ))}
+                    {tx.length > 0 && (
+                      <tr style={{ fontWeight: 700, background: "#f6f9fa" }}>
+                        <td colSpan={4}>JUMLAH DIBEBANKAN KE UNIT INI</td>
+                        <td className="num" style={{ textAlign: "right" }}>{rp(terpakai)}</td>
+                        <td colSpan={2} style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
+                          sama dengan Total Pengeluaran di atas
+                        </td>
+                      </tr>
+                    )}
                     {tx.length === 0 && (
                       <tr>
-                        <td colSpan={6} style={{ color: "var(--muted)", textAlign: "center", padding: 18 }}>
+                        <td colSpan={7} style={{ color: "var(--muted)", textAlign: "center", padding: 18 }}>
                           Belum ada transaksi yang dicatat langsung ke unit ini. Biaya yang
                           masuk lewat kontrak borongan muncul sebagai Alokasi Kontrak, bukan
                           sebagai transaksi unit.
@@ -679,7 +706,8 @@ export default async function KeuanganProyek({
                       <th>Jenis</th>
                       <th style={{ minWidth: 200 }}>Keterangan</th>
                       <th>Metode</th>
-                      <th style={{ textAlign: "right" }}>Total</th>
+                      <th style={{ textAlign: "right" }}>Alokasi ke Sini</th>
+                      <th style={{ textAlign: "right" }}>Total Pembayaran</th>
                       <th>Status</th>
                     </tr>
                   </thead>
@@ -698,15 +726,39 @@ export default async function KeuanganProyek({
                           )}
                         </td>
                         <td style={{ color: "var(--muted)" }}>{e.metode}</td>
-                        <td className="num" style={{ textAlign: "right" }}>{rp(e.total)}</td>
+                        {/* Dua kolom terpisah, bukan satu: "Alokasi ke Sini" adalah
+                            bagian yang ditanggung unit/item ini, sedangkan "Total
+                            Pembayaran" adalah nilai transaksi utuh yang cocok dengan
+                            satu baris mutasi bank. Menggabungkan keduanya membuat
+                            pembayaran lumsum terbaca seolah seluruhnya milik unit ini. */}
+                        <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>
+                          {rp(e.nominalDibebankan)}
+                        </td>
+                        <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
+                          {rp(e.total)}
+                          {e.jumlahTujuan > 1 && (
+                            <div style={{ fontSize: 10, fontWeight: 400 }}>
+                              dibagi ke {e.jumlahTujuan} tujuan
+                            </div>
+                          )}
+                        </td>
                         <td>
                           <Badge nilai={e.status} peta={WARNA_STATUS.bayar} />
                         </td>
                       </tr>
                     ))}
+                    {tx.length > 0 && (
+                      <tr style={{ fontWeight: 700, background: "#f6f9fa" }}>
+                        <td colSpan={4}>JUMLAH DIBEBANKAN KE ITEM INI</td>
+                        <td className="num" style={{ textAlign: "right" }}>{rp(terpakai)}</td>
+                        <td colSpan={2} style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
+                          sama dengan Total Pengeluaran di atas
+                        </td>
+                      </tr>
+                    )}
                     {tx.length === 0 && (
                       <tr>
-                        <td colSpan={6} style={{ color: "var(--muted)", textAlign: "center", padding: 18 }}>
+                        <td colSpan={7} style={{ color: "var(--muted)", textAlign: "center", padding: 18 }}>
                           Belum ada transaksi yang dicatat langsung ke item ini. Biaya yang
                           masuk lewat kontrak vendor muncul sebagai Alokasi Kontrak.
                         </td>

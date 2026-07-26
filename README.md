@@ -311,9 +311,18 @@ berbeda memang tidak sama besar. Pola ini sejajar dengan `ContractUnit`
 beserta `nilaiOverride` yang sudah lebih dulu ada.
 
 Konsekuensinya, angka realisasi per unit dijumlahkan dari baris alokasi, bukan
-dari total pembayarannya. Panel rincian per unit menampilkan nominal yang
-dibebankan beserta catatan "bagian dari Rp …" bila pembayarannya memang
-ditanggung beberapa tujuan.
+dari total pembayarannya. Tabel transaksi pada panel rincian per unit dan per
+sarpras memakai **dua kolom terpisah**:
+
+| Kolom | Artinya |
+|---|---|
+| **Alokasi ke Sini** | bagian yang ditanggung unit / item ini |
+| **Total Pembayaran** | nilai transaksi utuh — inilah yang cocok dengan satu baris mutasi bank |
+
+Menggabungkan keduanya jadi satu kolom "Total" membuat pembayaran lumsum
+terbaca seolah seluruhnya milik unit itu. Baris penutup menjumlahkan kolom
+Alokasi dan menyatakan bahwa jumlahnya sama dengan KPI Total Pengeluaran di
+atasnya, sehingga hubungan antar angkanya tidak perlu ditebak.
 
 ### Arti "Nilai Kontrak" pada Keuangan Proyek
 
