@@ -14,6 +14,11 @@ akan ikut pindah ke ERP:
 
 Tampilan sengaja diperlakukan sebagai sekali pakai.
 
+> **Akan memindahkan kode ini ke ERP?** Baca **[MIGRASI.md](MIGRASI.md)** lebih
+> dulu. Isinya peta lapisan kode, indeks rumus bisnis, aturan hak akses, urutan
+> langkah migrasi, dan beberapa keputusan model data yang kalau salah
+> dipindahkan akan diam-diam menghasilkan angka yang keliru.
+
 ---
 
 ## Menjalankan

@@ -55,12 +55,16 @@ export const ambilPengguna = cache(async (): Promise<Pengguna | null> => {
 
   const peran = user.roles.map((r) => r.role.nama);
 
-  // Izin bersifat gabungan: bila salah satu peran mengizinkan, pengguna boleh.
-  // Hak ubah pada satu peran mengalahkan hak baca-saja pada peran lain.
+  // Izin mengikuti PERAN YANG SEDANG AKTIF saja, bukan gabungan semua peran
+  // yang dimiliki pengguna. Inilah yang membuat pemilih "Lihat sebagai"
+  // bermakna: seseorang yang merangkap Komisaris dan Project Manager akan
+  // benar-benar kehilangan akses Keuangan saat sedang berperan Komisaris.
+  //
+  // Konsekuensinya sering disalahpahami sebagai bug — bila sebuah modul
+  // tampak tertutup padahal pengguna "punya" peran yang berhak, periksa dulu
+  // peran mana yang sedang dipilih.
   const izin = new Map<Section, boolean>();
   for (const { role } of user.roles) {
-    // Hanya peran yang sedang aktif yang berlaku — ini yang membuat pemilih
-    // "Lihat sebagai" bermakna, bukan sekadar hiasan.
     if (role.nama !== session.peranAktif) continue;
     for (const p of role.permissions) {
       const sec = p.section as Section;
