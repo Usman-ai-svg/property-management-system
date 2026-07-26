@@ -4,6 +4,7 @@ import { ambilPengguna, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/r
 import { rp, tanggal } from "@/lib/format";
 import { Badge, TabelHead } from "@/components/ui";
 import { HapusAset, TambahAset, UbahAset } from "./editors";
+import { Tabel } from "@/components/kartu-tabel";
 
 /** Tanggal untuk <input type="date">: YYYY-MM-DD. */
 const isoTanggal = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
@@ -83,109 +84,104 @@ export default async function EquipmentAsset() {
           keterangan="Aset sewa menampilkan tarif, bukan nilai perolehan."
           aksi={bolehKelola && <TambahAset vendor={daftarVendor} proyek={daftarProyek} />}
         />
-        <div className="tablewrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Kode</th>
-                <th style={{ minWidth: 200 }}>Nama</th>
-                <th>Kategori</th>
-                <th style={{ textAlign: "right" }}>Jumlah</th>
-                <th>Kepemilikan</th>
-                <th>Lokasi</th>
-                <th>Penanggung Jawab</th>
-                <th style={{ textAlign: "right" }}>Pemakaian</th>
-                <th>Servis Berikut</th>
-                {bolehHarga && <th style={{ textAlign: "right" }}>Nilai / Tarif</th>}
-                <th>Status</th>
-                {bolehKelola && <th style={{ width: 74 }} />}
-              </tr>
-            </thead>
-            <tbody>
-              {aset.map((a) => {
-                const servisLewat = a.servisBerikut && a.servisBerikut < new Date();
-                return (
-                  <tr key={a.id}>
-                    <td style={{ fontWeight: 600 }}>{a.kode}</td>
-                    <td>
-                      <div>{a.nama}</div>
-                      {a.merk && (
-                        <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{a.merk}</div>
-                      )}
-                    </td>
-                    <td style={{ color: "var(--muted)" }}>{a.kategori}</td>
-                    <td style={{ textAlign: "right" }}>
-                      {a.jumlah} {a.satuan}
-                    </td>
-                    <td>
-                      {a.kepemilikan === "Sewa" ? (
-                        <>
-                          <span className="chip" style={{ background: "var(--rona-amber)", color: "var(--amber)" }}>
-                            Sewa
-                          </span>
-                          {a.vendor && (
-                            <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>
-                              {a.vendor.nama}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <span className="chip" style={{ background: "var(--rona-abu)", color: "var(--muted)" }}>
-                          Milik Sendiri
-                        </span>
-                      )}
-                    </td>
-                    <td>{a.project?.kode ?? "—"}</td>
-                    <td style={{ color: "var(--muted)" }}>{a.penanggungJawab ?? "—"}</td>
-                    <td style={{ textAlign: "right" }}>
-                      {a.pemakaian.toLocaleString("id-ID")} {a.satuanPakai}
-                    </td>
-                    <td style={{ color: servisLewat ? "var(--red)" : "var(--muted)" }}>
-                      {tanggal(a.servisBerikut)}
-                      {servisLewat && (
-                        <div style={{ fontSize: 10, fontWeight: 600 }}>terlewat</div>
-                      )}
-                    </td>
-                    {bolehHarga && (
-                      <td className="num" style={{ textAlign: "right" }}>
-                        {rp(a.nilai)}
-                        {a.kepemilikan === "Sewa" && (
-                          <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 400 }}>
-                            per {a.satuanPakai}
-                          </div>
-                        )}
-                      </td>
-                    )}
-                    <td>
-                      <Badge nilai={a.status} peta={WARNA_ASET} />
-                    </td>
-                    {bolehKelola && (
-                      <td>
-                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                          <UbahAset
-                            aset={{
-                              id: a.id, kode: a.kode, nama: a.nama, kategori: a.kategori,
-                              merk: a.merk, jumlah: a.jumlah, satuan: a.satuan,
-                              kepemilikan: a.kepemilikan, vendorId: a.vendorId,
-                              projectId: a.projectId, penanggungJawab: a.penanggungJawab,
-                              status: a.status, satuanPakai: a.satuanPakai, pemakaian: a.pemakaian,
-                              servisTerakhir: isoTanggal(a.servisTerakhir),
-                              servisBerikut: isoTanggal(a.servisBerikut),
-                              nilai: a.nilai,
-                            }}
-                            vendor={daftarVendor}
-                            proyek={daftarProyek}
-                          />
-                          <HapusAset id={a.id} kode={a.kode} />
+        <Tabel
+          kolom={[
+            { label: "Kode" },
+            { label: "Nama", minLebar: 200 },
+            { label: "Kategori" },
+            { label: "Jumlah", rata: "kanan" },
+            { label: "Kepemilikan" },
+            { label: "Lokasi" },
+            { label: "Penanggung Jawab" },
+            { label: "Pemakaian", rata: "kanan" },
+            { label: "Servis Berikut" },
+            bolehHarga && { label: "Nilai / Tarif", rata: "kanan" },
+            { label: "Status" },
+            bolehKelola && { lebar: 74 },
+          ]}
+        >
+          {aset.map((a) => {
+            const servisLewat = a.servisBerikut && a.servisBerikut < new Date();
+            return (
+              <tr key={a.id}>
+                <td style={{ fontWeight: 600 }}>{a.kode}</td>
+                <td>
+                  <div>{a.nama}</div>
+                  {a.merk && (
+                    <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{a.merk}</div>
+                  )}
+                </td>
+                <td style={{ color: "var(--muted)" }}>{a.kategori}</td>
+                <td style={{ textAlign: "right" }}>
+                  {a.jumlah} {a.satuan}
+                </td>
+                <td>
+                  {a.kepemilikan === "Sewa" ? (
+                    <>
+                      <span className="chip" style={{ background: "var(--rona-amber)", color: "var(--amber)" }}>
+                        Sewa
+                      </span>
+                      {a.vendor && (
+                        <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>
+                          {a.vendor.nama}
                         </div>
-                      </td>
+                      )}
+                    </>
+                  ) : (
+                    <span className="chip" style={{ background: "var(--rona-abu)", color: "var(--muted)" }}>
+                      Milik Sendiri
+                    </span>
+                  )}
+                </td>
+                <td>{a.project?.kode ?? "—"}</td>
+                <td style={{ color: "var(--muted)" }}>{a.penanggungJawab ?? "—"}</td>
+                <td style={{ textAlign: "right" }}>
+                  {a.pemakaian.toLocaleString("id-ID")} {a.satuanPakai}
+                </td>
+                <td style={{ color: servisLewat ? "var(--red)" : "var(--muted)" }}>
+                  {tanggal(a.servisBerikut)}
+                  {servisLewat && (
+                    <div style={{ fontSize: 10, fontWeight: 600 }}>terlewat</div>
+                  )}
+                </td>
+                {bolehHarga && (
+                  <td className="num" style={{ textAlign: "right" }}>
+                    {rp(a.nilai)}
+                    {a.kepemilikan === "Sewa" && (
+                      <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 400 }}>
+                        per {a.satuanPakai}
+                      </div>
                     )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                  </td>
+                )}
+                <td>
+                  <Badge nilai={a.status} peta={WARNA_ASET} />
+                </td>
+                {bolehKelola && (
+                  <td>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <UbahAset
+                        aset={{
+                          id: a.id, kode: a.kode, nama: a.nama, kategori: a.kategori,
+                          merk: a.merk, jumlah: a.jumlah, satuan: a.satuan,
+                          kepemilikan: a.kepemilikan, vendorId: a.vendorId,
+                          projectId: a.projectId, penanggungJawab: a.penanggungJawab,
+                          status: a.status, satuanPakai: a.satuanPakai, pemakaian: a.pemakaian,
+                          servisTerakhir: isoTanggal(a.servisTerakhir),
+                          servisBerikut: isoTanggal(a.servisBerikut),
+                          nilai: a.nilai,
+                        }}
+                        vendor={daftarVendor}
+                        proyek={daftarProyek}
+                      />
+                      <HapusAset id={a.id} kode={a.kode} />
+                    </div>
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+        </Tabel>
       </div>
     </div>
   );

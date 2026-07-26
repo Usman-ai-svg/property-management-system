@@ -5,6 +5,7 @@ import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
 import { keteranganPekerjaan } from "@/lib/calc/opname";
 import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { FilterKonstruksi } from "./filter";
+import { Tabel } from "@/components/kartu-tabel";
 
 export default async function ProgresProyek({
   params,
@@ -101,65 +102,55 @@ export default async function ProgresProyek({
             <Terbatas apa="Daftar unit" />
           </div>
         ) : (
-          <div className="tablewrap" style={{ maxHeight: 340, overflowY: "auto" }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>Unit</th>
-                  <th>Fase</th>
-                  <th>Tipe</th>
-                  <th style={{ minWidth: 190 }}>Progress s.d. Minggu Ini</th>
-                  <th>Keterangan Pekerjaan</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {unitTampil.map((u) => (
-                  <tr key={u.id}>
-                    <td>
-                      <Link
-                        href={`/konstruksi/${kodeProyek}/unit/${u.kode}`}
-                        style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
-                      >
-                        {u.nomor}
-                      </Link>
-                    </td>
-                    <td>{u.phase.kode}</td>
-                    <td>{u.unitType.nama}</td>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <Track
-                          nilai={u.progress}
-                          tinggi={9}
-                          warna={u.progress === 100 ? "var(--green)" : "var(--teal)"}
-                        />
-                        <span style={{ fontSize: 11, color: "var(--muted)", width: 30 }}>{u.progress}%</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                        {keteranganPekerjaan(u.progress).map((k) => (
-                          <span key={k} className="chip" style={{ background: "var(--rona-teal)", color: "var(--teal)" }}>
-                            {k}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td>
-                      <Badge nilai={u.statusPembangunan} peta={WARNA_STATUS.bangun} />
-                    </td>
-                  </tr>
-                ))}
-                {unitTampil.length === 0 && (
-                  <tr>
-                    <td colSpan={6} style={{ textAlign: "center", color: "var(--muted)", padding: 22 }}>
-                      Tidak ada unit yang cocok dengan saringan ini.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <Tabel
+            tinggiMaks={340}
+            kolom={[
+              { label: "Unit" },
+              { label: "Fase" },
+              { label: "Tipe" },
+              { label: "Progress s.d. Minggu Ini", minLebar: 190 },
+              { label: "Keterangan Pekerjaan" },
+              { label: "Status" },
+            ]}
+            kosong="Tidak ada unit yang cocok dengan saringan ini."
+          >
+            {unitTampil.map((u) => (
+              <tr key={u.id}>
+                <td>
+                  <Link
+                    href={`/konstruksi/${kodeProyek}/unit/${u.kode}`}
+                    style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
+                  >
+                    {u.nomor}
+                  </Link>
+                </td>
+                <td>{u.phase.kode}</td>
+                <td>{u.unitType.nama}</td>
+                <td>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Track
+                      nilai={u.progress}
+                      tinggi={9}
+                      warna={u.progress === 100 ? "var(--green)" : "var(--teal)"}
+                    />
+                    <span style={{ fontSize: 11, color: "var(--muted)", width: 30 }}>{u.progress}%</span>
+                  </div>
+                </td>
+                <td>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {keteranganPekerjaan(u.progress).map((k) => (
+                      <span key={k} className="chip" style={{ background: "var(--rona-teal)", color: "var(--teal)" }}>
+                        {k}
+                      </span>
+                    ))}
+                  </div>
+                </td>
+                <td>
+                  <Badge nilai={u.statusPembangunan} peta={WARNA_STATUS.bangun} />
+                </td>
+              </tr>
+            ))}
+          </Tabel>
         )}
       </div>
 
@@ -174,55 +165,44 @@ export default async function ProgresProyek({
             <Terbatas apa="Daftar sarana & prasarana" />
           </div>
         ) : (
-          <div className="tablewrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Jenis</th>
-                  <th>Volume</th>
-                  <th style={{ minWidth: 190 }}>Progress s.d. Minggu Ini</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sarpras.map((s) => (
-                  <tr key={s.id}>
-                    <td>
-                      <Link
-                        href={`/konstruksi/${kodeProyek}/sarpras/${s.kode}`}
-                        style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
-                      >
-                        {s.nama}
-                      </Link>
-                    </td>
-                    <td style={{ color: "var(--muted)" }}>{s.jenis}</td>
-                    <td>{s.volume}</td>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <Track
-                          nilai={s.progress}
-                          tinggi={9}
-                          warna={s.progress === 100 ? "var(--green)" : "var(--brass)"}
-                        />
-                        <span style={{ fontSize: 11, color: "var(--muted)", width: 30 }}>{s.progress}%</span>
-                      </div>
-                    </td>
-                    <td>
-                      <Badge nilai={s.status} peta={WARNA_STATUS.bangun} />
-                    </td>
-                  </tr>
-                ))}
-                {sarpras.length === 0 && (
-                  <tr>
-                    <td colSpan={5} style={{ textAlign: "center", color: "var(--muted)", padding: 22 }}>
-                      Belum ada item sarana &amp; prasarana di proyek ini.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <Tabel
+            kolom={[
+              { label: "Item" },
+              { label: "Jenis" },
+              { label: "Volume" },
+              { label: "Progress s.d. Minggu Ini", minLebar: 190 },
+              { label: "Status" },
+            ]}
+            kosong="Belum ada item sarana &amp; prasarana di proyek ini."
+          >
+            {sarpras.map((s) => (
+              <tr key={s.id}>
+                <td>
+                  <Link
+                    href={`/konstruksi/${kodeProyek}/sarpras/${s.kode}`}
+                    style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
+                  >
+                    {s.nama}
+                  </Link>
+                </td>
+                <td style={{ color: "var(--muted)" }}>{s.jenis}</td>
+                <td>{s.volume}</td>
+                <td>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Track
+                      nilai={s.progress}
+                      tinggi={9}
+                      warna={s.progress === 100 ? "var(--green)" : "var(--brass)"}
+                    />
+                    <span style={{ fontSize: 11, color: "var(--muted)", width: 30 }}>{s.progress}%</span>
+                  </div>
+                </td>
+                <td>
+                  <Badge nilai={s.status} peta={WARNA_STATUS.bangun} />
+                </td>
+              </tr>
+            ))}
+          </Tabel>
         )}
       </div>
     </div>

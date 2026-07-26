@@ -8,6 +8,7 @@ import { Donut, LegendaDonut, RvsRAP } from "@/components/charts";
 import { TrenChart } from "@/components/tren-chart";
 import { TabelHead } from "@/components/ui";
 import { CatatPengeluaran } from "./catat";
+import { Tabel } from "@/components/kartu-tabel";
 
 export default async function DashboardKeuangan({
   searchParams,
@@ -110,45 +111,40 @@ export default async function DashboardKeuangan({
           judul="Pengeluaran per Proyek"
           keterangan="Klik nama proyek untuk membuka rincian pengeluarannya · diurut dari yang paling boros."
         />
-        <div className="tablewrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Proyek</th>
-                <th style={{ textAlign: "right" }}>Nilai Kontrak</th>
-                <th style={{ textAlign: "right" }}>RAP</th>
-                <th style={{ textAlign: "right" }}>Realisasi</th>
-                <th style={{ minWidth: 210 }}>% vs RAP</th>
+        <Tabel
+          kolom={[
+            { label: "Proyek" },
+            { label: "Nilai Kontrak", rata: "kanan" },
+            { label: "RAP", rata: "kanan" },
+            { label: "Realisasi", rata: "kanan" },
+            { label: "% vs RAP", minLebar: 210 },
+          ]}
+        >
+          {[...proyek]
+            .filter((p) => p.jumlahUnit)
+            .sort((a, b) => (b.rap ? b.realisasi / b.rap : 0) - (a.rap ? a.realisasi / a.rap : 0))
+            .map((p) => (
+              <tr key={p.id}>
+                <td>
+                  <Link
+                    href={`/keuangan/${p.kode}`}
+                    style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+                  >
+                    {p.nama}
+                  </Link>
+                  <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
+                    {p.kode} · {p.statusLahan}
+                  </div>
+                </td>
+                <td style={{ textAlign: "right" }}>{rp(p.nilaiKontrak)}</td>
+                <td style={{ textAlign: "right", color: "var(--muted)" }}>{rp(p.rap)}</td>
+                <td style={{ textAlign: "right" }}>{rp(p.realisasi)}</td>
+                <td>
+                  <RvsRAP realisasi={p.realisasi} rap={p.rap} denganLabel />
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {[...proyek]
-                .filter((p) => p.jumlahUnit)
-                .sort((a, b) => (b.rap ? b.realisasi / b.rap : 0) - (a.rap ? a.realisasi / a.rap : 0))
-                .map((p) => (
-                  <tr key={p.id}>
-                    <td>
-                      <Link
-                        href={`/keuangan/${p.kode}`}
-                        style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
-                      >
-                        {p.nama}
-                      </Link>
-                      <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
-                        {p.kode} · {p.statusLahan}
-                      </div>
-                    </td>
-                    <td style={{ textAlign: "right" }}>{rp(p.nilaiKontrak)}</td>
-                    <td style={{ textAlign: "right", color: "var(--muted)" }}>{rp(p.rap)}</td>
-                    <td style={{ textAlign: "right" }}>{rp(p.realisasi)}</td>
-                    <td>
-                      <RvsRAP realisasi={p.realisasi} rap={p.rap} denganLabel />
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+        </Tabel>
       </div>
 
       <div className="grid grid2" style={{ marginTop: 16 }}>
@@ -181,7 +177,7 @@ export default async function DashboardKeuangan({
                 key={e.id}
                 style={{
                   display: "grid", gridTemplateColumns: "34px 1fr auto", gap: 10,
-                  alignItems: "center", padding: "8px 0", borderBottom: "1px solid #eef2f3",
+                  alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--garis-halus)",
                 }}
               >
                 <div

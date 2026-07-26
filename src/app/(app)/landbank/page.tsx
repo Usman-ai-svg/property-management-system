@@ -6,6 +6,7 @@ import { ambilPengguna, bolehLihat, filterProyek } from "@/lib/auth/rbac";
 import { luasTotal } from "@/lib/data/proyek";
 import { m2, pct, rp } from "@/lib/format";
 import { Badge, TabelHead, Track, WARNA_STATUS } from "@/components/ui";
+import { Tabel } from "@/components/kartu-tabel";
 
 export default async function Landbank({
   searchParams,
@@ -137,71 +138,66 @@ export default async function Landbank({
               judul="Portofolio Lahan"
               keterangan="Klik nama proyek untuk membuka studi kelayakan dan business plan-nya."
             />
-            <div className="tablewrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Proyek</th>
-                    <th>Kecamatan / Kota</th>
-                    <th style={{ textAlign: "right" }}>Kavling Efektif</th>
-                    <th style={{ textAlign: "right" }}>Luas Total</th>
-                    <th style={{ minWidth: 120 }}>Rasio Efektif</th>
-                    {bolehHarga && <th style={{ textAlign: "right" }}>Harga / m²</th>}
-                    <th style={{ textAlign: "center" }}>Analisis Lahan</th>
-                    <th style={{ textAlign: "center" }}>Business Plan</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {baris.map((p) => (
-                    <tr key={p.id}>
-                      <td>
-                        <Link
-                          href={`/landbank/${p.kode}`}
-                          style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
-                        >
-                          {p.nama}
-                        </Link>
-                        <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{p.kode}</div>
-                      </td>
-                      <td style={{ color: "var(--muted)" }}>
-                        {p.kecamatan}, {p.kota}
-                      </td>
-                      <td style={{ textAlign: "right" }}>{m2(p.luasKavlingEfektif)}</td>
-                      <td style={{ textAlign: "right" }}>{m2(p.luasTotal)}</td>
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <Track nilai={p.rasioEfektif * 100} tinggi={9} warna="var(--brass)" />
-                          <span style={{ fontSize: 10.5, color: "var(--muted)", width: 36, textAlign: "right" }}>
-                            {pct(p.rasioEfektif, 1)}
-                          </span>
-                        </div>
-                      </td>
-                      {bolehHarga && (
-                        <td className="num" style={{ textAlign: "right" }}>{rp(p.hargaPerM2)}</td>
-                      )}
-                      <td style={{ textAlign: "center" }}>
-                        {p.analisaDocId ? (
-                          <FileText size={14} style={{ color: "var(--teal)" }} />
-                        ) : (
-                          <X size={14} style={{ color: "var(--rona-ikon)" }} />
-                        )}
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        {p.punyaBp ? (
-                          <Check size={14} style={{ color: "var(--green)" }} />
-                        ) : (
-                          <X size={14} style={{ color: "var(--rona-ikon)" }} />
-                        )}
-                      </td>
-                      <td>
-                        <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Tabel
+              kolom={[
+                { label: "Proyek" },
+                { label: "Kecamatan / Kota" },
+                { label: "Kavling Efektif", rata: "kanan" },
+                { label: "Luas Total", rata: "kanan" },
+                { label: "Rasio Efektif", minLebar: 120 },
+                bolehHarga && { label: "Harga / m²", rata: "kanan" },
+                { label: "Analisis Lahan", rata: "tengah" },
+                { label: "Business Plan", rata: "tengah" },
+                { label: "Status" },
+              ]}
+            >
+              {baris.map((p) => (
+                <tr key={p.id}>
+                  <td>
+                    <Link
+                      href={`/landbank/${p.kode}`}
+                      style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+                    >
+                      {p.nama}
+                    </Link>
+                    <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{p.kode}</div>
+                  </td>
+                  <td style={{ color: "var(--muted)" }}>
+                    {p.kecamatan}, {p.kota}
+                  </td>
+                  <td style={{ textAlign: "right" }}>{m2(p.luasKavlingEfektif)}</td>
+                  <td style={{ textAlign: "right" }}>{m2(p.luasTotal)}</td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <Track nilai={p.rasioEfektif * 100} tinggi={9} warna="var(--brass)" />
+                      <span style={{ fontSize: 10.5, color: "var(--muted)", width: 36, textAlign: "right" }}>
+                        {pct(p.rasioEfektif, 1)}
+                      </span>
+                    </div>
+                  </td>
+                  {bolehHarga && (
+                    <td className="num" style={{ textAlign: "right" }}>{rp(p.hargaPerM2)}</td>
+                  )}
+                  <td style={{ textAlign: "center" }}>
+                    {p.analisaDocId ? (
+                      <FileText size={14} style={{ color: "var(--teal)" }} />
+                    ) : (
+                      <X size={14} style={{ color: "var(--rona-ikon)" }} />
+                    )}
+                  </td>
+                  <td style={{ textAlign: "center" }}>
+                    {p.punyaBp ? (
+                      <Check size={14} style={{ color: "var(--green)" }} />
+                    ) : (
+                      <X size={14} style={{ color: "var(--rona-ikon)" }} />
+                    )}
+                  </td>
+                  <td>
+                    <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
+                  </td>
+                </tr>
+              ))}
+            </Tabel>
           </div>
         </>
       )}
@@ -216,39 +212,32 @@ export default async function Landbank({
                 : "Proyeksi laba & margin tidak ditampilkan untuk peran Anda."
             }
           />
-          <div className="tablewrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Indikator</th>
+          <Tabel
+            kolom={[
+              { label: "Indikator" },
+              ...baris.map((p) => ({ label: p.nama, rata: "kanan" as const })),
+            ]}
+          >
+            {indikator
+              .filter(([, , tampil]) => tampil)
+              .map(([label, ambil]) => (
+                <tr key={label}>
+                  <td style={{ fontWeight: 600 }}>{label}</td>
                   {baris.map((p) => (
-                    <th key={p.id} style={{ textAlign: "right" }}>{p.nama}</th>
+                    <td
+                      key={p.id}
+                      className="num"
+                      style={{
+                        textAlign: "right",
+                        color: label === "Margin Rencana" ? "var(--green)" : "inherit",
+                      }}
+                    >
+                      {ambil(p)}
+                    </td>
                   ))}
                 </tr>
-              </thead>
-              <tbody>
-                {indikator
-                  .filter(([, , tampil]) => tampil)
-                  .map(([label, ambil]) => (
-                    <tr key={label}>
-                      <td style={{ fontWeight: 600 }}>{label}</td>
-                      {baris.map((p) => (
-                        <td
-                          key={p.id}
-                          className="num"
-                          style={{
-                            textAlign: "right",
-                            color: label === "Margin Rencana" ? "var(--green)" : "inherit",
-                          }}
-                        >
-                          {ambil(p)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+          </Tabel>
         </div>
       )}
     </div>

@@ -78,7 +78,7 @@ export function FileRow({
   const revisi = versiTerbaru?.revisi ?? null;
 
   return (
-    <div style={{ borderBottom: "1px solid #eef2f3" }}>
+    <div style={{ borderBottom: "1px solid var(--garis-halus)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0" }}>
         <div
           style={{

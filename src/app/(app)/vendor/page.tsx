@@ -9,6 +9,7 @@ import {
   HapusTender, HapusVendor, TambahPeserta, TambahTender, TambahVendor,
   UbahStatusTender, UbahVendor,
 } from "./editors-vendor";
+import { Tabel } from "@/components/kartu-tabel";
 
 const WARNA_TENDER: Record<string, [string, string]> = {
   Dibuka: ["var(--rona-teal2)", "var(--teal)"],
@@ -117,87 +118,82 @@ export default async function VendorManagement() {
           keterangan="Klik nama vendor untuk membuka kontrak, penawaran, dan riwayat pembayarannya."
           aksi={bolehKelola && <TambahVendor />}
         />
-        <div className="tablewrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Vendor</th>
-                <th>Bidang</th>
-                <th>Proyek</th>
-                <th style={{ textAlign: "right" }}>Kontrak</th>
-                {bolehHarga && <th style={{ textAlign: "right" }}>Nilai Kontrak</th>}
-                {bolehHarga && <th style={{ textAlign: "right" }}>Terbayar</th>}
-                {bolehHarga && <th style={{ minWidth: 170 }}>Progres Bayar</th>}
-                <th>Status</th>
-                {bolehKelola && <th style={{ width: 74 }} />}
-              </tr>
-            </thead>
-            <tbody>
-              {baris.map((v) => (
-                <tr key={v.id}>
-                  <td>
-                    <Link
-                      href={`/vendor/${v.id}`}
-                      style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
-                    >
-                      {v.nama}
-                    </Link>
-                    <div style={{ fontSize: 10.5, color: "var(--muted)" }}>sejak {v.sejak}</div>
-                  </td>
-                  <td style={{ color: "var(--muted)" }}>{v.bidang}</td>
-                  <td style={{ color: "var(--muted)" }}>
-                    {v.proyek.length ? v.proyek.join(", ") : "—"}
-                  </td>
-                  <td style={{ textAlign: "right" }}>{v.jumlahKontrak}</td>
-                  {bolehHarga && <td className="num" style={{ textAlign: "right" }}>{rp(v.nilai)}</td>}
-                  {bolehHarga && (
-                    <td className="num" style={{ textAlign: "right", color: "var(--green)" }}>
-                      {rp(v.terbayar)}
-                    </td>
+        <Tabel
+          kolom={[
+            { label: "Vendor" },
+            { label: "Bidang" },
+            { label: "Proyek" },
+            { label: "Kontrak", rata: "kanan" },
+            bolehHarga && { label: "Nilai Kontrak", rata: "kanan" },
+            bolehHarga && { label: "Terbayar", rata: "kanan" },
+            bolehHarga && { label: "Progres Bayar", minLebar: 170 },
+            { label: "Status" },
+            bolehKelola && { lebar: 74 },
+          ]}
+        >
+          {baris.map((v) => (
+            <tr key={v.id}>
+              <td>
+                <Link
+                  href={`/vendor/${v.id}`}
+                  style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+                >
+                  {v.nama}
+                </Link>
+                <div style={{ fontSize: 10.5, color: "var(--muted)" }}>sejak {v.sejak}</div>
+              </td>
+              <td style={{ color: "var(--muted)" }}>{v.bidang}</td>
+              <td style={{ color: "var(--muted)" }}>
+                {v.proyek.length ? v.proyek.join(", ") : "—"}
+              </td>
+              <td style={{ textAlign: "right" }}>{v.jumlahKontrak}</td>
+              {bolehHarga && <td className="num" style={{ textAlign: "right" }}>{rp(v.nilai)}</td>}
+              {bolehHarga && (
+                <td className="num" style={{ textAlign: "right", color: "var(--green)" }}>
+                  {rp(v.terbayar)}
+                </td>
+              )}
+              {bolehHarga && (
+                <td>
+                  {v.nilai ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <Track nilai={(v.terbayar / v.nilai) * 100} tinggi={9} warna="var(--green)" />
+                      <span style={{ fontSize: 10.5, color: "var(--muted)", width: 40, textAlign: "right" }}>
+                        {pct(v.terbayar / v.nilai, 1)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span style={{ color: "var(--muted)", fontSize: 11.5 }}>—</span>
                   )}
-                  {bolehHarga && (
-                    <td>
-                      {v.nilai ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <Track nilai={(v.terbayar / v.nilai) * 100} tinggi={9} warna="var(--green)" />
-                          <span style={{ fontSize: 10.5, color: "var(--muted)", width: 40, textAlign: "right" }}>
-                            {pct(v.terbayar / v.nilai, 1)}
-                          </span>
-                        </div>
-                      ) : (
-                        <span style={{ color: "var(--muted)", fontSize: 11.5 }}>—</span>
-                      )}
-                    </td>
-                  )}
-                  <td>
-                    <span
-                      className="chip"
-                      style={{
-                        background: v.status === "Aktif" ? "var(--rona-hijau2)" : "var(--rona-abu)",
-                        color: v.status === "Aktif" ? "var(--green)" : "var(--muted)",
+                </td>
+              )}
+              <td>
+                <span
+                  className="chip"
+                  style={{
+                    background: v.status === "Aktif" ? "var(--rona-hijau2)" : "var(--rona-abu)",
+                    color: v.status === "Aktif" ? "var(--green)" : "var(--muted)",
+                  }}
+                >
+                  {v.status}
+                </span>
+              </td>
+              {bolehKelola && (
+                <td>
+                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <UbahVendor
+                      vendor={{
+                        id: v.id, nama: v.nama, bidang: v.bidang, kontak: v.kontak,
+                        alamat: v.alamat, sejak: v.sejak, status: v.status,
                       }}
-                    >
-                      {v.status}
-                    </span>
-                  </td>
-                  {bolehKelola && (
-                    <td>
-                      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                        <UbahVendor
-                          vendor={{
-                            id: v.id, nama: v.nama, bidang: v.bidang, kontak: v.kontak,
-                            alamat: v.alamat, sejak: v.sejak, status: v.status,
-                          }}
-                        />
-                        <HapusVendor id={v.id} nama={v.nama} />
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    />
+                    <HapusVendor id={v.id} nama={v.nama} />
+                  </div>
+                </td>
+              )}
+            </tr>
+          ))}
+        </Tabel>
       </div>
 
       <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
@@ -205,70 +201,59 @@ export default async function VendorManagement() {
           judul="Tender / Penawaran Berjalan"
           aksi={bolehKelola && <TambahTender proyek={daftarProyek} />}
         />
-        <div className="tablewrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Kode</th>
-                <th>Proyek</th>
-                <th>Pekerjaan</th>
-                <th>Tanggal</th>
-                {bolehHarga && <th style={{ textAlign: "right" }}>HPS</th>}
-                <th style={{ textAlign: "right" }}>Peserta</th>
-                {bolehHarga && <th style={{ textAlign: "right" }}>Penawaran Terendah</th>}
-                <th>Status</th>
-                {bolehKelola && <th style={{ width: 120 }} />}
-              </tr>
-            </thead>
-            <tbody>
-              {tender.map((t) => {
-                const terendah = t.peserta.length ? Math.min(...t.peserta.map((p) => p.nilai)) : 0;
-                return (
-                  <tr key={t.id}>
-                    <td style={{ fontWeight: 600 }}>{t.kode}</td>
-                    <td style={{ color: "var(--muted)" }}>{t.project.kode}</td>
-                    <td style={{ whiteSpace: "normal" }}>{t.pekerjaan}</td>
-                    <td style={{ color: "var(--muted)" }}>{tanggal(t.tanggal)}</td>
-                    {bolehHarga && <td className="num" style={{ textAlign: "right" }}>{rp(t.hps)}</td>}
-                    <td style={{ textAlign: "right" }}>{t.peserta.length}</td>
-                    {bolehHarga && (
-                      <td className="num" style={{ textAlign: "right" }}>
-                        {terendah ? rp(terendah) : "—"}
-                      </td>
-                    )}
-                    <td>
-                      <Badge nilai={t.status} peta={WARNA_TENDER} />
-                    </td>
-                    {bolehKelola && (
-                      <td>
-                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                          <TambahPeserta tenderId={t.id} kodeTender={t.kode} vendor={vendorAktif} />
-                          <UbahStatusTender
-                            tender={{
-                              id: t.id, kode: t.kode, status: t.status,
-                              pemenangVendorId: t.pemenangVendorId,
-                              peserta: t.peserta.map((p) => ({
-                                vendorId: p.vendorId, nama: p.vendor.nama, nilai: p.nilai,
-                              })),
-                            }}
-                          />
-                          <HapusTender id={t.id} kode={t.kode} />
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-              {tender.length === 0 && (
-                <tr>
-                  <td colSpan={bolehKelola ? 9 : 8} style={{ textAlign: "center", color: "var(--muted)", padding: 22 }}>
-                    Belum ada tender berjalan.
+        <Tabel
+          kolom={[
+            { label: "Kode" },
+            { label: "Proyek" },
+            { label: "Pekerjaan" },
+            { label: "Tanggal" },
+            bolehHarga && { label: "HPS", rata: "kanan" },
+            { label: "Peserta", rata: "kanan" },
+            bolehHarga && { label: "Penawaran Terendah", rata: "kanan" },
+            { label: "Status" },
+            bolehKelola && { lebar: 120 },
+          ]}
+          kosong="Belum ada tender berjalan."
+        >
+          {tender.map((t) => {
+            const terendah = t.peserta.length ? Math.min(...t.peserta.map((p) => p.nilai)) : 0;
+            return (
+              <tr key={t.id}>
+                <td style={{ fontWeight: 600 }}>{t.kode}</td>
+                <td style={{ color: "var(--muted)" }}>{t.project.kode}</td>
+                <td style={{ whiteSpace: "normal" }}>{t.pekerjaan}</td>
+                <td style={{ color: "var(--muted)" }}>{tanggal(t.tanggal)}</td>
+                {bolehHarga && <td className="num" style={{ textAlign: "right" }}>{rp(t.hps)}</td>}
+                <td style={{ textAlign: "right" }}>{t.peserta.length}</td>
+                {bolehHarga && (
+                  <td className="num" style={{ textAlign: "right" }}>
+                    {terendah ? rp(terendah) : "—"}
                   </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                )}
+                <td>
+                  <Badge nilai={t.status} peta={WARNA_TENDER} />
+                </td>
+                {bolehKelola && (
+                  <td>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <TambahPeserta tenderId={t.id} kodeTender={t.kode} vendor={vendorAktif} />
+                      <UbahStatusTender
+                        tender={{
+                          id: t.id, kode: t.kode, status: t.status,
+                          pemenangVendorId: t.pemenangVendorId,
+                          peserta: t.peserta.map((p) => ({
+                            vendorId: p.vendorId, nama: p.vendor.nama, nilai: p.nilai,
+                          })),
+                        }}
+                      />
+                      <HapusTender id={t.id} kode={t.kode} />
+                    </div>
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+        </Tabel>
       </div>
     </div>
   );

@@ -238,7 +238,7 @@ export default async function RincianSarpras({
               key={e.id}
               style={{
                 display: "grid", gridTemplateColumns: "150px 1fr", gap: 10,
-                padding: "7px 0", borderBottom: "1px solid #eef2f3", fontSize: 12,
+                padding: "7px 0", borderBottom: "1px solid var(--garis-halus)", fontSize: 12,
               }}
             >
               <div style={{ color: "var(--muted)" }}>{tanggalJam(e.waktu)}</div>

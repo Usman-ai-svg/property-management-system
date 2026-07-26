@@ -13,6 +13,7 @@ import {
   HapusCashflow, HapusPembanding, HapusPosHpp, HapusPosOmzet, HapusPosOperasional,
 } from "../editors-bp";
 import { EditBiayaLahan } from "./editors";
+import { Tabel } from "@/components/kartu-tabel";
 
 const BP_TAB = [
   ["hpp", "Rencana HPP"],
@@ -217,67 +218,57 @@ export default async function DetailLandbank({
               keterangan={`Proyek pembanding radius ±5 km · ${proyek.marketComparables.length} proyek`}
               aksi={bolehUbahBp && <FormPembanding kodeProyek={proyek.kode} />}
             />
-            <div className="tablewrap" style={{ maxHeight: 400, overflowY: "auto" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Nama Proyek</th>
-                    <th style={{ textAlign: "right" }}>Jumlah Unit</th>
-                    <th>Tipe Unit</th>
-                    <th style={{ textAlign: "right" }}>Luas Unit</th>
-                    <th style={{ textAlign: "right" }}>Luas Lahan</th>
-                    <th style={{ textAlign: "right" }}>Harga</th>
-                    {bolehUbahBp && <th style={{ width: 74 }} />}
-                  </tr>
-                </thead>
-                <tbody>
-                  {proyek.marketComparables.flatMap((mp) =>
-                    mp.tipe.map((t, i) => (
-                      <tr key={t.id}>
-                        {i === 0 && (
-                          <td
-                            rowSpan={mp.tipe.length}
-                            style={{ verticalAlign: "top", borderRight: "1px solid #eef2f3" }}
-                          >
-                            <div style={{ fontWeight: 600 }}>{mp.nama}</div>
-                            <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
-                              ± {mp.jarak.toLocaleString("id-ID")} km
-                            </div>
-                          </td>
-                        )}
-                        <td style={{ textAlign: "right" }}>{t.jumlah}</td>
-                        <td>{t.tipe}</td>
-                        <td style={{ textAlign: "right" }}>{t.luasUnit} m²</td>
-                        <td style={{ textAlign: "right" }}>{t.luasLahan} m²</td>
-                        <td className="num" style={{ textAlign: "right" }}>{rp(t.harga)}</td>
-                        {bolehUbahBp && (
-                          <td>
-                            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                              <FormPembanding
-                                kodeProyek={proyek.kode}
-                                data={{
-                                  id: t.id, nama: mp.nama, jarak: mp.jarak, tipe: t.tipe,
-                                  jumlah: t.jumlah, luasUnit: t.luasUnit,
-                                  luasLahan: t.luasLahan, harga: t.harga,
-                                }}
-                              />
-                              <HapusPembanding id={t.id} nama={`${mp.nama} · ${t.tipe}`} />
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    )),
-                  )}
-                  {proyek.marketComparables.length === 0 && (
-                    <tr>
-                      <td colSpan={bolehUbahBp ? 7 : 6} style={{ textAlign: "center", color: "var(--muted)", padding: 22 }}>
-                        Belum ada proyek pembanding.
+            <Tabel
+              tinggiMaks={400}
+              kolom={[
+                { label: "Nama Proyek" },
+                { label: "Jumlah Unit", rata: "kanan" },
+                { label: "Tipe Unit" },
+                { label: "Luas Unit", rata: "kanan" },
+                { label: "Luas Lahan", rata: "kanan" },
+                { label: "Harga", rata: "kanan" },
+                bolehUbahBp && { lebar: 74 },
+              ]}
+              kosong="Belum ada proyek pembanding."
+            >
+              {proyek.marketComparables.flatMap((mp) =>
+                mp.tipe.map((t, i) => (
+                  <tr key={t.id}>
+                    {i === 0 && (
+                      <td
+                        rowSpan={mp.tipe.length}
+                        style={{ verticalAlign: "top", borderRight: "1px solid var(--garis-halus)" }}
+                      >
+                        <div style={{ fontWeight: 600 }}>{mp.nama}</div>
+                        <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
+                          ± {mp.jarak.toLocaleString("id-ID")} km
+                        </div>
                       </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    )}
+                    <td style={{ textAlign: "right" }}>{t.jumlah}</td>
+                    <td>{t.tipe}</td>
+                    <td style={{ textAlign: "right" }}>{t.luasUnit} m²</td>
+                    <td style={{ textAlign: "right" }}>{t.luasLahan} m²</td>
+                    <td className="num" style={{ textAlign: "right" }}>{rp(t.harga)}</td>
+                    {bolehUbahBp && (
+                      <td>
+                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                          <FormPembanding
+                            kodeProyek={proyek.kode}
+                            data={{
+                              id: t.id, nama: mp.nama, jarak: mp.jarak, tipe: t.tipe,
+                              jumlah: t.jumlah, luasUnit: t.luasUnit,
+                              luasLahan: t.luasLahan, harga: t.harga,
+                            }}
+                          />
+                          <HapusPembanding id={t.id} nama={`${mp.nama} · ${t.tipe}`} />
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                )),
+              )}
+            </Tabel>
           </div>
         </>
       )}
@@ -328,43 +319,38 @@ export default async function DetailLandbank({
                 {bolehUbahBp && (
                   <TabelHead judul="Rencana HPP" aksi={<FormPosHpp businessPlanId={rencana.id} />} />
                 )}
-                <div className="tablewrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Komponen</th>
-                      <th style={{ textAlign: "right" }}>Anggaran</th>
-                      <th style={{ textAlign: "right" }}>Porsi</th>
-                      {bolehUbahBp && <th style={{ width: 74 }} />}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rencana.hpp.map((h) => (
-                      <tr key={h.id}>
-                        <td>{h.nama}</td>
-                        <td className="num" style={{ textAlign: "right" }}>{rp(h.nilai)}</td>
-                        <td style={{ textAlign: "right", color: "var(--muted)" }}>
-                          {totalHpp ? pct(h.nilai / totalHpp, 1) : "—"}
-                        </td>
-                        {bolehUbahBp && (
-                          <td>
-                            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                              <FormPosHpp businessPlanId={rencana.id} pos={h} />
-                              <HapusPosHpp id={h.id} nama={h.nama} />
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                    <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
-                      <td>TOTAL HPP</td>
-                      <td className="num" style={{ textAlign: "right" }}>{rp(totalHpp)}</td>
-                      <td style={{ textAlign: "right" }}>100%</td>
-                      {bolehUbahBp && <td />}
-                    </tr>
-                  </tbody>
-                </table>
-                </div>
+                <Tabel
+                  kolom={[
+                    { label: "Komponen" },
+                    { label: "Anggaran", rata: "kanan" },
+                    { label: "Porsi", rata: "kanan" },
+                    bolehUbahBp && { lebar: 74 },
+                  ]}
+                >
+                {rencana.hpp.map((h) => (
+                  <tr key={h.id}>
+                    <td>{h.nama}</td>
+                    <td className="num" style={{ textAlign: "right" }}>{rp(h.nilai)}</td>
+                    <td style={{ textAlign: "right", color: "var(--muted)" }}>
+                      {totalHpp ? pct(h.nilai / totalHpp, 1) : "—"}
+                    </td>
+                    {bolehUbahBp && (
+                      <td>
+                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                          <FormPosHpp businessPlanId={rencana.id} pos={h} />
+                          <HapusPosHpp id={h.id} nama={h.nama} />
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+                <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
+                  <td>TOTAL HPP</td>
+                  <td className="num" style={{ textAlign: "right" }}>{rp(totalHpp)}</td>
+                  <td style={{ textAlign: "right" }}>100%</td>
+                  {bolehUbahBp && <td />}
+                </tr>
+                </Tabel>
               </div>
             )}
 
@@ -373,42 +359,37 @@ export default async function DetailLandbank({
                 {bolehUbahBp && (
                   <TabelHead judul="Rencana Omset" aksi={<FormPosOmzet businessPlanId={rencana.id} />} />
                 )}
-                <div className="tablewrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Tipe Unit</th>
-                      <th style={{ textAlign: "right" }}>Jumlah</th>
-                      <th style={{ textAlign: "right" }}>Harga Satuan</th>
-                      <th style={{ textAlign: "right" }}>Subtotal</th>
-                      {bolehUbahBp && <th style={{ width: 74 }} />}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rencana.omzet.map((o) => (
-                      <tr key={o.id}>
-                        <td>{o.tipe}</td>
-                        <td style={{ textAlign: "right" }}>{o.jumlah}</td>
-                        <td className="num" style={{ textAlign: "right" }}>{rp(o.harga)}</td>
-                        <td className="num" style={{ textAlign: "right" }}>{rp(o.jumlah * o.harga)}</td>
-                        {bolehUbahBp && (
-                          <td>
-                            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                              <FormPosOmzet businessPlanId={rencana.id} pos={o} />
-                              <HapusPosOmzet id={o.id} tipe={o.tipe} />
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                    <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
-                      <td colSpan={3}>TOTAL OMSET</td>
-                      <td className="num" style={{ textAlign: "right" }}>{rp(totalOmzet)}</td>
-                      {bolehUbahBp && <td />}
-                    </tr>
-                  </tbody>
-                </table>
-                </div>
+                <Tabel
+                  kolom={[
+                    { label: "Tipe Unit" },
+                    { label: "Jumlah", rata: "kanan" },
+                    { label: "Harga Satuan", rata: "kanan" },
+                    { label: "Subtotal", rata: "kanan" },
+                    bolehUbahBp && { lebar: 74 },
+                  ]}
+                >
+                {rencana.omzet.map((o) => (
+                  <tr key={o.id}>
+                    <td>{o.tipe}</td>
+                    <td style={{ textAlign: "right" }}>{o.jumlah}</td>
+                    <td className="num" style={{ textAlign: "right" }}>{rp(o.harga)}</td>
+                    <td className="num" style={{ textAlign: "right" }}>{rp(o.jumlah * o.harga)}</td>
+                    {bolehUbahBp && (
+                      <td>
+                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                          <FormPosOmzet businessPlanId={rencana.id} pos={o} />
+                          <HapusPosOmzet id={o.id} tipe={o.tipe} />
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+                <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
+                  <td colSpan={3}>TOTAL OMSET</td>
+                  <td className="num" style={{ textAlign: "right" }}>{rp(totalOmzet)}</td>
+                  {bolehUbahBp && <td />}
+                </tr>
+                </Tabel>
               </div>
             )}
 
@@ -421,84 +402,75 @@ export default async function DetailLandbank({
                     aksi={<FormPosOperasional businessPlanId={rencana.id} />}
                   />
                 )}
-                <div className="tablewrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Komponen</th>
-                      <th style={{ textAlign: "right" }}>Anggaran</th>
-                      <th style={{ textAlign: "right" }}>Porsi terhadap Omset</th>
-                      {bolehUbahBp && <th style={{ width: 74 }} />}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rencana.operasional.map((o) => (
-                      <tr key={o.id}>
-                        <td>{o.nama}</td>
-                        <td className="num" style={{ textAlign: "right" }}>{rp(o.nilai)}</td>
-                        <td style={{ textAlign: "right", color: "var(--muted)" }}>
-                          {totalOmzet ? pct(o.nilai / totalOmzet, 1) : "—"}
-                        </td>
-                        {bolehUbahBp && (
-                          <td>
-                            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                              <FormPosOperasional businessPlanId={rencana.id} pos={o} />
-                              <HapusPosOperasional id={o.id} nama={o.nama} />
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                    <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
-                      <td>TOTAL OPERASIONAL</td>
-                      <td className="num" style={{ textAlign: "right" }}>{rp(totalOps)}</td>
-                      <td style={{ textAlign: "right" }}>
-                        {totalOmzet ? pct(totalOps / totalOmzet, 1) : "—"}
+                <Tabel
+                  kolom={[
+                    { label: "Komponen" },
+                    { label: "Anggaran", rata: "kanan" },
+                    { label: "Porsi terhadap Omset", rata: "kanan" },
+                    bolehUbahBp && { lebar: 74 },
+                  ]}
+                >
+                {rencana.operasional.map((o) => (
+                  <tr key={o.id}>
+                    <td>{o.nama}</td>
+                    <td className="num" style={{ textAlign: "right" }}>{rp(o.nilai)}</td>
+                    <td style={{ textAlign: "right", color: "var(--muted)" }}>
+                      {totalOmzet ? pct(o.nilai / totalOmzet, 1) : "—"}
+                    </td>
+                    {bolehUbahBp && (
+                      <td>
+                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                          <FormPosOperasional businessPlanId={rencana.id} pos={o} />
+                          <HapusPosOperasional id={o.id} nama={o.nama} />
+                        </div>
                       </td>
-                      {bolehUbahBp && <td />}
-                    </tr>
-                  </tbody>
-                </table>
-                </div>
+                    )}
+                  </tr>
+                ))}
+                <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
+                  <td>TOTAL OPERASIONAL</td>
+                  <td className="num" style={{ textAlign: "right" }}>{rp(totalOps)}</td>
+                  <td style={{ textAlign: "right" }}>
+                    {totalOmzet ? pct(totalOps / totalOmzet, 1) : "—"}
+                  </td>
+                  {bolehUbahBp && <td />}
+                </tr>
+                </Tabel>
               </div>
             )}
 
             {bpAktif === "laba" && (
-              <div className="card tablewrap">
-                <table>
-                  <tbody>
-                    {(
-                      [
-                        ["Rencana Omset", totalOmzet, "var(--ink)"],
-                        ["Harga Pokok Penjualan", -totalHpp, "var(--muted)"],
-                        ["Laba Kotor", labaKotor, "var(--teal)"],
-                        ["Biaya Operasional", -totalOps, "var(--muted)"],
-                        ["Laba Bersih", labaBersih, "var(--green)"],
-                      ] as [string, number, string][]
-                    ).map(([label, nilai, warna], i) => (
-                      <tr
-                        key={label}
-                        style={{
-                          fontWeight: i === 2 || i === 4 ? 700 : 400,
-                          background: i === 4 ? "var(--rona-baris)" : undefined,
-                        }}
-                      >
-                        <td>{label}</td>
-                        <td className="num" style={{ textAlign: "right", color: warna }}>
-                          {nilai < 0 ? "−" : ""}
-                          {rp(Math.abs(nilai))}
-                        </td>
-                      </tr>
-                    ))}
-                    <tr style={{ fontWeight: 700 }}>
-                      <td>Margin Laba Bersih</td>
-                      <td className="num" style={{ textAlign: "right", color: "var(--green)" }}>
-                        {totalOmzet ? pct(labaBersih / totalOmzet, 1) : "—"}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <Tabel kolom={[]} kelasBungkus="card tablewrap">
+                {(
+                  [
+                    ["Rencana Omset", totalOmzet, "var(--ink)"],
+                    ["Harga Pokok Penjualan", -totalHpp, "var(--muted)"],
+                    ["Laba Kotor", labaKotor, "var(--teal)"],
+                    ["Biaya Operasional", -totalOps, "var(--muted)"],
+                    ["Laba Bersih", labaBersih, "var(--green)"],
+                  ] as [string, number, string][]
+                ).map(([label, nilai, warna], i) => (
+                  <tr
+                    key={label}
+                    style={{
+                      fontWeight: i === 2 || i === 4 ? 700 : 400,
+                      background: i === 4 ? "var(--rona-baris)" : undefined,
+                    }}
+                  >
+                    <td>{label}</td>
+                    <td className="num" style={{ textAlign: "right", color: warna }}>
+                      {nilai < 0 ? "−" : ""}
+                      {rp(Math.abs(nilai))}
+                    </td>
+                  </tr>
+                ))}
+                <tr style={{ fontWeight: 700 }}>
+                  <td>Margin Laba Bersih</td>
+                  <td className="num" style={{ textAlign: "right", color: "var(--green)" }}>
+                    {totalOmzet ? pct(labaBersih / totalOmzet, 1) : "—"}
+                  </td>
+                </tr>
+              </Tabel>
             )}
 
             {bpAktif === "cash" && (
@@ -506,63 +478,58 @@ export default async function DetailLandbank({
                 {bolehUbahBp && (
                   <TabelHead judul="Rencana Cashflow" aksi={<FormCashflow businessPlanId={rencana.id} />} />
                 )}
-                <div className="tablewrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Periode</th>
-                      <th style={{ textAlign: "right" }}>Kas Masuk</th>
-                      <th style={{ textAlign: "right" }}>Kas Keluar</th>
-                      <th style={{ textAlign: "right" }}>Net</th>
-                      <th style={{ textAlign: "right" }}>Kumulatif</th>
-                      {bolehUbahBp && <th style={{ width: 74 }} />}
+                <Tabel
+                  kolom={[
+                    { label: "Periode" },
+                    { label: "Kas Masuk", rata: "kanan" },
+                    { label: "Kas Keluar", rata: "kanan" },
+                    { label: "Net", rata: "kanan" },
+                    { label: "Kumulatif", rata: "kanan" },
+                    bolehUbahBp && { lebar: 74 },
+                  ]}
+                >
+                {rencana.cashflow.map((c, i) => {
+                  const net = c.masuk - c.keluar;
+                  const kumulatif = rencana.cashflow
+                    .slice(0, i + 1)
+                    .reduce((s, x) => s + (x.masuk - x.keluar), 0);
+                  return (
+                    <tr key={c.id}>
+                      <td style={{ fontWeight: 600 }}>{c.periode}</td>
+                      <td className="num" style={{ textAlign: "right" }}>{rp(c.masuk)}</td>
+                      <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
+                        {rp(c.keluar)}
+                      </td>
+                      <td
+                        className="num"
+                        style={{ textAlign: "right", color: net >= 0 ? "var(--green)" : "var(--red)" }}
+                      >
+                        {net < 0 ? "−" : ""}
+                        {rp(Math.abs(net))}
+                      </td>
+                      <td
+                        className="num"
+                        style={{
+                          textAlign: "right",
+                          color: kumulatif >= 0 ? "var(--ink)" : "var(--red)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {kumulatif < 0 ? "−" : ""}
+                        {rp(Math.abs(kumulatif))}
+                      </td>
+                      {bolehUbahBp && (
+                        <td>
+                          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                            <FormCashflow businessPlanId={rencana.id} baris={c} />
+                            <HapusCashflow id={c.id} periode={c.periode} />
+                          </div>
+                        </td>
+                      )}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {rencana.cashflow.map((c, i) => {
-                      const net = c.masuk - c.keluar;
-                      const kumulatif = rencana.cashflow
-                        .slice(0, i + 1)
-                        .reduce((s, x) => s + (x.masuk - x.keluar), 0);
-                      return (
-                        <tr key={c.id}>
-                          <td style={{ fontWeight: 600 }}>{c.periode}</td>
-                          <td className="num" style={{ textAlign: "right" }}>{rp(c.masuk)}</td>
-                          <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
-                            {rp(c.keluar)}
-                          </td>
-                          <td
-                            className="num"
-                            style={{ textAlign: "right", color: net >= 0 ? "var(--green)" : "var(--red)" }}
-                          >
-                            {net < 0 ? "−" : ""}
-                            {rp(Math.abs(net))}
-                          </td>
-                          <td
-                            className="num"
-                            style={{
-                              textAlign: "right",
-                              color: kumulatif >= 0 ? "var(--ink)" : "var(--red)",
-                              fontWeight: 600,
-                            }}
-                          >
-                            {kumulatif < 0 ? "−" : ""}
-                            {rp(Math.abs(kumulatif))}
-                          </td>
-                          {bolehUbahBp && (
-                            <td>
-                              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                                <FormCashflow businessPlanId={rencana.id} baris={c} />
-                                <HapusCashflow id={c.id} periode={c.periode} />
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                </div>
+                  );
+                })}
+                </Tabel>
               </div>
             )}
           </>

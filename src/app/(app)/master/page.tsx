@@ -4,6 +4,7 @@ import { ambilPengguna } from "@/lib/auth/rbac";
 import { daftarProyek, kpiMaster, luasTotal } from "@/lib/data/proyek";
 import { m2 } from "@/lib/format";
 import { Badge, TabelHead, WARNA_STATUS } from "@/components/ui";
+import { Tabel } from "@/components/kartu-tabel";
 
 export default async function MasterProyek() {
   const pengguna = await ambilPengguna();
@@ -41,55 +42,44 @@ export default async function MasterProyek() {
           judul="Daftar Proyek"
           keterangan="Klik nama proyek untuk membuka detailnya."
         />
-        <div className="tablewrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Proyek</th>
-                <th>Kecamatan / Kota</th>
-                <th style={{ textAlign: "right" }}>Luas Total</th>
-                <th style={{ textAlign: "right" }}>Unit</th>
-                <th>Fase</th>
-                <th style={{ textAlign: "right" }}>Sarpras</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {proyek.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <Link
-                      href={`/master/${p.kode}`}
-                      style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
-                    >
-                      {p.nama}
-                    </Link>
-                    <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{p.kode}</div>
-                  </td>
-                  <td style={{ color: "var(--muted)" }}>
-                    {p.kecamatan}, {p.kota}
-                  </td>
-                  <td style={{ textAlign: "right" }}>{m2(luasTotal(p))}</td>
-                  <td style={{ textAlign: "right" }}>{p._count.units}</td>
-                  <td style={{ color: "var(--muted)" }}>
-                    {p.fases.map((f) => f.kode).join(", ")}
-                  </td>
-                  <td style={{ textAlign: "right" }}>{p._count.infrastructures}</td>
-                  <td>
-                    <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
-                  </td>
-                </tr>
-              ))}
-              {proyek.length === 0 && (
-                <tr>
-                  <td colSpan={7} style={{ color: "var(--muted)", textAlign: "center", padding: 20 }}>
-                    Belum ada proyek yang dapat Anda akses.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Tabel
+          kolom={[
+            { label: "Proyek" },
+            { label: "Kecamatan / Kota" },
+            { label: "Luas Total", rata: "kanan" },
+            { label: "Unit", rata: "kanan" },
+            { label: "Fase" },
+            { label: "Sarpras", rata: "kanan" },
+            { label: "Status" },
+          ]}
+          kosong="Belum ada proyek yang dapat Anda akses."
+        >
+          {proyek.map((p) => (
+            <tr key={p.id}>
+              <td>
+                <Link
+                  href={`/master/${p.kode}`}
+                  style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+                >
+                  {p.nama}
+                </Link>
+                <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{p.kode}</div>
+              </td>
+              <td style={{ color: "var(--muted)" }}>
+                {p.kecamatan}, {p.kota}
+              </td>
+              <td style={{ textAlign: "right" }}>{m2(luasTotal(p))}</td>
+              <td style={{ textAlign: "right" }}>{p._count.units}</td>
+              <td style={{ color: "var(--muted)" }}>
+                {p.fases.map((f) => f.kode).join(", ")}
+              </td>
+              <td style={{ textAlign: "right" }}>{p._count.infrastructures}</td>
+              <td>
+                <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
+              </td>
+            </tr>
+          ))}
+        </Tabel>
       </div>
     </div>
   );

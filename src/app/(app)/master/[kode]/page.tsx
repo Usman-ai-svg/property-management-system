@@ -13,6 +13,7 @@ import {
   AksiSarpras, AksiTipeUnit, EditLegalitas, EditLokasi, EditLuasLahan, EditUnit,
   HapusUnit, TambahSarpras, TambahTipeUnit, TambahUnit,
 } from "./editors";
+import { Tabel } from "@/components/kartu-tabel";
 
 export default async function DetailProyek({ params }: { params: Promise<{ kode: string }> }) {
   const pengguna = await ambilPengguna();
@@ -150,7 +151,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                 key={lg.id}
                 style={{
                   padding: "9px 0",
-                  borderBottom: i < proyek.legalitas.length - 1 ? "1px solid #eef2f3" : "none",
+                  borderBottom: i < proyek.legalitas.length - 1 ? "1px solid var(--garis-halus)" : "none",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
@@ -245,43 +246,32 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
             keterangan="Luas bangunan, dokumen teknis, BOQ, RAB & RAP unit mengikuti tipenya."
             aksi={ubahTeknis && <TambahTipeUnit kode={kodeProyek} />}
           />
-          <div className="tablewrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Tipe</th>
-                  <th>Kode</th>
-                  <th style={{ textAlign: "right" }}>LB</th>
-                  <th style={{ textAlign: "right" }}>LT</th>
-                  <th style={{ textAlign: "right" }}>Unit Terpakai</th>
-                  {ubahTeknis && <th style={{ width: 70 }} />}
-                </tr>
-              </thead>
-              <tbody>
-                {proyek.unitTypes.map((t) => (
-                  <tr key={t.id}>
-                    <td style={{ fontWeight: 600 }}>{t.nama}</td>
-                    <td style={{ color: "var(--muted)" }}>{t.kode}</td>
-                    <td style={{ textAlign: "right" }}>{t.luasBangunan} m²</td>
-                    <td style={{ textAlign: "right" }}>{t.luasTanah} m²</td>
-                    <td style={{ textAlign: "right" }}>{t._count.units}</td>
-                    {ubahTeknis && (
-                      <td>
-                        <AksiTipeUnit kode={kodeProyek} data={t} dipakai={t._count.units} />
-                      </td>
-                    )}
-                  </tr>
-                ))}
-                {proyek.unitTypes.length === 0 && (
-                  <tr>
-                    <td colSpan={6} style={{ color: "var(--muted)", textAlign: "center", padding: 20 }}>
-                      Belum ada tipe unit. Tambahkan tipe lebih dulu sebelum membuat unit.
-                    </td>
-                  </tr>
+          <Tabel
+            kolom={[
+              { label: "Tipe" },
+              { label: "Kode" },
+              { label: "LB", rata: "kanan" },
+              { label: "LT", rata: "kanan" },
+              { label: "Unit Terpakai", rata: "kanan" },
+              ubahTeknis && { lebar: 70 },
+            ]}
+            kosong="Belum ada tipe unit. Tambahkan tipe lebih dulu sebelum membuat unit."
+          >
+            {proyek.unitTypes.map((t) => (
+              <tr key={t.id}>
+                <td style={{ fontWeight: 600 }}>{t.nama}</td>
+                <td style={{ color: "var(--muted)" }}>{t.kode}</td>
+                <td style={{ textAlign: "right" }}>{t.luasBangunan} m²</td>
+                <td style={{ textAlign: "right" }}>{t.luasTanah} m²</td>
+                <td style={{ textAlign: "right" }}>{t._count.units}</td>
+                {ubahTeknis && (
+                  <td>
+                    <AksiTipeUnit kode={kodeProyek} data={t} dipakai={t._count.units} />
+                  </td>
                 )}
-              </tbody>
-            </table>
-          </div>
+              </tr>
+            ))}
+          </Tabel>
         </div>
 
         {/* ---------- Daftar Unit ---------- */}
@@ -308,91 +298,81 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
               <Terbatas apa="Daftar unit" />
             </div>
           ) : (
-            <div className="tablewrap" style={{ maxHeight: 400, overflowY: "auto" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Unit</th>
-                    <th>Fase</th>
-                    <th>Tipe</th>
-                    <th style={{ textAlign: "right" }}>LB</th>
-                    <th style={{ textAlign: "right" }}>LT</th>
-                    <th>Konfigurasi</th>
-                    <th>Status Bangun</th>
-                    <th>Status Jual</th>
-                    {bolehHarga && <th style={{ textAlign: "right" }}>RAB</th>}
-                    {bolehHarga && <th style={{ textAlign: "right" }}>RAP</th>}
-                    {(ubahProgres || ubahData) && <th style={{ width: 70 }} />}
-                  </tr>
-                </thead>
-                <tbody>
-                  {unit.map((u) => {
-                    const n = bolehHarga ? nilaiUnit(u) : null;
-                    const custom = (u.customWorks?.length ?? 0) > 0;
-                    const label = `${u.phase.kode}-${u.nomor}`;
+            <Tabel
+              tinggiMaks={400}
+              kolom={[
+                { label: "Unit" },
+                { label: "Fase" },
+                { label: "Tipe" },
+                { label: "LB", rata: "kanan" },
+                { label: "LT", rata: "kanan" },
+                { label: "Konfigurasi" },
+                { label: "Status Bangun" },
+                { label: "Status Jual" },
+                bolehHarga && { label: "RAB", rata: "kanan" },
+                bolehHarga && { label: "RAP", rata: "kanan" },
+                (ubahProgres || ubahData) && { lebar: 70 },
+              ]}
+              kosong="Belum ada unit pada proyek ini."
+            >
+              {unit.map((u) => {
+                const n = bolehHarga ? nilaiUnit(u) : null;
+                const custom = (u.customWorks?.length ?? 0) > 0;
+                const label = `${u.phase.kode}-${u.nomor}`;
 
-                    return (
-                      <tr key={u.id}>
-                        <td>
-                          <Link
-                            href={`/master/${kodeProyek}/unit/${u.kode}`}
-                            style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
-                          >
-                            {u.nomor}
-                          </Link>
-                        </td>
-                        <td>{u.phase.kode}</td>
-                        <td>{u.unitType.nama}</td>
-                        <td style={{ textAlign: "right" }}>{u.unitType.luasBangunan} m²</td>
-                        <td style={{ textAlign: "right" }}>{u.luasTanah} m²</td>
-                        <td>
-                          {custom ? (
-                            <span className="chip" style={{ background: "var(--rona-amber)", color: "var(--amber)" }}>
-                              Custom
-                            </span>
-                          ) : (
-                            <span className="chip" style={{ background: "var(--rona-abu)", color: "var(--muted)" }}>
-                              Default
-                            </span>
+                return (
+                  <tr key={u.id}>
+                    <td>
+                      <Link
+                        href={`/master/${kodeProyek}/unit/${u.kode}`}
+                        style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+                      >
+                        {u.nomor}
+                      </Link>
+                    </td>
+                    <td>{u.phase.kode}</td>
+                    <td>{u.unitType.nama}</td>
+                    <td style={{ textAlign: "right" }}>{u.unitType.luasBangunan} m²</td>
+                    <td style={{ textAlign: "right" }}>{u.luasTanah} m²</td>
+                    <td>
+                      {custom ? (
+                        <span className="chip" style={{ background: "var(--rona-amber)", color: "var(--amber)" }}>
+                          Custom
+                        </span>
+                      ) : (
+                        <span className="chip" style={{ background: "var(--rona-abu)", color: "var(--muted)" }}>
+                          Default
+                        </span>
+                      )}
+                    </td>
+                    <td><Badge nilai={u.statusPembangunan} peta={WARNA_STATUS.bangun} /></td>
+                    <td><Badge nilai={u.statusJual} peta={WARNA_STATUS.jual} /></td>
+                    {bolehHarga && (
+                      <td className="num" style={{ textAlign: "right" }}>{rp(n!.rab)}</td>
+                    )}
+                    {bolehHarga && (
+                      <td className="num" style={{ textAlign: "right" }}>{rp(n!.rap)}</td>
+                    )}
+                    {(ubahProgres || ubahData) && (
+                      <td>
+                        <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
+                          {ubahProgres && (
+                            <EditUnit
+                              data={{
+                                id: u.id, label, luasTanah: u.luasTanah,
+                                statusPembangunan: u.statusPembangunan,
+                                statusJual: u.statusJual, progress: u.progress,
+                              }}
+                            />
                           )}
-                        </td>
-                        <td><Badge nilai={u.statusPembangunan} peta={WARNA_STATUS.bangun} /></td>
-                        <td><Badge nilai={u.statusJual} peta={WARNA_STATUS.jual} /></td>
-                        {bolehHarga && (
-                          <td className="num" style={{ textAlign: "right" }}>{rp(n!.rab)}</td>
-                        )}
-                        {bolehHarga && (
-                          <td className="num" style={{ textAlign: "right" }}>{rp(n!.rap)}</td>
-                        )}
-                        {(ubahProgres || ubahData) && (
-                          <td>
-                            <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
-                              {ubahProgres && (
-                                <EditUnit
-                                  data={{
-                                    id: u.id, label, luasTanah: u.luasTanah,
-                                    statusPembangunan: u.statusPembangunan,
-                                    statusJual: u.statusJual, progress: u.progress,
-                                  }}
-                                />
-                              )}
-                              {ubahData && u.progress === 0 && <HapusUnit id={u.id} label={label} />}
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                  {unit.length === 0 && (
-                    <tr>
-                      <td colSpan={11} style={{ color: "var(--muted)", textAlign: "center", padding: 20 }}>
-                        Belum ada unit pada proyek ini.
+                          {ubahData && u.progress === 0 && <HapusUnit id={u.id} label={label} />}
+                        </div>
                       </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    )}
+                  </tr>
+                );
+              })}
+            </Tabel>
           )}
         </div>
 
@@ -415,64 +395,53 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
               <Terbatas apa="Daftar sarana & prasarana" />
             </div>
           ) : (
-            <div className="tablewrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Jenis</th>
-                    <th>Volume</th>
-                    <th>Status Bangun</th>
-                    {bolehHarga && <th style={{ textAlign: "right" }}>RAB</th>}
-                    {bolehHarga && <th style={{ textAlign: "right" }}>RAP</th>}
-                    {ubahSarprasData && <th style={{ width: 70 }} />}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sarpras.map((s) => {
-                    const n = bolehHarga ? nilaiSarpras(s) : null;
-                    return (
-                      <tr key={s.id}>
-                        <td>
-                          <Link
-                            href={`/master/${kodeProyek}/sarpras/${s.kode}`}
-                            style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
-                          >
-                            {s.nama}
-                          </Link>
-                        </td>
-                        <td style={{ color: "var(--muted)" }}>{s.jenis}</td>
-                        <td>{s.volume}</td>
-                        <td><Badge nilai={s.status} peta={WARNA_STATUS.bangun} /></td>
-                        {bolehHarga && (
-                          <td className="num" style={{ textAlign: "right" }}>{rp(n!.rab)}</td>
-                        )}
-                        {bolehHarga && (
-                          <td className="num" style={{ textAlign: "right" }}>{rp(n!.rap)}</td>
-                        )}
-                        {ubahSarprasData && (
-                          <td>
-                            <AksiSarpras
-                              kode={kodeProyek}
-                              data={s as Parameters<typeof AksiSarpras>[0]["data"]}
-                              terkontrak={s._count.contractItems}
-                              bolehHarga={ubahHarga}
-                            />
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                  {sarpras.length === 0 && (
-                    <tr>
-                      <td colSpan={7} style={{ color: "var(--muted)", textAlign: "center", padding: 20 }}>
-                        Belum ada item sarana atau prasarana.
+            <Tabel
+              kolom={[
+                { label: "Item" },
+                { label: "Jenis" },
+                { label: "Volume" },
+                { label: "Status Bangun" },
+                bolehHarga && { label: "RAB", rata: "kanan" },
+                bolehHarga && { label: "RAP", rata: "kanan" },
+                ubahSarprasData && { lebar: 70 },
+              ]}
+              kosong="Belum ada item sarana atau prasarana."
+            >
+              {sarpras.map((s) => {
+                const n = bolehHarga ? nilaiSarpras(s) : null;
+                return (
+                  <tr key={s.id}>
+                    <td>
+                      <Link
+                        href={`/master/${kodeProyek}/sarpras/${s.kode}`}
+                        style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+                      >
+                        {s.nama}
+                      </Link>
+                    </td>
+                    <td style={{ color: "var(--muted)" }}>{s.jenis}</td>
+                    <td>{s.volume}</td>
+                    <td><Badge nilai={s.status} peta={WARNA_STATUS.bangun} /></td>
+                    {bolehHarga && (
+                      <td className="num" style={{ textAlign: "right" }}>{rp(n!.rab)}</td>
+                    )}
+                    {bolehHarga && (
+                      <td className="num" style={{ textAlign: "right" }}>{rp(n!.rap)}</td>
+                    )}
+                    {ubahSarprasData && (
+                      <td>
+                        <AksiSarpras
+                          kode={kodeProyek}
+                          data={s as Parameters<typeof AksiSarpras>[0]["data"]}
+                          terkontrak={s._count.contractItems}
+                          bolehHarga={ubahHarga}
+                        />
                       </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    )}
+                  </tr>
+                );
+              })}
+            </Tabel>
           )}
         </div>
       </div>

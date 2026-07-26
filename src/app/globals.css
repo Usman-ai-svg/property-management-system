@@ -21,6 +21,13 @@
   --blue: #2f6fb0;
   --text: #1b2a33;
   --muted: #67787f;
+  --ungu: #8b5cf6;
+  --redup: #9aa8ad;          /* teks yang sengaja dibuat paling samar */
+  /*
+   * Garis pemisah antar baris di dalam sebuah kartu. Lebih pucat daripada
+   * `--line`, yang dipakai untuk tepi kartu dan tepi tabel.
+   */
+  --garis-halus: #eef2f3;
 
   /*
    * Rona latar untuk chip, baris jumlah, dan panel bantu.
@@ -44,6 +51,8 @@
   --rona-teal2: #e7f0f4;     /* chip status berjalan */
   --rona-brass: #fbf1e0;     /* chip peran kelompok pimpinan */
   --rona-ikon: #c3ccd0;      /* ikon dokumen yang belum ada isinya */
+  --rona-krem: #fbf9f3;      /* kartu sorotan di beranda */
+  --garis-krem: #ecdfc4;     /* tepi kartu sorotan di beranda */
 }
 
 * {
@@ -233,7 +242,7 @@ body {
 .track {
   position: relative;
   height: 22px;
-  background: #eef3f4;
+  background: var(--rona-teal);
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -294,13 +303,13 @@ th {
 
 td {
   padding: 8px 10px;
-  border-bottom: 1px solid #eef2f3;
+  border-bottom: 1px solid var(--garis-halus);
   font-size: 12.5px;
   white-space: nowrap;
 }
 
 tbody tr:hover {
-  background: #f6f9fa;
+  background: var(--rona-baris);
 }
 
 /*
@@ -324,7 +333,7 @@ thead .frz {
 }
 
 tbody tr:hover .frz {
-  background: #f6f9fa;
+  background: var(--rona-baris);
 }
 
 /* ---------- form ---------- */

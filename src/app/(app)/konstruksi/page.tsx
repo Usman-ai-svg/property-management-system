@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ambilPengguna } from "@/lib/auth/rbac";
 import { dashboardKonstruksi } from "@/lib/data/konstruksi";
 import { Badge, TabelHead, Track, WARNA_STATUS } from "@/components/ui";
+import { Tabel } from "@/components/kartu-tabel";
 
 export default async function DashboardKonstruksi() {
   const pengguna = await ambilPengguna();
@@ -51,73 +52,62 @@ export default async function DashboardKonstruksi() {
           judul="Tabel Progress Proyek"
           keterangan="Klik nama proyek untuk membuka progress unit dan sarana prasarananya."
         />
-        <div className="tablewrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Proyek</th>
-                <th>Fase</th>
-                <th style={{ textAlign: "right" }}>Unit</th>
-                <th style={{ textAlign: "right" }}>Dikerjakan</th>
-                <th style={{ minWidth: 170 }}>Progress Unit</th>
-                <th style={{ textAlign: "right" }}>Sarpras</th>
-                <th style={{ minWidth: 170 }}>Progress Sarpras</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {proyek.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <Link
-                      href={`/konstruksi/${p.kode}`}
-                      style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
-                    >
-                      {p.nama}
-                    </Link>
-                    <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{p.kode}</div>
-                  </td>
-                  <td style={{ color: "var(--muted)" }}>{p.fases.join(", ")}</td>
-                  <td style={{ textAlign: "right" }}>{p.jumlahUnit}</td>
-                  <td style={{ textAlign: "right" }}>{p.dikerjakan}</td>
-                  <td>
-                    <Track nilai={p.rataUnit} tinggi={10} warna={p.rataUnit === 100 ? "var(--green)" : "var(--teal)"} />
+        <Tabel
+          kolom={[
+            { label: "Proyek" },
+            { label: "Fase" },
+            { label: "Unit", rata: "kanan" },
+            { label: "Dikerjakan", rata: "kanan" },
+            { label: "Progress Unit", minLebar: 170 },
+            { label: "Sarpras", rata: "kanan" },
+            { label: "Progress Sarpras", minLebar: 170 },
+            { label: "Status" },
+          ]}
+          kosong="Belum ada proyek yang dapat Anda akses."
+        >
+          {proyek.map((p) => (
+            <tr key={p.id}>
+              <td>
+                <Link
+                  href={`/konstruksi/${p.kode}`}
+                  style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+                >
+                  {p.nama}
+                </Link>
+                <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{p.kode}</div>
+              </td>
+              <td style={{ color: "var(--muted)" }}>{p.fases.join(", ")}</td>
+              <td style={{ textAlign: "right" }}>{p.jumlahUnit}</td>
+              <td style={{ textAlign: "right" }}>{p.dikerjakan}</td>
+              <td>
+                <Track nilai={p.rataUnit} tinggi={10} warna={p.rataUnit === 100 ? "var(--green)" : "var(--teal)"} />
+                <div style={{ fontSize: 10.5, color: "var(--muted)", textAlign: "right", marginTop: 2 }}>
+                  {p.rataUnit}%
+                </div>
+              </td>
+              <td style={{ textAlign: "right" }}>{p.jumlahSarpras}</td>
+              <td>
+                {p.jumlahSarpras ? (
+                  <>
+                    <Track
+                      nilai={p.rataSarpras}
+                      tinggi={10}
+                      warna={p.rataSarpras === 100 ? "var(--green)" : "var(--brass)"}
+                    />
                     <div style={{ fontSize: 10.5, color: "var(--muted)", textAlign: "right", marginTop: 2 }}>
-                      {p.rataUnit}%
+                      {p.rataSarpras}%
                     </div>
-                  </td>
-                  <td style={{ textAlign: "right" }}>{p.jumlahSarpras}</td>
-                  <td>
-                    {p.jumlahSarpras ? (
-                      <>
-                        <Track
-                          nilai={p.rataSarpras}
-                          tinggi={10}
-                          warna={p.rataSarpras === 100 ? "var(--green)" : "var(--brass)"}
-                        />
-                        <div style={{ fontSize: 10.5, color: "var(--muted)", textAlign: "right", marginTop: 2 }}>
-                          {p.rataSarpras}%
-                        </div>
-                      </>
-                    ) : (
-                      <span style={{ color: "var(--muted)", fontSize: 11.5 }}>—</span>
-                    )}
-                  </td>
-                  <td>
-                    <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
-                  </td>
-                </tr>
-              ))}
-              {proyek.length === 0 && (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: "center", color: "var(--muted)", padding: 22 }}>
-                    Belum ada proyek yang dapat Anda akses.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                  </>
+                ) : (
+                  <span style={{ color: "var(--muted)", fontSize: 11.5 }}>—</span>
+                )}
+              </td>
+              <td>
+                <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
+              </td>
+            </tr>
+          ))}
+        </Tabel>
       </div>
     </div>
   );

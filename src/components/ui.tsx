@@ -94,7 +94,7 @@ export function InfoRow({ label, nilai }: { label: string; nilai: React.ReactNod
     <div
       style={{
         display: "flex", justifyContent: "space-between", gap: 12,
-        padding: "7px 0", borderBottom: "1px solid #eef2f3", fontSize: 12.5,
+        padding: "7px 0", borderBottom: "1px solid var(--garis-halus)", fontSize: 12.5,
         alignItems: "center",
       }}
     >

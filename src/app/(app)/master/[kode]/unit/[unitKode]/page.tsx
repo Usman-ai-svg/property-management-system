@@ -283,7 +283,7 @@ export default async function RincianUnit({
               key={kt.id}
               style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
-                gap: 8, padding: "7px 0", borderBottom: "1px solid #eef2f3",
+                gap: 8, padding: "7px 0", borderBottom: "1px solid var(--garis-halus)",
               }}
             >
               <div style={{ minWidth: 0 }}>

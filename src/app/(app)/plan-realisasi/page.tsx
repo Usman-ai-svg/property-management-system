@@ -7,6 +7,7 @@ import { pct, rp } from "@/lib/format";
 import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { CatatBiayaOperasional } from "./catat-ops";
 import { HapusPembayaranJual, KelolaPembayaranJual, UbahPembayaranJual } from "./bayar-jual";
+import { Tabel } from "@/components/kartu-tabel";
 
 const TAB = [
   ["hpp", "HPP"],
@@ -42,7 +43,7 @@ function Meter({
     <div
       style={{
         display: "grid", gridTemplateColumns: "180px 1fr 210px", gap: 12,
-        alignItems: "center", padding: "9px 0", borderTop: "1px solid #eef2f3",
+        alignItems: "center", padding: "9px 0", borderTop: "1px solid var(--garis-halus)",
       }}
     >
       <div style={{ fontWeight: 600, fontSize: 13 }}>{nama}</div>
@@ -261,87 +262,83 @@ export default async function PlanRealisasi({
               judul="Penjualan per Unit"
               keterangan="Harga target mengacu rencana omset · pencairan dari penerimaan yang tercatat."
             />
-            <div className="tablewrap" style={{ maxHeight: 460, overflowY: "auto" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Unit</th>
-                    <th>Tipe</th>
-                    <th style={{ textAlign: "right" }}>L. Bangunan</th>
-                    <th style={{ textAlign: "right" }}>L. Tanah</th>
-                    <th style={{ textAlign: "right" }}>Harga Target</th>
-                    <th style={{ textAlign: "right" }}>Harga Akad</th>
-                    <th style={{ textAlign: "right" }}>Nominal Pencairan</th>
-                    <th style={{ textAlign: "right" }}>Sudah Cair</th>
-                    <th style={{ textAlign: "right" }}>Belum Cair</th>
-                    <th>Status</th>
-                    {bolehCatatCair && <th style={{ minWidth: 130 }}>Pencairan</th>}
+            <Tabel
+              tinggiMaks={460}
+              kolom={[
+                { label: "Unit" },
+                { label: "Tipe" },
+                { label: "L. Bangunan", rata: "kanan" },
+                { label: "L. Tanah", rata: "kanan" },
+                { label: "Harga Target", rata: "kanan" },
+                { label: "Harga Akad", rata: "kanan" },
+                { label: "Nominal Pencairan", rata: "kanan" },
+                { label: "Sudah Cair", rata: "kanan" },
+                { label: "Belum Cair", rata: "kanan" },
+                { label: "Status" },
+                bolehCatatCair && { label: "Pencairan", minLebar: 130 },
+              ]}
+            >
+              {d.sales.map((s) => {
+                const belum = s.pencairan - s.sudahCair;
+                return (
+                  <tr key={s.id}>
+                    <td style={{ fontWeight: 600 }}>{s.no}</td>
+                    <td>{s.tipe}</td>
+                    <td style={{ textAlign: "right" }}>{s.luasBangunan} m²</td>
+                    <td style={{ textAlign: "right" }}>{s.luasTanah} m²</td>
+                    <td className="num" style={{ textAlign: "right" }}>{rp(s.target)}</td>
+                    <td className="num" style={{ textAlign: "right" }}>
+                      {s.akad ? rp(s.real) : "—"}
+                    </td>
+                    <td className="num" style={{ textAlign: "right" }}>
+                      {s.akad ? rp(s.pencairan) : "—"}
+                    </td>
+                    <td className="num" style={{ textAlign: "right" }}>
+                      {s.akad ? (
+                        <>
+                          {rp(s.sudahCair)}{" "}
+                          <span style={{ color: "var(--muted)", fontSize: 11 }}>
+                            ({s.pencairan ? pct(s.sudahCair / s.pencairan) : "0%"})
+                          </span>
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td
+                      className="num"
+                      style={{
+                        textAlign: "right",
+                        color: belum > 0 ? "var(--amber)" : "var(--green)",
+                      }}
+                    >
+                      {s.akad ? rp(belum) : "—"}
+                    </td>
+                    <td>
+                      <Badge nilai={s.akad ? "Akad" : "Tersedia"} peta={WARNA_STATUS.jual} />
+                    </td>
+                    {bolehCatatCair && (
+                      <td>
+                        <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+                          <KelolaPembayaranJual
+                            unitId={s.id}
+                            labelUnit={s.no}
+                            hargaJual={s.target}
+                            riwayat={s.penerimaan}
+                          />
+                          {s.penerimaan.map((p) => (
+                            <span key={p.id} style={{ display: "flex", alignItems: "center" }}>
+                              <UbahPembayaranJual bayar={p} labelUnit={s.no} />
+                              <HapusPembayaranJual id={p.id} uraian={p.uraian} />
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    )}
                   </tr>
-                </thead>
-                <tbody>
-                  {d.sales.map((s) => {
-                    const belum = s.pencairan - s.sudahCair;
-                    return (
-                      <tr key={s.id}>
-                        <td style={{ fontWeight: 600 }}>{s.no}</td>
-                        <td>{s.tipe}</td>
-                        <td style={{ textAlign: "right" }}>{s.luasBangunan} m²</td>
-                        <td style={{ textAlign: "right" }}>{s.luasTanah} m²</td>
-                        <td className="num" style={{ textAlign: "right" }}>{rp(s.target)}</td>
-                        <td className="num" style={{ textAlign: "right" }}>
-                          {s.akad ? rp(s.real) : "—"}
-                        </td>
-                        <td className="num" style={{ textAlign: "right" }}>
-                          {s.akad ? rp(s.pencairan) : "—"}
-                        </td>
-                        <td className="num" style={{ textAlign: "right" }}>
-                          {s.akad ? (
-                            <>
-                              {rp(s.sudahCair)}{" "}
-                              <span style={{ color: "var(--muted)", fontSize: 11 }}>
-                                ({s.pencairan ? pct(s.sudahCair / s.pencairan) : "0%"})
-                              </span>
-                            </>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td
-                          className="num"
-                          style={{
-                            textAlign: "right",
-                            color: belum > 0 ? "var(--amber)" : "var(--green)",
-                          }}
-                        >
-                          {s.akad ? rp(belum) : "—"}
-                        </td>
-                        <td>
-                          <Badge nilai={s.akad ? "Akad" : "Tersedia"} peta={WARNA_STATUS.jual} />
-                        </td>
-                        {bolehCatatCair && (
-                          <td>
-                            <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
-                              <KelolaPembayaranJual
-                                unitId={s.id}
-                                labelUnit={s.no}
-                                hargaJual={s.target}
-                                riwayat={s.penerimaan}
-                              />
-                              {s.penerimaan.map((p) => (
-                                <span key={p.id} style={{ display: "flex", alignItems: "center" }}>
-                                  <UbahPembayaranJual bayar={p} labelUnit={s.no} />
-                                  <HapusPembayaranJual id={p.id} uraian={p.uraian} />
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                );
+              })}
+            </Tabel>
           </div>
         </>
       )}
@@ -395,64 +392,59 @@ export default async function PlanRealisasi({
       {tabAktif === "laba" && (
         <div className="card" style={{ padding: "18px 22px" }}>
           <div className="eyebrow" style={{ marginBottom: 12 }}>Rencana Laba · Plan vs Realisasi</div>
-          <div className="tablewrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Pos</th>
-                  <th style={{ textAlign: "right" }}>Plan</th>
-                  <th style={{ textAlign: "right" }}>Realisasi</th>
-                  <th style={{ textAlign: "right" }}>Selisih</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(
-                  [
-                    ["Penjualan", d.penjualanPlan, d.penjualanReal, false],
-                    ["Biaya Pokok (HPP)", -d.hppPlan, -d.hppReal, true],
-                    ["Laba Kotor", d.labaKotorPlan, d.labaKotorReal, false],
-                    ["Biaya Operasional", -d.opsPlan, -d.opsReal, true],
-                    ["Laba Bersih", d.labaBersihPlan, d.labaBersihReal, false],
-                  ] as [string, number, number, boolean][]
-                ).map(([label, plan, real, pengurang], i) => (
-                  <tr
-                    key={label}
-                    style={{
-                      fontWeight: i === 2 || i === 4 ? 700 : 400,
-                      background: i === 4 ? "var(--rona-baris)" : undefined,
-                    }}
-                  >
-                    <td style={{ color: pengurang ? "var(--muted)" : "inherit" }}>{label}</td>
-                    <td className="num" style={{ textAlign: "right" }}>{rp(plan)}</td>
-                    <td className="num" style={{ textAlign: "right" }}>{rp(real)}</td>
-                    <td
-                      style={{
-                        textAlign: "right", fontSize: 11, fontWeight: 600,
-                        color: real - plan >= 0 ? "var(--green)" : "var(--red)",
-                      }}
-                    >
-                      {real - plan >= 0 ? "+" : ""}
-                      {rp(real - plan)}
-                    </td>
-                  </tr>
-                ))}
-                <tr style={{ fontWeight: 700 }}>
-                  <td>Margin Laba Bersih</td>
-                  <td className="num" style={{ textAlign: "right" }}>{pct(d.marginPlan, 1)}</td>
-                  <td className="num" style={{ textAlign: "right" }}>{pct(d.marginReal, 1)}</td>
-                  <td
-                    style={{
-                      textAlign: "right", fontSize: 11, fontWeight: 600,
-                      color: d.marginReal >= d.marginPlan ? "var(--green)" : "var(--red)",
-                    }}
-                  >
-                    {d.marginReal >= d.marginPlan ? "+" : ""}
-                    {pct(d.marginReal - d.marginPlan, 1)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <Tabel
+            kolom={[
+              { label: "Pos" },
+              { label: "Plan", rata: "kanan" },
+              { label: "Realisasi", rata: "kanan" },
+              { label: "Selisih", rata: "kanan" },
+            ]}
+          >
+            {(
+              [
+                ["Penjualan", d.penjualanPlan, d.penjualanReal, false],
+                ["Biaya Pokok (HPP)", -d.hppPlan, -d.hppReal, true],
+                ["Laba Kotor", d.labaKotorPlan, d.labaKotorReal, false],
+                ["Biaya Operasional", -d.opsPlan, -d.opsReal, true],
+                ["Laba Bersih", d.labaBersihPlan, d.labaBersihReal, false],
+              ] as [string, number, number, boolean][]
+            ).map(([label, plan, real, pengurang], i) => (
+              <tr
+                key={label}
+                style={{
+                  fontWeight: i === 2 || i === 4 ? 700 : 400,
+                  background: i === 4 ? "var(--rona-baris)" : undefined,
+                }}
+              >
+                <td style={{ color: pengurang ? "var(--muted)" : "inherit" }}>{label}</td>
+                <td className="num" style={{ textAlign: "right" }}>{rp(plan)}</td>
+                <td className="num" style={{ textAlign: "right" }}>{rp(real)}</td>
+                <td
+                  style={{
+                    textAlign: "right", fontSize: 11, fontWeight: 600,
+                    color: real - plan >= 0 ? "var(--green)" : "var(--red)",
+                  }}
+                >
+                  {real - plan >= 0 ? "+" : ""}
+                  {rp(real - plan)}
+                </td>
+              </tr>
+            ))}
+            <tr style={{ fontWeight: 700 }}>
+              <td>Margin Laba Bersih</td>
+              <td className="num" style={{ textAlign: "right" }}>{pct(d.marginPlan, 1)}</td>
+              <td className="num" style={{ textAlign: "right" }}>{pct(d.marginReal, 1)}</td>
+              <td
+                style={{
+                  textAlign: "right", fontSize: 11, fontWeight: 600,
+                  color: d.marginReal >= d.marginPlan ? "var(--green)" : "var(--red)",
+                }}
+              >
+                {d.marginReal >= d.marginPlan ? "+" : ""}
+                {pct(d.marginReal - d.marginPlan, 1)}
+              </td>
+            </tr>
+          </Tabel>
         </div>
       )}
     </div>

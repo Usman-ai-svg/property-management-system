@@ -47,7 +47,7 @@ export function KontrakBacaSaja({
         daftar.map((k) => {
           const r = ringkasKontrak(k);
           return (
-            <div key={k.id} style={{ padding: "8px 0", borderBottom: "1px solid #eef2f3" }}>
+            <div key={k.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--garis-halus)" }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{k.vendor.nama}</div>
               <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 5 }}>{k.deskripsi}</div>
               {bolehHarga ? (

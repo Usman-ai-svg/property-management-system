@@ -8,6 +8,7 @@ import { pct, rp, tanggal } from "@/lib/format";
 import { Donut, LegendaDonut, RvsRAP } from "@/components/charts";
 import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { HapusTransaksi, UbahTransaksi } from "./ubah-transaksi";
+import { Tabel } from "@/components/kartu-tabel";
 
 export default async function KeuanganProyek({
   params,
@@ -244,83 +245,79 @@ export default async function KeuanganProyek({
           judul={`Pengeluaran per Unit · ${proyek.units.length} unit`}
           keterangan="Klik nomor unit untuk melihat rincian per jenis biaya · Alokasi kontrak adalah bagian unit dari kontrak borongan yang sudah terbayar."
         />
-        <div className="tablewrap" style={{ maxHeight: 380, overflowY: "auto" }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Unit</th>
-                <th>Fase</th>
-                <th>Tipe</th>
-                <th style={{ textAlign: "right" }}>RAP</th>
-                <th style={{ textAlign: "right" }}>Pengeluaran Langsung</th>
-                <th style={{ textAlign: "right" }}>Alokasi Kontrak</th>
-                <th style={{ textAlign: "right" }}>Total Realisasi</th>
-                <th style={{ minWidth: 150 }}>% vs RAP</th>
-              </tr>
-            </thead>
-            <tbody>
-              {proyek.units.map((u) => {
-                const rap = totalRapDari(u);
-                const langsung = langsungPerUnit.get(u.id) ?? 0;
-                const alokasi = alokasiPerUnit.get(u.id) ?? 0;
-                const total = langsung + alokasi;
-                const rasio = rap ? total / rap : 0;
+        <Tabel
+          tinggiMaks={380}
+          kolom={[
+            { label: "Unit" },
+            { label: "Fase" },
+            { label: "Tipe" },
+            { label: "RAP", rata: "kanan" },
+            { label: "Pengeluaran Langsung", rata: "kanan" },
+            { label: "Alokasi Kontrak", rata: "kanan" },
+            { label: "Total Realisasi", rata: "kanan" },
+            { label: "% vs RAP", minLebar: 150 },
+          ]}
+        >
+          {proyek.units.map((u) => {
+            const rap = totalRapDari(u);
+            const langsung = langsungPerUnit.get(u.id) ?? 0;
+            const alokasi = alokasiPerUnit.get(u.id) ?? 0;
+            const total = langsung + alokasi;
+            const rasio = rap ? total / rap : 0;
 
-                return (
-                  <tr key={u.id}>
-                    <td>
-                      <Link
-                        href={
-                          unitRinci?.id === u.id
-                            ? alamatDasar
-                            : `${alamatDasar}&unit=${u.kode}#rincian-unit`
-                        }
-                        scroll={false}
-                        style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
-                      >
-                        {u.nomor}
-                      </Link>
-                    </td>
-                    <td>{u.phase.kode}</td>
-                    <td>{u.unitType.nama}</td>
-                    <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>{rp(rap)}</td>
-                    <td className="num" style={{ textAlign: "right" }}>{langsung ? rp(langsung) : "—"}</td>
-                    <td className="num" style={{ textAlign: "right" }}>
-                      {alokasi ? rp(Math.round(alokasi)) : "—"}
-                    </td>
-                    <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>
-                      {rp(Math.round(total))}
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <Track
-                          nilai={rasio * 100}
-                          tinggi={9}
-                          warna={rasio > 1 ? "var(--red)" : rasio > 0.9 ? "var(--amber)" : "var(--teal)"}
-                        />
-                        <span
-                          style={{
-                            fontSize: 10.5, width: 38, textAlign: "right",
-                            color: rasio > 1 ? "var(--red)" : "var(--muted)",
-                          }}
-                        >
-                          {pct(rasio, 1)}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
-                <td colSpan={4}>Biaya level proyek (belum dialokasikan ke unit)</td>
-                <td className="num" style={{ textAlign: "right" }} colSpan={3}>{rp(levelProyek)}</td>
-                <td style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
-                  perijinan, prasarana, pengolahan lahan
+            return (
+              <tr key={u.id}>
+                <td>
+                  <Link
+                    href={
+                      unitRinci?.id === u.id
+                        ? alamatDasar
+                        : `${alamatDasar}&unit=${u.kode}#rincian-unit`
+                    }
+                    scroll={false}
+                    style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+                  >
+                    {u.nomor}
+                  </Link>
+                </td>
+                <td>{u.phase.kode}</td>
+                <td>{u.unitType.nama}</td>
+                <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>{rp(rap)}</td>
+                <td className="num" style={{ textAlign: "right" }}>{langsung ? rp(langsung) : "—"}</td>
+                <td className="num" style={{ textAlign: "right" }}>
+                  {alokasi ? rp(Math.round(alokasi)) : "—"}
+                </td>
+                <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>
+                  {rp(Math.round(total))}
+                </td>
+                <td>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Track
+                      nilai={rasio * 100}
+                      tinggi={9}
+                      warna={rasio > 1 ? "var(--red)" : rasio > 0.9 ? "var(--amber)" : "var(--teal)"}
+                    />
+                    <span
+                      style={{
+                        fontSize: 10.5, width: 38, textAlign: "right",
+                        color: rasio > 1 ? "var(--red)" : "var(--muted)",
+                      }}
+                    >
+                      {pct(rasio, 1)}
+                    </span>
+                  </div>
                 </td>
               </tr>
-            </tbody>
-          </table>
-        </div>
+            );
+          })}
+          <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
+            <td colSpan={4}>Biaya level proyek (belum dialokasikan ke unit)</td>
+            <td className="num" style={{ textAlign: "right" }} colSpan={3}>{rp(levelProyek)}</td>
+            <td style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
+              perijinan, prasarana, pengolahan lahan
+            </td>
+          </tr>
+        </Tabel>
       </div>
 
       {/* ---------- rincian biaya satu unit ---------- */}
@@ -424,78 +421,66 @@ export default async function KeuanganProyek({
               <div className="eyebrow" style={{ margin: "16px 0 8px" }}>
                 Transaksi Unit · {tx.length} entri
               </div>
-              <div className="tablewrap" style={{ maxHeight: 260, overflowY: "auto" }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Tanggal</th>
-                      <th>Jenis</th>
-                      <th style={{ minWidth: 200 }}>Keterangan</th>
-                      <th>Metode</th>
-                      <th style={{ textAlign: "right" }}>Alokasi ke Sini</th>
-                      <th style={{ textAlign: "right" }}>Total Pembayaran</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tx.map((e) => (
-                      <tr key={e.id}>
-                        <td style={{ color: "var(--muted)" }}>{tanggal(e.tanggal)}</td>
-                        <td>
-                          <span style={{ color: WARNA_JENIS[e.jenis] ?? "#999", marginRight: 4 }}>■</span>
-                          {e.jenis}
-                        </td>
-                        <td style={{ whiteSpace: "normal" }}>
-                          {e.uraian}
-                          {/* Sebagian besar transaksi per unit belum punya PIC;
-                              barisnya disembunyikan alih-alih menulis "oleh —". */}
-                          {e.pic && (
-                            <div style={{ fontSize: 10, color: "var(--muted)" }}>oleh {e.pic}</div>
-                          )}
-                        </td>
-                        <td style={{ color: "var(--muted)" }}>{e.metode}</td>
-                        {/* Dua kolom terpisah, bukan satu: "Alokasi ke Sini" adalah
-                            bagian yang ditanggung unit/item ini, sedangkan "Total
-                            Pembayaran" adalah nilai transaksi utuh yang cocok dengan
-                            satu baris mutasi bank. Menggabungkan keduanya membuat
-                            pembayaran lumsum terbaca seolah seluruhnya milik unit ini. */}
-                        <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>
-                          {rp(e.nominalDibebankan)}
-                        </td>
-                        <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
-                          {rp(e.total)}
-                          {e.jumlahTujuan > 1 && (
-                            <div style={{ fontSize: 10, fontWeight: 400 }}>
-                              dibagi ke {e.jumlahTujuan} tujuan
-                            </div>
-                          )}
-                        </td>
-                        <td>
-                          <Badge nilai={e.status} peta={WARNA_STATUS.bayar} />
-                        </td>
-                      </tr>
-                    ))}
-                    {tx.length > 0 && (
-                      <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
-                        <td colSpan={4}>JUMLAH DIBEBANKAN KE UNIT INI</td>
-                        <td className="num" style={{ textAlign: "right" }}>{rp(terpakai)}</td>
-                        <td colSpan={2} style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
-                          sama dengan Total Pengeluaran di atas
-                        </td>
-                      </tr>
-                    )}
-                    {tx.length === 0 && (
-                      <tr>
-                        <td colSpan={7} style={{ color: "var(--muted)", textAlign: "center", padding: 18 }}>
-                          Belum ada transaksi yang dicatat langsung ke unit ini. Biaya yang
-                          masuk lewat kontrak borongan muncul sebagai Alokasi Kontrak, bukan
-                          sebagai transaksi unit.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <Tabel
+                tinggiMaks={260}
+                kolom={[
+                  { label: "Tanggal" },
+                  { label: "Jenis" },
+                  { label: "Keterangan", minLebar: 200 },
+                  { label: "Metode" },
+                  { label: "Alokasi ke Sini", rata: "kanan" },
+                  { label: "Total Pembayaran", rata: "kanan" },
+                  { label: "Status" },
+                ]}
+                kosong="Belum ada transaksi yang dicatat langsung ke unit ini. Biaya yang masuk lewat kontrak borongan muncul sebagai Alokasi Kontrak, bukan sebagai transaksi unit."
+              >
+                {tx.map((e) => (
+                  <tr key={e.id}>
+                    <td style={{ color: "var(--muted)" }}>{tanggal(e.tanggal)}</td>
+                    <td>
+                      <span style={{ color: WARNA_JENIS[e.jenis] ?? "#999", marginRight: 4 }}>■</span>
+                      {e.jenis}
+                    </td>
+                    <td style={{ whiteSpace: "normal" }}>
+                      {e.uraian}
+                      {/* Sebagian besar transaksi per unit belum punya PIC;
+                          barisnya disembunyikan alih-alih menulis "oleh —". */}
+                      {e.pic && (
+                        <div style={{ fontSize: 10, color: "var(--muted)" }}>oleh {e.pic}</div>
+                      )}
+                    </td>
+                    <td style={{ color: "var(--muted)" }}>{e.metode}</td>
+                    {/* Dua kolom terpisah, bukan satu: "Alokasi ke Sini" adalah
+                        bagian yang ditanggung unit/item ini, sedangkan "Total
+                        Pembayaran" adalah nilai transaksi utuh yang cocok dengan
+                        satu baris mutasi bank. Menggabungkan keduanya membuat
+                        pembayaran lumsum terbaca seolah seluruhnya milik unit ini. */}
+                    <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>
+                      {rp(e.nominalDibebankan)}
+                    </td>
+                    <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
+                      {rp(e.total)}
+                      {e.jumlahTujuan > 1 && (
+                        <div style={{ fontSize: 10, fontWeight: 400 }}>
+                          dibagi ke {e.jumlahTujuan} tujuan
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <Badge nilai={e.status} peta={WARNA_STATUS.bayar} />
+                    </td>
+                  </tr>
+                ))}
+                {tx.length > 0 && (
+                  <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
+                    <td colSpan={4}>JUMLAH DIBEBANKAN KE UNIT INI</td>
+                    <td className="num" style={{ textAlign: "right" }}>{rp(terpakai)}</td>
+                    <td colSpan={2} style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
+                      sama dengan Total Pengeluaran di atas
+                    </td>
+                  </tr>
+                )}
+              </Tabel>
             </div>
           );
         })()}
@@ -506,86 +491,76 @@ export default async function KeuanganProyek({
           judul={`Pengeluaran Sarana & Prasarana · ${proyek.infrastructures.length} item`}
           keterangan="Klik nama item untuk melihat rincian per jenis biaya · progresnya sama dengan yang tampil di modul Konstruksi."
         />
-        <div className="tablewrap" style={{ maxHeight: 380, overflowY: "auto" }}>
-          <table>
-            <thead>
-              <tr>
-                <th style={{ minWidth: 150 }}>Item</th>
-                <th>Jenis</th>
-                <th style={{ textAlign: "right" }}>Progres</th>
-                <th style={{ textAlign: "right" }}>RAP</th>
-                <th style={{ textAlign: "right" }}>Pengeluaran Langsung</th>
-                <th style={{ textAlign: "right" }}>Alokasi Kontrak</th>
-                <th style={{ textAlign: "right" }}>Total Realisasi</th>
-                <th style={{ minWidth: 150 }}>% vs RAP</th>
-              </tr>
-            </thead>
-            <tbody>
-              {proyek.infrastructures.map((s) => {
-                const rap = totalRapDari(s);
-                const langsung = langsungPerSarpras.get(s.id) ?? 0;
-                const alokasi = alokasiPerSarpras.get(s.id) ?? 0;
-                const total = langsung + alokasi;
-                const rasio = rap ? total / rap : 0;
+        <Tabel
+          tinggiMaks={380}
+          kolom={[
+            { label: "Item", minLebar: 150 },
+            { label: "Jenis" },
+            { label: "Progres", rata: "kanan" },
+            { label: "RAP", rata: "kanan" },
+            { label: "Pengeluaran Langsung", rata: "kanan" },
+            { label: "Alokasi Kontrak", rata: "kanan" },
+            { label: "Total Realisasi", rata: "kanan" },
+            { label: "% vs RAP", minLebar: 150 },
+          ]}
+          kosong="Proyek ini belum punya item sarana & prasarana."
+        >
+          {proyek.infrastructures.map((s) => {
+            const rap = totalRapDari(s);
+            const langsung = langsungPerSarpras.get(s.id) ?? 0;
+            const alokasi = alokasiPerSarpras.get(s.id) ?? 0;
+            const total = langsung + alokasi;
+            const rasio = rap ? total / rap : 0;
 
-                return (
-                  <tr key={s.id}>
-                    <td>
-                      <Link
-                        href={
-                          sarprasRinci?.id === s.id
-                            ? alamatDasar
-                            : `${alamatDasar}&sarpras=${s.kode}#rincian-sarpras`
-                        }
-                        scroll={false}
-                        style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
-                      >
-                        {s.nama}
-                      </Link>
-                      <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
-                        {s.kode} · {s.volume}
-                      </div>
-                    </td>
-                    <td>{s.jenis}</td>
-                    <td style={{ textAlign: "right", color: "var(--muted)" }}>{s.progress}%</td>
-                    <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>{rp(rap)}</td>
-                    <td className="num" style={{ textAlign: "right" }}>{langsung ? rp(langsung) : "—"}</td>
-                    <td className="num" style={{ textAlign: "right" }}>
-                      {alokasi ? rp(Math.round(alokasi)) : "—"}
-                    </td>
-                    <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>
-                      {rp(Math.round(total))}
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <Track
-                          nilai={rasio * 100}
-                          tinggi={9}
-                          warna={rasio > 1 ? "var(--red)" : rasio > 0.9 ? "var(--amber)" : "var(--teal)"}
-                        />
-                        <span
-                          style={{
-                            fontSize: 10.5, width: 38, textAlign: "right",
-                            color: rasio > 1 ? "var(--red)" : "var(--muted)",
-                          }}
-                        >
-                          {pct(rasio, 1)}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {proyek.infrastructures.length === 0 && (
-                <tr>
-                  <td colSpan={8} style={{ color: "var(--muted)", textAlign: "center", padding: 20 }}>
-                    Proyek ini belum punya item sarana & prasarana.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            return (
+              <tr key={s.id}>
+                <td>
+                  <Link
+                    href={
+                      sarprasRinci?.id === s.id
+                        ? alamatDasar
+                        : `${alamatDasar}&sarpras=${s.kode}#rincian-sarpras`
+                    }
+                    scroll={false}
+                    style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+                  >
+                    {s.nama}
+                  </Link>
+                  <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
+                    {s.kode} · {s.volume}
+                  </div>
+                </td>
+                <td>{s.jenis}</td>
+                <td style={{ textAlign: "right", color: "var(--muted)" }}>{s.progress}%</td>
+                <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>{rp(rap)}</td>
+                <td className="num" style={{ textAlign: "right" }}>{langsung ? rp(langsung) : "—"}</td>
+                <td className="num" style={{ textAlign: "right" }}>
+                  {alokasi ? rp(Math.round(alokasi)) : "—"}
+                </td>
+                <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>
+                  {rp(Math.round(total))}
+                </td>
+                <td>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Track
+                      nilai={rasio * 100}
+                      tinggi={9}
+                      warna={rasio > 1 ? "var(--red)" : rasio > 0.9 ? "var(--amber)" : "var(--teal)"}
+                    />
+                    <span
+                      style={{
+                        fontSize: 10.5, width: 38, textAlign: "right",
+                        color: rasio > 1 ? "var(--red)" : "var(--muted)",
+                      }}
+                    >
+                      {pct(rasio, 1)}
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </Tabel>
       </div>
 
       {/* ---------- rincian biaya satu item sarpras ---------- */}
@@ -698,75 +673,64 @@ export default async function KeuanganProyek({
               <div className="eyebrow" style={{ margin: "16px 0 8px" }}>
                 Transaksi Sarpras · {tx.length} entri
               </div>
-              <div className="tablewrap" style={{ maxHeight: 260, overflowY: "auto" }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Tanggal</th>
-                      <th>Jenis</th>
-                      <th style={{ minWidth: 200 }}>Keterangan</th>
-                      <th>Metode</th>
-                      <th style={{ textAlign: "right" }}>Alokasi ke Sini</th>
-                      <th style={{ textAlign: "right" }}>Total Pembayaran</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tx.map((e) => (
-                      <tr key={e.id}>
-                        <td style={{ color: "var(--muted)" }}>{tanggal(e.tanggal)}</td>
-                        <td>
-                          <span style={{ color: WARNA_JENIS[e.jenis] ?? "#999", marginRight: 4 }}>■</span>
-                          {e.jenis}
-                        </td>
-                        <td style={{ whiteSpace: "normal" }}>
-                          {e.uraian}
-                          {e.pic && (
-                            <div style={{ fontSize: 10, color: "var(--muted)" }}>oleh {e.pic}</div>
-                          )}
-                        </td>
-                        <td style={{ color: "var(--muted)" }}>{e.metode}</td>
-                        {/* Dua kolom terpisah, bukan satu: "Alokasi ke Sini" adalah
-                            bagian yang ditanggung unit/item ini, sedangkan "Total
-                            Pembayaran" adalah nilai transaksi utuh yang cocok dengan
-                            satu baris mutasi bank. Menggabungkan keduanya membuat
-                            pembayaran lumsum terbaca seolah seluruhnya milik unit ini. */}
-                        <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>
-                          {rp(e.nominalDibebankan)}
-                        </td>
-                        <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
-                          {rp(e.total)}
-                          {e.jumlahTujuan > 1 && (
-                            <div style={{ fontSize: 10, fontWeight: 400 }}>
-                              dibagi ke {e.jumlahTujuan} tujuan
-                            </div>
-                          )}
-                        </td>
-                        <td>
-                          <Badge nilai={e.status} peta={WARNA_STATUS.bayar} />
-                        </td>
-                      </tr>
-                    ))}
-                    {tx.length > 0 && (
-                      <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
-                        <td colSpan={4}>JUMLAH DIBEBANKAN KE ITEM INI</td>
-                        <td className="num" style={{ textAlign: "right" }}>{rp(terpakai)}</td>
-                        <td colSpan={2} style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
-                          sama dengan Total Pengeluaran di atas
-                        </td>
-                      </tr>
-                    )}
-                    {tx.length === 0 && (
-                      <tr>
-                        <td colSpan={7} style={{ color: "var(--muted)", textAlign: "center", padding: 18 }}>
-                          Belum ada transaksi yang dicatat langsung ke item ini. Biaya yang
-                          masuk lewat kontrak vendor muncul sebagai Alokasi Kontrak.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <Tabel
+                tinggiMaks={260}
+                kolom={[
+                  { label: "Tanggal" },
+                  { label: "Jenis" },
+                  { label: "Keterangan", minLebar: 200 },
+                  { label: "Metode" },
+                  { label: "Alokasi ke Sini", rata: "kanan" },
+                  { label: "Total Pembayaran", rata: "kanan" },
+                  { label: "Status" },
+                ]}
+                kosong="Belum ada transaksi yang dicatat langsung ke item ini. Biaya yang masuk lewat kontrak vendor muncul sebagai Alokasi Kontrak."
+              >
+                {tx.map((e) => (
+                  <tr key={e.id}>
+                    <td style={{ color: "var(--muted)" }}>{tanggal(e.tanggal)}</td>
+                    <td>
+                      <span style={{ color: WARNA_JENIS[e.jenis] ?? "#999", marginRight: 4 }}>■</span>
+                      {e.jenis}
+                    </td>
+                    <td style={{ whiteSpace: "normal" }}>
+                      {e.uraian}
+                      {e.pic && (
+                        <div style={{ fontSize: 10, color: "var(--muted)" }}>oleh {e.pic}</div>
+                      )}
+                    </td>
+                    <td style={{ color: "var(--muted)" }}>{e.metode}</td>
+                    {/* Dua kolom terpisah, bukan satu: "Alokasi ke Sini" adalah
+                        bagian yang ditanggung unit/item ini, sedangkan "Total
+                        Pembayaran" adalah nilai transaksi utuh yang cocok dengan
+                        satu baris mutasi bank. Menggabungkan keduanya membuat
+                        pembayaran lumsum terbaca seolah seluruhnya milik unit ini. */}
+                    <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>
+                      {rp(e.nominalDibebankan)}
+                    </td>
+                    <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
+                      {rp(e.total)}
+                      {e.jumlahTujuan > 1 && (
+                        <div style={{ fontSize: 10, fontWeight: 400 }}>
+                          dibagi ke {e.jumlahTujuan} tujuan
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <Badge nilai={e.status} peta={WARNA_STATUS.bayar} />
+                    </td>
+                  </tr>
+                ))}
+                {tx.length > 0 && (
+                  <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
+                    <td colSpan={4}>JUMLAH DIBEBANKAN KE ITEM INI</td>
+                    <td className="num" style={{ textAlign: "right" }}>{rp(terpakai)}</td>
+                    <td colSpan={2} style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
+                      sama dengan Total Pengeluaran di atas
+                    </td>
+                  </tr>
+                )}
+              </Tabel>
             </div>
           );
         })()}
@@ -777,93 +741,80 @@ export default async function KeuanganProyek({
           judul={`Transaksi · ${proyek.expenses.length} entri`}
           keterangan="Kontrak vendor dikelola di modul Vendor Management."
         />
-        <div className="tablewrap" style={{ maxHeight: 360, overflowY: "auto" }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Tanggal</th>
-                <th>Jenis</th>
-                <th>Keterangan</th>
-                <th>Bukti</th>
-                <th style={{ textAlign: "right" }}>Total</th>
-                <th>Status</th>
-                {bolehUbahKeuangan && <th style={{ width: 74 }} />}
-              </tr>
-            </thead>
-            <tbody>
-              {proyek.expenses.map((e) => (
-                <tr key={e.id}>
-                  <td style={{ color: "var(--muted)" }}>{tanggal(e.tanggal)}</td>
-                  <td>
-                    <span style={{ color: WARNA_JENIS[e.jenis] ?? "var(--muted)", marginRight: 4 }}>■</span>
-                    {e.jenis}
-                  </td>
-                  <td>
-                    <div>
-                      {e.uraian}
-                      {e.alokasi.length > 1 && (
-                        <span
-                          className="chip"
-                          title="Satu pembayaran yang dibebankan ke beberapa tujuan"
-                          style={{ background: "var(--rona-teal)", color: "var(--teal)", marginLeft: 6 }}
-                        >
-                          dibagi ke {e.alokasi.length} tujuan
-                        </span>
-                      )}
-                    </div>
-                    {(e.pic || e.contract) && (
-                      <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
-                        {e.pic ? `oleh ${e.pic}` : ""}
-                        {e.pic && e.contract ? " · " : ""}
-                        {e.contract ? e.contract.vendor.nama : ""}
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    {e.bukti ? (
-                      <span style={{ color: "var(--teal)", fontSize: 11 }}>📎 {e.bukti}</span>
-                    ) : (
-                      <span style={{ color: "var(--muted)", fontSize: 11 }}>—</span>
-                    )}
-                  </td>
-                  <td className="num" style={{ textAlign: "right" }}>{rp(e.total)}</td>
-                  <td>
-                    <Badge nilai={e.status} peta={WARNA_STATUS.bayar} />
-                  </td>
-                  {bolehUbahKeuangan && (
-                    <td>
-                      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                        <UbahTransaksi
-                          transaksi={{
-                            id: e.id, peruntukan: e.peruntukan, jenis: e.jenis,
-                            metode: e.metode, uraian: e.uraian, total: e.total,
-                            status: e.status, bukti: e.bukti,
-                            alokasi: e.alokasi.map((a) => ({
-                              unitId: a.unitId, infrastructureId: a.infrastructureId, nominal: a.nominal,
-                            })),
-                          }}
-                          units={pilihanUnit}
-                          sarpras={pilihanSarpras}
-                        />
-                        <HapusTransaksi id={e.id} uraian={e.uraian} />
-                      </div>
-                    </td>
+        <Tabel
+          tinggiMaks={360}
+          kolom={[
+            { label: "Tanggal" },
+            { label: "Jenis" },
+            { label: "Keterangan" },
+            { label: "Bukti" },
+            { label: "Total", rata: "kanan" },
+            { label: "Status" },
+            bolehUbahKeuangan && { lebar: 74 },
+          ]}
+          kosong="Belum ada transaksi tercatat."
+        >
+          {proyek.expenses.map((e) => (
+            <tr key={e.id}>
+              <td style={{ color: "var(--muted)" }}>{tanggal(e.tanggal)}</td>
+              <td>
+                <span style={{ color: WARNA_JENIS[e.jenis] ?? "var(--muted)", marginRight: 4 }}>■</span>
+                {e.jenis}
+              </td>
+              <td>
+                <div>
+                  {e.uraian}
+                  {e.alokasi.length > 1 && (
+                    <span
+                      className="chip"
+                      title="Satu pembayaran yang dibebankan ke beberapa tujuan"
+                      style={{ background: "var(--rona-teal)", color: "var(--teal)", marginLeft: 6 }}
+                    >
+                      dibagi ke {e.alokasi.length} tujuan
+                    </span>
                   )}
-                </tr>
-              ))}
-              {proyek.expenses.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={bolehUbahKeuangan ? 7 : 6}
-                    style={{ textAlign: "center", color: "var(--muted)", padding: 22 }}
-                  >
-                    Belum ada transaksi tercatat.
-                  </td>
-                </tr>
+                </div>
+                {(e.pic || e.contract) && (
+                  <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
+                    {e.pic ? `oleh ${e.pic}` : ""}
+                    {e.pic && e.contract ? " · " : ""}
+                    {e.contract ? e.contract.vendor.nama : ""}
+                  </div>
+                )}
+              </td>
+              <td>
+                {e.bukti ? (
+                  <span style={{ color: "var(--teal)", fontSize: 11 }}>📎 {e.bukti}</span>
+                ) : (
+                  <span style={{ color: "var(--muted)", fontSize: 11 }}>—</span>
+                )}
+              </td>
+              <td className="num" style={{ textAlign: "right" }}>{rp(e.total)}</td>
+              <td>
+                <Badge nilai={e.status} peta={WARNA_STATUS.bayar} />
+              </td>
+              {bolehUbahKeuangan && (
+                <td>
+                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <UbahTransaksi
+                      transaksi={{
+                        id: e.id, peruntukan: e.peruntukan, jenis: e.jenis,
+                        metode: e.metode, uraian: e.uraian, total: e.total,
+                        status: e.status, bukti: e.bukti,
+                        alokasi: e.alokasi.map((a) => ({
+                          unitId: a.unitId, infrastructureId: a.infrastructureId, nominal: a.nominal,
+                        })),
+                      }}
+                      units={pilihanUnit}
+                      sarpras={pilihanSarpras}
+                    />
+                    <HapusTransaksi id={e.id} uraian={e.uraian} />
+                  </div>
+                </td>
               )}
-            </tbody>
-          </table>
-        </div>
+            </tr>
+          ))}
+        </Tabel>
       </div>
     </div>
   );

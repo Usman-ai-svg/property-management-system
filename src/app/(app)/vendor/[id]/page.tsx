@@ -7,6 +7,7 @@ import { pct, rp, tanggal } from "@/lib/format";
 import { Badge, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { TambahPembayaran, TambahVo } from "./editors";
 import { HapusKontrak, TambahKontrak, UbahKontrak } from "../editors-vendor";
+import { Tabel } from "@/components/kartu-tabel";
 
 const TAB = [
   ["kontrak", "Kontrak"],
@@ -326,63 +327,58 @@ export default async function DetailVendor({
                             Belum ada pekerjaan tambah atau kurang.
                           </div>
                         ) : (
-                          <div className="tablewrap">
-                            <table>
-                              <thead>
-                                <tr>
-                                  <th style={{ width: 60 }}>No.</th>
-                                  <th style={{ width: 110 }}>Tanggal</th>
-                                  <th>Uraian</th>
-                                  {bolehHarga && <th style={{ textAlign: "right" }}>Nominal</th>}
-                                  <th style={{ width: 92 }}>Status</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {k.variationOrders.map((v) => (
-                                  <tr key={v.id}>
-                                    <td style={{ fontWeight: 600 }}>{v.nomor}</td>
-                                    <td style={{ color: "var(--muted)" }}>{tanggal(v.tanggal)}</td>
-                                    <td style={{ whiteSpace: "normal" }}>{v.uraian}</td>
-                                    {bolehHarga && (
-                                      <td
-                                        className="num"
-                                        style={{
-                                          textAlign: "right",
-                                          color: v.nominal >= 0 ? "var(--amber)" : "var(--teal)",
-                                        }}
-                                      >
-                                        {v.nominal >= 0 ? "+" : "−"}
-                                        {rp(Math.abs(v.nominal))}
-                                      </td>
-                                    )}
-                                    <td>
-                                      <span
-                                        className="chip"
-                                        style={{
-                                          background: v.status === "Disetujui" ? "var(--rona-hijau2)" : "var(--rona-amber)",
-                                          color: v.status === "Disetujui" ? "var(--green)" : "var(--amber)",
-                                        }}
-                                      >
-                                        {v.status}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                ))}
-                                {bolehHarga && r.voDiajukan !== 0 && (
-                                  <tr>
-                                    <td colSpan={3} style={{ color: "var(--muted)" }}>
-                                      Menunggu persetujuan (belum masuk nilai akhir)
-                                    </td>
-                                    <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
-                                      {r.voDiajukan >= 0 ? "+" : "−"}
-                                      {rp(Math.abs(r.voDiajukan))}
-                                    </td>
-                                    <td />
-                                  </tr>
+                          <Tabel
+                            kolom={[
+                              { label: "No.", lebar: 60 },
+                              { label: "Tanggal", lebar: 110 },
+                              { label: "Uraian" },
+                              bolehHarga && { label: "Nominal", rata: "kanan" },
+                              { label: "Status", lebar: 92 },
+                            ]}
+                          >
+                            {k.variationOrders.map((v) => (
+                              <tr key={v.id}>
+                                <td style={{ fontWeight: 600 }}>{v.nomor}</td>
+                                <td style={{ color: "var(--muted)" }}>{tanggal(v.tanggal)}</td>
+                                <td style={{ whiteSpace: "normal" }}>{v.uraian}</td>
+                                {bolehHarga && (
+                                  <td
+                                    className="num"
+                                    style={{
+                                      textAlign: "right",
+                                      color: v.nominal >= 0 ? "var(--amber)" : "var(--teal)",
+                                    }}
+                                  >
+                                    {v.nominal >= 0 ? "+" : "−"}
+                                    {rp(Math.abs(v.nominal))}
+                                  </td>
                                 )}
-                              </tbody>
-                            </table>
-                          </div>
+                                <td>
+                                  <span
+                                    className="chip"
+                                    style={{
+                                      background: v.status === "Disetujui" ? "var(--rona-hijau2)" : "var(--rona-amber)",
+                                      color: v.status === "Disetujui" ? "var(--green)" : "var(--amber)",
+                                    }}
+                                  >
+                                    {v.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                            {bolehHarga && r.voDiajukan !== 0 && (
+                              <tr>
+                                <td colSpan={3} style={{ color: "var(--muted)" }}>
+                                  Menunggu persetujuan (belum masuk nilai akhir)
+                                </td>
+                                <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
+                                  {r.voDiajukan >= 0 ? "+" : "−"}
+                                  {rp(Math.abs(r.voDiajukan))}
+                                </td>
+                                <td />
+                              </tr>
+                            )}
+                          </Tabel>
                         )}
                       </div>
 
@@ -468,76 +464,66 @@ export default async function DetailVendor({
 
       {/* ================= PROGRESS PEKERJAAN ================= */}
       {tabAktif === "progres" && (
-        <div className="card tablewrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Kontrak</th>
-                <th>Objek</th>
-                <th>Jenis</th>
-                <th style={{ minWidth: 190 }}>Progress</th>
-                <th>Status</th>
+        <Tabel
+          kelasBungkus="card tablewrap"
+          kolom={[
+            { label: "Kontrak" },
+            { label: "Objek" },
+            { label: "Jenis" },
+            { label: "Progress", minLebar: 190 },
+            { label: "Status" },
+          ]}
+          kosong="Belum ada pekerjaan yang dikontrakkan ke vendor ini."
+        >
+          {vendor.contracts.flatMap((k) => [
+            ...k.units.map((x) => (
+              <tr key={`u-${k.id}-${x.unit.id}`}>
+                <td style={{ color: "var(--muted)" }}>{k.kode}</td>
+                <td style={{ fontWeight: 600 }}>
+                  Unit {x.unit.phase.kode}-{x.unit.nomor}
+                </td>
+                <td>{x.unit.unitType.nama}</td>
+                <td>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Track
+                      nilai={x.unit.progress}
+                      tinggi={9}
+                      warna={x.unit.progress === 100 ? "var(--green)" : "var(--teal)"}
+                    />
+                    <span style={{ fontSize: 11, color: "var(--muted)", width: 30 }}>
+                      {x.unit.progress}%
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  <Badge nilai={x.unit.statusPembangunan} peta={WARNA_STATUS.bangun} />
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {vendor.contracts.flatMap((k) => [
-                ...k.units.map((x) => (
-                  <tr key={`u-${k.id}-${x.unit.id}`}>
-                    <td style={{ color: "var(--muted)" }}>{k.kode}</td>
-                    <td style={{ fontWeight: 600 }}>
-                      Unit {x.unit.phase.kode}-{x.unit.nomor}
-                    </td>
-                    <td>{x.unit.unitType.nama}</td>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <Track
-                          nilai={x.unit.progress}
-                          tinggi={9}
-                          warna={x.unit.progress === 100 ? "var(--green)" : "var(--teal)"}
-                        />
-                        <span style={{ fontSize: 11, color: "var(--muted)", width: 30 }}>
-                          {x.unit.progress}%
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <Badge nilai={x.unit.statusPembangunan} peta={WARNA_STATUS.bangun} />
-                    </td>
-                  </tr>
-                )),
-                ...k.infrastructures.map((x) => (
-                  <tr key={`s-${k.id}-${x.infrastructure.id}`}>
-                    <td style={{ color: "var(--muted)" }}>{k.kode}</td>
-                    <td style={{ fontWeight: 600 }}>{x.infrastructure.nama}</td>
-                    <td>{x.infrastructure.jenis}</td>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <Track
-                          nilai={x.infrastructure.progress}
-                          tinggi={9}
-                          warna={x.infrastructure.progress === 100 ? "var(--green)" : "var(--brass)"}
-                        />
-                        <span style={{ fontSize: 11, color: "var(--muted)", width: 30 }}>
-                          {x.infrastructure.progress}%
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <Badge nilai={x.infrastructure.status} peta={WARNA_STATUS.bangun} />
-                    </td>
-                  </tr>
-                )),
-              ])}
-              {vendor.contracts.length === 0 && (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: "center", color: "var(--muted)", padding: 22 }}>
-                    Belum ada pekerjaan yang dikontrakkan ke vendor ini.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            )),
+            ...k.infrastructures.map((x) => (
+              <tr key={`s-${k.id}-${x.infrastructure.id}`}>
+                <td style={{ color: "var(--muted)" }}>{k.kode}</td>
+                <td style={{ fontWeight: 600 }}>{x.infrastructure.nama}</td>
+                <td>{x.infrastructure.jenis}</td>
+                <td>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Track
+                      nilai={x.infrastructure.progress}
+                      tinggi={9}
+                      warna={x.infrastructure.progress === 100 ? "var(--green)" : "var(--brass)"}
+                    />
+                    <span style={{ fontSize: 11, color: "var(--muted)", width: 30 }}>
+                      {x.infrastructure.progress}%
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  <Badge nilai={x.infrastructure.status} peta={WARNA_STATUS.bangun} />
+                </td>
+              </tr>
+            )),
+          ])}
+        </Tabel>
       )}
 
       {/* ================= PEMBAYARAN ================= */}
@@ -573,35 +559,30 @@ export default async function DetailVendor({
                 {k.pembayaran.length === 0 ? (
                   <div style={{ fontSize: 12, color: "var(--muted)" }}>Belum ada pembayaran.</div>
                 ) : (
-                  <div className="tablewrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th style={{ width: 110 }}>Tanggal</th>
-                          <th>Uraian</th>
-                          <th style={{ textAlign: "right" }}>Nominal</th>
-                          <th style={{ textAlign: "right" }}>Kumulatif</th>
+                  <Tabel
+                    kolom={[
+                      { label: "Tanggal", lebar: 110 },
+                      { label: "Uraian" },
+                      { label: "Nominal", rata: "kanan" },
+                      { label: "Kumulatif", rata: "kanan" },
+                    ]}
+                  >
+                    {k.pembayaran.map((p, i) => {
+                      const kumulatif = k.pembayaran
+                        .slice(0, i + 1)
+                        .reduce((s, x) => s + x.nominal, 0);
+                      return (
+                        <tr key={p.id}>
+                          <td style={{ color: "var(--muted)" }}>{tanggal(p.tanggal)}</td>
+                          <td style={{ whiteSpace: "normal" }}>{p.uraian}</td>
+                          <td className="num" style={{ textAlign: "right" }}>{rp(p.nominal)}</td>
+                          <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
+                            {rp(kumulatif)}
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {k.pembayaran.map((p, i) => {
-                          const kumulatif = k.pembayaran
-                            .slice(0, i + 1)
-                            .reduce((s, x) => s + x.nominal, 0);
-                          return (
-                            <tr key={p.id}>
-                              <td style={{ color: "var(--muted)" }}>{tanggal(p.tanggal)}</td>
-                              <td style={{ whiteSpace: "normal" }}>{p.uraian}</td>
-                              <td className="num" style={{ textAlign: "right" }}>{rp(p.nominal)}</td>
-                              <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
-                                {rp(kumulatif)}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                      );
+                    })}
+                  </Tabel>
                 )}
               </div>
             );

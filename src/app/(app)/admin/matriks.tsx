@@ -8,7 +8,7 @@ import { ubahIzin, ubahStatusUser } from "./actions";
 type Tingkat = "tidak" | "lihat" | "ubah";
 
 const WARNA: Record<Tingkat, [string, string, string]> = {
-  tidak: ["var(--rona-kosong)", "#9aa8ad", "—"],
+  tidak: ["var(--rona-kosong)", "var(--redup)", "—"],
   lihat: ["var(--rona-teal2)", "var(--teal)", "Lihat"],
   ubah: ["var(--rona-hijau2)", "var(--green)", "Ubah"],
 };

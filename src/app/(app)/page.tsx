@@ -6,6 +6,7 @@ import { ringkasanProyek } from "@/lib/data/ringkasan";
 import { statusSerapan } from "@/lib/calc/keuangan";
 import { pct, rpRingkas } from "@/lib/format";
 import { Badge, JudulHalaman, Kpi, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
+import { Tabel } from "@/components/kartu-tabel";
 
 export default async function Ringkasan() {
   const pengguna = await ambilPengguna();
@@ -53,8 +54,8 @@ export default async function Ringkasan() {
           className="card"
           style={{
             marginTop: 14, padding: "13px 16px", display: "flex",
-            alignItems: "flex-start", gap: 10, background: "#fbf9f3",
-            borderColor: "#ecdfc4",
+            alignItems: "flex-start", gap: 10, background: "var(--rona-krem)",
+            borderColor: "var(--garis-krem)",
           }}
         >
           <Lightbulb size={16} style={{ color: "var(--brass)", flexShrink: 0, marginTop: 1 }} />
@@ -67,78 +68,74 @@ export default async function Ringkasan() {
 
       <div className="sectitle">Progres per proyek</div>
 
-      <div className="card tablewrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Proyek</th>
-              <th>Status lahan</th>
-              <th style={{ textAlign: "right" }}>Unit</th>
-              <th style={{ minWidth: 190 }}>Progres rata-rata</th>
-              {bolehKeuangan && <th style={{ textAlign: "right" }}>Anggaran (RAP)</th>}
-              {bolehKeuangan && <th style={{ textAlign: "right" }}>Realisasi</th>}
-              {bolehKeuangan && <th>Serapan</th>}
-              <th />
+      <Tabel
+        kelasBungkus="card tablewrap"
+        kolom={[
+          { label: "Proyek" },
+          { label: "Status lahan" },
+          { label: "Unit", rata: "kanan" },
+          { label: "Progres rata-rata", minLebar: 190 },
+          bolehKeuangan && { label: "Anggaran (RAP)", rata: "kanan" },
+          bolehKeuangan && { label: "Realisasi", rata: "kanan" },
+          bolehKeuangan && { label: "Serapan" },
+          {},
+        ]}
+      >
+        {proyek.map((p) => {
+          const serapan = p.anggaran ? (p.realisasi ?? 0) / p.anggaran : 0;
+          return (
+            <tr key={p.id}>
+              <td>
+                <div style={{ fontWeight: 600 }}>{p.nama}</div>
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>{p.kode}</div>
+              </td>
+              <td>
+                <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
+              </td>
+              <td style={{ textAlign: "right" }} className="num">
+                {p.jumlahUnit}
+              </td>
+              <td>
+                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                  <Track nilai={p.rataProgress} tinggi={18} />
+                  <span className="num" style={{ fontSize: 12, minWidth: 34, textAlign: "right" }}>
+                    {p.rataProgress}%
+                  </span>
+                </div>
+              </td>
+              {bolehKeuangan && (
+                <td style={{ textAlign: "right" }} className="num">
+                  {rpRingkas(p.anggaran ?? 0)}
+                </td>
+              )}
+              {bolehKeuangan && (
+                <td style={{ textAlign: "right" }} className="num">
+                  {rpRingkas(p.realisasi ?? 0)}
+                </td>
+              )}
+              {bolehKeuangan && (
+                <td>
+                  <Badge
+                    nilai={statusSerapan(serapan, p.rataProgress)}
+                    peta={WARNA_STATUS.serapan}
+                  />
+                </td>
+              )}
+              <td>
+                <Link
+                  href={`/master/${p.kode}`}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    color: "var(--teal)", fontSize: 12, fontWeight: 600, textDecoration: "none",
+                  }}
+                >
+                  Detail <ArrowUpRight size={13} />
+                </Link>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {proyek.map((p) => {
-              const serapan = p.anggaran ? (p.realisasi ?? 0) / p.anggaran : 0;
-              return (
-                <tr key={p.id}>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{p.nama}</div>
-                    <div style={{ fontSize: 11, color: "var(--muted)" }}>{p.kode}</div>
-                  </td>
-                  <td>
-                    <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
-                  </td>
-                  <td style={{ textAlign: "right" }} className="num">
-                    {p.jumlahUnit}
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                      <Track nilai={p.rataProgress} tinggi={18} />
-                      <span className="num" style={{ fontSize: 12, minWidth: 34, textAlign: "right" }}>
-                        {p.rataProgress}%
-                      </span>
-                    </div>
-                  </td>
-                  {bolehKeuangan && (
-                    <td style={{ textAlign: "right" }} className="num">
-                      {rpRingkas(p.anggaran ?? 0)}
-                    </td>
-                  )}
-                  {bolehKeuangan && (
-                    <td style={{ textAlign: "right" }} className="num">
-                      {rpRingkas(p.realisasi ?? 0)}
-                    </td>
-                  )}
-                  {bolehKeuangan && (
-                    <td>
-                      <Badge
-                        nilai={statusSerapan(serapan, p.rataProgress)}
-                        peta={WARNA_STATUS.serapan}
-                      />
-                    </td>
-                  )}
-                  <td>
-                    <Link
-                      href={`/master/${p.kode}`}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: 4,
-                        color: "var(--teal)", fontSize: 12, fontWeight: 600, textDecoration: "none",
-                      }}
-                    >
-                      Detail <ArrowUpRight size={13} />
-                    </Link>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+          );
+        })}
+      </Tabel>
 
       {!bolehKeuangan && (
         <div style={{ marginTop: 14 }}>
