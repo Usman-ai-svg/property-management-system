@@ -59,7 +59,7 @@ export default async function KeuanganProyek({
         select: {
           id: true, tanggal: true, jenis: true, peruntukan: true, metode: true,
           uraian: true, total: true, status: true, pic: true, bukti: true,
-          unitId: true, infrastructureId: true,
+          unitId: true, infrastructureId: true, batchId: true,
           contract: { select: { vendor: { select: { nama: true } } } },
         },
       },
@@ -134,6 +134,13 @@ export default async function KeuanganProyek({
     ? proyek.infrastructures.find((s) => s.kode === sarprasDipilih.toUpperCase())
     : undefined;
   const alamatDasar = `/keuangan/${proyek.kode}?donat=${mode}`;
+
+  // Berapa baris yang berasal dari satu pembayaran yang dipecah ke beberapa
+  // unit — dipakai untuk menandai barisnya agar pemecahan itu terlihat.
+  const jumlahSebatch = new Map<string, number>();
+  for (const e of proyek.expenses) {
+    if (e.batchId) jumlahSebatch.set(e.batchId, (jumlahSebatch.get(e.batchId) ?? 0) + 1);
+  }
 
   const bolehUbahKeuangan = bolehUbah(pengguna, "keuangan");
   const pilihanUnit = proyek.units.map((u) => ({
@@ -720,7 +727,18 @@ export default async function KeuanganProyek({
                     {e.jenis}
                   </td>
                   <td>
-                    <div>{e.uraian}</div>
+                    <div>
+                      {e.uraian}
+                      {e.batchId && (jumlahSebatch.get(e.batchId) ?? 0) > 1 && (
+                        <span
+                          className="chip"
+                          title="Satu pembayaran yang dibagi rata ke beberapa unit"
+                          style={{ background: "#eef3f4", color: "var(--teal)", marginLeft: 6 }}
+                        >
+                          1 dari {jumlahSebatch.get(e.batchId)} unit
+                        </span>
+                      )}
+                    </div>
                     {(e.pic || e.contract) && (
                       <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
                         {e.pic ? `oleh ${e.pic}` : ""}

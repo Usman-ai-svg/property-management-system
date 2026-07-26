@@ -681,6 +681,11 @@ model Expense {
   bukti      String?
   /// Kontrak vendor yang membiayai pengeluaran ini, bila ada.
   contractId String?
+  /// Penanda satu pembayaran yang dipecah ke beberapa unit. Satu pembayaran
+  /// upah borongan untuk lima unit tersimpan sebagai lima baris dengan
+  /// `batchId` yang sama, supaya tiap unit punya angka realisasinya sendiri
+  /// tanpa kehilangan jejak bahwa asalnya satu transaksi.
+  batchId    String?
 
   project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   unit           Unit?           @relation(fields: [unitId], references: [id])
@@ -688,6 +693,7 @@ model Expense {
   contract       Contract?       @relation(fields: [contractId], references: [id])
 
   @@index([projectId, tanggal])
+  @@index([batchId])
   @@map("expenses")
 }
 

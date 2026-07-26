@@ -99,10 +99,17 @@ export async function trenBulanan(u: Pengguna, projectId?: string) {
     if (peta.has(k)) peta.set(k, peta.get(k)! + e.total);
   }
 
-  return [...peta.entries()].map(([k, nilai]) => ({
-    bulan: BULAN[Number(k.split("-")[1])],
-    nilai,
-  }));
+  return [...peta.entries()].map(([k, nilai]) => {
+    const [tahun, bulan] = k.split("-").map(Number);
+    return {
+      bulan: BULAN[bulan],
+      // Tahun ikut dibawa supaya grafik bisa menyebut bulannya secara utuh —
+      // rentang 12 bulan selalu melewati pergantian tahun, dan "Jan" saja
+      // tidak cukup untuk tahu tahun berapa.
+      label: `${BULAN[bulan]} ${tahun}`,
+      nilai,
+    };
+  });
 }
 
 /**

@@ -244,6 +244,7 @@ Yang bisa diubah, beserta izin yang dibutuhkan:
 | Dokumen teknis | `dokumenTeknis` | unggah revisi baru, nomor revisi naik sendiri |
 | Biaya operasional | `businessPlan` | lewat Plan vs Realisasi |
 | Transaksi pengeluaran | `keuangan` | catat, sunting, dan hapus — tiap field yang berubah masuk Log Perubahan |
+| VO & pembayaran kontrak | `progress` / `keuangan` | lewat Vendor Management, tab Kontrak dan Pembayaran |
 
 ### Membuktikan snapshot bekerja
 
@@ -273,6 +274,27 @@ Seluruh modul dari prototipe sudah diporting.
 | **Landbank** | Portofolio, perbandingan proyek, feasibility study, dan business plan. |
 | **Plan vs Realisasi** | HPP, penjualan, operasional, dan rencana laba — realisasi diturunkan dari data yang tercatat. |
 | **Admin** | Pengelolaan proyek, matriks hak akses yang bisa disunting, kelola user, dan log perubahan. |
+
+### Satu pembayaran untuk beberapa unit
+
+Upah borongan sering dibayar sekali untuk beberapa unit. Formulir Catat
+Pengeluaran menerima banyak unit sekaligus, lalu menyimpannya sebagai **satu
+baris per unit** dengan `batchId` yang sama.
+
+Alternatifnya — satu baris memuat daftar unit — membuat tiap laporan realisasi
+per unit harus membagi ulang nominalnya sendiri, dan cepat atau lambat ada yang
+membaginya dengan cara berbeda. Dengan dipecah di muka, angka per unit sudah
+final dan sama di mana pun dibaca.
+
+Pembagiannya rata; sisa pembagian ditaruh pada baris pertama, bukan dibuang,
+supaya jumlah seluruh pecahan **persis** sama dengan nominal aslinya. Selisih
+satu rupiah pada laporan keuangan adalah selisih yang harus dicari orang.
+`bagiRata()` di `src/lib/calc/keuangan.ts` yang menanganinya, beserta
+pengujiannya.
+
+Baris hasil pemecahan ditandai chip "1 dari N unit" pada tabel Transaksi.
+Menyunting satu baris hanya mengubah bagian unit itu — untuk mengoreksi seluruh
+pembayaran, sunting tiap barisnya atau hapus lalu catat ulang.
 
 ### Arti "Nilai Kontrak" pada Keuangan Proyek
 

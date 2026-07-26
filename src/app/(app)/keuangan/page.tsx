@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehUbah, filterProyek } from "@/lib/auth/rbac";
 import { keuanganPerProyek, komposisi, trenBulanan, WARNA_JENIS } from "@/lib/data/keuangan";
 import { rp, rpRingkas, tanggal } from "@/lib/format";
-import { Donut, LegendaDonut, RvsRAP, TrenChart } from "@/components/charts";
+import { Donut, LegendaDonut, RvsRAP } from "@/components/charts";
+import { TrenChart } from "@/components/tren-chart";
 import { TabelHead } from "@/components/ui";
 import { CatatPengeluaran } from "./catat";
 

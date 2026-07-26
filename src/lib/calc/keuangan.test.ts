@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { alokasiKontrak, ringkasKontrak, statusSerapan, totalVoDisetujui } from "./keuangan";
+import { alokasiKontrak, bagiRata, ringkasKontrak, statusSerapan, totalVoDisetujui } from "./keuangan";
 
 describe("statusSerapan", () => {
   it("menandai Over ketika biaya mendahului progres", () => {
@@ -108,5 +108,34 @@ describe("totalVoDisetujui", () => {
       { nominal: 40, status: "Ditolak" },
     ]);
     assert.equal(total, 10);
+  });
+});
+
+describe("bagiRata", () => {
+  it("membagi habis tanpa sisa", () => {
+    assert.deepEqual(bagiRata(1_000_000, 4), [250_000, 250_000, 250_000, 250_000]);
+  });
+
+  it("menaruh sisa pembagian pada bagian pertama", () => {
+    const b = bagiRata(1_000_000, 3);
+    assert.deepEqual(b, [333_334, 333_333, 333_333]);
+  });
+
+  it("menjaga jumlah pecahan persis sama dengan nominal aslinya", () => {
+    for (const [nominal, banyak] of [
+      [70_000_000, 5], [1, 3], [999_999_999, 7], [12_345_678, 11],
+    ] as [number, number][]) {
+      const b = bagiRata(nominal, banyak);
+      assert.equal(b.length, banyak);
+      assert.equal(b.reduce((s, x) => s + x, 0), nominal, `${nominal} dibagi ${banyak}`);
+    }
+  });
+
+  it("mengembalikan nominal utuh untuk satu penerima", () => {
+    assert.deepEqual(bagiRata(70_000_000, 1), [70_000_000]);
+  });
+
+  it("mengembalikan daftar kosong bila tidak ada penerima", () => {
+    assert.deepEqual(bagiRata(70_000_000, 0), []);
   });
 });

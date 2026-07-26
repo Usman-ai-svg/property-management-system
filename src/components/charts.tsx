@@ -45,48 +45,6 @@ export function Donut({
   );
 }
 
-/** Grafik garis tren bulanan. */
-export function TrenChart({ data }: { data: { bulan: string; nilai: number }[] }) {
-  if (data.length < 2) {
-    return (
-      <div style={{ fontSize: 12.5, color: "var(--muted)", padding: "20px 0", textAlign: "center" }}>
-        Belum cukup data untuk menggambar tren.
-      </div>
-    );
-  }
-
-  const w = 760, h = 190, pad = 34, padB = 26;
-  const maks = Math.max(...data.map((d) => d.nilai)) * 1.12 || 1;
-  const titik = data.map((d, i) => [
-    pad + (i * (w - pad - 12)) / (data.length - 1),
-    h - padB - (d.nilai / maks) * (h - padB - 12),
-  ]);
-
-  const garis = titik.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
-  const area = `${garis} L ${titik[titik.length - 1][0].toFixed(1)} ${h - padB} L ${titik[0][0].toFixed(1)} ${h - padB} Z`;
-
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" style={{ display: "block" }} role="img" aria-label="Tren pengeluaran">
-      <path d={area} fill="rgba(31,78,95,.10)" />
-      <path d={garis} fill="none" stroke="var(--teal)" strokeWidth="2.5" strokeLinejoin="round" />
-      {titik.map((p, i) => (
-        <circle
-          key={i}
-          cx={p[0]} cy={p[1]}
-          r={i === titik.length - 1 ? 4.5 : 3}
-          fill={i === titik.length - 1 ? "var(--teal)" : "#fff"}
-          stroke="var(--teal)" strokeWidth="2"
-        />
-      ))}
-      {data.map((d, i) => (
-        <text key={d.bulan} x={titik[i][0]} y={h - 8} textAnchor="middle" style={{ fontSize: 10, fill: "var(--muted)" }}>
-          {d.bulan}
-        </text>
-      ))}
-    </svg>
-  );
-}
-
 /**
  * Batang realisasi terhadap RAP.
  *

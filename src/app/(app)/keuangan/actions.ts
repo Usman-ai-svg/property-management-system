@@ -1,11 +1,13 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
 } from "@/lib/actions/guard";
+import { bagiRata } from "@/lib/calc/keuangan";
 import { JENIS_BIAYA, METODE_BAYAR, PERUNTUKAN_BIAYA, STATUS_BAYAR } from "@/lib/domain/enums";
 
 const POS_HPP: Record<string, string> = {
@@ -22,25 +24,28 @@ const POS_HPP: Record<string, string> = {
  * Keduanya saling meniadakan. Membebankan satu pengeluaran ke unit sekaligus
  * ke sarpras akan membuatnya terhitung dua kali pada laporan realisasi.
  */
-async function bebanan(
+async function bebananMasuk(
   form: FormData,
   projectId: string,
-): Promise<{ unitId: string | null; infrastructureId: string | null }> {
-  const unitId = teksOpsional(form, "unitId");
+): Promise<{ unitIds: string[]; infrastructureId: string | null }> {
+  // Pencatatan baru boleh memilih banyak unit sekaligus; penyuntingan satu
+  // baris hanya mengenal satu unit, jadi keduanya sama-sama dibaca.
+  const unitIds = [
+    ...new Set(
+      form.getAll("unitId").map((v) => String(v).trim()).filter(Boolean),
+    ),
+  ];
   const infrastructureId = teksOpsional(form, "infrastructureId");
 
-  if (unitId && infrastructureId) {
+  if (unitIds.length > 0 && infrastructureId) {
     throw new GagalIzin(
       "Satu pengeluaran hanya boleh dibebankan ke unit ATAU ke sarana & prasarana, tidak keduanya.",
     );
   }
 
-  if (unitId) {
-    const unit = await prisma.unit.findUnique({
-      where: { id: unitId },
-      select: { projectId: true },
-    });
-    if (!unit || unit.projectId !== projectId) throw new GagalIzin("Unit tidak sah untuk proyek ini.");
+  if (unitIds.length > 0) {
+    const sah = await prisma.unit.count({ where: { id: { in: unitIds }, projectId } });
+    if (sah !== unitIds.length) throw new GagalIzin("Ada unit yang tidak sah untuk proyek ini.");
   }
 
   if (infrastructureId) {
@@ -53,7 +58,7 @@ async function bebanan(
     }
   }
 
-  return { unitId: unitId || null, infrastructureId: infrastructureId || null };
+  return { unitIds, infrastructureId: infrastructureId || null };
 }
 
 /**
@@ -75,37 +80,64 @@ export async function catatPengeluaran(_s: HasilAksi | null, form: FormData): Pr
     if (!proyek) throw new GagalIzin("Proyek tidak ditemukan.");
 
     const peruntukan = pilihan(form, "peruntukan", PERUNTUKAN_BIAYA);
-    const { unitId, infrastructureId } = await bebanan(form, projectId);
+    const { unitIds, infrastructureId } = await bebananMasuk(form, projectId);
     const total = angka(form, "total", { min: 1, wajib: true });
 
-    await prisma.expense.create({
-      data: {
-        projectId,
-        unitId,
-        infrastructureId,
-        tanggal: new Date(),
-        peruntukan,
-        jenis: pilihan(form, "jenis", JENIS_BIAYA),
-        metode: pilihan(form, "metode", METODE_BAYAR),
-        uraian: teks(form, "uraian", true),
-        total,
-        status: pilihan(form, "status", STATUS_BAYAR),
-        pic: pengguna.nama,
-        bukti: teksOpsional(form, "bukti"),
-        posHpp: POS_HPP[peruntukan],
-      },
-    });
+    const uraian = teks(form, "uraian", true);
+    const bersama = {
+      projectId,
+      infrastructureId,
+      tanggal: new Date(),
+      peruntukan,
+      jenis: pilihan(form, "jenis", JENIS_BIAYA),
+      metode: pilihan(form, "metode", METODE_BAYAR),
+      uraian,
+      status: pilihan(form, "status", STATUS_BAYAR),
+      pic: pengguna.nama,
+      bukti: teksOpsional(form, "bukti"),
+      posHpp: POS_HPP[peruntukan],
+    };
 
-    await catat({
-      pengguna, projectId,
-      objek: `Pengeluaran · ${peruntukan}`,
-      aksi: "Catat pengeluaran",
-      ke: `${teks(form, "uraian")} — ${rpLog(total)}`,
-    });
+    // Satu pembayaran untuk beberapa unit disimpan sebagai satu baris per unit.
+    // Alternatifnya — satu baris dengan daftar unit — membuat tiap laporan
+    // realisasi per unit harus membagi ulang nominalnya sendiri, dan cepat atau
+    // lambat ada yang membaginya dengan cara berbeda.
+    if (unitIds.length > 1) {
+      const batchId = randomUUID();
+      const bagian = bagiRata(total, unitIds.length);
+
+      await prisma.expense.createMany({
+        data: unitIds.map((unitId, i) => ({
+          ...bersama, unitId, batchId, total: bagian[i],
+        })),
+      });
+
+      await catat({
+        pengguna, projectId,
+        objek: `Pengeluaran · ${peruntukan}`,
+        aksi: "Catat pengeluaran",
+        ke: `${uraian} — ${rpLog(total)} dibagi rata ke ${unitIds.length} unit`,
+      });
+    } else {
+      await prisma.expense.create({
+        data: { ...bersama, unitId: unitIds[0] ?? null, total },
+      });
+
+      await catat({
+        pengguna, projectId,
+        objek: `Pengeluaran · ${peruntukan}`,
+        aksi: "Catat pengeluaran",
+        ke: `${uraian} — ${rpLog(total)}`,
+      });
+    }
 
     revalidatePath("/keuangan");
     revalidatePath(`/keuangan/${proyek.kode}`);
     revalidatePath("/");
+
+    if (unitIds.length > 1) {
+      return `${rpLog(total)} dibagi rata menjadi ${unitIds.length} baris, satu per unit.`;
+    }
   });
 }
 
@@ -136,7 +168,13 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
     const pengguna = await izinkan("keuangan", lama.projectId);
 
     const peruntukan = pilihan(form, "peruntukan", PERUNTUKAN_BIAYA);
-    const { unitId, infrastructureId } = await bebanan(form, lama.projectId);
+    const { unitIds, infrastructureId } = await bebananMasuk(form, lama.projectId);
+    if (unitIds.length > 1) {
+      throw new GagalIzin(
+        "Satu baris transaksi hanya bisa dibebankan ke satu unit. Untuk memecah ke beberapa unit, catat ulang sebagai pengeluaran baru.",
+      );
+    }
+    const unitId = unitIds[0] ?? null;
 
     const baru = {
       peruntukan,

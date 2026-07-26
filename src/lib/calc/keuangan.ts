@@ -71,6 +71,25 @@ export function ringkasKontrak(k: KontrakLike) {
  * (mis. unit sudut dihargai lebih). Sisa nilai kontrak dibagi rata ke
  * item-item yang tidak di-override.
  */
+/**
+ * Bagi satu nominal ke beberapa penerima dalam rupiah bulat.
+ *
+ * Dipakai saat satu pembayaran — mis. upah borongan untuk lima unit — dipecah
+ * menjadi satu baris pengeluaran per unit. Sisa pembagian ditaruh pada baris
+ * pertama, bukan dibuang, supaya jumlah seluruh pecahannya **persis** sama
+ * dengan nominal aslinya. Selisih satu rupiah pada laporan keuangan adalah
+ * selisih yang harus dicari orang, jadi tidak boleh ada.
+ */
+export function bagiRata(nominal: number, banyak: number): number[] {
+  if (banyak <= 0) return [];
+  if (banyak === 1) return [nominal];
+
+  const dasar = Math.floor(nominal / banyak);
+  const bagian = Array<number>(banyak).fill(dasar);
+  bagian[0] += nominal - dasar * banyak;
+  return bagian;
+}
+
 export function alokasiKontrak<T extends { nilaiOverride?: number | null }>(
   nilaiKontrak: number,
   items: T[],
