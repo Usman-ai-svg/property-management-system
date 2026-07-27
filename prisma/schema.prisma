@@ -320,6 +320,7 @@ model Unit {
   customWorks    CustomWork[]
   progressRecords ProgressRecord[]
   contractUnits  ContractUnit[]
+  boqSpk         ContractBoqItem[]
   alokasiBiaya   ExpenseAllocation[]
   penerimaan     SalesPayment[]
 
@@ -470,6 +471,7 @@ model Infrastructure {
   rapItems        InfrastructureRapItem[]
   progressRecords ProgressRecord[]
   contractItems   ContractInfrastructure[]
+  boqSpk          ContractBoqItem[]
   alokasiBiaya    ExpenseAllocation[]
 
   @@map("infrastructures")
@@ -555,9 +557,52 @@ model Contract {
   pembayaran      ContractPayment[]
   variationOrders VariationOrder[]
   expenses        Expense[]
+  boqItems        ContractBoqItem[]
 
   @@index([projectId])
   @@map("contracts")
+}
+
+/// Rincian pekerjaan yang diperintahkan sebuah SPK, sekaligus tempat QS
+/// mencatat progres.
+///
+/// BOQ SPK sengaja BERDIRI SENDIRI, tidak menunjuk ke `UnitBoqItem`. Rincian
+/// pekerjaan pada SPK borongan kerap tidak sama persis dengan RAB unit —
+/// beberapa pekerjaan digabung, sebagian lain di luar lingkup vendor — jadi
+/// memaksanya mengikuti BOQ unit akan membuat SPK tidak bisa ditulis apa
+/// adanya.
+///
+/// Konsekuensinya satu pekerjaan bisa tercatat di dua tempat. Yang
+/// menyambungkan keduanya adalah `unitId` / `infrastructureId`: dari situlah
+/// progres tiap baris dijumlahkan tertimbang nilai menjadi progres unit.
+/// Karena itu salah satu dari keduanya WAJIB terisi dan tidak boleh
+/// dua-duanya — ditegakkan `periksaBarisBoqSpk()` di lib/calc/kontrak-boq.ts.
+model ContractBoqItem {
+  id         String @id @default(cuid())
+  contractId String
+
+  /// Objek yang dikerjakan baris ini. Tepat satu yang terisi.
+  unitId           String?
+  infrastructureId String?
+
+  grup        String
+  uraian      String
+  satuan      String
+  volume      Float
+  hargaSatuan Float
+
+  /// Persentase penyelesaian baris ini, 0–100. Diisi QS saat opname.
+  progress Int @default(0)
+  urutan   Int @default(0)
+
+  contract       Contract        @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  unit           Unit?           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  infrastructure Infrastructure? @relation(fields: [infrastructureId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@index([unitId])
+  @@index([infrastructureId])
+  @@map("contract_boq_items")
 }
 
 /// Unit yang tercakup dalam sebuah kontrak. `nilaiOverride` dipakai bila unit

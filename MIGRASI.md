@@ -64,7 +64,8 @@ struktur data ini yang menentukan sistemnya benar atau tidak.
 
 **Vendor dan kontrak**
 `Vendor`, `Contract`, `ContractUnit`, `ContractInfrastructure`,
-`ContractPayment`, `VariationOrder`, `Tender`, `TenderParticipant`
+`ContractBoqItem`, `ContractPayment`, `VariationOrder`, `Tender`,
+`TenderParticipant`
 
 **Uang keluar dan masuk**
 `Expense`, `ExpenseAllocation`, `OperationalCost`, `SalesPayment`
@@ -107,7 +108,23 @@ Nilai yang sah didaftar di `src/lib/domain/enums.ts` dan divalidasi di
 lapisan aplikasi. Bila ERP memakai PostgreSQL, enum asli lebih aman — tapi
 ambil daftar nilainya dari `enums.ts`, jangan menulis ulang dari layar.
 
-**d. `AuditLog` bersifat hanya-tambah.** Tidak ada jalur ubah atau hapus di
+**d. `Unit.progress` adalah cache, bukan sumber kebenaran.** Sejak progres
+diopname per baris BOQ SPK, angka progres unit dan sarpras DIHITUNG dari
+`ContractBoqItem`, tertimbang nilai tiap pekerjaan. Kolom `progress` tetap ada
+dan tetap ditulis — karena 48 tempat di aplikasi membacanya, dan karena
+`statusPembangunan` yang diturunkan darinya dipakai menyaring di tingkat
+database.
+
+> **Invarian yang wajib dijaga:** setiap jalur yang mengubah `ContractBoqItem`
+> harus memanggil `hitungUlangProgres()` di `src/lib/data/progres-spk.ts`
+> sebelum selesai. Cache yang tidak diperbarui tidak menimbulkan galat apa pun
+> — hanya angka progres yang diam-diam keliru, dan angka itu jadi dasar
+> penagihan vendor.
+
+Unit yang belum punya baris BOQ SPK tetap memakai progres manual. Yang sudah
+punya menolak isian manual, di UI maupun di Server Action.
+
+**e. `AuditLog` bersifat hanya-tambah.** Tidak ada jalur ubah atau hapus di
 seluruh aplikasi. `catatDiff()` menulis satu baris per kolom yang berubah,
 bukan satu baris per aksi, supaya "siapa mengubah angka apa dari berapa jadi
 berapa" bisa dilacak per kolom. Pertahankan sifat ini.
@@ -137,6 +154,10 @@ keputusan.
 | `plan-real.ts` | `ringkasPlanReal` | Rencana vs realisasi per pos |
 | `opname.ts` | `susunOpname`, `ringkasOpname` | Opname progres mingguan |
 | | `fraksiBaris` | Pembagian progres ke baris pekerjaan |
+| `kontrak-boq.ts` | `progresTertimbang` | Progres dari baris BOQ, tertimbang nilai |
+| | `progresPerUnit`, `progresPerSarpras` | Pengelompokan progres per objek |
+| | `nilaiTerpasang` | Rupiah pekerjaan terpasang — dasar penagihan |
+| | `periksaBarisBoqSpk` | Validasi baris BOQ SPK |
 
 Dua yang paling perlu dibaca sebelum dipercaya:
 
@@ -146,6 +167,13 @@ Dua yang paling perlu dibaca sebelum dipercaya:
 - **`alokasiKontrak`** membagi kontrak borongan ke beberapa unit secara rata,
   **kecuali** unit yang punya `nilaiOverride` sendiri. Unit ber-override
   diambil lebih dulu, sisanya baru dibagi rata.
+
+Satu catatan tentang `fraksiBaris`: fungsi itu memecah SATU angka persen ke
+baris-baris BOQ dengan anggapan pekerjaan diselesaikan berurutan, dan
+anggapan itu hanya benar bila tiap baris berbobot sama. Ia masih dipakai
+tabel opname mingguan untuk unit yang belum punya BOQ SPK. Untuk unit yang
+sudah punya, arah datanya terbalik — `progresTertimbang` menghitung persen
+unit DARI baris, dan itulah yang boleh dipakai menagih.
 
 ---
 

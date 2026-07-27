@@ -8,6 +8,7 @@ import { Badge, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { TabelMingguan } from "@/components/tabel-mingguan";
 import { UbahProgres } from "@/components/ubah-progres";
 import { ubahProgresSarpras } from "../../../actions";
+import { progresSarprasDikendalikanSpk } from "@/lib/data/progres-spk";
 
 export default async function OpnameSarpras({
   params,
@@ -39,6 +40,10 @@ export default async function OpnameSarpras({
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
   const bolehProgres = bolehLihat(pengguna, "progress");
   const ubahProgres = bolehUbah(pengguna, "progress");
+
+  // Sama seperti unit: progres yang dirinci lewat BOQ SPK tidak boleh
+  // ditimpa manual karena akan tertulis ulang saat opname berikutnya.
+  const dariSpk = await progresSarprasDikendalikanSpk(item.id);
 
   if (!bolehProgres) {
     return (
@@ -87,7 +92,18 @@ export default async function OpnameSarpras({
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <Badge nilai={item.status} peta={WARNA_STATUS.bangun} />
-          {ubahProgres && <UbahProgres id={item.id} nilai={item.progress} aksi={ubahProgresSarpras} />}
+          {ubahProgres && !dariSpk && (
+            <UbahProgres id={item.id} nilai={item.progress} aksi={ubahProgresSarpras} />
+          )}
+          {dariSpk && (
+            <span
+              className="chip"
+              title="Progres dihitung dari baris BOQ pada SPK, tertimbang nilai tiap pekerjaan"
+              style={{ background: "var(--rona-teal2)", color: "var(--teal)" }}
+            >
+              {item.progress}% · dari opname SPK
+            </span>
+          )}
         </div>
       </div>
 

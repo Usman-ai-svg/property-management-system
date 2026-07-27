@@ -30,6 +30,16 @@ export async function ubahProgresUnit(_s: HasilAksi | null, form: FormData): Pro
 
     const pengguna = await izinkan("progress", unit.projectId);
 
+    // Unit yang progresnya sudah dirinci lewat BOQ SPK tidak boleh ditimpa dari
+    // sini. Tombolnya memang sudah disembunyikan di halaman unit, tetapi
+    // menyembunyikan tombol bukan penegakan — aksi ini bisa dipanggil langsung.
+    if (await prisma.contractBoqItem.count({ where: { unitId: id } })) {
+      throw new GagalIzin(
+        "Progres unit ini dihitung dari BOQ SPK. Ubah lewat opname di halaman SPK-nya, " +
+          "karena isian manual akan tertulis ulang pada penyimpanan opname berikutnya.",
+      );
+    }
+
     if (progress === unit.progress) return "Progres tidak berubah.";
 
     // Status bangun mengikuti progres, seperti pada artifact.
@@ -74,6 +84,14 @@ export async function ubahProgresSarpras(_s: HasilAksi | null, form: FormData): 
     if (!item) throw new GagalIzin("Item sarpras tidak ditemukan.");
 
     const pengguna = await izinkan("progress", item.projectId);
+
+    // Sama seperti unit: yang sudah dirinci lewat BOQ SPK diopname dari sana.
+    if (await prisma.contractBoqItem.count({ where: { infrastructureId: id } })) {
+      throw new GagalIzin(
+        "Progres item ini dihitung dari BOQ SPK. Ubah lewat opname di halaman SPK-nya, " +
+          "karena isian manual akan tertulis ulang pada penyimpanan opname berikutnya.",
+      );
+    }
 
     if (progress === item.progress) return "Progres tidak berubah.";
 

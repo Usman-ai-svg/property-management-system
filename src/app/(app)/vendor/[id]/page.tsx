@@ -232,11 +232,23 @@ export default async function DetailVendor({
                         }}
                       >
                         <div>
-                          <div className="disp" style={{ fontWeight: 600, fontSize: 15 }}>{k.deskripsi}</div>
+                          <Link
+                            href={`/vendor/${vendor.id}/kontrak/${k.kode}`}
+                            className="disp"
+                            style={{
+                              fontWeight: 600, fontSize: 15,
+                              color: "var(--teal)", textDecoration: "none",
+                            }}
+                          >
+                            {k.deskripsi}
+                          </Link>
                           <div style={{ fontSize: 12, color: "var(--muted)" }}>
                             {k.kode} · {k.project.kode} ·{" "}
                             {k.jenis === "Unit" ? `${k.units.length} unit` : "Sarpras"} · mulai{" "}
                             {tanggal(k.mulai)}
+                          </div>
+                          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>
+                            Klik nama pekerjaan untuk membuka rincian BOQ dan opname progresnya.
                           </div>
                         </div>
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>

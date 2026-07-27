@@ -32,6 +32,84 @@ const PASSWORD_DEMO = "nanoland2026";
 const emailDari = (nama: string) =>
   nama.toLowerCase().replace(/[^a-z\s]/g, "").trim().replace(/\s+/g, ".") + "@nanoland.id";
 
+/**
+ * Rincian pekerjaan contoh untuk BOQ SPK borongan.
+ *
+ * Bobotnya sengaja tidak rata — pekerjaan struktur jauh lebih mahal daripada
+ * finishing. Justru ketimpangan itu yang membuat progres tertimbang terlihat
+ * bedanya dari rata-rata sederhana saat demo.
+ */
+const BOQ_SPK = [
+  { grup: "Persiapan", uraian: "Pembersihan lahan & bouwplank", satuan: "ls", volume: 1, bagian: 0.04 },
+  { grup: "Struktur", uraian: "Pek. Pondasi batu kali", satuan: "m³", volume: 18, bagian: 0.16 },
+  { grup: "Struktur", uraian: "Pek. Sloof, kolom & ring balok", satuan: "m³", volume: 9, bagian: 0.22 },
+  { grup: "Struktur", uraian: "Pek. Rangka atap baja ringan", satuan: "m²", volume: 78, bagian: 0.18 },
+  { grup: "Arsitektur", uraian: "Pek. Dinding bata & plesteran", satuan: "m²", volume: 210, bagian: 0.2 },
+  { grup: "Arsitektur", uraian: "Pek. Lantai & keramik", satuan: "m²", volume: 60, bagian: 0.12 },
+  { grup: "Finishing", uraian: "Pek. Pengecatan", satuan: "m²", volume: 240, bagian: 0.08 },
+];
+
+/**
+ * Isi BOQ SPK beserta progres tiap barisnya.
+ *
+ * Progres per baris dibangkitkan dari progres unit yang SUDAH tersimpan,
+ * dengan anggapan pekerjaan diselesaikan berurutan. Tujuannya supaya angka
+ * demo tidak berubah begitu fitur ini masuk: progres unit hasil hitung ulang
+ * tertimbang mendarat persis di angka yang sama seperti sebelumnya.
+ *
+ * Pengisian mengikuti NILAI KUMULATIF, bukan urutan baris. `fraksiBaris()`
+ * yang lama memakai `i / n`, yang hanya benar bila semua baris berbobot sama —
+ * padahal pekerjaan struktur jauh lebih mahal daripada pengecatan. Memakai
+ * urutan baris di sini akan meleset sampai sepuluh poin dari progres unit.
+ *
+ * Yang berbeda hanyalah arah datanya. Setelah ini, angka barislah yang
+ * sungguhan dan angka unit yang jadi turunan — bukan sebaliknya.
+ */
+async function isiBoqSpk(contractId: string, K: { nominal: number }) {
+  const cakupan = await prisma.contractUnit.findMany({
+    where: { contractId },
+    select: { unit: { select: { id: true, progress: true } } },
+  });
+  if (cakupan.length === 0) return;
+
+  // Nilai SPK dibagi rata ke seluruh unit, lalu dipecah menurut bobot pekerjaan.
+  const nilaiPerUnit = K.nominal / cakupan.length;
+
+  for (const { unit } of cakupan) {
+    // Harga satuan dibulatkan lebih dulu supaya nilai yang dipakai di sini
+    // sama persis dengan yang nanti dibaca aplikasi dari database.
+    const baris = BOQ_SPK.map((b) => ({
+      ...b,
+      hargaSatuan: Math.round((nilaiPerUnit * b.bagian) / b.volume),
+    }));
+    const totalNilai = baris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
+    const sasaran = totalNilai * (unit.progress / 100);
+
+    let terkumpul = 0;
+    await prisma.contractBoqItem.createMany({
+      data: baris.map((b, i) => {
+        const nilaiBaris = b.volume * b.hargaSatuan;
+        // Isi baris ini sebanyak sisa sasaran yang masih bisa ditampungnya.
+        const fraksi = nilaiBaris
+          ? Math.max(0, Math.min(1, (sasaran - terkumpul) / nilaiBaris))
+          : 0;
+        terkumpul += nilaiBaris;
+        return {
+          contractId,
+          unitId: unit.id,
+          grup: b.grup,
+          uraian: b.uraian,
+          satuan: b.satuan,
+          volume: b.volume,
+          hargaSatuan: b.hargaSatuan,
+          progress: Math.round(fraksi * 100),
+          urutan: i + 1,
+        };
+      }),
+    });
+  }
+}
+
 /** Buat Document + DocumentVersion R1 dari metadata artifact. */
 async function buatDokumen(kategori: string, dok: Dok | null | undefined): Promise<string | null> {
   if (!dok) return null;
@@ -65,6 +143,7 @@ async function main() {
   await prisma.tender.deleteMany();
   await prisma.variationOrder.deleteMany();
   await prisma.contractPayment.deleteMany();
+  await prisma.contractBoqItem.deleteMany();
   await prisma.contractUnit.deleteMany();
   await prisma.contractInfrastructure.deleteMany();
   await prisma.contract.deleteMany();
@@ -380,6 +459,8 @@ async function main() {
       if (!sid) continue;
       await prisma.contractInfrastructure.create({ data: { contractId: c.id, infrastructureId: sid } });
     }
+
+    await isiBoqSpk(c.id, K);
   }
 
   for (const T of TENDER) {

@@ -9,6 +9,18 @@ import type { HasilAksi } from "@/lib/actions/guard";
 // Kolom isian
 // ---------------------------------------------------------------------------
 
+/**
+ * Satu pilihan pada kolom bertipe daftar.
+ *
+ * Boleh berupa teks polos bila nilai dan labelnya sama — itu bentuk yang
+ * paling sering dipakai untuk enum. Bentuk objek dipakai ketika yang dikirim
+ * ke server adalah id sementara yang dibaca pengguna adalah namanya.
+ */
+export type PilihanField = string | { nilai: string; label: string };
+
+const nilaiPilihan = (p: PilihanField) => (typeof p === "string" ? p : p.nilai);
+const labelPilihan = (p: PilihanField) => (typeof p === "string" ? p : p.label);
+
 export function Field({
   label,
   nama,
@@ -23,11 +35,11 @@ export function Field({
   label: string;
   nama: string;
   nilai?: string | number | null;
-  tipe?: "text" | "number" | "textarea" | "tanggal";
+  tipe?: "text" | "number" | "textarea" | "tanggal" | "berkas";
   satuan?: string;
   petunjuk?: string;
   wajib?: boolean;
-  pilihan?: readonly string[];
+  pilihan?: readonly PilihanField[];
   lebar?: "penuh" | "separuh";
 }) {
   const id = useId();
@@ -46,11 +58,13 @@ export function Field({
         {pilihan ? (
           <select id={id} name={nama} className="inp" defaultValue={nilai ?? undefined} required={wajib}>
             {pilihan.map((p) => (
-              <option key={p} value={p}>
-                {p}
+              <option key={nilaiPilihan(p)} value={nilaiPilihan(p)}>
+                {labelPilihan(p)}
               </option>
             ))}
           </select>
+        ) : tipe === "berkas" ? (
+          <input id={id} name={nama} className="inp" type="file" required={wajib} />
         ) : tipe === "textarea" ? (
           <textarea
             id={id}

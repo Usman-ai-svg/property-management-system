@@ -70,7 +70,9 @@ export const ACL_UBAH: Record<string, string[]> = {
   hargaRabRap: ["BOD", "Quantity Surveyor", "Head Operation Office"],
   businessPlan: ["BOD", "Business Development"],
   keuangan: ["BOD", "Finance", "Admin", "Head Operation Office"],
-  progress: ["BOD", "Project Manager", "Supervisor", "Head Operation Project"],
+  // Quantity Surveyor ikut boleh mengubah karena memantau progres vendor
+  // memang tugasnya, sekalipun angkanya diperoleh dari Supervisor di lapangan.
+  progress: ["BOD", "Project Manager", "Supervisor", "Head Operation Project", "Quantity Surveyor"],
   aset: ["BOD", "Head Operation Office", "Head Operation Project", "Project Manager", "Procurement"],
 };
 
