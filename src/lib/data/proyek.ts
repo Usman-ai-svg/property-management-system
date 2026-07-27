@@ -112,6 +112,9 @@ export async function detailProyek(u: Pengguna, kode: string) {
         select: {
           id: true, kode: true, nomor: true, luasTanah: true,
           statusPembangunan: true, statusJual: true, progress: true,
+          // Menentukan apakah progres unit ini turunan dari opname SPK,
+          // yang berarti isian manualnya ditiadakan.
+          _count: { select: { boqSpk: true } },
           phase: { select: { kode: true } },
           unitType: { select: { kode: true, nama: true, luasBangunan: true } },
           customWorks: {

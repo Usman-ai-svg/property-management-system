@@ -33,6 +33,7 @@ export default async function RincianUnit({
   const ubahHarga = bolehUbah(pengguna, "hargaRabRap");
   const ubahData = bolehUbah(pengguna, "daftarUnit");
   const ubahProgres = bolehUbah(pengguna, "progress");
+
   const ubahTeknis = bolehUbah(pengguna, "dokumenTeknis");
   const bolehDokumen = bolehLihat(pengguna, "dokumenTeknis");
 
@@ -42,6 +43,9 @@ export default async function RincianUnit({
       id: true, kode: true, nomor: true, luasTanah: true, projectId: true,
       phaseId: true, unitTypeId: true,
       statusPembangunan: true, statusJual: true, progress: true,
+      // Jumlah baris BOQ SPK menentukan apakah progres unit ini turunan
+      // dari opname atau masih diisi manual.
+      _count: { select: { boqSpk: true } },
       phase: { select: { kode: true } },
       project: {
         select: {
@@ -111,6 +115,11 @@ export default async function RincianUnit({
   if (!unit || unit.project.kode !== kodeProyek) notFound();
   if (!bolehAksesProyek(pengguna, unit.projectId)) notFound();
 
+  // Progres unit hanya punya satu sumber. Bila unit ini sudah dirinci lewat
+  // BOQ SPK, angkanya turunan dari opname dan isian manualnya ditiadakan —
+  // sama seperti di halaman Konstruksi.
+  const dariSpk = unit._count.boqSpk > 0;
+
   const kontrak = await prisma.contract.findMany({
     where: { units: { some: { unitId: unit.id } } },
     select: {
@@ -172,6 +181,7 @@ export default async function RincianUnit({
                     phaseId: unit.phaseId, unitTypeId: unit.unitTypeId,
                     statusPembangunan: unit.statusPembangunan,
                     statusJual: unit.statusJual, progress: unit.progress,
+                    dariSpk,
                   }}
                   fases={unit.project.fases}
                   tipes={unit.project.unitTypes}
@@ -184,7 +194,17 @@ export default async function RincianUnit({
           <InfoRow label="Tipe" nilai={unit.unitType.nama} />
           <InfoRow label="Luas Bangunan" nilai={`${unit.unitType.luasBangunan} m²`} />
           <InfoRow label="Luas Tanah" nilai={`${unit.luasTanah} m²`} />
-          <InfoRow label="Progres" nilai={`${unit.progress}%`} />
+          <InfoRow
+            label="Progres"
+            nilai={
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                {unit.progress}%
+                <span style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)" }}>
+                  {dariSpk ? "dari opname SPK" : "sama dengan Konstruksi"}
+                </span>
+              </span>
+            }
+          />
           <InfoRow
             label="Status Bangun"
             nilai={<Badge nilai={unit.statusPembangunan} peta={WARNA_STATUS.bangun} />}

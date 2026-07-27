@@ -151,3 +151,34 @@ export function statusDariProgres(progress: number): string {
   if (progress >= 100) return "Selesai";
   return progress > 0 ? "Progress" : "Belum terbangun";
 }
+
+/**
+ * Status setelah pekerjaan fisik tuntas.
+ *
+ * Ketiganya tidak bisa disimpulkan dari angka progres — sebuah unit 100%
+ * berpindah ke "Serah Terima" karena ada berita acara, bukan karena
+ * pekerjaannya bertambah.
+ */
+const STATUS_PASCA_100 = ["Selesai", "Serah Terima", "Habis Masa Garansi"];
+
+/**
+ * Selaraskan status pembangunan dengan progresnya.
+ *
+ * Halaman Konstruksi menurunkan status dari progres, sedangkan Master Proyek
+ * dulu menyediakan keduanya sebagai isian terpisah — sehingga sebuah unit bisa
+ * tersimpan sebagai "progres 100%, status Belum terbangun". Kombinasi seperti
+ * itu tidak salah ketik belaka: ia membuat dua halaman menampilkan keadaan
+ * yang berbeda untuk unit yang sama.
+ *
+ * Aturannya:
+ *
+ *   - Selama progres di bawah 100%, status MENGIKUTI progres. Pilihan
+ *     pengguna diabaikan karena tidak ada status di bawah 100% yang tidak
+ *     bisa disimpulkan dari angkanya.
+ *   - Setelah 100%, pengguna bebas memilih di antara status pasca-selesai.
+ *     Pilihan di luar itu dikembalikan ke "Selesai".
+ */
+export function statusSelaras(progress: number, diminta: string): string {
+  if (progress < 100) return statusDariProgres(progress);
+  return STATUS_PASCA_100.includes(diminta) ? diminta : "Selesai";
+}

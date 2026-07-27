@@ -277,6 +277,8 @@ export function EditUnit({
   data: {
     id: string; label: string; luasTanah: number;
     statusPembangunan: string; statusJual: string; progress: number;
+    /** Benar bila progres unit ini turunan dari BOQ SPK, bukan isian manual. */
+    dariSpk: boolean;
   };
 }) {
   return (
@@ -292,7 +294,19 @@ export function EditUnit({
         <Field label="Status Jual" nama="statusJual" nilai={data.statusJual} pilihan={STATUS_JUAL} />
       </BarisField>
       <BarisField>
-        <Field label="Progres" nama="progress" nilai={data.progress} tipe="number" satuan="%" />
+        {data.dariSpk ? (
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+              Progres
+            </label>
+            <input type="hidden" name="progress" value={data.progress} />
+            <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
+              <b>{data.progress}%</b> — dari opname SPK, tidak bisa diisi di sini.
+            </div>
+          </div>
+        ) : (
+          <Field label="Progres" nama="progress" nilai={data.progress} tipe="number" satuan="%" />
+        )}
         <Field label="Luas Tanah" nama="luasTanah" nilai={data.luasTanah} tipe="number" satuan="m²" />
       </BarisField>
     </FormModal>

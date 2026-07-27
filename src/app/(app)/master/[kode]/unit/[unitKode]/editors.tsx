@@ -20,6 +20,8 @@ export function EditDeskripsiUnit({
   unit: {
     id: string; nomor: number; luasTanah: number; phaseId: string; unitTypeId: string;
     statusPembangunan: string; statusJual: string; progress: number;
+    /** Benar bila progres unit ini turunan dari BOQ SPK, bukan isian manual. */
+    dariSpk: boolean;
   };
   fases: { id: string; kode: string }[];
   tipes: { id: string; nama: string; luasBangunan: number }[];
@@ -70,9 +72,28 @@ export function EditDeskripsiUnit({
         <Field label="Status Jual" nama="statusJual" nilai={unit.statusJual} pilihan={STATUS_JUAL} />
       </BarisField>
 
-      <BarisField kolom={1}>
-        <Field label="Progres" nama="progress" nilai={unit.progress} tipe="number" satuan="%" />
-      </BarisField>
+      {unit.dariSpk ? (
+        <>
+          <input type="hidden" name="progress" value={unit.progress} />
+          <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+            Progres unit ini <b>{unit.progress}%</b>, dihitung dari BOQ SPK dan
+            tertimbang nilai tiap pekerjaan — karena itu tidak bisa diisi di sini.
+            Ubah lewat opname di halaman SPK-nya. Status bangun mengikuti angka itu
+            selama belum 100%.
+          </p>
+        </>
+      ) : (
+        <>
+          <BarisField kolom={1}>
+            <Field label="Progres" nama="progress" nilai={unit.progress} tipe="number" satuan="%" />
+          </BarisField>
+          <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+            Angka progres ini sama dengan yang tampil di halaman Konstruksi — keduanya
+            membaca kolom yang sama. Status bangun mengikuti progres selama belum
+            100%; setelah 100% barulah Serah Terima dan Habis Masa Garansi bisa dipilih.
+          </p>
+        </>
+      )}
     </FormModal>
   );
 }

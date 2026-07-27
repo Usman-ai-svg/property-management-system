@@ -12,6 +12,7 @@ import {
   JENIS_SARPRAS, STATUS_JUAL, STATUS_PEMBANGUNAN, STATUS_SARPRAS,
 } from "@/lib/domain/enums";
 import { buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap, rabAcuan } from "@/lib/calc/boq";
+import { statusSelaras } from "@/lib/calc/kontrak-boq";
 
 /** Segarkan halaman proyek dan ringkasan setelah perubahan. */
 function segarkan(kode: string) {
@@ -330,13 +331,31 @@ export async function ubahUnit(_s: HasilAksi | null, form: FormData): Promise<Ha
 
     const pengguna = await izinkan("progress", lama.projectId);
 
+    // Progres unit hanya punya SATU sumber. Bila unit ini sudah dirinci lewat
+    // BOQ SPK, angkanya turunan dari opname — mengetiknya di sini hanya
+    // bertahan sampai opname berikutnya menuliskannya ulang. Isian dari
+    // formulir diabaikan, bukan ditolak, supaya kolom lain di formulir yang
+    // sama (luas tanah, tipe, nomor) tetap bisa disunting.
+    const dikendalikanSpk =
+      (await prisma.contractBoqItem.count({ where: { unitId: id } })) > 0;
+
+    const progresDiminta = angka(form, "progress", { min: 0, max: 100 });
+    const progress = dikendalikanSpk ? lama.progress : progresDiminta;
+
     const baru: {
       statusPembangunan: string; statusJual: string; progress: number; luasTanah: number;
       nomor?: number; phaseId?: string; unitTypeId?: string; kode?: string;
     } = {
-      statusPembangunan: pilihan(form, "statusPembangunan", STATUS_PEMBANGUNAN),
+      // Status bangun MENGIKUTI progres, sama seperti di halaman Konstruksi.
+      // Sebelumnya keduanya isian terpisah, sehingga sebuah unit bisa
+      // tersimpan sebagai "progres 100%, status Belum terbangun" — dua halaman
+      // menampilkan keadaan berbeda untuk unit yang sama.
+      statusPembangunan: statusSelaras(
+        progress,
+        pilihan(form, "statusPembangunan", STATUS_PEMBANGUNAN),
+      ),
       statusJual: pilihan(form, "statusJual", STATUS_JUAL),
-      progress: angka(form, "progress", { min: 0, max: 100 }),
+      progress,
       luasTanah: angka(form, "luasTanah", { min: 1, wajib: true }),
     };
 
@@ -402,6 +421,15 @@ export async function ubahUnit(_s: HasilAksi | null, form: FormData): Promise<Ha
     });
 
     segarkan(lama.project.kode);
+
+    // Beri tahu bila isian progres diabaikan, supaya pengguna tidak mengira
+    // angkanya tersimpan lalu bingung saat halaman menampilkan angka lama.
+    if (dikendalikanSpk && progresDiminta !== lama.progress) {
+      return (
+        `Progres unit ini dihitung dari BOQ SPK, jadi isian ${progresDiminta}% tidak ` +
+        `disimpan. Ubah lewat opname di halaman SPK-nya. Kolom lain tersimpan.`
+      );
+    }
   });
 }
 

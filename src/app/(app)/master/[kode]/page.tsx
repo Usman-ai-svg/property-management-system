@@ -362,6 +362,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                                 id: u.id, label, luasTanah: u.luasTanah,
                                 statusPembangunan: u.statusPembangunan,
                                 statusJual: u.statusJual, progress: u.progress,
+                                dariSpk: u._count.boqSpk > 0,
                               }}
                             />
                           )}
