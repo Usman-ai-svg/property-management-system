@@ -13,7 +13,14 @@ export interface ItemNav {
   anak?: Omit<ItemNav, "ikon" | "anak">[];
 }
 
-const PIMPINAN = ["Komisaris", "BOD", "Business Development"];
+/**
+ * Peran yang boleh membuka Landbank.
+ *
+ * "Administrator Sistem" ikut karena akun administrator harus bisa membuka
+ * seluruh modul — dua menu di bawah disaring per PERAN, bukan per izin
+ * sub-bagian, sehingga tidak otomatis terbuka hanya dengan memberi izin.
+ */
+const PIMPINAN = ["Administrator Sistem", "Komisaris", "BOD", "Business Development"];
 
 export const NAV: ItemNav[] = [
   { id: "ringkasan", label: "Ringkasan", href: "/", ikon: "LayoutGrid" },
@@ -32,7 +39,7 @@ export const NAV: ItemNav[] = [
   },
   { id: "landbank", label: "Landbank", href: "/landbank", ikon: "Map", butuhPeran: PIMPINAN },
   { id: "planreal", label: "Plan vs Realisasi", href: "/plan-realisasi", ikon: "GaugeCircle", butuhSection: "businessPlan" },
-  { id: "admin", label: "Admin", href: "/admin", ikon: "ShieldCheck", butuhPeran: ["BOD", "Business Development", "Head Operation Office", "Admin"] },
+  { id: "admin", label: "Admin", href: "/admin", ikon: "ShieldCheck", butuhPeran: ["Administrator Sistem", "BOD", "Business Development", "Head Operation Office", "Admin"] },
 ];
 
 /** Saring menu sesuai peran aktif dan izin yang dimiliki. */

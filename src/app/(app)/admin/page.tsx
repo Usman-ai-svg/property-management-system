@@ -22,6 +22,7 @@ const TAB = [
 
 /** Warna chip peran, mengikuti pengelompokan pada artifact. */
 const WARNA_GRUP: Record<string, [string, string]> = {
+  sys: ["var(--rona-teal)", "var(--ink)"],
   lead: ["var(--rona-brass)", "var(--brass)"],
   ops: ["var(--rona-biru)", "var(--blue)"],
   biz: ["var(--rona-brass)", "var(--brass)"],

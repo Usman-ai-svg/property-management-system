@@ -110,7 +110,7 @@ Kata sandi seluruh akun: `nanoland2026`
 
 | Email | Peran | Untuk memperagakan |
 |---|---|---|
-| `h.nugroho@nanoland.id` | Komisaris, BOD | akses penuh termasuk angka finansial |
+| `h.nugroho@nanoland.id` | **Administrator Sistem**, Komisaris, BOD | akses penuh ke seluruh fitur — akun peragaan utama |
 | `budi.hartono@nanoland.id` | Quantity Surveyor, Procurement | boleh harga, terbatas pada NT4 & NT2 |
 | `fajar.ramadhan@nanoland.id` | Arsitek | **tidak** boleh melihat harga |
 | `maya.larasati@nanoland.id` | Customer Care | terbatas pada NT2 saja |
@@ -464,9 +464,19 @@ Perubahan ini ada di data semaian, jadi hanya berlaku setelah
 Matriks Hak Akses** tanpa menyentuh kode.
 
 Perlu diingat hak akses mengikuti **peran aktif**, bukan gabungan seluruh peran
-yang dimiliki seseorang. `h.nugroho@nanoland.id` memegang Komisaris dan BOD;
-selama peran aktifnya masih Komisaris, halaman Keuangan tetap tertutup. Ganti
-peran aktif lewat pemilih di bilah samping.
+yang dimiliki seseorang.
+
+`h.nugroho@nanoland.id` masuk sebagai **Administrator Sistem** — peran sistem
+berakses penuh ke sembilan sub-bagian, dipakai untuk memperagakan aplikasi
+tanpa terhalang pembatasan. Akun itu juga memegang Komisaris dan BOD, jadi
+pembatasan peran tetap bisa diperagakan dengan mengganti peran aktif lewat
+pemilih di bilah samping. Berpindah ke Komisaris, misalnya, langsung menutup
+halaman Keuangan dan Vendor Management.
+
+"Administrator Sistem" sengaja dibuat sebagai peran tersendiri, bukan dengan
+menaikkan hak peran "Admin" yang sudah ada — "Admin" adalah jabatan staf
+administrasi yang juga dipegang Rina Safitri, dan menjadikannya berakses penuh
+akan diam-diam memperluas akses orang lain.
 
 ---
 

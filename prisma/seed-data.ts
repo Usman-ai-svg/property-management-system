@@ -28,6 +28,10 @@ export function tglPendek(s: string): Date {
 // ---------------------------------------------------------------------------
 
 export const ROLE_GRUP: Record<string, string> = {
+  // Peran sistem, bukan jabatan organisasi. Sengaja dipisahkan dari kelompok
+  // "lead" supaya jelas bahwa akses penuhnya berasal dari kebutuhan
+  // administrasi aplikasi, bukan dari posisi di perusahaan.
+  "Administrator Sistem": "sys",
   Komisaris: "lead", BOD: "lead",
   "Head Operation Office": "ops", "Head Operation Project": "ops",
   "Project Manager": "ops", Supervisor: "ops",
@@ -48,10 +52,10 @@ export const ACL_AWAL: Record<string, string[]> = {
   daftarUnit: SEMUA_PERAN,
   daftarSarpras: SEMUA_PERAN,
   dokumenTeknis: SEMUA_PERAN,
-  hargaRabRap: ["Komisaris", "BOD", "Business Development", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor", "Procurement", "Admin", "Finance", "Consultant Finance"],
-  businessPlan: ["Komisaris", "BOD", "Business Development"],
-  keuangan: ["BOD", "Business Development", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor", "Admin", "Finance", "Consultant Finance"],
-  progress: ["BOD", "Head Operation Project", "Project Manager", "Supervisor", "Quantity Surveyor", "Arsitek", "Procurement"],
+  hargaRabRap: ["Administrator Sistem", "Komisaris", "BOD", "Business Development", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor", "Procurement", "Admin", "Finance", "Consultant Finance"],
+  businessPlan: ["Administrator Sistem", "Komisaris", "BOD", "Business Development"],
+  keuangan: ["Administrator Sistem", "BOD", "Business Development", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor", "Admin", "Finance", "Consultant Finance"],
+  progress: ["Administrator Sistem", "BOD", "Head Operation Project", "Project Manager", "Supervisor", "Quantity Surveyor", "Arsitek", "Procurement"],
   aset: SEMUA_PERAN,
 };
 
@@ -63,22 +67,25 @@ export const ACL_AWAL: Record<string, string[]> = {
  * artifact, BOD belum punya hak ubah atas dokumen teknis dan progres.
  */
 export const ACL_UBAH: Record<string, string[]> = {
-  deskripsi: ["BOD", "Business Development", "Head Operation Office"],
-  daftarUnit: ["BOD", "Head Operation Office", "Head Operation Project", "Project Manager"],
-  daftarSarpras: ["BOD", "Head Operation Office", "Head Operation Project", "Project Manager"],
-  dokumenTeknis: ["BOD", "Arsitek", "Head Operation Project", "Project Manager"],
-  hargaRabRap: ["BOD", "Quantity Surveyor", "Head Operation Office"],
-  businessPlan: ["BOD", "Business Development"],
-  keuangan: ["BOD", "Finance", "Admin", "Head Operation Office"],
+  deskripsi: ["Administrator Sistem", "BOD", "Business Development", "Head Operation Office"],
+  daftarUnit: ["Administrator Sistem", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager"],
+  daftarSarpras: ["Administrator Sistem", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager"],
+  dokumenTeknis: ["Administrator Sistem", "BOD", "Arsitek", "Head Operation Project", "Project Manager"],
+  hargaRabRap: ["Administrator Sistem", "BOD", "Quantity Surveyor", "Head Operation Office"],
+  businessPlan: ["Administrator Sistem", "BOD", "Business Development"],
+  keuangan: ["Administrator Sistem", "BOD", "Finance", "Admin", "Head Operation Office"],
   // Quantity Surveyor ikut boleh mengubah karena memantau progres vendor
   // memang tugasnya, sekalipun angkanya diperoleh dari Supervisor di lapangan.
-  progress: ["BOD", "Project Manager", "Supervisor", "Head Operation Project", "Quantity Surveyor"],
-  aset: ["BOD", "Head Operation Office", "Head Operation Project", "Project Manager", "Procurement"],
+  progress: ["Administrator Sistem", "BOD", "Project Manager", "Supervisor", "Head Operation Project", "Quantity Surveyor"],
+  aset: ["Administrator Sistem", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager", "Procurement"],
 };
 
 export const USERS = [
   { nama: "Andra Wijaya", inisial: "AW", peran: ["Business Development"], semua: true, proyek: [] },
-  { nama: "H. Nugroho", inisial: "HN", peran: ["Komisaris", "BOD"], semua: true, proyek: [] },
+  // Peran administrator ditaruh pertama karena `peranAktif` saat login diambil
+  // dari peran pertama — akun ini harus langsung berakses penuh, dan tetap
+  // bisa dipindah ke Komisaris atau BOD untuk memperagakan pembatasan peran.
+  { nama: "H. Nugroho", inisial: "HN", peran: ["Administrator Sistem", "Komisaris", "BOD"], semua: true, proyek: [] },
   { nama: "Rina Safitri", inisial: "RS", peran: ["Head Operation Office", "Admin"], semua: true, proyek: [] },
   { nama: "Hendra Kurnia", inisial: "HK", peran: ["Head Operation Project", "Project Manager"], semua: false, proyek: ["NT4", "GN2"] },
   { nama: "Agus Pratama", inisial: "AP", peran: ["Supervisor"], semua: false, proyek: ["NT4", "GN2"] },
