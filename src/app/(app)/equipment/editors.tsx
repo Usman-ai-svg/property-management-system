@@ -4,8 +4,10 @@ import { useState } from "react";
 import {
   BarisField, Field, FormModal, TombolHapus, TombolIkon, TombolTambah,
 } from "@/components/form";
-import { KEPEMILIKAN_ASET, SATUAN_PAKAI, STATUS_ASET } from "@/lib/domain/enums";
-import { hapusAset, tambahAset, ubahAset } from "./actions";
+import {
+  JENIS_PENYESUAIAN_ASET, KEPEMILIKAN_ASET, SATUAN_PAKAI, STATUS_ASET,
+} from "@/lib/domain/enums";
+import { catatPenyesuaianAset, hapusAset, tambahAset, ubahAset } from "./actions";
 
 export interface AsetForm {
   id: string;
@@ -59,7 +61,21 @@ function IsianAset({
       </BarisField>
 
       <BarisField>
-        <Field label="Jumlah" nama="jumlah" nilai={nilai?.jumlah ?? 1} tipe="number" wajib />
+        {nilai ? (
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+              Jumlah
+            </label>
+            <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
+              <b>
+                {nilai.jumlah} {nilai.satuan}
+              </b>{" "}
+              — diubah lewat Penyesuaian, bukan di sini.
+            </div>
+          </div>
+        ) : (
+          <Field label="Jumlah Awal" nama="jumlah" nilai={1} tipe="number" wajib />
+        )}
         <Field label="Satuan" nama="satuan" nilai={nilai?.satuan ?? "unit"} />
       </BarisField>
 
@@ -186,4 +202,88 @@ export function UbahAset({
 
 export function HapusAset({ id, kode }: { id: string; kode: string }) {
   return <TombolHapus aksi={hapusAset} id={id} nama={`aset ${kode}`} />;
+}
+
+/* ===================== PENYESUAIAN STOK ===================== */
+
+/**
+ * Catat kehilangan, kerusakan, perbaikan, atau koreksi opname.
+ *
+ * Inilah satu-satunya jalan mengubah jumlah aset. Formulir Ubah Aset hanya
+ * menampilkan jumlahnya sebagai keterangan, supaya tiap pergerakan stok selalu
+ * punya alasan dan penanggung jawab.
+ */
+export function PenyesuaianAset({
+  aset,
+}: {
+  aset: {
+    id: string;
+    kode: string;
+    nama: string;
+    satuan: string;
+    jumlah: number;
+    jumlahRusak: number;
+  };
+}) {
+  const terpakai = aset.jumlah - aset.jumlahRusak;
+
+  return (
+    <FormModal
+      judul={`Penyesuaian Stok · ${aset.kode}`}
+      keterangan={
+        `${aset.nama} — ${aset.jumlah} ${aset.satuan} tercatat, ` +
+        `${terpakai} terpakai, ${aset.jumlahRusak} rusak`
+      }
+      aksi={catatPenyesuaianAset}
+      labelSimpan="Catat Penyesuaian"
+      lebar={600}
+      pemicu={(buka) => (
+        <button
+          type="button"
+          className="btn-garis"
+          onClick={buka}
+          style={{ fontSize: 11, padding: "3px 8px" }}
+          title={`Catat kehilangan atau kerusakan ${aset.kode}`}
+        >
+          Sesuaikan
+        </button>
+      )}
+    >
+      <input type="hidden" name="equipmentId" value={aset.id} />
+
+      <BarisField>
+        <Field label="Jenis Penyesuaian" nama="jenis" pilihan={JENIS_PENYESUAIAN_ASET} wajib />
+        <Field label="Banyaknya" nama="banyak" tipe="number" satuan={aset.satuan} wajib />
+      </BarisField>
+
+      <BarisField kolom={1}>
+        <Field
+          label="Keterangan"
+          nama="keterangan"
+          wajib
+          petunjuk="mis. hilang di lokasi NT4 saat pemindahan, atau pecah tertimpa material"
+        />
+      </BarisField>
+
+      <BarisField kolom={1}>
+        <Field
+          label="Penanggung Jawab"
+          nama="penanggungJawab"
+          petunjuk="Nama orang yang bertanggung jawab atas barang saat kejadian. Boleh dikosongkan."
+        />
+      </BarisField>
+
+      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+        <b>Hilang</b> mengurangi jumlah tercatat. <b>Rusak</b> tidak — barangnya masih
+        dimiliki, hanya tidak bisa dipakai, dan bisa dikembalikan lewat{" "}
+        <b>Perbaikan Selesai</b>. <b>Koreksi Stok</b> untuk hasil opname fisik; isi
+        angka negatif bila stok nyatanya lebih sedikit.
+        <br />
+        <br />
+        Riwayat penyesuaian bersifat tetap. Pencatatan yang telanjur salah diperbaiki
+        dengan Koreksi Stok baru, bukan dengan menghapus catatan lama. Nilai rupiah aset
+        tidak berubah — penyusutan dibukukan Finance di luar sistem ini.
+      </p>
+    </FormModal>
+  );
 }

@@ -43,7 +43,7 @@ lapisan di atasnya.
 
 ## 2. Model data
 
-Skema ada di `prisma/schema.prisma`, 42 model. Ini bagian yang paling
+Skema ada di `prisma/schema.prisma`, 43 model. Ini bagian yang paling
 bernilai dan paling tahan lama — kalaupun seluruh tampilan ditulis ulang,
 struktur data ini yang menentukan sistemnya benar atau tidak.
 
@@ -60,7 +60,7 @@ struktur data ini yang menentukan sistemnya benar atau tidak.
 `CustomWork`, `CustomWorkBoqItem`, `CustomWorkRapItem`
 
 **Pelaksanaan**
-`ProgressRecord`, `Equipment`
+`ProgressRecord`, `Equipment`, `EquipmentAdjustment`
 
 **Vendor dan kontrak**
 `Vendor`, `Contract`, `ContractUnit`, `ContractInfrastructure`,
@@ -76,7 +76,7 @@ struktur data ini yang menentukan sistemnya benar atau tidak.
 **Dokumen dan jejak**
 `Document`, `DocumentVersion`, `AuditLog`
 
-### Lima keputusan yang mudah salah dipindahkan
+### Enam keputusan yang mudah salah dipindahkan
 
 **a. Pengeluaran berbentuk induk–rincian.** `Expense` adalah satu pembayaran
 — setara satu baris mutasi rekening bank. Pembebanannya ke unit atau ke
@@ -146,7 +146,19 @@ database.
 Objek yang belum punya baris BOQ tetap memakai progres satu angka manual.
 Yang sudah punya menolak isian manual, di UI maupun di Server Action.
 
-**e. `AuditLog` bersifat hanya-tambah.** Tidak ada jalur ubah atau hapus di
+**e. Stok aset hanya berubah lewat penyesuaian.** `Equipment.jumlah` tidak
+bisa diketik dari formulir Ubah Aset; ia hanya bergerak lewat baris
+`EquipmentAdjustment`, sehingga tiap perubahan punya alasan, tanggal, dan
+penanggung jawab. `jumlahRusak` dipisah dari `status` karena status melekat
+pada seluruh baris — 5 helm yang 2 di antaranya rusak tidak bisa dinyatakan
+lewat satu status saja. Riwayatnya hanya-tambah: pencatatan yang salah
+diperbaiki dengan baris "Koreksi Stok" baru.
+
+Nilai rupiah aset sengaja tidak ikut berubah. Penyusutan dan pembukuan
+kerugian dikerjakan Finance di luar sistem ini; nilai perolehan sebuah aset
+lama bukan angka kerugian yang benar.
+
+**f. `AuditLog` bersifat hanya-tambah.** Tidak ada jalur ubah atau hapus di
 seluruh aplikasi. `catatDiff()` menulis satu baris per kolom yang berubah,
 bukan satu baris per aksi, supaya "siapa mengubah angka apa dari berapa jadi
 berapa" bisa dilacak per kolom. Pertahankan sifat ini.
@@ -156,7 +168,7 @@ berapa" bisa dilacak per kolom. Pertahankan sifat ini.
 ## 3. Indeks rumus bisnis
 
 Semua ada di `src/lib/calc/`, tanpa impor framework, dan **seluruhnya sudah
-punya tes** (125 tes, `npm test`). Ini daftar yang perlu diperiksa ulang
+punya tes** (145 tes, `npm test`). Ini daftar yang perlu diperiksa ulang
 bersama tim keuangan dan teknik sebelum dipakai di produksi — bukan karena
 diragukan, tapi karena angka-angka inilah yang nanti dipakai mengambil
 keputusan.
@@ -175,6 +187,8 @@ keputusan.
 | | `bagiRata` | Pembagian rata; sisa pembulatan ke baris pertama |
 | | `periksaAlokasi` | Penegak invarian induk–rincian di atas |
 | `plan-real.ts` | `ringkasPlanReal` | Rencana vs realisasi per pos |
+| `aset.ts` | `terapkanPenyesuaian` | Akibat kehilangan/kerusakan pada stok aset |
+| | `unitTerpakai`, `taksiranNilaiRusak` | Unit siap pakai dan taksiran nilai rusak |
 | `opname.ts` | `susunOpname`, `ringkasOpname` | Opname mingguan dari progres per baris |
 | | `susunOpnameDariPersen` | Taksiran lama, untuk BOQ yang belum diopname |
 | | `fraksiBaris` | Pembagian progres ke baris pekerjaan |
@@ -218,10 +232,14 @@ Konsekuensinya: hak akses ikut menentukan bentuk query, bukan hanya bentuk
 tampilan. Kalau ERP menyalin halaman tapi tidak menyalin pola ini, kebocoran
 akan terjadi tanpa gejala apa pun di layar.
 
-### Sembilan sub-bagian
+### Sepuluh sub-bagian
 
 `deskripsi`, `daftarUnit`, `daftarSarpras`, `dokumenTeknis`, `hargaRabRap`,
-`businessPlan`, `keuangan`, `progress`, `aset`
+`businessPlan`, `keuangan`, `progress`, `aset`, `penyesuaianAset`
+
+`aset` dan `penyesuaianAset` sengaja dipisah: yang mendata kehilangan dan
+kerusakan adalah orang lapangan, sedangkan yang menambah atau menghapus master
+aset adalah bagian pengadaan.
 
 Tiap peran punya satu dari tiga tingkat per sub-bagian: tidak boleh lihat,
 boleh lihat, atau boleh ubah. Tersimpan di `RoleSectionPermission`, bisa

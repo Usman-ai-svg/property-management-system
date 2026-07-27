@@ -72,6 +72,23 @@ export const KEPEMILIKAN_ASET = ["Milik Sendiri", "Sewa"] as const;
 /** Satuan pemakaian alat: alat berat dihitung per jam, alat bantu per hari. */
 export const SATUAN_PAKAI = ["jam", "hari"] as const;
 
+/**
+ * Jenis penyesuaian stok aset.
+ *
+ * Dibedakan karena akibatnya pada angka tidak sama:
+ *   - Hilang mengurangi jumlah — barangnya memang tidak ada lagi.
+ *   - Rusak TIDAK mengurangi jumlah, hanya menambah bagian yang tak terpakai;
+ *     barangnya masih dimiliki dan bisa diperbaiki.
+ *   - Perbaikan Selesai mengembalikan bagian rusak menjadi terpakai.
+ *   - Koreksi Stok menambah atau mengurangi jumlah setelah opname fisik.
+ */
+export const JENIS_PENYESUAIAN_ASET = [
+  "Hilang",
+  "Rusak",
+  "Perbaikan Selesai",
+  "Koreksi Stok",
+] as const;
+
 /** Sub-bagian yang hak aksesnya diatur terpisah di Admin → Kelola Hak Akses. */
 export const SECTIONS = [
   "deskripsi",
@@ -83,6 +100,7 @@ export const SECTIONS = [
   "keuangan",
   "progress",
   "aset",
+  "penyesuaianAset",
 ] as const;
 
 export const SECTION_LABELS: Record<Section, string> = {
@@ -95,6 +113,7 @@ export const SECTION_LABELS: Record<Section, string> = {
   keuangan: "Keuangan Operasional",
   progress: "Progress & Kontrak",
   aset: "Equipment & Asset",
+  penyesuaianAset: "Penyesuaian Aset",
 };
 
 /** Peran. Satu user boleh memegang lebih dari satu. */

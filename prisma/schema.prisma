@@ -940,6 +940,12 @@ model Equipment {
   kategori  String
   merk      String?
   jumlah    Int     @default(1)
+  /// Bagian dari `jumlah` yang sedang rusak dan tidak bisa dipakai.
+  ///
+  /// Dipisah dari `status` karena status melekat pada seluruh baris: 5 helm
+  /// yang 2 di antaranya rusak tidak bisa dinyatakan lewat satu status saja.
+  /// Selalu <= jumlah; ditegakkan `terapkanPenyesuaian()` di lib/calc/aset.ts.
+  jumlahRusak Int   @default(0)
   satuan    String  @default("unit")
   /// Milik Sendiri | Sewa
   kepemilikan String @default("Milik Sendiri")
@@ -958,8 +964,42 @@ model Equipment {
 
   vendor  Vendor?  @relation(fields: [vendorId], references: [id])
   project Project? @relation(fields: [projectId], references: [id])
+  penyesuaian EquipmentAdjustment[]
 
   @@map("equipments")
+}
+
+/// Riwayat penyesuaian stok aset: kehilangan, kerusakan, dan koreksi opname.
+///
+/// BERSIFAT HANYA-TAMBAH, seperti jejak audit. Jumlah aset berubah HANYA lewat
+/// baris di sini, tidak pernah diketik langsung — dengan begitu setiap
+/// pergerakan stok punya alasan, tanggal, dan penanggung jawab. Pencatatan
+/// yang telanjur salah diperbaiki dengan baris "Koreksi Stok" baru, bukan
+/// dengan menghapus atau menyunting baris lama.
+///
+/// `jumlahSebelum` dan `jumlahSesudah` disimpan apa adanya, bukan dihitung
+/// ulang dari rantai riwayat: itu membuat tiap baris bisa dibaca sendirian
+/// saat audit, tanpa perlu menyusuri seluruh riwayat sejak awal.
+model EquipmentAdjustment {
+  id          String   @id @default(cuid())
+  equipmentId String
+  tanggal     DateTime @default(now())
+  /// Hilang | Rusak | Perbaikan Selesai | Koreksi Stok
+  jenis       String
+  /// Banyaknya unit yang disesuaikan. Selalu positif; arahnya ditentukan jenis.
+  banyak      Int
+  jumlahSebelum     Int
+  jumlahSesudah     Int
+  rusakSebelum      Int
+  rusakSesudah      Int
+  keterangan        String
+  penanggungJawab   String?
+  dicatatOleh       String
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@index([equipmentId, tanggal])
+  @@map("equipment_adjustments")
 }
 
 // =============================================================================

@@ -3,11 +3,19 @@ import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
 import { rp, tanggal } from "@/lib/format";
 import { Badge, TabelHead } from "@/components/ui";
-import { HapusAset, TambahAset, UbahAset } from "./editors";
+import { unitTerpakai } from "@/lib/calc/aset";
+import { HapusAset, PenyesuaianAset, TambahAset, UbahAset } from "./editors";
 import { Tabel } from "@/components/kartu-tabel";
 
 /** Tanggal untuk <input type="date">: YYYY-MM-DD. */
 const isoTanggal = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+
+const WARNA_PENYESUAIAN: Record<string, [string, string]> = {
+  Hilang: ["var(--rona-merah)", "var(--red)"],
+  Rusak: ["var(--rona-amber)", "var(--amber)"],
+  "Perbaikan Selesai": ["var(--rona-hijau2)", "var(--green)"],
+  "Koreksi Stok": ["var(--rona-biru)", "var(--blue)"],
+};
 
 const WARNA_ASET: Record<string, [string, string]> = {
   Tersedia: ["var(--rona-abu)", "var(--muted)"],
@@ -22,17 +30,33 @@ export default async function EquipmentAsset() {
 
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
   const bolehKelola = bolehUbah(pengguna, "aset");
+  const bolehSesuaikan = bolehUbah(pengguna, "penyesuaianAset");
 
   const aset = await prisma.equipment.findMany({
     orderBy: { kode: "asc" },
     select: {
       id: true, kode: true, nama: true, kategori: true, merk: true,
-      jumlah: true, satuan: true, kepemilikan: true, status: true,
+      jumlah: true, jumlahRusak: true, satuan: true, kepemilikan: true, status: true,
       satuanPakai: true, pemakaian: true, nilai: true,
       servisTerakhir: true, servisBerikut: true, penanggungJawab: true,
       vendorId: true, projectId: true,
       vendor: { select: { nama: true } },
       project: { select: { kode: true } },
+    },
+  });
+
+  // Riwayat penyesuaian terbaru — kehilangan, kerusakan, dan koreksi opname.
+  // Ditampilkan sebagai tabel tersendiri karena inilah jawaban atas "kenapa
+  // stoknya berkurang", yang tidak terbaca dari daftar aset saja.
+  const penyesuaian = await prisma.equipmentAdjustment.findMany({
+    orderBy: { tanggal: "desc" },
+    take: 50,
+    select: {
+      id: true, tanggal: true, jenis: true, banyak: true,
+      jumlahSebelum: true, jumlahSesudah: true,
+      rusakSebelum: true, rusakSesudah: true,
+      keterangan: true, penanggungJawab: true, dicatatOleh: true,
+      equipment: { select: { kode: true, nama: true, satuan: true } },
     },
   });
 
@@ -90,6 +114,7 @@ export default async function EquipmentAsset() {
             { label: "Nama", minLebar: 200 },
             { label: "Kategori" },
             { label: "Jumlah", rata: "kanan" },
+            { label: "Terpakai / Rusak", rata: "kanan" },
             { label: "Kepemilikan" },
             { label: "Lokasi" },
             { label: "Penanggung Jawab" },
@@ -97,7 +122,7 @@ export default async function EquipmentAsset() {
             { label: "Servis Berikut" },
             bolehHarga && { label: "Nilai / Tarif", rata: "kanan" },
             { label: "Status" },
-            bolehKelola && { lebar: 74 },
+            (bolehKelola || bolehSesuaikan) && { lebar: 150 },
           ]}
         >
           {aset.map((a) => {
@@ -114,6 +139,14 @@ export default async function EquipmentAsset() {
                 <td style={{ color: "var(--muted)" }}>{a.kategori}</td>
                 <td style={{ textAlign: "right" }}>
                   {a.jumlah} {a.satuan}
+                </td>
+                <td style={{ textAlign: "right" }}>
+                  {unitTerpakai(a)}
+                  {a.jumlahRusak > 0 ? (
+                    <span style={{ color: "var(--red)" }}> / {a.jumlahRusak} rusak</span>
+                  ) : (
+                    <span style={{ color: "var(--muted)" }}> / —</span>
+                  )}
                 </td>
                 <td>
                   {a.kepemilikan === "Sewa" ? (
@@ -157,9 +190,18 @@ export default async function EquipmentAsset() {
                 <td>
                   <Badge nilai={a.status} peta={WARNA_ASET} />
                 </td>
-                {bolehKelola && (
+                {(bolehKelola || bolehSesuaikan) && (
                   <td>
                     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      {bolehSesuaikan && (
+                        <PenyesuaianAset
+                          aset={{
+                            id: a.id, kode: a.kode, nama: a.nama, satuan: a.satuan,
+                            jumlah: a.jumlah, jumlahRusak: a.jumlahRusak,
+                          }}
+                        />
+                      )}
+                      {bolehKelola && (
                       <UbahAset
                         aset={{
                           id: a.id, kode: a.kode, nama: a.nama, kategori: a.kategori,
@@ -174,13 +216,65 @@ export default async function EquipmentAsset() {
                         vendor={daftarVendor}
                         proyek={daftarProyek}
                       />
-                      <HapusAset id={a.id} kode={a.kode} />
+                      )}
+                    {bolehKelola && <HapusAset id={a.id} kode={a.kode} />}
                     </div>
                   </td>
                 )}
               </tr>
             );
           })}
+        </Tabel>
+      </div>
+
+      {/* ---------- riwayat penyesuaian ---------- */}
+      <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
+        <TabelHead
+          judul={`Riwayat Penyesuaian Stok · ${penyesuaian.length} catatan terakhir`}
+          keterangan={
+            "Kehilangan, kerusakan, perbaikan, dan koreksi opname. Bersifat tetap — " +
+            "pencatatan yang salah diperbaiki dengan Koreksi Stok baru, bukan dihapus."
+          }
+        />
+        <Tabel
+          tinggiMaks={420}
+          kolom={[
+            { label: "Tanggal", lebar: 110 },
+            { label: "Aset", minLebar: 170 },
+            { label: "Jenis" },
+            { label: "Banyak", rata: "kanan" },
+            { label: "Stok", rata: "kanan" },
+            { label: "Rusak", rata: "kanan" },
+            { label: "Keterangan", minLebar: 220 },
+            { label: "Penanggung Jawab" },
+            { label: "Dicatat Oleh" },
+          ]}
+          kosong="Belum ada penyesuaian stok yang tercatat."
+        >
+          {penyesuaian.map((r) => (
+            <tr key={r.id}>
+              <td style={{ color: "var(--muted)" }}>{tanggal(r.tanggal)}</td>
+              <td>
+                <div style={{ fontWeight: 600 }}>{r.equipment.kode}</div>
+                <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{r.equipment.nama}</div>
+              </td>
+              <td>
+                <Badge nilai={r.jenis} peta={WARNA_PENYESUAIAN} />
+              </td>
+              <td style={{ textAlign: "right" }}>
+                {r.banyak > 0 ? `+${r.banyak}` : r.banyak} {r.equipment.satuan}
+              </td>
+              <td style={{ textAlign: "right", color: "var(--muted)" }}>
+                {r.jumlahSebelum} → <b style={{ color: "var(--text)" }}>{r.jumlahSesudah}</b>
+              </td>
+              <td style={{ textAlign: "right", color: "var(--muted)" }}>
+                {r.rusakSebelum} → <b style={{ color: "var(--text)" }}>{r.rusakSesudah}</b>
+              </td>
+              <td style={{ whiteSpace: "normal" }}>{r.keterangan}</td>
+              <td style={{ color: "var(--muted)" }}>{r.penanggungJawab ?? "—"}</td>
+              <td style={{ color: "var(--muted)" }}>{r.dicatatOleh}</td>
+            </tr>
+          ))}
         </Tabel>
       </div>
     </div>

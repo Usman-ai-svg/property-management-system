@@ -16,6 +16,7 @@ import { hashPassword } from "../src/lib/auth/password";
 import { buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap, rabAcuan, rapAcuan, totalBaris, boqSarprasDefault, rapGenerik } from "../src/lib/calc/boq";
 import { parseUkuran } from "../src/lib/format";
 import { alokasiPembayaran } from "../src/lib/calc/keuangan";
+import { terapkanPenyesuaian } from "../src/lib/calc/aset";
 import {
   ACL_AWAL, ACL_UBAH, ASET, BIAYA_OPERASIONAL, BIAYA_UMUM, KERJA_TAMBAH, KONTRAK, LOG_AWAL,
   PORSI_BIAYA_SARPRAS, PORSI_BIAYA_UNIT, POS_HPP, PROYEK, ROLE_GRUP, SARPRAS, SEMUA_PERAN,
@@ -200,6 +201,73 @@ async function isiProgresBoqMaster() {
   }
 }
 
+/**
+ * Beberapa penyesuaian stok contoh, supaya riwayatnya tidak kosong saat demo.
+ *
+ * Sengaja mencakup tiga jenis berbeda — hilang, rusak, lalu perbaikan —
+ * karena akibatnya pada angka tidak sama, dan perbedaan itulah yang perlu
+ * terlihat: "Rusak" tidak mengurangi jumlah, "Hilang" mengurangi.
+ */
+async function isiPenyesuaianAset() {
+  const contoh: {
+    kode: string;
+    jenis: "Hilang" | "Rusak" | "Perbaikan Selesai" | "Koreksi Stok";
+    banyak: number;
+    keterangan: string;
+    pj?: string;
+    oleh: string;
+  }[] = [
+    { kode: "SCF-001", jenis: "Hilang", banyak: 3, keterangan: "Hilang di lokasi NT4 setelah pemindahan barak pekerja", pj: "Agus Pratama", oleh: "Agus Pratama" },
+    { kode: "SCF-001", jenis: "Rusak", banyak: 2, keterangan: "Retak tertimpa material saat bongkar muat", pj: "Agus Pratama", oleh: "Budi Hartono" },
+    { kode: "GEN-007", jenis: "Rusak", banyak: 1, keterangan: "Dinamo terbakar, menunggu suku cadang", pj: "Hendra Kurnia", oleh: "Hendra Kurnia" },
+    { kode: "VBR-006", jenis: "Rusak", banyak: 2, keterangan: "Dua unit mati total setelah kemasukan air", pj: "Agus Pratama", oleh: "Agus Pratama" },
+    { kode: "VBR-006", jenis: "Perbaikan Selesai", banyak: 1, keterangan: "Satu unit selesai servis, sudah bisa dipakai kembali", oleh: "Hendra Kurnia" },
+    { kode: "SCF-001", jenis: "Koreksi Stok", banyak: -4, keterangan: "Opname fisik gudang: tercatat lebih banyak daripada yang ada", oleh: "Budi Hartono" },
+  ];
+
+  let n = 0;
+  for (const c of contoh) {
+    const aset = await prisma.equipment.findUnique({
+      where: { kode: c.kode },
+      select: { id: true, jumlah: true, jumlahRusak: true },
+    });
+    if (!aset) continue;
+
+    const { stok, galat } = terapkanPenyesuaian(
+      { jumlah: aset.jumlah, jumlahRusak: aset.jumlahRusak },
+      c.jenis,
+      c.banyak,
+    );
+    // Penyesuaian contoh yang tidak sah dilewati, bukan dipaksakan — data demo
+    // tidak boleh melanggar aturan yang ditegakkan aplikasi.
+    if (galat) {
+      console.log(`  penyesuaian ${c.kode} dilewati: ${galat}`);
+      continue;
+    }
+
+    await prisma.equipment.update({
+      where: { id: aset.id },
+      data: { jumlah: stok.jumlah, jumlahRusak: stok.jumlahRusak },
+    });
+    await prisma.equipmentAdjustment.create({
+      data: {
+        equipmentId: aset.id,
+        jenis: c.jenis,
+        banyak: c.banyak,
+        jumlahSebelum: aset.jumlah,
+        jumlahSesudah: stok.jumlah,
+        rusakSebelum: aset.jumlahRusak,
+        rusakSesudah: stok.jumlahRusak,
+        keterangan: c.keterangan,
+        penanggungJawab: c.pj ?? null,
+        dicatatOleh: c.oleh,
+      },
+    });
+    n++;
+  }
+  console.log(`  ${n} penyesuaian stok aset`);
+}
+
 /** Buat Document + DocumentVersion R1 dari metadata artifact. */
 async function buatDokumen(kategori: string, dok: Dok | null | undefined): Promise<string | null> {
   if (!dok) return null;
@@ -236,6 +304,7 @@ async function main() {
   await prisma.contractUnit.deleteMany();
   await prisma.contractInfrastructure.deleteMany();
   await prisma.contract.deleteMany();
+  await prisma.equipmentAdjustment.deleteMany();
   await prisma.equipment.deleteMany();
   await prisma.progressRecord.deleteMany();
   await prisma.customWorkBoqItem.deleteMany();
@@ -784,6 +853,8 @@ async function main() {
   // Ringkasan
   // ---------------------------------------------------------------------
   const totalRab = await prisma.unitBoqItem.findMany({ select: { volume: true, hargaSatuan: true } });
+  await isiPenyesuaianAset();
+
   await isiProgresBoqMaster();
 
   console.log("\nSelesai.");

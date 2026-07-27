@@ -57,6 +57,7 @@ export const ACL_AWAL: Record<string, string[]> = {
   keuangan: ["Administrator Sistem", "BOD", "Business Development", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor", "Admin", "Finance", "Consultant Finance"],
   progress: ["Administrator Sistem", "BOD", "Head Operation Project", "Project Manager", "Supervisor", "Quantity Surveyor", "Arsitek", "Procurement"],
   aset: SEMUA_PERAN,
+  penyesuaianAset: SEMUA_PERAN,
 };
 
 /**
@@ -78,6 +79,10 @@ export const ACL_UBAH: Record<string, string[]> = {
   // memang tugasnya, sekalipun angkanya diperoleh dari Supervisor di lapangan.
   progress: ["Administrator Sistem", "BOD", "Project Manager", "Supervisor", "Head Operation Project", "Quantity Surveyor"],
   aset: ["Administrator Sistem", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager", "Procurement"],
+  // Penyesuaian stok dipisahkan dari hak ubah aset karena pelakunya berbeda:
+  // yang mendata kehilangan dan kerusakan adalah orang lapangan, sedangkan
+  // yang menambah atau menghapus master aset adalah bagian pengadaan.
+  penyesuaianAset: ["Administrator Sistem", "BOD", "Head Operation Project", "Project Manager", "Quantity Surveyor", "Supervisor"],
 };
 
 export const USERS = [

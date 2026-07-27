@@ -6,7 +6,10 @@ import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
 } from "@/lib/actions/guard";
-import { KEPEMILIKAN_ASET, SATUAN_PAKAI, STATUS_ASET } from "@/lib/domain/enums";
+import {
+  JENIS_PENYESUAIAN_ASET, KEPEMILIKAN_ASET, SATUAN_PAKAI, STATUS_ASET,
+} from "@/lib/domain/enums";
+import { terapkanPenyesuaian } from "@/lib/calc/aset";
 
 /**
  * Pengelolaan peralatan dan aset.
@@ -116,14 +119,17 @@ export async function ubahAset(_s: HasilAksi | null, form: FormData): Promise<Ha
       if (bentrok) throw new GagalIzin(`Kode "${kode}" sudah dipakai aset lain.`);
     }
 
-    const data = await bacaAset(form);
+    // Jumlah sengaja DIBUANG di sini: stok hanya berubah lewat penyesuaian,
+    // supaya setiap pergerakannya punya alasan dan penanggung jawab. Formulir
+    // Ubah Aset pun tidak lagi menampilkan isiannya.
+    const { jumlah: _abaikan, ...data } = await bacaAset(form);
     await prisma.equipment.update({ where: { id }, data: { ...data, kode } });
 
     const jml = await catatDiff({
       pengguna,
       objek: `Aset ${lama.kode}`,
-      sebelum: { ...lama, kode: lama.kode },
-      sesudah: { ...data, kode },
+      sebelum: { ...lama, kode: lama.kode, jumlah: lama.jumlah },
+      sesudah: { ...data, kode, jumlah: lama.jumlah },
       label: LABEL,
       format: FORMAT,
     });
@@ -155,5 +161,77 @@ export async function hapusAset(_s: HasilAksi | null, form: FormData): Promise<H
     });
 
     revalidatePath("/equipment");
+  });
+}
+
+/**
+ * Catat satu penyesuaian stok aset: kehilangan, kerusakan, atau koreksi opname.
+ *
+ * Jumlah aset TIDAK BOLEH diketik langsung dari formulir Ubah Aset — ia hanya
+ * berubah lewat sini, supaya tiap pergerakan stok punya alasan dan penanggung
+ * jawab. Riwayatnya hanya-tambah: pencatatan yang telanjur salah diperbaiki
+ * dengan baris "Koreksi Stok" baru, bukan dengan menghapus baris lama.
+ *
+ * Nilai rupiah aset sengaja tidak disentuh. Penyusutan dan pembukuan kerugian
+ * dikerjakan Finance di luar modul ini.
+ */
+export async function catatPenyesuaianAset(
+  _s: HasilAksi | null,
+  form: FormData,
+): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const equipmentId = teks(form, "equipmentId", true);
+    const pengguna = await izinkan("penyesuaianAset");
+
+    const aset = await prisma.equipment.findUnique({
+      where: { id: equipmentId },
+      select: { id: true, kode: true, nama: true, satuan: true, jumlah: true, jumlahRusak: true },
+    });
+    if (!aset) throw new GagalIzin("Aset tidak ditemukan.");
+
+    const jenis = pilihan(form, "jenis", JENIS_PENYESUAIAN_ASET);
+    const banyak = Math.trunc(angka(form, "banyak", { wajib: true }));
+    const keterangan = teks(form, "keterangan", true);
+    const penanggungJawab = teksOpsional(form, "penanggungJawab");
+
+    const { stok, galat } = terapkanPenyesuaian(
+      { jumlah: aset.jumlah, jumlahRusak: aset.jumlahRusak },
+      jenis,
+      banyak,
+    );
+    if (galat) throw new GagalIzin(galat);
+
+    await prisma.$transaction([
+      prisma.equipment.update({
+        where: { id: equipmentId },
+        data: { jumlah: stok.jumlah, jumlahRusak: stok.jumlahRusak },
+      }),
+      prisma.equipmentAdjustment.create({
+        data: {
+          equipmentId,
+          jenis,
+          banyak,
+          jumlahSebelum: aset.jumlah,
+          jumlahSesudah: stok.jumlah,
+          rusakSebelum: aset.jumlahRusak,
+          rusakSesudah: stok.jumlahRusak,
+          keterangan,
+          penanggungJawab,
+          dicatatOleh: pengguna.nama,
+        },
+      }),
+    ]);
+
+    await catat({
+      pengguna,
+      objek: `Aset ${aset.kode} · ${aset.nama}`,
+      aksi: `Penyesuaian stok — ${jenis}`,
+      dari: `${aset.jumlah} ${aset.satuan} (${aset.jumlahRusak} rusak)`,
+      ke: `${stok.jumlah} ${aset.satuan} (${stok.jumlahRusak} rusak) — ${keterangan}`,
+    });
+
+    revalidatePath("/equipment");
+    return `Penyesuaian tersimpan. Stok ${aset.kode} kini ${stok.jumlah} ${aset.satuan}` +
+      (stok.jumlahRusak > 0 ? `, ${stok.jumlahRusak} di antaranya rusak.` : ".");
   });
 }
