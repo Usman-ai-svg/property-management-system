@@ -43,7 +43,7 @@ lapisan di atasnya.
 
 ## 2. Model data
 
-Skema ada di `prisma/schema.prisma`, 43 model. Ini bagian yang paling
+Skema ada di `prisma/schema.prisma`, 42 model. Ini bagian yang paling
 bernilai dan paling tahan lama — kalaupun seluruh tampilan ditulis ulang,
 struktur data ini yang menentukan sistemnya benar atau tidak.
 
@@ -64,8 +64,7 @@ struktur data ini yang menentukan sistemnya benar atau tidak.
 
 **Vendor dan kontrak**
 `Vendor`, `Contract`, `ContractUnit`, `ContractInfrastructure`,
-`ContractBoqItem`, `ContractPayment`, `VariationOrder`, `Tender`,
-`TenderParticipant`
+`ContractBoqItem`, `VariationOrder`, `Tender`, `TenderParticipant`
 
 **Uang keluar dan masuk**
 `Expense`, `ExpenseAllocation`, `OperationalCost`, `SalesPayment`
@@ -96,6 +95,18 @@ tetap satu baris di sistem, supaya rekonsiliasi bank tidak berantakan.
 Alokasi dengan `unitId` dan `infrastructureId` sama-sama kosong berarti biaya
 level proyek — perijinan, pengolahan lahan — yang memang tidak dibebankan ke
 unit mana pun.
+
+**Pembayaran vendor juga `Expense`**, yaitu yang `contractId`-nya terisi.
+Tidak ada tabel pembayaran kontrak tersendiri: pernah ada, dan akibatnya uang
+yang sama tercatat dua kali — sekali di tab Pembayaran vendor, sekali di Catat
+Pengeluaran — lalu terhitung ganda di halaman Keuangan. "Terbayar" pada sebuah
+kontrak dihitung dari `Expense` yang menunjuk kontrak itu.
+
+Untuk membagi sebuah termin ke unit yang dicakup kontrak, pakai
+`alokasiPembayaran()`, **bukan** `alokasiKontrak()`. Yang kedua membagi nilai
+kontrak dan mengembalikan `nilaiOverride` apa adanya — dipakai untuk membagi
+termin, pembayaran Rp 162 juta pada kontrak Rp 540 juta menghasilkan alokasi
+Rp 540 juta.
 
 **b. Uang disimpan sebagai `Float`, bukan `Int`.** `Int` pada Prisma adalah
 32-bit, tembus di angka sekitar 2,1 miliar — sementara nilai kontrak di sini
@@ -145,7 +156,7 @@ berapa" bisa dilacak per kolom. Pertahankan sifat ini.
 ## 3. Indeks rumus bisnis
 
 Semua ada di `src/lib/calc/`, tanpa impor framework, dan **seluruhnya sudah
-punya tes** (120 tes, `npm test`). Ini daftar yang perlu diperiksa ulang
+punya tes** (125 tes, `npm test`). Ini daftar yang perlu diperiksa ulang
 bersama tim keuangan dan teknik sebelum dipakai di produksi — bukan karena
 diragukan, tapi karena angka-angka inilah yang nanti dipakai mengambil
 keputusan.
@@ -159,7 +170,8 @@ keputusan.
 | | `rapGenerik`, `boqSarprasDefault` | Template untuk sarpras |
 | `keuangan.ts` | `statusSerapan` | Hemat / Sesuai / Over, toleransi 3% |
 | | `ringkasKontrak` | Nilai efektif, terbayar, retensi, VO |
-| | `alokasiKontrak` | Bagian tiap unit atas kontrak borongan |
+| | `alokasiKontrak` | Bagian tiap unit atas NILAI kontrak borongan |
+| | `alokasiPembayaran` | Bagian tiap unit atas satu TERMIN pembayaran |
 | | `bagiRata` | Pembagian rata; sisa pembulatan ke baris pertama |
 | | `periksaAlokasi` | Penegak invarian induk–rincian di atas |
 | `plan-real.ts` | `ringkasPlanReal` | Rencana vs realisasi per pos |

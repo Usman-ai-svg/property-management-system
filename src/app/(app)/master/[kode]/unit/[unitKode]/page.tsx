@@ -125,7 +125,7 @@ export default async function RincianUnit({
     select: {
       id: true, nominal: true, retensiPct: true, deskripsi: true,
       vendor: { select: { nama: true } },
-      pembayaran: { select: { nominal: true } },
+      expenses: { select: { total: true } },
       variationOrders: { select: { nominal: true, status: true } },
     },
   });

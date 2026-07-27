@@ -44,7 +44,7 @@ export default async function VendorManagement() {
         select: {
           id: true, nominal: true, retensiPct: true,
           project: { select: { kode: true } },
-          pembayaran: { select: { nominal: true } },
+          expenses: { select: { total: true } },
           variationOrders: { select: { nominal: true, status: true } },
         },
       },

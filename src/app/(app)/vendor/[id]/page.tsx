@@ -52,7 +52,10 @@ export default async function DetailVendor({
           id: true, kode: true, jenis: true, deskripsi: true, nominal: true,
           retensiPct: true, jatuhTempoBln: true, mulai: true,
           project: { select: { kode: true, nama: true } },
-          pembayaran: { orderBy: { tanggal: "asc" }, select: { id: true, tanggal: true, uraian: true, nominal: true } },
+          expenses: {
+            orderBy: { tanggal: "asc" },
+            select: { id: true, tanggal: true, uraian: true, total: true },
+          },
           variationOrders: {
             orderBy: { tanggal: "asc" },
             select: { id: true, nomor: true, tanggal: true, uraian: true, nominal: true, status: true },
@@ -504,7 +507,7 @@ export default async function DetailVendor({
                   )}
                 </div>
 
-                {k.pembayaran.length === 0 ? (
+                {k.expenses.length === 0 ? (
                   <div style={{ fontSize: 12, color: "var(--muted)" }}>Belum ada pembayaran.</div>
                 ) : (
                   <Tabel
@@ -515,15 +518,15 @@ export default async function DetailVendor({
                       { label: "Kumulatif", rata: "kanan" },
                     ]}
                   >
-                    {k.pembayaran.map((p, i) => {
-                      const kumulatif = k.pembayaran
+                    {k.expenses.map((p, i) => {
+                      const kumulatif = k.expenses
                         .slice(0, i + 1)
-                        .reduce((s, x) => s + x.nominal, 0);
+                        .reduce((s, x) => s + x.total, 0);
                       return (
                         <tr key={p.id}>
                           <td style={{ color: "var(--muted)" }}>{tanggal(p.tanggal)}</td>
                           <td style={{ whiteSpace: "normal" }}>{p.uraian}</td>
-                          <td className="num" style={{ textAlign: "right" }}>{rp(p.nominal)}</td>
+                          <td className="num" style={{ textAlign: "right" }}>{rp(p.total)}</td>
                           <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
                             {rp(kumulatif)}
                           </td>

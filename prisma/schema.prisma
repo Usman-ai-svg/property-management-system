@@ -581,8 +581,18 @@ model Contract {
 
   units           ContractUnit[]
   infrastructures ContractInfrastructure[]
-  pembayaran      ContractPayment[]
   variationOrders VariationOrder[]
+  /// Pembayaran ke vendor atas kontrak ini.
+  ///
+  /// Tidak ada tabel pembayaran kontrak tersendiri: satu pembayaran vendor
+  /// adalah satu `Expense` yang menunjuk kontrak ini. Sebelumnya keduanya
+  /// terpisah, dan uang yang sama bisa tercatat dua kali — sekali di tab
+  /// Pembayaran vendor, sekali di Catat Pengeluaran — lalu terhitung ganda
+  /// di halaman Keuangan.
+  ///
+  /// Dengan satu tabel, pembayaran vendor otomatis ikut aturan induk–rincian
+  /// `Expense`: satu baris mutasi bank, dibebankan ke beberapa unit lewat
+  /// `ExpenseAllocation`.
   expenses        Expense[]
   boqItems        ContractBoqItem[]
 
@@ -657,19 +667,6 @@ model ContractInfrastructure {
 
   @@id([contractId, infrastructureId])
   @@map("contract_infrastructures")
-}
-
-model ContractPayment {
-  id         String   @id @default(cuid())
-  contractId String
-  tanggal    DateTime
-  uraian     String
-  nominal    Float
-
-  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-
-  @@index([contractId])
-  @@map("contract_payments")
 }
 
 /// Variation Order — pekerjaan tambah/kurang. Nominal boleh negatif.

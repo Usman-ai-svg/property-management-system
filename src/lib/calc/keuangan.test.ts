@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   alokasiKontrak, bagiRata, periksaAlokasi, ringkasKontrak, statusSerapan, totalVoDisetujui,
+  alokasiPembayaran,
 } from "./keuangan";
 
 describe("statusSerapan", () => {
@@ -27,7 +28,7 @@ describe("ringkasKontrak", () => {
   const kontrak = {
     nominal: 900_000_000,
     retensiPct: 5,
-    pembayaran: [{ nominal: 300_000_000 }, { nominal: 250_000_000 }],
+    expenses: [{ total: 300_000_000 }, { total: 250_000_000 }],
     variationOrders: [
       { nominal: 24_000_000, status: "Disetujui" },
       { nominal: -8_500_000, status: "Disetujui" },
@@ -63,7 +64,7 @@ describe("ringkasKontrak", () => {
   });
 
   it("tidak membagi nol pada kontrak bernilai nol", () => {
-    const kosong = { nominal: 0, retensiPct: 0, pembayaran: [], variationOrders: [] };
+    const kosong = { nominal: 0, retensiPct: 0, expenses: [], variationOrders: [] };
     assert.equal(ringkasKontrak(kosong).persenTerbayar, 0);
   });
 });
@@ -193,5 +194,43 @@ describe("periksaAlokasi", () => {
       const baris = bagiRata(total, n).map((nominal, i) => u(nominal, `u${i}`));
       assert.equal(periksaAlokasi(total, baris), null, `${total} dibagi ${n}`);
     }
+  });
+});
+
+describe("alokasiPembayaran", () => {
+  it("membagi sebanding dengan porsi tiap unit, bukan mengembalikan nilai override", () => {
+    // Kontrak Rp 540 juta dengan override; termin yang dibayar Rp 162 juta.
+    // `alokasiKontrak` akan mengembalikan 540 juta di sini — itu bug yang
+    // fungsi ini ada untuk mencegahnya.
+    const hasil = alokasiPembayaran(162_000_000, 540_000_000, [
+      { nilaiOverride: 165_000_000 },
+      { nilaiOverride: 165_000_000 },
+      { nilaiOverride: 210_000_000 },
+    ]);
+    assert.equal(
+      hasil.reduce((s, h) => s + h.alokasi, 0),
+      162_000_000,
+    );
+    assert.equal(hasil[2].alokasi, 63_000_000); // 210/540 × 162 juta
+  });
+
+  it("membagi rata bila tidak ada override", () => {
+    const hasil = alokasiPembayaran(90_000_000, 300_000_000, [{}, {}, {}]);
+    assert.deepEqual(hasil.map((h) => h.alokasi), [30_000_000, 30_000_000, 30_000_000]);
+  });
+
+  it("menaruh sisa pembulatan di baris pertama supaya jumlahnya persis", () => {
+    const hasil = alokasiPembayaran(100, 300, [{}, {}, {}]);
+    assert.equal(hasil.reduce((s, h) => s + h.alokasi, 0), 100);
+    assert.deepEqual(hasil.map((h) => h.alokasi), [34, 33, 33]);
+  });
+
+  it("membagi rata bila nilai kontraknya nol", () => {
+    const hasil = alokasiPembayaran(60, 0, [{}, {}]);
+    assert.deepEqual(hasil.map((h) => h.alokasi), [30, 30]);
+  });
+
+  it("mengembalikan daftar kosong bila tidak ada cakupan", () => {
+    assert.deepEqual(alokasiPembayaran(100, 200, []), []);
   });
 });

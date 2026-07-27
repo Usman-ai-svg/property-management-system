@@ -18,7 +18,7 @@ export function KontrakBacaSaja({
     retensiPct: number;
     vendor: { nama: string };
     deskripsi: string;
-    pembayaran: { nominal: number }[];
+    expenses: { total: number }[];
     variationOrders: { nominal: number; status: string }[];
   }[];
   bolehHarga: boolean;

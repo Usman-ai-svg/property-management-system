@@ -27,13 +27,19 @@ export interface VariationOrderLike {
 export interface KontrakLike {
   nominal: number;
   retensiPct: number;
-  pembayaran: { nominal: number }[];
+  /**
+   * Pembayaran ke vendor, yaitu `Expense` yang menunjuk kontrak ini.
+   *
+   * Sengaja bukan tabel tersendiri: pembayaran vendor adalah pengeluaran
+   * biasa, dan memisahkannya membuat uang yang sama bisa tercatat dua kali.
+   */
+  expenses: { total: number }[];
   variationOrders: VariationOrderLike[];
 }
 
 /** Total yang sudah dibayarkan pada sebuah kontrak. */
-export const totalTerbayar = (k: Pick<KontrakLike, "pembayaran">): number =>
-  k.pembayaran.reduce((s, p) => s + p.nominal, 0);
+export const totalTerbayar = (k: Pick<KontrakLike, "expenses">): number =>
+  k.expenses.reduce((s, e) => s + e.total, 0);
 
 /** Total VO yang sudah disetujui (boleh negatif untuk pekerjaan kurang). */
 export const totalVoDisetujui = (vo: VariationOrderLike[]): number =>
@@ -147,6 +153,42 @@ export function alokasiKontrak<T extends { nilaiOverride?: number | null }>(
     ...i,
     alokasi: i.nilaiOverride ?? perItem,
   }));
+}
+
+/**
+ * Bagi satu PEMBAYARAN kontrak ke unit/sarpras yang dicakupnya.
+ *
+ * Berbeda dari `alokasiKontrak`, yang membagi NILAI KONTRAK. Untuk kontrak
+ * yang punya `nilaiOverride`, fungsi itu mengembalikan angka override apa
+ * adanya — benar untuk membagi nilai kontrak, tetapi salah besar bila dipakai
+ * membagi sebuah termin: pembayaran Rp 162 juta pada kontrak Rp 540 juta akan
+ * menghasilkan alokasi Rp 540 juta.
+ *
+ * Di sini tiap item mendapat porsi SEBANDING dengan bagiannya atas nilai
+ * kontrak. Sisa pembulatan ditaruh pada baris pertama supaya jumlah seluruh
+ * alokasi persis sama dengan nominal yang dibayarkan — invarian `Expense`
+ * mensyaratkan itu, dan selisih satu rupiah pada laporan keuangan adalah
+ * selisih yang harus dicari orang.
+ */
+export function alokasiPembayaran<T extends { nilaiOverride?: number | null }>(
+  nominalBayar: number,
+  nilaiKontrak: number,
+  items: T[],
+): (T & { alokasi: number })[] {
+  if (items.length === 0) return [];
+
+  const porsiNilai = alokasiKontrak(nilaiKontrak, items);
+  const totalPorsi = porsiNilai.reduce((s, i) => s + i.alokasi, 0);
+
+  // Kontrak tanpa nilai — bagi rata saja, tidak ada dasar pembobotan lain.
+  const bagian = totalPorsi
+    ? porsiNilai.map((i) => Math.floor((nominalBayar * i.alokasi) / totalPorsi))
+    : bagiRata(nominalBayar, items.length);
+
+  const sisa = nominalBayar - bagian.reduce((s, b) => s + b, 0);
+  bagian[0] += sisa;
+
+  return items.map((i, k) => ({ ...i, alokasi: bagian[k] }));
 }
 
 // ---------------------------------------------------------------------------

@@ -7,6 +7,7 @@ import {
   angka, GagalIzin, HasilAksi, idProyekDariKode, izinkan, jalankan, pilihan, teks, teksOpsional,
 } from "@/lib/actions/guard";
 import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
+import { alokasiPembayaran, periksaAlokasi } from "@/lib/calc/keuangan";
 import {
   DOKUMEN_TENDER, JENIS_KONTRAK, STATUS_TENDER, STATUS_VENDOR, STATUS_VO,
 } from "@/lib/domain/enums";
@@ -67,11 +68,14 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
     const kontrak = await prisma.contract.findUnique({
       where: { id: contractId },
       select: {
-        id: true, kode: true, nominal: true, retensiPct: true, projectId: true,
+        id: true, kode: true, jenis: true, deskripsi: true,
+        nominal: true, retensiPct: true, projectId: true,
         project: { select: { kode: true } },
         vendor: { select: { id: true, nama: true } },
-        pembayaran: { select: { nominal: true } },
+        expenses: { select: { total: true } },
         variationOrders: { select: { nominal: true, status: true } },
+        units: { select: { unitId: true, nilaiOverride: true } },
+        infrastructures: { select: { infrastructureId: true, nilaiOverride: true } },
       },
     });
     if (!kontrak) throw new GagalIzin("Kontrak tidak ditemukan.");
@@ -87,7 +91,7 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
       .filter((v) => v.status === "Disetujui")
       .reduce((s, v) => s + v.nominal, 0);
     const nilaiEfektif = kontrak.nominal + voDisetujui;
-    const sudah = kontrak.pembayaran.reduce((s, p) => s + p.nominal, 0);
+    const sudah = kontrak.expenses.reduce((s, e) => s + e.total, 0);
 
     if (sudah + nominal > nilaiEfektif) {
       throw new GagalIzin(
@@ -95,8 +99,40 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
       );
     }
 
-    await prisma.contractPayment.create({
-      data: { contractId, tanggal: new Date(), uraian, nominal },
+    // Pembayaran vendor DISIMPAN SEBAGAI PENGELUARAN, bukan tabel tersendiri.
+    // Dengan begitu satu pembayaran hanya punya satu catatan: ia muncul di
+    // Keuangan sebagai baris mutasi bank sekaligus di kontrak ini sebagai
+    // termin, tanpa risiko terhitung dua kali.
+    //
+    // Pembebanannya mengikuti cakupan kontrak — dibagi menurut porsi tiap
+    // unit atau item sarpras, memakai pembagian yang sama dengan alokasi
+    // kontrak di halaman Keuangan.
+    const porsi =
+      kontrak.jenis === "Unit"
+        ? alokasiPembayaran(nominal, nilaiEfektif, kontrak.units).map((a) => ({
+            unitId: a.unitId, infrastructureId: null, nominal: a.alokasi,
+          }))
+        : alokasiPembayaran(nominal, nilaiEfektif, kontrak.infrastructures).map((a) => ({
+            unitId: null, infrastructureId: a.infrastructureId, nominal: a.alokasi,
+          }));
+
+    const galat = periksaAlokasi(nominal, porsi);
+    if (galat) throw new GagalIzin(galat);
+
+    await prisma.expense.create({
+      data: {
+        projectId: kontrak.projectId,
+        contractId,
+        tanggal: new Date(),
+        peruntukan: kontrak.jenis === "Unit" ? "Unit" : "Sarana & Prasarana",
+        jenis: "Upah Borongan",
+        metode: "Transfer",
+        uraian: `${uraian} — ${kontrak.kode} ${kontrak.vendor.nama}`,
+        total: nominal,
+        status: "Lunas",
+        pic: pengguna.nama,
+        alokasi: { create: porsi },
+      },
     });
 
     await catat({
@@ -425,17 +461,17 @@ export async function hapusKontrak(_s: HasilAksi | null, form: FormData): Promis
       select: {
         id: true, kode: true, projectId: true, vendorId: true, deskripsi: true, nominal: true,
         project: { select: { kode: true } },
-        _count: { select: { pembayaran: true, expenses: true } },
+        _count: { select: { expenses: true } },
       },
     });
     if (!lama) return;
 
     const pengguna = await izinkan("progress", lama.projectId);
 
-    if (lama._count.pembayaran > 0 || lama._count.expenses > 0) {
+    if (lama._count.expenses > 0) {
       throw new GagalIzin(
-        `Kontrak ${lama.kode} sudah punya ${lama._count.pembayaran} pembayaran dan ` +
-          `${lama._count.expenses} pengeluaran terkait. Hapus catatan itu lebih dulu bila kontrak ini memang batal.`,
+        `Kontrak ${lama.kode} sudah punya ${lama._count.expenses} pembayaran tercatat. ` +
+          `Hapus pembayaran itu lebih dulu bila kontrak ini memang batal.`,
       );
     }
 

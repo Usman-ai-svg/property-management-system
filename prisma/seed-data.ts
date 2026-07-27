@@ -429,17 +429,13 @@ export const POS_HPP: Record<string, string> = {
  * `unit` diisi nomor unit bila biaya itu menempel pada satu unit tertentu.
  */
 export const BIAYA_UMUM = [
-  { tgl: "16 Jul 2026", proyek: "NT4", fase: "F2", unit: "5", peruntukan: "Unit (rumah dijual)", jenis: "Subkon", metode: "Transfer", uraian: "Termin 3 subkon rangka atap", total: 70000000, status: "Lunas", pic: "Budi Hartono", bukti: "ba-termin-3.pdf", kontrak: "CV Baja Jaya Mandiri" },
   { tgl: "14 Jul 2026", proyek: "GN2", fase: "F1", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Material", metode: "Petty Cash", uraian: "Besi 6mm & 10mm, semen unit 6-10", total: 62000000, status: "Lunas", pic: "Sari Kusuma", bukti: "nota-besi.jpg", kontrak: "" },
   { tgl: "12 Jul 2026", proyek: "NT4", fase: "F2", unit: "", peruntukan: "Prasarana & Sarana", jenis: "Material", metode: "Transfer", uraian: "Beton jalan lingkungan", total: 18400000, status: "Lunas", pic: "Budi Hartono", bukti: "inv-beton.pdf", kontrak: "" },
   { tgl: "11 Jul 2026", proyek: "GN2", fase: "F1", unit: "2", peruntukan: "Unit (rumah dijual)", jenis: "Material", metode: "Transfer", uraian: "Keramik lantai & sanitair", total: 9800000, status: "Belum", pic: "Sari Kusuma", bukti: "", kontrak: "" },
   { tgl: "10 Jul 2026", proyek: "GN2", fase: "F1", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Upah Harian", metode: "Petty Cash", uraian: "Upah tukang minggu ke-2 Juli, 24 orang", total: 24000000, status: "Lunas", pic: "Sari Kusuma", bukti: "absensi.jpg", kontrak: "" },
   { tgl: "08 Jul 2026", proyek: "NT4", fase: "F1", unit: "", peruntukan: "Prasarana & Sarana", jenis: "Upah Harian", metode: "Petty Cash", uraian: "Upah paving jalan cluster", total: 4500000, status: "Lunas", pic: "Budi Hartono", bukti: "", kontrak: "" },
-  { tgl: "05 Jul 2026", proyek: "NT2", fase: "F1", unit: "", peruntukan: "Pengolahan Lahan", jenis: "Subkon", metode: "Transfer", uraian: "Cut & fill lahan", total: 12500000, status: "Lunas", pic: "Dewi Anggraini", bukti: "kontrak-cnf.pdf", kontrak: "CV Tanah Makmur" },
-  { tgl: "02 Jul 2026", proyek: "GN2", fase: "F1", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Upah Borongan", metode: "Transfer", uraian: "Termin 2 borongan F1", total: 81000000, status: "Lunas", pic: "Sari Kusuma", bukti: "ba-borongan.pdf", kontrak: "Pemborong Hj. Hasim" },
   { tgl: "28 Jun 2026", proyek: "NT2", fase: "F2", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Material", metode: "Transfer", uraian: "Bata ringan & mortar", total: 15600000, status: "Lunas", pic: "Dewi Anggraini", bukti: "nota-bata.jpg", kontrak: "" },
   { tgl: "21 Jun 2026", proyek: "GN2", fase: "F1", unit: "", peruntukan: "Perijinan & Ormas", jenis: "Lain-lain proyek", metode: "Tunai langsung", uraian: "Biaya izin ormas & lingkungan", total: 6000000, status: "Lunas", pic: "Sari Kusuma", bukti: "kwitansi.jpg", kontrak: "" },
-  { tgl: "15 Jun 2026", proyek: "NT4", fase: "F2", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Subkon", metode: "Transfer", uraian: "Termin 2 subkon rangka atap", total: 250000000, status: "Lunas", pic: "Budi Hartono", bukti: "ba-termin-2.pdf", kontrak: "CV Baja Jaya Mandiri" },
   { tgl: "10 Jun 2026", proyek: "NT4", fase: "F3", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Upah Borongan", metode: "Transfer", uraian: "Borongan struktur Tesla", total: 95000000, status: "Lunas", pic: "Budi Hartono", bukti: "ba-tesla.pdf", kontrak: "" },
 ];
 

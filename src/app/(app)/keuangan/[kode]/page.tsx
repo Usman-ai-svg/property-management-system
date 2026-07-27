@@ -78,7 +78,7 @@ export default async function KeuanganProyek({
     where: { projectId: proyek.id, jenis: "Unit" },
     select: {
       id: true, nominal: true, retensiPct: true,
-      pembayaran: { select: { nominal: true } },
+      expenses: { select: { total: true } },
       variationOrders: { select: { nominal: true, status: true } },
       units: { select: { unitId: true, nilaiOverride: true } },
     },
@@ -98,7 +98,7 @@ export default async function KeuanganProyek({
     where: { projectId: proyek.id, jenis: "Sarpras" },
     select: {
       id: true, nominal: true, retensiPct: true,
-      pembayaran: { select: { nominal: true } },
+      expenses: { select: { total: true } },
       variationOrders: { select: { nominal: true, status: true } },
       infrastructures: { select: { infrastructureId: true, nilaiOverride: true } },
     },

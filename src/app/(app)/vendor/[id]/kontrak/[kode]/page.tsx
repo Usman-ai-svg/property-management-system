@@ -64,7 +64,7 @@ export default async function DetailKontrak({
           },
         },
       },
-      pembayaran: { select: { nominal: true } },
+      expenses: { select: { total: true } },
       variationOrders: { select: { nominal: true, status: true } },
       units: {
         select: {

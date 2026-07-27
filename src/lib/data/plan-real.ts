@@ -56,7 +56,7 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
         where: { jenis: "Sarpras" },
         select: {
           nominal: true, retensiPct: true,
-          pembayaran: { select: { nominal: true } },
+          expenses: { select: { total: true } },
           variationOrders: { select: { nominal: true, status: true } },
         },
       },

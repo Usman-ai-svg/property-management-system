@@ -15,6 +15,7 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/lib/auth/password";
 import { buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap, rabAcuan, rapAcuan, totalBaris, boqSarprasDefault, rapGenerik } from "../src/lib/calc/boq";
 import { parseUkuran } from "../src/lib/format";
+import { alokasiPembayaran } from "../src/lib/calc/keuangan";
 import {
   ACL_AWAL, ACL_UBAH, ASET, BIAYA_OPERASIONAL, BIAYA_UMUM, KERJA_TAMBAH, KONTRAK, LOG_AWAL,
   PORSI_BIAYA_SARPRAS, PORSI_BIAYA_UNIT, POS_HPP, PROYEK, ROLE_GRUP, SARPRAS, SEMUA_PERAN,
@@ -231,7 +232,6 @@ async function main() {
   await prisma.tenderParticipant.deleteMany();
   await prisma.tender.deleteMany();
   await prisma.variationOrder.deleteMany();
-  await prisma.contractPayment.deleteMany();
   await prisma.contractBoqItem.deleteMany();
   await prisma.contractUnit.deleteMany();
   await prisma.contractInfrastructure.deleteMany();
@@ -531,7 +531,6 @@ async function main() {
         kode: K.kode, projectId: projectId.get(K.proyek)!, vendorId: vendorId.get(K.vendor)!,
         jenis: K.jenis, deskripsi: K.deskripsi, nominal: K.nominal,
         retensiPct: K.retensiPct, jatuhTempoBln: K.jatuhTempoBln, mulai: tgl(K.mulai)!,
-        pembayaran: { create: K.riwayat.map((r) => ({ tanggal: tgl(r.tgl)!, uraian: r.uraian, nominal: r.nominal })) },
         variationOrders: { create: (K.vo ?? []).map((v) => ({ nomor: v.no, tanggal: tgl(v.tgl)!, uraian: v.uraian, nominal: v.nominal, status: v.status })) },
       },
     });
@@ -547,6 +546,47 @@ async function main() {
       const sid = infraId.get(kodeSar);
       if (!sid) continue;
       await prisma.contractInfrastructure.create({ data: { contractId: c.id, infrastructureId: sid } });
+    }
+
+    // Pembayaran vendor disimpan sebagai PENGELUARAN yang menunjuk kontrak,
+    // bukan tabel tersendiri — satu uang, satu catatan. Pembebanannya dibagi
+    // menurut porsi tiap unit/sarpras dalam kontrak, memakai pembagian yang
+    // sama dengan yang dipakai halaman Keuangan.
+    const cakupanUnit = await prisma.contractUnit.findMany({
+      where: { contractId: c.id },
+      select: { unitId: true, nilaiOverride: true },
+    });
+    const cakupanSarpras = await prisma.contractInfrastructure.findMany({
+      where: { contractId: c.id },
+      select: { infrastructureId: true, nilaiOverride: true },
+    });
+
+    for (const r of K.riwayat) {
+      const porsi =
+        K.jenis === "Unit"
+          ? alokasiPembayaran(r.nominal, K.nominal, cakupanUnit).map((a) => ({
+              unitId: a.unitId, infrastructureId: null, nominal: a.alokasi,
+            }))
+          : alokasiPembayaran(r.nominal, K.nominal, cakupanSarpras).map((a) => ({
+              unitId: null, infrastructureId: a.infrastructureId, nominal: a.alokasi,
+            }));
+      if (porsi.length === 0) continue;
+
+      await prisma.expense.create({
+        data: {
+          projectId: projectId.get(K.proyek)!,
+          contractId: c.id,
+          tanggal: tgl(r.tgl)!,
+          peruntukan: K.jenis === "Unit" ? "Unit (rumah dijual)" : "Sarana & Prasarana",
+          jenis: "Upah Borongan",
+          metode: "Transfer",
+          uraian: `${r.uraian} — ${K.kode} ${K.vendor}`,
+          total: r.nominal,
+          status: "Lunas",
+          pic: "Sistem",
+          alokasi: { create: porsi },
+        },
+      });
     }
 
     await isiBoqSpk(c.id, K);
