@@ -137,6 +137,7 @@ model Document {
   ktDesain            CustomWork[]     @relation("KtDesain")
   ktModel3d           CustomWork[]     @relation("KtModel3d")
   ktGambarKerja       CustomWork[]     @relation("KtGambarKerja")
+  contractSpk         Contract?        @relation("ContractSpk")
 
   @@map("documents")
 }
@@ -568,6 +569,15 @@ model Contract {
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   vendor  Vendor  @relation(fields: [vendorId], references: [id])
+
+  /// Dokumen SPK (Surat Perintah Kerja) yang mendasari kontrak ini.
+  ///
+  /// Kontrak tidak sah tanpa SPK, jadi berkasnya diunggah bersamaan saat
+  /// kontrak dibuat. Memakai `Document` + `DocumentVersion` seperti dokumen
+  /// lain supaya revisinya ikut terlacak — SPK kerap direvisi setelah
+  /// negosiasi, dan versi mana yang berlaku harus bisa ditelusuri.
+  docSpkId String?   @unique
+  docSpk   Document? @relation("ContractSpk", fields: [docSpkId], references: [id])
 
   units           ContractUnit[]
   infrastructures ContractInfrastructure[]

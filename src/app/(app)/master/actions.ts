@@ -699,6 +699,17 @@ export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promis
       if (!l) throw new GagalIzin("Legalitas tidak ditemukan.");
       projectId = l.projectId;
       kodeProyek = l.project.kode;
+    } else if (pemilikJenis === "kontrak") {
+      // SPK menempel pada kontrak, bukan pada proyek atau unit — revisinya
+      // dilacak sama seperti gambar kerja karena SPK kerap direvisi setelah
+      // negosiasi, dan versi mana yang berlaku harus bisa ditelusuri.
+      const k = await prisma.contract.findUnique({
+        where: { id: pemilikId },
+        select: { id: true, projectId: true, project: { select: { kode: true } } },
+      });
+      if (!k) throw new GagalIzin("Kontrak tidak ditemukan.");
+      projectId = k.projectId;
+      kodeProyek = k.project.kode;
     } else if (pemilikJenis === "proyek") {
       const p = await prisma.project.findUnique({
         where: { id: pemilikId },
@@ -769,6 +780,8 @@ export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promis
         const kolom = kolomKt[kategori];
         if (!kolom) throw new GagalIzin(`Kategori dokumen "${kategori}" tidak dikenal untuk kerja tambah.`);
         await prisma.customWork.update({ where: { id: pemilikId }, data: { [kolom]: dokId } });
+      } else if (pemilikJenis === "kontrak") {
+        await prisma.contract.update({ where: { id: pemilikId }, data: { docSpkId: dokId } });
       } else if (pemilikJenis === "sarpras") {
         const kolom = kategori === "model3d" ? "docModel3dId" : "docGambarKerjaId";
         await prisma.infrastructure.update({ where: { id: pemilikId }, data: { [kolom]: dokId } });

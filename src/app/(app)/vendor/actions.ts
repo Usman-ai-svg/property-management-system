@@ -6,6 +6,7 @@ import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
   angka, GagalIzin, HasilAksi, idProyekDariKode, izinkan, jalankan, pilihan, teks, teksOpsional,
 } from "@/lib/actions/guard";
+import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
 import {
   DOKUMEN_TENDER, JENIS_KONTRAK, STATUS_TENDER, STATUS_VENDOR, STATUS_VO,
 } from "@/lib/domain/enums";
@@ -300,9 +301,39 @@ export async function tambahKontrak(_s: HasilAksi | null, form: FormData): Promi
 
     const { jenis, cakupan, data } = await bacaKontrak(form, projectId);
 
+    // Kontrak tidak sah tanpa SPK, jadi berkasnya diminta di formulir yang
+    // sama — bukan diunggah belakangan, yang membuka celah kontrak berjalan
+    // tanpa dasar tertulis.
+    const spk = form.get("spk");
+    if (!(spk instanceof File) || spk.size === 0) {
+      throw new GagalIzin("Dokumen SPK wajib diunggah saat membuat kontrak.");
+    }
+    const namaFile = bersihkanNamaFile(spk.name);
+    periksaBerkas(namaFile, spk.type, spk.size);
+    const tersimpan = await simpanBerkas(await spk.arrayBuffer(), namaFile);
+
+    // Dokumen dibuat lebih dulu lalu ditunjuk lewat kolom id: Prisma tidak
+    // mengizinkan relasi bersarang dicampur dengan skalar `projectId` /
+    // `vendorId` dalam satu create.
+    const dokumen = await prisma.document.create({
+      data: {
+        kategori: "spk",
+        judul: `SPK ${kode} · ${vendor.nama}`,
+        versions: {
+          create: {
+            revisi: "R1",
+            namaFile,
+            ukuranByte: tersimpan.ukuranByte,
+            objectKey: tersimpan.objectKey,
+            diunggahOlehId: pengguna.id,
+          },
+        },
+      },
+    });
+
     await prisma.contract.create({
       data: {
-        ...data, kode, projectId, vendorId,
+        ...data, kode, projectId, vendorId, docSpkId: dokumen.id,
         ...(jenis === "Unit"
           ? { units: { create: cakupan.map((unitId) => ({ unitId })) } }
           : { infrastructures: { create: cakupan.map((infrastructureId) => ({ infrastructureId })) } }),
@@ -313,7 +344,9 @@ export async function tambahKontrak(_s: HasilAksi | null, form: FormData): Promi
       pengguna, projectId,
       objek: `Kontrak ${kode} · ${vendor.nama}`,
       aksi: "Buat kontrak",
-      ke: `${data.deskripsi} — ${rpLog(data.nominal)} · ${cakupan.length} ${jenis === "Unit" ? "unit" : "item sarpras"}`,
+      ke:
+        `${data.deskripsi} — ${rpLog(data.nominal)} · ${cakupan.length} ` +
+        `${jenis === "Unit" ? "unit" : "item sarpras"} · SPK ${namaFile}`,
     });
 
     revalidatePath("/vendor");

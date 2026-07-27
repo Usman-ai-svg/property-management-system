@@ -6,6 +6,8 @@ import { nilaiTerpasang, progresTertimbang } from "@/lib/calc/kontrak-boq";
 import { ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Tabel } from "@/components/kartu-tabel";
+import { FileRow } from "@/components/file-row";
+import { unggahRevisi } from "../../../../master/actions";
 import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import {
   HapusBarisBoq,
@@ -50,6 +52,18 @@ export default async function DetailKontrak({
       retensiPct: true, jatuhTempoBln: true, mulai: true, projectId: true,
       project: { select: { kode: true, nama: true } },
       vendor: { select: { id: true, nama: true, bidang: true } },
+      docSpk: {
+        select: {
+          id: true, kategori: true,
+          versions: {
+            orderBy: { diunggahPada: "desc" },
+            select: {
+              id: true, revisi: true, namaFile: true, ukuranByte: true,
+              objectKey: true, diunggahPada: true,
+            },
+          },
+        },
+      },
       pembayaran: { select: { nominal: true } },
       variationOrders: { select: { nominal: true, status: true } },
       units: {
@@ -147,6 +161,27 @@ export default async function DetailKontrak({
       >
         ← Kembali ke {kontrak.vendor.nama}
       </Link>
+
+      {/* ---------- dokumen SPK ---------- */}
+      <div className="card" style={{ padding: "14px 18px", marginBottom: 16 }}>
+        <div className="eyebrow" style={{ marginBottom: 6 }}>Dokumen SPK</div>
+        <FileRow
+          label={`SPK ${kontrak.kode}`}
+          dokumen={
+            kontrak.docSpk
+              ? { ...kontrak.docSpk, versi: kontrak.docSpk.versions }
+              : null
+          }
+          bolehUbah={bolehUbahProgres}
+          konteks={`SPK ${kontrak.kode} · ${kontrak.vendor.nama}`}
+          pemilik={{ jenis: "kontrak", id: kontrak.id, kategori: "spk" }}
+          aksiUnggah={unggahRevisi}
+        />
+        <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: "8px 0 0" }}>
+          SPK yang direvisi diunggah sebagai revisi baru, bukan menimpa yang lama —
+          versi mana yang berlaku saat sebuah opname disetujui tetap bisa ditelusuri.
+        </p>
+      </div>
 
       <RingkasOpname
         nilaiKontrak={ringkas.nilaiEfektif}

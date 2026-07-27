@@ -156,6 +156,16 @@ export function TambahKontrak({
         <Field label="Deskripsi Pekerjaan" nama="deskripsi" wajib />
       </BarisField>
 
+      <BarisField kolom={1}>
+        <Field
+          label="Dokumen SPK"
+          nama="spk"
+          tipe="berkas"
+          wajib
+          petunjuk="Surat Perintah Kerja yang mendasari kontrak ini. Tersimpan sebagai revisi R1 dan bisa diperbarui dari halaman SPK."
+        />
+      </BarisField>
+
       <BarisField>
         <Field label="Nilai Kontrak" nama="nominal" tipe="number" satuan="Rp" wajib />
         <Field label="Mulai" nama="mulai" tipe="tanggal" />

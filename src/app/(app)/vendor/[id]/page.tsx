@@ -12,7 +12,6 @@ import { Tabel } from "@/components/kartu-tabel";
 const TAB = [
   ["kontrak", "Kontrak"],
   ["tender", "Penawaran"],
-  ["progres", "Progress Pekerjaan"],
   ["bayar", "Pembayaran"],
 ] as const;
 
@@ -474,69 +473,6 @@ export default async function DetailVendor({
           })
         ))}
 
-      {/* ================= PROGRESS PEKERJAAN ================= */}
-      {tabAktif === "progres" && (
-        <Tabel
-          kelasBungkus="card tablewrap"
-          kolom={[
-            { label: "Kontrak" },
-            { label: "Objek" },
-            { label: "Jenis" },
-            { label: "Progress", minLebar: 190 },
-            { label: "Status" },
-          ]}
-          kosong="Belum ada pekerjaan yang dikontrakkan ke vendor ini."
-        >
-          {vendor.contracts.flatMap((k) => [
-            ...k.units.map((x) => (
-              <tr key={`u-${k.id}-${x.unit.id}`}>
-                <td style={{ color: "var(--muted)" }}>{k.kode}</td>
-                <td style={{ fontWeight: 600 }}>
-                  Unit {x.unit.phase.kode}-{x.unit.nomor}
-                </td>
-                <td>{x.unit.unitType.nama}</td>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Track
-                      nilai={x.unit.progress}
-                      tinggi={9}
-                      warna={x.unit.progress === 100 ? "var(--green)" : "var(--teal)"}
-                    />
-                    <span style={{ fontSize: 11, color: "var(--muted)", width: 30 }}>
-                      {x.unit.progress}%
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <Badge nilai={x.unit.statusPembangunan} peta={WARNA_STATUS.bangun} />
-                </td>
-              </tr>
-            )),
-            ...k.infrastructures.map((x) => (
-              <tr key={`s-${k.id}-${x.infrastructure.id}`}>
-                <td style={{ color: "var(--muted)" }}>{k.kode}</td>
-                <td style={{ fontWeight: 600 }}>{x.infrastructure.nama}</td>
-                <td>{x.infrastructure.jenis}</td>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Track
-                      nilai={x.infrastructure.progress}
-                      tinggi={9}
-                      warna={x.infrastructure.progress === 100 ? "var(--green)" : "var(--brass)"}
-                    />
-                    <span style={{ fontSize: 11, color: "var(--muted)", width: 30 }}>
-                      {x.infrastructure.progress}%
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <Badge nilai={x.infrastructure.status} peta={WARNA_STATUS.bangun} />
-                </td>
-              </tr>
-            )),
-          ])}
-        </Tabel>
-      )}
 
       {/* ================= PEMBAYARAN ================= */}
       {tabAktif === "bayar" &&
