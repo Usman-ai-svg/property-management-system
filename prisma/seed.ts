@@ -83,7 +83,15 @@ async function isiBoqSpk(contractId: string, K: { nominal: number }) {
       hargaSatuan: Math.round((nilaiPerUnit * b.bagian) / b.volume),
     }));
     const totalNilai = baris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
-    const sasaran = totalNilai * (unit.progress / 100);
+
+    // Vendor borongan struktur biasanya berjalan lebih dulu daripada rata-rata
+    // pekerjaan unit — finishing dan MEP menyusul belakangan. Progres SPK
+    // karena itu sengaja dibuat lebih maju daripada progres konstruksi, supaya
+    // data demo memperlihatkan bahwa keduanya memang angka yang BERBEDA:
+    // Progress Vendor mengukur lingkup satu SPK, Progress Konstruksi mengukur
+    // seluruh lingkup unit.
+    const majuVendor = Math.min(100, Math.round(unit.progress * 1.3));
+    const sasaran = totalNilai * (majuVendor / 100);
 
     let terkumpul = 0;
     await prisma.contractBoqItem.createMany({
@@ -107,6 +115,87 @@ async function isiBoqSpk(contractId: string, K: { nominal: number }) {
         };
       }),
     });
+  }
+}
+
+/**
+ * Isi progres tiap baris BOQ Master dari progres unit yang sudah tersimpan.
+ *
+ * Pengisian mengikuti NILAI KUMULATIF baris, bukan urutan baris, supaya
+ * progres unit hasil hitung ulang tertimbang mendarat persis di angka lama —
+ * angka demo tidak berubah oleh perpindahan sumber ini.
+ *
+ * Baris paling awal dibuat tuntas lebih dulu; itu mendekati urutan kerja
+ * nyata (struktur sebelum finishing) dan membuat tabel opname terbaca masuk
+ * akal saat demo.
+ */
+async function isiProgresBoqMaster() {
+  const unit = await prisma.unit.findMany({
+    select: {
+      id: true, progress: true,
+      boqItems: {
+        orderBy: { urutan: "asc" },
+        select: { id: true, volume: true, hargaSatuan: true },
+      },
+    },
+  });
+
+  for (const u of unit) {
+    if (u.boqItems.length === 0) continue;
+    const total = u.boqItems.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
+    if (total === 0) continue;
+
+    const sasaran = total * (u.progress / 100);
+    // Opname "minggu lalu" diambil beberapa poin di belakang supaya kolom
+    // penambahan minggu ini pada laporan tidak kosong saat demo.
+    const sasaranLalu = total * (Math.max(0, u.progress - 7) / 100);
+
+    let terkumpul = 0;
+    for (const b of u.boqItems) {
+      const nilai = b.volume * b.hargaSatuan;
+      const isi = (batas: number) =>
+        nilai ? Math.round(Math.max(0, Math.min(1, (batas - terkumpul) / nilai)) * 100) : 0;
+      const progress = isi(sasaran);
+      const progressLalu = isi(sasaranLalu);
+      terkumpul += nilai;
+      await prisma.unitBoqItem.update({
+        where: { id: b.id },
+        data: { progress, progressLalu },
+      });
+    }
+  }
+
+  const sarpras = await prisma.infrastructure.findMany({
+    select: {
+      id: true, progress: true,
+      boqItems: {
+        orderBy: { urutan: "asc" },
+        select: { id: true, volume: true, hargaSatuan: true },
+      },
+    },
+  });
+
+  for (const s of sarpras) {
+    if (s.boqItems.length === 0) continue;
+    const total = s.boqItems.reduce((a, b) => a + b.volume * b.hargaSatuan, 0);
+    if (total === 0) continue;
+
+    const sasaran = total * (s.progress / 100);
+    const sasaranLalu = total * (Math.max(0, s.progress - 7) / 100);
+
+    let terkumpul = 0;
+    for (const b of s.boqItems) {
+      const nilai = b.volume * b.hargaSatuan;
+      const isi = (batas: number) =>
+        nilai ? Math.round(Math.max(0, Math.min(1, (batas - terkumpul) / nilai)) * 100) : 0;
+      const progress = isi(sasaran);
+      const progressLalu = isi(sasaranLalu);
+      terkumpul += nilai;
+      await prisma.infrastructureBoqItem.update({
+        where: { id: b.id },
+        data: { progress, progressLalu },
+      });
+    }
   }
 }
 
@@ -655,6 +744,8 @@ async function main() {
   // Ringkasan
   // ---------------------------------------------------------------------
   const totalRab = await prisma.unitBoqItem.findMany({ select: { volume: true, hargaSatuan: true } });
+  await isiProgresBoqMaster();
+
   console.log("\nSelesai.");
   console.log(`  Total RAB seluruh unit : Rp ${Math.round(totalBaris(totalRab)).toLocaleString("id-ID")}`);
   console.log(`\n  Login demo — password semua akun: ${PASSWORD_DEMO}`);

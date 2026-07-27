@@ -43,9 +43,9 @@ export default async function RincianUnit({
       id: true, kode: true, nomor: true, luasTanah: true, projectId: true,
       phaseId: true, unitTypeId: true,
       statusPembangunan: true, statusJual: true, progress: true,
-      // Jumlah baris BOQ SPK menentukan apakah progres unit ini turunan
-      // dari opname atau masih diisi manual.
-      _count: { select: { boqSpk: true } },
+      // Jumlah baris BOQ Master menentukan apakah progres unit ini turunan
+      // dari opname per baris atau masih diisi satu angka manual.
+      _count: { select: { boqItems: true } },
       phase: { select: { kode: true } },
       project: {
         select: {
@@ -116,9 +116,9 @@ export default async function RincianUnit({
   if (!bolehAksesProyek(pengguna, unit.projectId)) notFound();
 
   // Progres unit hanya punya satu sumber. Bila unit ini sudah dirinci lewat
-  // BOQ SPK, angkanya turunan dari opname dan isian manualnya ditiadakan —
-  // sama seperti di halaman Konstruksi.
-  const dariSpk = unit._count.boqSpk > 0;
+  // BOQ Master, angkanya turunan dari opname per baris dan isian satu
+  // angka di sini ditiadakan — sama seperti di halaman Konstruksi.
+  const dariBoq = unit._count.boqItems > 0;
 
   const kontrak = await prisma.contract.findMany({
     where: { units: { some: { unitId: unit.id } } },
@@ -181,7 +181,7 @@ export default async function RincianUnit({
                     phaseId: unit.phaseId, unitTypeId: unit.unitTypeId,
                     statusPembangunan: unit.statusPembangunan,
                     statusJual: unit.statusJual, progress: unit.progress,
-                    dariSpk,
+                    dariBoq,
                   }}
                   fases={unit.project.fases}
                   tipes={unit.project.unitTypes}
@@ -200,7 +200,7 @@ export default async function RincianUnit({
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                 {unit.progress}%
                 <span style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)" }}>
-                  {dariSpk ? "dari opname SPK" : "sama dengan Konstruksi"}
+                  {dariBoq ? "dari opname BOQ" : "sama dengan Konstruksi"}
                 </span>
               </span>
             }

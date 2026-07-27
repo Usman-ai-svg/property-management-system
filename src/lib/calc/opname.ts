@@ -1,18 +1,18 @@
 /**
  * Opname / laporan progres mingguan.
  *
- * Model penyelesaian yang dipakai: baris-baris pekerjaan diasumsikan selesai
- * berurutan. Pada progres p%, baris ke-i (dari n baris) memiliki fraksi selesai
+ * Sumber angkanya adalah progres yang DIISI QS per baris BOQ Master Proyek —
+ * `UnitBoqItem.progress` untuk capaian sekarang dan `UnitBoqItem.progressLalu`
+ * untuk capaian pada opname sebelumnya.
  *
- *     f(p, i) = clamp( (p/100 − i/n) · n , 0 , 1 )
+ * Sebelumnya baris-baris ini tidak punya angka sendiri: satu persen di tingkat
+ * unit disebar ke tiap baris dengan anggapan pekerjaan selesai berurutan
+ * (`fraksiBaris`). Anggapan itu memadai untuk peragaan, tetapi tidak untuk
+ * opname yang jadi dasar penagihan — dan meleset makin jauh ketika bobot antar
+ * pekerjaan timpang, karena ia menganggap tiap baris berbobot sama.
  *
- * Artinya baris 1 selesai lebih dulu, baru baris 2, dan seterusnya — bukan
- * semua baris maju bersamaan. Ini mendekati urutan kerja konstruksi nyata
- * (struktur dulu, finishing belakangan).
- *
- * Berbeda dari prototipe yang menebak progres minggu lalu dengan `progres − 7`,
- * fungsi di sini menerima kedua nilai progres secara eksplisit supaya bisa diisi
- * dari riwayat `progress_records` yang sebenarnya.
+ * `fraksiBaris` dipertahankan hanya untuk unit lama yang baris BOQ-nya belum
+ * pernah diopname sama sekali; lihat `susunOpnameDariPersen`.
  */
 
 export interface BarisOpnameInput {
@@ -47,27 +47,30 @@ export function fraksiBaris(persen: number, i: number, n: number): number {
   return Math.max(0, Math.min(1, (persen / 100 - i / n) * n));
 }
 
-/**
- * Susun laporan opname dari sekumpulan baris pekerjaan.
- *
- * @param rows          baris BOQ (unit, sarpras, atau kerja tambah)
- * @param progresLalu   progres kumulatif pada opname sebelumnya (%)
- * @param progresKini   progres kumulatif saat ini (%)
- */
-export function susunOpname(
-  rows: BarisOpnameInput[],
-  progresLalu: number,
-  progresKini: number,
-): BarisOpname[] {
-  const n = rows.length;
-  const total = rows.reduce((s, r) => s + r.volume * r.hargaSatuan, 0);
-  if (n === 0 || total === 0) return [];
+/** Baris BOQ yang sudah punya angka opname sendiri. */
+export interface BarisOpnameTerisi extends BarisOpnameInput {
+  /** Capaian sekarang, 0–100. */
+  progress: number;
+  /** Capaian pada opname sebelumnya, 0–100. */
+  progressLalu: number;
+}
 
-  return rows.map((r, i) => {
+const jepit = (n: number) => (Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0);
+
+/**
+ * Susun laporan opname dari baris pekerjaan yang progresnya sudah diisi.
+ *
+ * @param rows baris BOQ Master beserta `progress` dan `progressLalu`-nya
+ */
+export function susunOpname(rows: BarisOpnameTerisi[]): BarisOpname[] {
+  const total = rows.reduce((s, r) => s + r.volume * r.hargaSatuan, 0);
+  if (rows.length === 0 || total === 0) return [];
+
+  return rows.map((r) => {
     const sub = r.volume * r.hargaSatuan;
     const bobot = (sub / total) * 100;
-    const fL = fraksiBaris(progresLalu, i, n);
-    const fN = fraksiBaris(progresKini, i, n);
+    const fL = jepit(r.progressLalu) / 100;
+    const fN = jepit(r.progress) / 100;
 
     return {
       ...r,
@@ -84,6 +87,27 @@ export function susunOpname(
       nilaiKini: sub * fN,
     };
   });
+}
+
+/**
+ * Versi lama: sebarkan satu angka persen ke baris-baris pekerjaan.
+ *
+ * Hanya untuk unit yang baris BOQ-nya belum pernah diopname — angkanya adalah
+ * taksiran, bukan catatan lapangan, jadi jangan dipakai menagih.
+ */
+export function susunOpnameDariPersen(
+  rows: BarisOpnameInput[],
+  progresLalu: number,
+  progresKini: number,
+): BarisOpname[] {
+  const n = rows.length;
+  return susunOpname(
+    rows.map((r, i) => ({
+      ...r,
+      progressLalu: Math.round(fraksiBaris(progresLalu, i, n) * 100),
+      progress: Math.round(fraksiBaris(progresKini, i, n) * 100),
+    })),
+  );
 }
 
 /** Ringkasan total sebuah laporan opname. */

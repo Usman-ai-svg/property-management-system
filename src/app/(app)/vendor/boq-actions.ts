@@ -5,7 +5,6 @@ import { prisma } from "@/lib/db";
 import { catat } from "@/lib/audit";
 import { angka, GagalIzin, HasilAksi, izinkan, jalankan, teks } from "@/lib/actions/guard";
 import { nilaiTerpasang, periksaBarisBoqSpk } from "@/lib/calc/kontrak-boq";
-import { hitungUlangProgres, sasaranDariKontrak } from "@/lib/data/progres-spk";
 import { bacaBoqDariExcel } from "@/lib/impor-excel";
 
 /**
@@ -15,11 +14,14 @@ import { bacaBoqDariExcel } from "@/lib/impor-excel";
  * Semua aksi di berkas ini dijaga izin "progress" — sama dengan jalur opname
  * lainnya, karena inilah pengganti pengisian progres manual.
  *
- * Aturan yang berlaku di seluruh berkas: setiap perubahan baris BOQ WAJIB
- * diikuti `hitungUlangProgres()` sebelum aksi selesai. `Unit.progress` adalah
- * cache dari baris-baris ini, dan cache yang tidak diperbarui akan diam-diam
- * salah — tidak ada gejala di layar sampai seseorang menagih vendor dengan
- * angka yang keliru.
+ * PENTING: progres di sini adalah **Progress Vendor**, bukan Progress
+ * Konstruksi. Lingkupnya hanya pekerjaan yang diperintahkan SPK ini — vendor
+ * atap yang tuntas 100% tidak membuat unitnya selesai. Karena itu aksi di
+ * berkas ini TIDAK menyentuh `Unit.progress`; angka itu dihitung dari BOQ
+ * Master Proyek, lihat `lib/data/progres-konstruksi.ts`.
+ *
+ * Keduanya sengaja tidak saling mengisi karena BOQ SPK kerap tidak sebangun
+ * dengan BOQ Master — pekerjaan digabung, dipecah, atau diberi uraian berbeda.
  */
 
 /** Muat kontrak beserta konteks yang dibutuhkan seluruh aksi di sini. */
@@ -40,9 +42,9 @@ async function ambilKontrak(contractId: string) {
 /**
  * Pastikan baris ditujukan ke objek yang memang tercakup kontrak ini.
  *
- * Tanpa pemeriksaan ini, sebuah SPK bisa mengklaim progres atas unit yang
- * bukan lingkupnya — dan karena progres unit adalah gabungan seluruh SPK,
- * angka unit itu akan berubah tanpa jejak yang masuk akal.
+ * Tanpa pemeriksaan ini, sebuah SPK bisa mencatat pekerjaan atas unit yang
+ * bukan lingkupnya — dan capaian vendor jadi tidak bisa ditelusuri ke objek
+ * yang benar saat penagihan.
  */
 function pastikanDalamLingkup(
   kontrak: Awaited<ReturnType<typeof ambilKontrak>>,
@@ -105,10 +107,6 @@ export async function tambahBarisBoqSpk(
       data: { ...baris, contractId, urutan: (terakhir?.urutan ?? 0) + 1 },
     });
 
-    const perubahan = await hitungUlangProgres(
-      { unitIds: unitId ? [unitId] : [], sarprasIds: sarprasId ? [sarprasId] : [] },
-      pengguna.nama,
-    );
 
     await catat({
       pengguna, projectId: kontrak.projectId,
@@ -118,7 +116,6 @@ export async function tambahBarisBoqSpk(
     });
 
     segarkan(kontrak.project.kode, kontrak.vendorId);
-    return ringkasPerubahan(perubahan);
   });
 }
 
@@ -158,13 +155,6 @@ export async function ubahBarisBoqSpk(
 
     await prisma.contractBoqItem.update({ where: { id }, data: baru });
 
-    const perubahan = await hitungUlangProgres(
-      {
-        unitIds: lama.unitId ? [lama.unitId] : [],
-        sarprasIds: lama.infrastructureId ? [lama.infrastructureId] : [],
-      },
-      pengguna.nama,
-    );
 
     if (lama.progress !== baru.progress) {
       await catat({
@@ -176,7 +166,6 @@ export async function ubahBarisBoqSpk(
     }
 
     segarkan(kontrak.project.kode, kontrak.vendorId);
-    return ringkasPerubahan(perubahan);
   });
 }
 
@@ -231,10 +220,6 @@ export async function simpanProgresBoqSpk(
       ),
     );
 
-    const perubahan = await hitungUlangProgres(
-      await sasaranDariKontrak(contractId),
-      pengguna.nama,
-    );
 
     await catat({
       pengguna, projectId: kontrak.projectId,
@@ -244,7 +229,7 @@ export async function simpanProgresBoqSpk(
     });
 
     segarkan(kontrak.project.kode, kontrak.vendorId);
-    return `${ubah.length} baris tersimpan. ${ringkasPerubahan(perubahan)}`.trim();
+    return `${ubah.length} baris tersimpan.`;
   });
 }
 
@@ -269,13 +254,6 @@ export async function hapusBarisBoqSpk(
 
     await prisma.contractBoqItem.delete({ where: { id } });
 
-    const perubahan = await hitungUlangProgres(
-      {
-        unitIds: baris.unitId ? [baris.unitId] : [],
-        sarprasIds: baris.infrastructureId ? [baris.infrastructureId] : [],
-      },
-      pengguna.nama,
-    );
 
     await catat({
       pengguna, projectId: kontrak.projectId,
@@ -285,7 +263,6 @@ export async function hapusBarisBoqSpk(
     });
 
     segarkan(kontrak.project.kode, kontrak.vendorId);
-    return ringkasPerubahan(perubahan);
   });
 }
 
@@ -333,10 +310,6 @@ export async function imporBoqSpk(_s: HasilAksi | null, form: FormData): Promise
       }),
     ]);
 
-    const perubahan = await hitungUlangProgres(
-      { unitIds: unitId ? [unitId] : [], sarprasIds: sarprasId ? [sarprasId] : [] },
-      pengguna.nama,
-    );
 
     await catat({
       pengguna, projectId: kontrak.projectId,
@@ -346,7 +319,7 @@ export async function imporBoqSpk(_s: HasilAksi | null, form: FormData): Promise
     });
 
     segarkan(kontrak.project.kode, kontrak.vendorId);
-    return `${rows.length} baris pekerjaan diimpor. ${ringkasPerubahan(perubahan)}`.trim();
+    return `${rows.length} baris pekerjaan diimpor.`;
   });
 }
 
@@ -395,8 +368,6 @@ export async function salinBoqKeSemua(
       }),
     ]);
 
-    const perubahan = await hitungUlangProgres({ unitIds: lain, sarprasIds: [] }, pengguna.nama);
-
     await catat({
       pengguna, projectId: kontrak.projectId,
       objek: `SPK ${kontrak.kode}`,
@@ -405,18 +376,8 @@ export async function salinBoqKeSemua(
     });
 
     segarkan(kontrak.project.kode, kontrak.vendorId);
-    return `BOQ disalin ke ${lain.length} unit. ${ringkasPerubahan(perubahan)}`.trim();
+    return `BOQ disalin ke ${lain.length} unit.`;
   });
-}
-
-/** Rangkum dampak ke progres objek supaya QS tahu akibat penyimpanannya. */
-function ringkasPerubahan(perubahan: { label: string; dari: number; ke: number }[]): string {
-  if (perubahan.length === 0) return "";
-  if (perubahan.length === 1) {
-    const p = perubahan[0];
-    return `Progres ${p.label} kini ${p.ke}% (sebelumnya ${p.dari}%).`;
-  }
-  return `Progres ${perubahan.length} objek ikut diperbarui.`;
 }
 
 /** Nilai pekerjaan terpasang sebuah SPK — dasar opname untuk penagihan. */

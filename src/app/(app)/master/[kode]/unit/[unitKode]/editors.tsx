@@ -20,8 +20,8 @@ export function EditDeskripsiUnit({
   unit: {
     id: string; nomor: number; luasTanah: number; phaseId: string; unitTypeId: string;
     statusPembangunan: string; statusJual: string; progress: number;
-    /** Benar bila progres unit ini turunan dari BOQ SPK, bukan isian manual. */
-    dariSpk: boolean;
+    /** Benar bila progres unit ini turunan dari BOQ Master, bukan isian satu angka. */
+    dariBoq: boolean;
   };
   fases: { id: string; kode: string }[];
   tipes: { id: string; nama: string; luasBangunan: number }[];
@@ -72,13 +72,13 @@ export function EditDeskripsiUnit({
         <Field label="Status Jual" nama="statusJual" nilai={unit.statusJual} pilihan={STATUS_JUAL} />
       </BarisField>
 
-      {unit.dariSpk ? (
+      {unit.dariBoq ? (
         <>
           <input type="hidden" name="progress" value={unit.progress} />
           <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
-            Progres unit ini <b>{unit.progress}%</b>, dihitung dari BOQ SPK dan
+            Progres unit ini <b>{unit.progress}%</b>, dihitung dari BOQ Master Proyek dan
             tertimbang nilai tiap pekerjaan — karena itu tidak bisa diisi di sini.
-            Ubah lewat opname di halaman SPK-nya. Status bangun mengikuti angka itu
+            Isi lewat tabel opname di halaman Konstruksi unit ini. Status bangun mengikuti angka itu
             selama belum 100%.
           </p>
         </>

@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat } from "@/lib/audit";
 import { angka, GagalIzin, HasilAksi, izinkan, jalankan, teks } from "@/lib/actions/guard";
+import {
+  hitungUlangProgresSarpras,
+  hitungUlangProgresUnit,
+} from "@/lib/data/progres-konstruksi";
 
 /**
  * Pembaruan progres dari modul Konstruksi.
@@ -30,13 +34,14 @@ export async function ubahProgresUnit(_s: HasilAksi | null, form: FormData): Pro
 
     const pengguna = await izinkan("progress", unit.projectId);
 
-    // Unit yang progresnya sudah dirinci lewat BOQ SPK tidak boleh ditimpa dari
-    // sini. Tombolnya memang sudah disembunyikan di halaman unit, tetapi
-    // menyembunyikan tombol bukan penegakan — aksi ini bisa dipanggil langsung.
-    if (await prisma.contractBoqItem.count({ where: { unitId: id } })) {
+    // Unit yang BOQ Master-nya sudah tersusun diopname per baris, bukan
+    // ditimpa satu angka dari sini. Tombolnya memang sudah disembunyikan di
+    // halaman unit, tetapi menyembunyikan tombol bukan penegakan — aksi ini
+    // bisa dipanggil langsung.
+    if (await prisma.unitBoqItem.count({ where: { unitId: id } })) {
       throw new GagalIzin(
-        "Progres unit ini dihitung dari BOQ SPK. Ubah lewat opname di halaman SPK-nya, " +
-          "karena isian manual akan tertulis ulang pada penyimpanan opname berikutnya.",
+        "Progres unit ini dihitung dari BOQ Master Proyek. Isi lewat tabel opname " +
+          "di halaman unit, karena angka manual akan tertulis ulang pada opname berikutnya.",
       );
     }
 
@@ -85,11 +90,11 @@ export async function ubahProgresSarpras(_s: HasilAksi | null, form: FormData): 
 
     const pengguna = await izinkan("progress", item.projectId);
 
-    // Sama seperti unit: yang sudah dirinci lewat BOQ SPK diopname dari sana.
-    if (await prisma.contractBoqItem.count({ where: { infrastructureId: id } })) {
+    // Sama seperti unit: yang BOQ-nya sudah tersusun diopname per baris.
+    if (await prisma.infrastructureBoqItem.count({ where: { infrastructureId: id } })) {
       throw new GagalIzin(
-        "Progres item ini dihitung dari BOQ SPK. Ubah lewat opname di halaman SPK-nya, " +
-          "karena isian manual akan tertulis ulang pada penyimpanan opname berikutnya.",
+        "Progres item ini dihitung dari BOQ Master Proyek. Isi lewat tabel opname " +
+          "di halaman item, karena angka manual akan tertulis ulang pada opname berikutnya.",
       );
     }
 
@@ -118,4 +123,160 @@ export async function ubahProgresSarpras(_s: HasilAksi | null, form: FormData): 
     revalidatePath(`/master/${item.project.kode}`);
     revalidatePath("/");
   });
+}
+
+/**
+ * Simpan opname konstruksi: progres tiap baris BOQ Master sekaligus.
+ *
+ * Inilah sumber Progress Konstruksi — lingkup penuh unit, termasuk pekerjaan
+ * yang dikerjakan sendiri maupun yang dikontrakkan. Progres SPK vendor tidak
+ * ikut menghitung ke sini; keduanya dicatat terpisah karena rincian
+ * pekerjaannya kerap tidak sebangun.
+ *
+ * Nilai lama tiap baris digeser ke `progressLalu` supaya tabel opname bisa
+ * menampilkan penambahan minggu ini tanpa tabel riwayat per baris tersendiri.
+ */
+export async function simpanOpnameUnit(
+  _s: HasilAksi | null,
+  form: FormData,
+): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const unitId = teks(form, "unitId", true);
+
+    const unit = await prisma.unit.findUnique({
+      where: { id: unitId },
+      select: {
+        id: true, nomor: true, projectId: true,
+        phase: { select: { kode: true } },
+        project: { select: { kode: true } },
+      },
+    });
+    if (!unit) throw new GagalIzin("Unit tidak ditemukan.");
+
+    const pengguna = await izinkan("progress", unit.projectId);
+    const jml = await simpanBarisOpname(form, "unit", unitId);
+    if (jml === 0) return "Tidak ada progres yang berubah.";
+
+    const berubah = await hitungUlangProgresUnit(unitId, pengguna.nama);
+
+    await catat({
+      pengguna, projectId: unit.projectId,
+      objek: `Unit ${unit.phase.kode}-${unit.nomor}`,
+      aksi: "Opname konstruksi per baris BOQ",
+      dari: berubah ? `${berubah.dari}%` : undefined,
+      ke: berubah ? `${berubah.ke}%` : `${jml} baris diperbarui`,
+    });
+
+    revalidatePath(`/konstruksi/${unit.project.kode}`);
+    revalidatePath(`/master/${unit.project.kode}`);
+    revalidatePath("/");
+
+    return berubah
+      ? `${jml} baris tersimpan. Progres unit kini ${berubah.ke}% (sebelumnya ${berubah.dari}%).`
+      : `${jml} baris tersimpan.`;
+  });
+}
+
+/** Versi sarana & prasarana dari `simpanOpnameUnit`. */
+export async function simpanOpnameSarpras(
+  _s: HasilAksi | null,
+  form: FormData,
+): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const sarprasId = teks(form, "sarprasId", true);
+
+    const item = await prisma.infrastructure.findUnique({
+      where: { id: sarprasId },
+      select: {
+        id: true, nama: true, projectId: true,
+        project: { select: { kode: true } },
+      },
+    });
+    if (!item) throw new GagalIzin("Item sarpras tidak ditemukan.");
+
+    const pengguna = await izinkan("progress", item.projectId);
+    const jml = await simpanBarisOpname(form, "sarpras", sarprasId);
+    if (jml === 0) return "Tidak ada progres yang berubah.";
+
+    const berubah = await hitungUlangProgresSarpras(sarprasId, pengguna.nama);
+
+    await catat({
+      pengguna, projectId: item.projectId,
+      objek: item.nama,
+      aksi: "Opname konstruksi per baris BOQ",
+      dari: berubah ? `${berubah.dari}%` : undefined,
+      ke: berubah ? `${berubah.ke}%` : `${jml} baris diperbarui`,
+    });
+
+    revalidatePath(`/konstruksi/${item.project.kode}`);
+    revalidatePath(`/master/${item.project.kode}`);
+    revalidatePath("/");
+
+    return berubah
+      ? `${jml} baris tersimpan. Progres item kini ${berubah.ke}% (sebelumnya ${berubah.dari}%).`
+      : `${jml} baris tersimpan.`;
+  });
+}
+
+/**
+ * Baca dan simpan progres baris opname dari form. Mengembalikan jumlah baris
+ * yang benar-benar berubah.
+ *
+ * Baris yang bukan milik objek ini diabaikan alih-alih menggagalkan seluruh
+ * penyimpanan — formulir bisa saja tertinggal versi lama setelah BOQ disunting.
+ */
+async function simpanBarisOpname(
+  form: FormData,
+  jenis: "unit" | "sarpras",
+  objekId: string,
+): Promise<number> {
+  const ids = form.getAll("barisId").map(String);
+  const nilai = form.getAll("barisProgress").map((v) => Number(String(v)));
+  if (ids.length !== nilai.length) {
+    throw new GagalIzin("Data opname tidak lengkap. Muat ulang halaman lalu coba lagi.");
+  }
+
+  const sebelum =
+    jenis === "unit"
+      ? await prisma.unitBoqItem.findMany({
+          where: { id: { in: ids }, unitId: objekId },
+          select: { id: true, uraian: true, progress: true },
+        })
+      : await prisma.infrastructureBoqItem.findMany({
+          where: { id: { in: ids }, infrastructureId: objekId },
+          select: { id: true, uraian: true, progress: true },
+        });
+  const petaLama = new Map(sebelum.map((b) => [b.id, b]));
+
+  const ubah: { id: string; progress: number; progressLalu: number }[] = [];
+  for (let i = 0; i < ids.length; i++) {
+    const lama = petaLama.get(ids[i]);
+    if (!lama) continue;
+
+    const p = nilai[i];
+    if (!Number.isFinite(p) || p < 0 || p > 100) {
+      throw new GagalIzin(`Progres "${lama.uraian}" harus di antara 0 dan 100 persen.`);
+    }
+    const bulat = Math.round(p);
+    if (bulat !== lama.progress) {
+      ubah.push({ id: ids[i], progress: bulat, progressLalu: lama.progress });
+    }
+  }
+
+  if (ubah.length === 0) return 0;
+
+  await prisma.$transaction(
+    ubah.map((u) =>
+      jenis === "unit"
+        ? prisma.unitBoqItem.update({
+            where: { id: u.id },
+            data: { progress: u.progress, progressLalu: u.progressLalu },
+          })
+        : prisma.infrastructureBoqItem.update({
+            where: { id: u.id },
+            data: { progress: u.progress, progressLalu: u.progressLalu },
+          }),
+    ),
+  );
+  return ubah.length;
 }

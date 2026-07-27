@@ -331,16 +331,16 @@ export async function ubahUnit(_s: HasilAksi | null, form: FormData): Promise<Ha
 
     const pengguna = await izinkan("progress", lama.projectId);
 
-    // Progres unit hanya punya SATU sumber. Bila unit ini sudah dirinci lewat
-    // BOQ SPK, angkanya turunan dari opname — mengetiknya di sini hanya
-    // bertahan sampai opname berikutnya menuliskannya ulang. Isian dari
-    // formulir diabaikan, bukan ditolak, supaya kolom lain di formulir yang
-    // sama (luas tanah, tipe, nomor) tetap bisa disunting.
-    const dikendalikanSpk =
-      (await prisma.contractBoqItem.count({ where: { unitId: id } })) > 0;
+    // Progres unit hanya punya SATU sumber: BOQ Master Proyek. Bila baris
+    // BOQ-nya sudah tersusun, angkanya turunan dari opname per baris —
+    // mengetiknya di sini hanya bertahan sampai opname berikutnya
+    // menuliskannya ulang. Isian dari formulir diabaikan, bukan ditolak,
+    // supaya kolom lain (luas tanah, tipe, nomor) tetap bisa disunting.
+    const dikendalikanBoq =
+      (await prisma.unitBoqItem.count({ where: { unitId: id } })) > 0;
 
     const progresDiminta = angka(form, "progress", { min: 0, max: 100 });
-    const progress = dikendalikanSpk ? lama.progress : progresDiminta;
+    const progress = dikendalikanBoq ? lama.progress : progresDiminta;
 
     const baru: {
       statusPembangunan: string; statusJual: string; progress: number; luasTanah: number;
@@ -424,10 +424,10 @@ export async function ubahUnit(_s: HasilAksi | null, form: FormData): Promise<Ha
 
     // Beri tahu bila isian progres diabaikan, supaya pengguna tidak mengira
     // angkanya tersimpan lalu bingung saat halaman menampilkan angka lama.
-    if (dikendalikanSpk && progresDiminta !== lama.progress) {
+    if (dikendalikanBoq && progresDiminta !== lama.progress) {
       return (
-        `Progres unit ini dihitung dari BOQ SPK, jadi isian ${progresDiminta}% tidak ` +
-        `disimpan. Ubah lewat opname di halaman SPK-nya. Kolom lain tersimpan.`
+        `Progres unit ini dihitung dari BOQ Master Proyek, jadi isian ${progresDiminta}% ` +
+        `tidak disimpan. Isi lewat tabel opname di halaman Konstruksi. Kolom lain tersimpan.`
       );
     }
   });

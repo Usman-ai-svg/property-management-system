@@ -341,6 +341,18 @@ model UnitBoqItem {
   spesifikasi String?
   urutan      Int    @default(0)
 
+  /// Persentase penyelesaian baris ini, 0–100. Diisi QS saat opname konstruksi.
+  ///
+  /// INILAH sumber Progress Konstruksi — lingkup penuh satu unit: struktur,
+  /// arsitektur, MEP, hingga subkon. Jangan dikacaukan dengan progres pada
+  /// `ContractBoqItem`, yang hanya mencakup lingkup satu SPK.
+  progress Int @default(0)
+
+  /// Nilai `progress` pada opname sebelumnya, disimpan saat opname baru
+  /// tersimpan. Dipakai tabel opname mingguan untuk menampilkan penambahan
+  /// minggu ini tanpa perlu tabel riwayat per baris tersendiri.
+  progressLalu Int @default(0)
+
   unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
   @@index([unitId])
@@ -505,6 +517,11 @@ model InfrastructureBoqItem {
   hargaSatuan      Float
   spesifikasi      String?
   urutan           Int     @default(0)
+
+  /// Sama peranannya dengan `UnitBoqItem.progress`: sumber Progress Konstruksi
+  /// untuk item sarana & prasarana, mencakup seluruh lingkup pekerjaannya.
+  progress     Int @default(0)
+  progressLalu Int @default(0)
 
   infrastructure Infrastructure @relation(fields: [infrastructureId], references: [id], onDelete: Cascade)
 

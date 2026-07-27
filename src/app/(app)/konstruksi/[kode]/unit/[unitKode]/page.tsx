@@ -4,11 +4,11 @@ import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { duaTitikProgres } from "@/lib/data/konstruksi";
 import { susunOpname } from "@/lib/calc/opname";
+import { OpnameBoq } from "@/components/opname-boq";
 import { Badge, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { TabelMingguan } from "@/components/tabel-mingguan";
 import { UbahProgres } from "@/components/ubah-progres";
-import { ubahProgresUnit } from "../../../actions";
-import { progresDikendalikanSpk } from "@/lib/data/progres-spk";
+import { ubahProgresUnit, simpanOpnameUnit } from "../../../actions";
 
 export default async function OpnameUnit({
   params,
@@ -31,7 +31,10 @@ export default async function OpnameUnit({
       unitType: { select: { nama: true } },
       boqItems: {
         orderBy: { urutan: "asc" },
-        select: { grup: true, uraian: true, satuan: true, volume: true, hargaSatuan: true },
+        select: {
+          id: true, grup: true, uraian: true, satuan: true,
+          volume: true, hargaSatuan: true, progress: true, progressLalu: true,
+        },
       },
     },
   });
@@ -43,10 +46,10 @@ export default async function OpnameUnit({
   const bolehProgres = bolehLihat(pengguna, "progress");
   const ubahProgres = bolehUbah(pengguna, "progress");
 
-  // Progres unit yang sudah dirinci lewat BOQ SPK adalah nilai turunan.
-  // Menimpanya manual hanya bertahan sampai opname berikutnya menuliskannya
-  // ulang, jadi tombolnya ditiadakan dan alasannya dijelaskan.
-  const dariSpk = await progresDikendalikanSpk(unit.id);
+  // Progres yang sudah dirinci lewat BOQ Master adalah nilai turunan.
+  // Menimpanya manual hanya bertahan sampai opname berikutnya, jadi tombol
+  // satu-angka ditiadakan dan digantikan tabel opname per baris di bawah.
+  const dariBoq = unit.boqItems.length > 0;
 
   if (!bolehProgres) {
     return (
@@ -61,8 +64,7 @@ export default async function OpnameUnit({
     );
   }
 
-  const titik = await duaTitikProgres({ unitId: unit.id }, unit.progress);
-  const baris = susunOpname(unit.boqItems, titik.lalu, titik.kini);
+    const baris = susunOpname(unit.boqItems);
 
   return (
     <div style={{ padding: 24 }}>
@@ -93,16 +95,16 @@ export default async function OpnameUnit({
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <Badge nilai={unit.statusPembangunan} peta={WARNA_STATUS.bangun} />
-          {ubahProgres && !dariSpk && (
+          {ubahProgres && !dariBoq && (
             <UbahProgres id={unit.id} nilai={unit.progress} aksi={ubahProgresUnit} />
           )}
-          {dariSpk && (
+          {dariBoq && (
             <span
               className="chip"
-              title="Progres dihitung dari baris BOQ pada SPK, tertimbang nilai tiap pekerjaan"
+              title="Progres dihitung dari baris BOQ Master Proyek, tertimbang nilai tiap pekerjaan"
               style={{ background: "var(--rona-teal2)", color: "var(--teal)" }}
             >
-              {unit.progress}% · dari opname SPK
+              {unit.progress}% · dari opname BOQ
             </span>
           )}
         </div>
@@ -113,8 +115,25 @@ export default async function OpnameUnit({
           fontSize: 11.5, color: "var(--muted)", marginBottom: 10, lineHeight: 1.6,
         }}
       >
-        Pembanding &ldquo;minggu lalu&rdquo; diambil dari catatan opname sebelumnya
-        {titik.lalu === 0 && titik.kini > 0 ? " — unit ini baru punya satu catatan, jadi seluruh progres dihitung sebagai penambahan minggu ini." : "."}
+        Progres diisi per baris pekerjaan pada BOQ Master Proyek, mencakup seluruh
+        lingkup unit — struktur, arsitektur, MEP, hingga subkon. Pekerjaan yang
+        dikontrakkan ke vendor punya opname sendiri di halaman SPK-nya, dan tidak
+        otomatis mengisi angka di sini.
+      </div>
+
+      <OpnameBoq
+        aksi={simpanOpnameUnit}
+        namaId="unitId"
+        nilaiId={unit.id}
+        baris={unit.boqItems}
+        bolehUbah={ubahProgres}
+        bolehHarga={bolehHarga}
+      />
+
+      <div className="sectitle">Laporan opname mingguan</div>
+      <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 10, lineHeight: 1.6 }}>
+        Kolom &ldquo;minggu lalu&rdquo; adalah capaian tiap baris pada opname sebelumnya,
+        disimpan otomatis setiap kali opname di atas tersimpan.
       </div>
 
       <TabelMingguan baris={baris} bolehHarga={bolehHarga} />

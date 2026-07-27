@@ -43,7 +43,7 @@ lapisan di atasnya.
 
 ## 2. Model data
 
-Skema ada di `prisma/schema.prisma`, 42 model. Ini bagian yang paling
+Skema ada di `prisma/schema.prisma`, 43 model. Ini bagian yang paling
 bernilai dan paling tahan lama — kalaupun seluruh tampilan ditulis ulang,
 struktur data ini yang menentukan sistemnya benar atau tidak.
 
@@ -77,7 +77,7 @@ struktur data ini yang menentukan sistemnya benar atau tidak.
 **Dokumen dan jejak**
 `Document`, `DocumentVersion`, `AuditLog`
 
-### Empat keputusan yang mudah salah dipindahkan
+### Lima keputusan yang mudah salah dipindahkan
 
 **a. Pengeluaran berbentuk induk–rincian.** `Expense` adalah satu pembayaran
 — setara satu baris mutasi rekening bank. Pembebanannya ke unit atau ke
@@ -108,21 +108,32 @@ Nilai yang sah didaftar di `src/lib/domain/enums.ts` dan divalidasi di
 lapisan aplikasi. Bila ERP memakai PostgreSQL, enum asli lebih aman — tapi
 ambil daftar nilainya dari `enums.ts`, jangan menulis ulang dari layar.
 
-**d. `Unit.progress` adalah cache, bukan sumber kebenaran.** Sejak progres
-diopname per baris BOQ SPK, angka progres unit dan sarpras DIHITUNG dari
-`ContractBoqItem`, tertimbang nilai tiap pekerjaan. Kolom `progress` tetap ada
-dan tetap ditulis — karena 48 tempat di aplikasi membacanya, dan karena
-`statusPembangunan` yang diturunkan darinya dipakai menyaring di tingkat
+**d. Ada DUA progres yang berbeda, dan keduanya tidak saling mengisi.**
+
+| | Progress Konstruksi | Progress Vendor |
+|---|---|---|
+| Lingkup | Seluruh pekerjaan unit — struktur, arsitektur, MEP, subkon | Hanya pekerjaan dalam satu SPK |
+| Sumber | `UnitBoqItem` / `InfrastructureBoqItem` (BOQ Master Proyek) | `ContractBoqItem` (BOQ kontrak, dimuat di SPK) |
+| Diisi di | Halaman Konstruksi unit / sarpras | Halaman detail SPK |
+
+Vendor atap yang tuntas 100% TIDAK membuat unitnya selesai — ia hanya
+menuntaskan satu item dari lingkup penuh. Keduanya sengaja tidak saling
+menghitung karena BOQ SPK kerap tidak sebangun dengan BOQ Master: pekerjaan
+digabung, dipecah, atau diberi uraian berbeda. QS mengisi keduanya.
+
+`Unit.progress` dan `Infrastructure.progress` adalah CACHE dari baris BOQ
+Master, tertimbang nilai. Kolomnya tetap ditulis karena puluhan tempat
+membacanya dan karena `statusPembangunan` dipakai menyaring di tingkat
 database.
 
-> **Invarian yang wajib dijaga:** setiap jalur yang mengubah `ContractBoqItem`
-> harus memanggil `hitungUlangProgres()` di `src/lib/data/progres-spk.ts`
-> sebelum selesai. Cache yang tidak diperbarui tidak menimbulkan galat apa pun
-> — hanya angka progres yang diam-diam keliru, dan angka itu jadi dasar
-> penagihan vendor.
+> **Invarian yang wajib dijaga:** setiap jalur yang mengubah
+> `UnitBoqItem.progress` harus memanggil `hitungUlangProgresUnit()` di
+> `src/lib/data/progres-konstruksi.ts` sebelum selesai. Cache yang tidak
+> diperbarui tidak menimbulkan galat apa pun — hanya angka kemajuan yang
+> diam-diam keliru.
 
-Unit yang belum punya baris BOQ SPK tetap memakai progres manual. Yang sudah
-punya menolak isian manual, di UI maupun di Server Action.
+Objek yang belum punya baris BOQ tetap memakai progres satu angka manual.
+Yang sudah punya menolak isian manual, di UI maupun di Server Action.
 
 **e. `AuditLog` bersifat hanya-tambah.** Tidak ada jalur ubah atau hapus di
 seluruh aplikasi. `catatDiff()` menulis satu baris per kolom yang berubah,
@@ -134,7 +145,7 @@ berapa" bisa dilacak per kolom. Pertahankan sifat ini.
 ## 3. Indeks rumus bisnis
 
 Semua ada di `src/lib/calc/`, tanpa impor framework, dan **seluruhnya sudah
-punya tes** (86 tes, `npm test`). Ini daftar yang perlu diperiksa ulang
+punya tes** (120 tes, `npm test`). Ini daftar yang perlu diperiksa ulang
 bersama tim keuangan dan teknik sebelum dipakai di produksi — bukan karena
 diragukan, tapi karena angka-angka inilah yang nanti dipakai mengambil
 keputusan.
@@ -152,9 +163,11 @@ keputusan.
 | | `bagiRata` | Pembagian rata; sisa pembulatan ke baris pertama |
 | | `periksaAlokasi` | Penegak invarian induk–rincian di atas |
 | `plan-real.ts` | `ringkasPlanReal` | Rencana vs realisasi per pos |
-| `opname.ts` | `susunOpname`, `ringkasOpname` | Opname progres mingguan |
+| `opname.ts` | `susunOpname`, `ringkasOpname` | Opname mingguan dari progres per baris |
+| | `susunOpnameDariPersen` | Taksiran lama, untuk BOQ yang belum diopname |
 | | `fraksiBaris` | Pembagian progres ke baris pekerjaan |
 | `kontrak-boq.ts` | `progresTertimbang` | Progres dari baris BOQ, tertimbang nilai |
+| | `statusSelaras` | Status bangun yang selaras dengan progres |
 | | `progresPerUnit`, `progresPerSarpras` | Pengelompokan progres per objek |
 | | `nilaiTerpasang` | Rupiah pekerjaan terpasang — dasar penagihan |
 | | `periksaBarisBoqSpk` | Validasi baris BOQ SPK |
@@ -170,10 +183,10 @@ Dua yang paling perlu dibaca sebelum dipercaya:
 
 Satu catatan tentang `fraksiBaris`: fungsi itu memecah SATU angka persen ke
 baris-baris BOQ dengan anggapan pekerjaan diselesaikan berurutan, dan
-anggapan itu hanya benar bila tiap baris berbobot sama. Ia masih dipakai
-tabel opname mingguan untuk unit yang belum punya BOQ SPK. Untuk unit yang
-sudah punya, arah datanya terbalik — `progresTertimbang` menghitung persen
-unit DARI baris, dan itulah yang boleh dipakai menagih.
+anggapan itu hanya benar bila tiap baris berbobot sama. Kini ia hanya dipakai
+`susunOpnameDariPersen`, untuk objek lama yang baris BOQ-nya belum pernah
+diopname. Arah data yang benar sudah terbalik: QS mengisi tiap baris, dan
+`progresTertimbang` menghitung persen objeknya DARI baris-baris itu.
 
 ---
 

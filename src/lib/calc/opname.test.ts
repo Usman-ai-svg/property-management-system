@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { fraksiBaris, keteranganPekerjaan, ringkasOpname, susunOpname } from "./opname";
+import {
+  fraksiBaris,
+  keteranganPekerjaan,
+  ringkasOpname,
+  susunOpname,
+  susunOpnameDariPersen,
+} from "./opname";
 
 const BARIS = [
   { uraian: "Pondasi", satuan: "ls", volume: 1, hargaSatuan: 100_000_000 },
@@ -33,12 +39,12 @@ describe("fraksiBaris", () => {
 
 describe("susunOpname", () => {
   it("bobot seluruh baris berjumlah seratus", () => {
-    const total = susunOpname(BARIS, 0, 50).reduce((s, r) => s + r.bobot, 0);
+    const total = susunOpnameDariPersen(BARIS, 0, 50).reduce((s, r) => s + r.bobot, 0);
     assert.ok(Math.abs(total - 100) < 1e-9);
   });
 
   it("penambahan minggu ini adalah selisih dua titik progres", () => {
-    const baris = susunOpname(BARIS, 25, 50);
+    const baris = susunOpnameDariPersen(BARIS, 25, 50);
     const kumulatif = baris.reduce((s, r) => s + r.bobotKini, 0);
     const lalu = baris.reduce((s, r) => s + r.bobotLalu, 0);
     const delta = baris.reduce((s, r) => s + r.deltaBobot, 0);
@@ -46,24 +52,24 @@ describe("susunOpname", () => {
   });
 
   it("tidak memunculkan kemajuan ketika progres tidak berubah", () => {
-    for (const r of susunOpname(BARIS, 60, 60)) {
+    for (const r of susunOpnameDariPersen(BARIS, 60, 60)) {
       assert.equal(r.deltaProgres, 0);
       assert.equal(r.deltaNilai, 0);
     }
   });
 
   it("nilai kumulatif seluruh baris sama dengan nilai kontrak pada 100%", () => {
-    const r = ringkasOpname(susunOpname(BARIS, 0, 100));
+    const r = ringkasOpname(susunOpnameDariPersen(BARIS, 0, 100));
     assert.equal(r.nilaiKini, 400_000_000);
     assert.equal(r.nilaiKontrak, 400_000_000);
   });
 
   it("mengembalikan daftar kosong bila tidak ada baris", () => {
-    assert.deepEqual(susunOpname([], 0, 50), []);
+    assert.deepEqual(susunOpnameDariPersen([], 0, 50), []);
   });
 
   it("mengembalikan daftar kosong bila seluruh nilainya nol", () => {
-    assert.deepEqual(susunOpname([{ uraian: "x", satuan: "ls", volume: 0, hargaSatuan: 0 }], 0, 50), []);
+    assert.deepEqual(susunOpnameDariPersen([{ uraian: "x", satuan: "ls", volume: 0, hargaSatuan: 0 }], 0, 50), []);
   });
 
   it("membobot baris sesuai nilainya, bukan sama rata", () => {
@@ -71,7 +77,7 @@ describe("susunOpname", () => {
       { uraian: "Besar", satuan: "ls", volume: 1, hargaSatuan: 300_000_000 },
       { uraian: "Kecil", satuan: "ls", volume: 1, hargaSatuan: 100_000_000 },
     ];
-    const baris = susunOpname(campuran, 0, 100);
+    const baris = susunOpnameDariPersen(campuran, 0, 100);
     assert.equal(baris[0].bobot, 75);
     assert.equal(baris[1].bobot, 25);
   });
@@ -88,5 +94,49 @@ describe("keteranganPekerjaan", () => {
 
   it("selalu mengembalikan minimal satu keterangan", () => {
     for (let p = 0; p <= 100; p++) assert.ok(keteranganPekerjaan(p).length >= 1);
+  });
+});
+
+describe("susunOpname dari angka per baris", () => {
+  const isi = [
+    { uraian: "Pondasi", satuan: "ls", volume: 1, hargaSatuan: 90_000_000, progressLalu: 60, progress: 100 },
+    { uraian: "Cat", satuan: "ls", volume: 1, hargaSatuan: 10_000_000, progressLalu: 0, progress: 0 },
+  ];
+
+  it("memakai angka tiap baris apa adanya, bukan menyebarnya", () => {
+    const [pondasi, cat] = susunOpname(isi);
+    assert.equal(pondasi.progresKini, 100);
+    assert.equal(pondasi.progresLalu, 60);
+    assert.equal(cat.progresKini, 0);
+  });
+
+  it("menimbang bobot menurut nilai baris", () => {
+    const [pondasi, cat] = susunOpname(isi);
+    assert.equal(Math.round(pondasi.bobot), 90);
+    assert.equal(Math.round(cat.bobot), 10);
+  });
+
+  it("menghitung penambahan minggu ini dari selisih kedua angka", () => {
+    const [pondasi] = susunOpname(isi);
+    assert.equal(pondasi.deltaProgres, 40);
+    assert.equal(pondasi.deltaNilai, 36_000_000);
+  });
+
+  it("menjumlahkan nilai terpasang sesuai capaian tiap baris", () => {
+    const r = ringkasOpname(susunOpname(isi));
+    assert.equal(r.nilaiKini, 90_000_000);
+    assert.equal(r.nilaiKontrak, 100_000_000);
+  });
+
+  it("menjepit angka di luar rentang 0–100", () => {
+    const [a] = susunOpname([
+      { uraian: "X", satuan: "ls", volume: 1, hargaSatuan: 1_000_000, progressLalu: -5, progress: 150 },
+    ]);
+    assert.equal(a.progresKini, 100);
+    assert.equal(a.progresLalu, 0);
+  });
+
+  it("mengembalikan daftar kosong bila tidak ada baris bernilai", () => {
+    assert.deepEqual(susunOpname([]), []);
   });
 });
