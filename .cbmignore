@@ -1,0 +1,5 @@
+# Folder rute Next.js ini bernama "vendor" dan tertangkap pola bawaan
+# codebase-memory-mcp untuk folder vendor pihak ketiga (Go/PHP).
+# Tanpa negasi ini, seluruh modul Vendor Management hilang dari indeks.
+!vendor/
+!**/vendor/**
