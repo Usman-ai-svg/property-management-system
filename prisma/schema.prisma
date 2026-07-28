@@ -119,25 +119,30 @@ model RoleSectionPermission {
 /// berkas .skp di proyek ini berukuran 24–38 MB.
 model Document {
   id         String   @id @default(cuid())
-  /// model3d | gambarKerja | render | spek | desain | legalitas | analisa | lain
+  /// model3d | gambarKerjaPdf | gambarKerjaDwg | render | spek | desain | rab
+  /// | legalitas | analisa | lain
   kategori   String
   judul      String
   dibuatPada DateTime @default(now())
 
   versions DocumentVersion[]
 
-  unitTypeModel3d     UnitType? @relation("UnitTypeModel3d")
-  unitTypeGambarKerja UnitType? @relation("UnitTypeGambarKerja")
-  unitTypeRender      UnitType? @relation("UnitTypeRender")
-  unitTypeSpek        UnitType? @relation("UnitTypeSpek")
-  legality            Legality?
-  projectAnalisa      Project?  @relation("ProjectAnalisa")
-  infraModel3d        Infrastructure[] @relation("InfraModel3d")
-  infraGambarKerja    Infrastructure[] @relation("InfraGambarKerja")
-  ktDesain            CustomWork[]     @relation("KtDesain")
-  ktModel3d           CustomWork[]     @relation("KtModel3d")
-  ktGambarKerja       CustomWork[]     @relation("KtGambarKerja")
-  contractSpk         Contract?        @relation("ContractSpk")
+  unitTypeModel3d        UnitType? @relation("UnitTypeModel3d")
+  unitTypeGambarKerjaPdf UnitType? @relation("UnitTypeGambarKerjaPdf")
+  unitTypeGambarKerjaDwg UnitType? @relation("UnitTypeGambarKerjaDwg")
+  unitTypeRender         UnitType? @relation("UnitTypeRender")
+  unitTypeSpek           UnitType? @relation("UnitTypeSpek")
+  legality               Legality?
+  projectAnalisa         Project?  @relation("ProjectAnalisa")
+  infraModel3d           Infrastructure[] @relation("InfraModel3d")
+  infraGambarKerjaPdf    Infrastructure[] @relation("InfraGambarKerjaPdf")
+  infraGambarKerjaDwg    Infrastructure[] @relation("InfraGambarKerjaDwg")
+  ktDesain               CustomWork[]     @relation("KtDesain")
+  ktModel3d              CustomWork[]     @relation("KtModel3d")
+  ktGambarKerjaPdf       CustomWork[]     @relation("KtGambarKerjaPdf")
+  ktGambarKerjaDwg       CustomWork[]     @relation("KtGambarKerjaDwg")
+  ktRab                  CustomWork[]     @relation("KtRab")
+  contractSpk            Contract?        @relation("ContractSpk")
 
   @@map("documents")
 }
@@ -229,7 +234,12 @@ model Legality {
   id          String  @id @default(cuid())
   projectId   String
   nib         String
-  /// Uraian sertifikat, mis. "SHM No. 412 — Induk, pemecahan selesai 8 unit"
+  /// Hak Milik (HM) | Hak Guna Usaha (HGU) | Hak Guna Bangunan (HGB) |
+  /// Hak Pakai | Hak Pengelolaan (HPL) | Hak Tanggungan
+  jenisHak    String  @default("Hak Milik (HM)")
+  /// Nomor hak atas tanah, mis. "412"
+  nomorHak    String  @default("")
+  /// Catatan tambahan bebas tentang sertifikat, mis. "Induk, pemecahan selesai 8 unit"
   sertifikat  String
   luas        Float
   dokumenId   String? @unique
@@ -269,21 +279,72 @@ model UnitType {
   luasBangunan  Float
   luasTanah     Float
 
-  docModel3dId     String? @unique
-  docGambarKerjaId String? @unique
-  docRenderId      String? @unique
-  docSpekId        String? @unique
+  /// Upah tenaga kerja acuan RAP tipe ini (material ada di UnitTypeRapItem).
+  /// Volume disatuankan OH (orang-hari); jumlah = rapUpahVolume * rapUpahHarga.
+  /// Ini yang disalin ke Unit baru bertipe ini saat pertama dibuat.
+  rapUpahVolume Float @default(1)
+  rapUpahHarga  Float @default(0)
 
-  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  docModel3d     Document? @relation("UnitTypeModel3d", fields: [docModel3dId], references: [id])
-  docGambarKerja Document? @relation("UnitTypeGambarKerja", fields: [docGambarKerjaId], references: [id])
-  docRender      Document? @relation("UnitTypeRender", fields: [docRenderId], references: [id])
-  docSpek        Document? @relation("UnitTypeSpek", fields: [docSpekId], references: [id])
+  docModel3dId        String? @unique
+  docGambarKerjaPdfId String? @unique
+  docGambarKerjaDwgId String? @unique
+  docRenderId         String? @unique
+  docSpekId           String? @unique
 
-  units Unit[]
+  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  docModel3d        Document? @relation("UnitTypeModel3d", fields: [docModel3dId], references: [id])
+  docGambarKerjaPdf Document? @relation("UnitTypeGambarKerjaPdf", fields: [docGambarKerjaPdfId], references: [id])
+  docGambarKerjaDwg Document? @relation("UnitTypeGambarKerjaDwg", fields: [docGambarKerjaDwgId], references: [id])
+  docRender         Document? @relation("UnitTypeRender", fields: [docRenderId], references: [id])
+  docSpek           Document? @relation("UnitTypeSpek", fields: [docSpekId], references: [id])
+
+  units    Unit[]
+  /// RAB master tipe ini — dasar yang disalin ke Unit baru bertipe ini.
+  boqItems UnitTypeBoqItem[]
+  /// RAP master tipe ini — dasar yang disalin ke Unit baru bertipe ini.
+  rapItems UnitTypeRapItem[]
 
   @@unique([projectId, kode])
   @@map("unit_types")
+}
+
+/// RAB master milik sebuah TIPE unit — bukan snapshot unit. Ini yang disalin
+/// ke `UnitBoqItem` saat unit baru dibuat dari tipe ini (lihat catatan pada
+/// `buatBoqDariTemplate` di lib/calc/boq.ts, yang dipakai hanya sebagai
+/// fallback bila tipe belum punya rincian sendiri).
+model UnitTypeBoqItem {
+  id          String @id @default(cuid())
+  unitTypeId  String
+  grup        String
+  uraian      String
+  satuan      String
+  volume      Float
+  hargaSatuan Float
+  spesifikasi String?
+  urutan      Int    @default(0)
+
+  unitType UnitType @relation(fields: [unitTypeId], references: [id], onDelete: Cascade)
+
+  @@index([unitTypeId])
+  @@map("unit_type_boq_items")
+}
+
+/// RAP master milik sebuah TIPE unit — pasangan `UnitTypeBoqItem`.
+model UnitTypeRapItem {
+  id          String  @id @default(cuid())
+  unitTypeId  String
+  grup        String
+  nama        String
+  satuan      String
+  volume      Float
+  hargaSatuan Float
+  keterangan  String?
+  urutan      Int     @default(0)
+
+  unitType UnitType @relation(fields: [unitTypeId], references: [id], onDelete: Cascade)
+
+  @@index([unitTypeId])
+  @@map("unit_type_rap_items")
 }
 
 model Unit {
@@ -306,8 +367,10 @@ model Unit {
   progress          Int    @default(0)
 
   hargaJual Float @default(0)
-  /// Upah tenaga kerja pada RAP (material ada di UnitRapItem)
-  rapUpah   Float @default(0)
+  /// Upah tenaga kerja pada RAP (material ada di UnitRapItem). Volume
+  /// disatuankan OH (orang-hari); jumlah = rapUpahVolume * rapUpahHarga.
+  rapUpahVolume Float @default(1)
+  rapUpahHarga  Float @default(0)
 
   dibuatPada DateTime @default(now())
   diubahPada DateTime @updatedAt
@@ -326,6 +389,7 @@ model Unit {
   penerimaan     SalesPayment[]
 
   @@index([projectId, phaseId])
+  @@unique([projectId, nomor])
   @@map("units")
 }
 
@@ -383,17 +447,25 @@ model CustomWork {
   id       String  @id @default(cuid())
   unitId   String
   judul    String
-  /// Upah tenaga kerja untuk kerja tambah ini
-  rapUpah  Float   @default(0)
+  /// Upah tenaga kerja untuk kerja tambah ini. Volume disatuankan OH
+  /// (orang-hari); jumlah = rapUpahVolume * rapUpahHarga.
+  rapUpahVolume Float @default(1)
+  rapUpahHarga  Float @default(0)
 
-  docDesainId      String?
-  docModel3dId     String?
-  docGambarKerjaId String?
+  docDesainId         String?
+  docModel3dId        String?
+  docGambarKerjaPdfId String?
+  docGambarKerjaDwgId String?
+  /// RAB (disetujui) — harus ditandatangani konsumen yang meminta kerja
+  /// tambah ini sebelum dikerjakan.
+  docRabId            String?
 
-  unit           Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  docDesain      Document? @relation("KtDesain", fields: [docDesainId], references: [id])
-  docModel3d     Document? @relation("KtModel3d", fields: [docModel3dId], references: [id])
-  docGambarKerja Document? @relation("KtGambarKerja", fields: [docGambarKerjaId], references: [id])
+  unit              Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  docDesain         Document? @relation("KtDesain", fields: [docDesainId], references: [id])
+  docModel3d        Document? @relation("KtModel3d", fields: [docModel3dId], references: [id])
+  docGambarKerjaPdf Document? @relation("KtGambarKerjaPdf", fields: [docGambarKerjaPdfId], references: [id])
+  docGambarKerjaDwg Document? @relation("KtGambarKerjaDwg", fields: [docGambarKerjaDwgId], references: [id])
+  docRab            Document? @relation("KtRab", fields: [docRabId], references: [id])
 
   boqItems CustomWorkBoqItem[]
   rapItems CustomWorkRapItem[]
@@ -404,6 +476,7 @@ model CustomWork {
 model CustomWorkBoqItem {
   id           String  @id @default(cuid())
   customWorkId String
+  grup         String  @default("Tambahan")
   uraian       String
   satuan       String
   volume       Float
@@ -470,15 +543,19 @@ model Infrastructure {
   status    String @default("Belum terbangun")
   progress  Int    @default(0)
   rab       Float
-  /// Upah tenaga kerja pada RAP (material ada di InfrastructureRapItem)
-  rapUpah   Float  @default(0)
+  /// Upah tenaga kerja pada RAP (material ada di InfrastructureRapItem).
+  /// Volume disatuankan OH (orang-hari); jumlah = rapUpahVolume * rapUpahHarga.
+  rapUpahVolume Float @default(1)
+  rapUpahHarga  Float @default(0)
 
-  docModel3dId     String?
-  docGambarKerjaId String?
+  docModel3dId        String?
+  docGambarKerjaPdfId String?
+  docGambarKerjaDwgId String?
 
-  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  docModel3d     Document? @relation("InfraModel3d", fields: [docModel3dId], references: [id])
-  docGambarKerja Document? @relation("InfraGambarKerja", fields: [docGambarKerjaId], references: [id])
+  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  docModel3d        Document? @relation("InfraModel3d", fields: [docModel3dId], references: [id])
+  docGambarKerjaPdf Document? @relation("InfraGambarKerjaPdf", fields: [docGambarKerjaPdfId], references: [id])
+  docGambarKerjaDwg Document? @relation("InfraGambarKerjaDwg", fields: [docGambarKerjaDwgId], references: [id])
 
   boqItems        InfrastructureBoqItem[]
   rapItems        InfrastructureRapItem[]

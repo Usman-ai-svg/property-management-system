@@ -383,7 +383,10 @@ async function main() {
     for (const L of P.legalitas) {
       const dokId = await buatDokumen("legalitas", L.dok);
       await prisma.legality.create({
-        data: { projectId: p.id, nib: L.nib, sertifikat: L.sertifikat, luas: L.luas, dokumenId: dokId },
+        data: {
+          projectId: p.id, nib: L.nib, jenisHak: L.jenisHak, nomorHak: L.nomorHak,
+          sertifikat: L.sertifikat, luas: L.luas, dokumenId: dokId,
+        },
       });
     }
 
@@ -424,13 +427,23 @@ async function main() {
     }
 
     for (const T of TIPE_UNIT[P.kode] ?? []) {
+      // Tipe langsung dibekali RAB & RAP master dari formula berbasis luas
+      // bangunan, supaya halaman Detail Tipe Unit tidak kosong — inilah yang
+      // lalu disalin ke setiap unit baru bertipe ini (lihat tambahUnit).
+      const boq = buatBoqDariTemplate(T.lb);
+      const rap = buatRapDariTemplate(T.lb);
+
       const t = await prisma.unitType.create({
         data: {
           projectId: pid, kode: T.kode, nama: T.nama, luasBangunan: T.lb, luasTanah: T.lt,
+          rapUpahVolume: 1, rapUpahHarga: hitungUpahRap(T.lb),
           docModel3dId: await buatDokumen("model3d", T.docs.model3d),
-          docGambarKerjaId: await buatDokumen("gambarKerja", T.docs.gambarKerja),
+          docGambarKerjaPdfId: await buatDokumen("gambarKerjaPdf", T.docs.gambarKerjaPdf),
+          docGambarKerjaDwgId: await buatDokumen("gambarKerjaDwg", T.docs.gambarKerjaDwg),
           docRenderId: await buatDokumen("render", T.docs.render),
           docSpekId: await buatDokumen("spek", T.docs.spek),
+          boqItems: { create: boq },
+          rapItems: { create: rap },
         },
       });
       typeId.set(`${P.kode}|${T.kode}`, t.id);
@@ -450,12 +463,19 @@ async function main() {
     const tipes = TIPE_UNIT[P.kode] ?? [];
     if (tipes.length === 0) continue;
 
+    // Nomor unit berjalan lanjut untuk SATU PROYEK, tidak reset tiap fase —
+    // fase tidak membebaskan nomor yang sama dipakai lagi (lihat @@unique
+    // [projectId, nomor] pada schema). Kode unit (mis. "NT4-F2-3") tetap
+    // memakai penomoran per-fase supaya seluruh rujukan kode di data demo
+    // (KERJA_TAMBAH, KONTRAK, dst.) tidak perlu berubah.
+    let nomorProyek = 1;
+
     for (const [fase, n] of Object.entries(P.fases)) {
       // charCodeAt(1) = digit fase ('1'=49, '2'=50, …). Dipertahankan apa adanya
       // dari artifact supaya sebaran data demo persis sama.
       const kodeFase = fase.charCodeAt(1);
 
-      for (let i = 1; i <= n; i++) {
+      for (let i = 1; i <= n; i++, nomorProyek++) {
         const kode = `${P.kode}-${fase}-${i}`;
         const T = tipes[(i + kodeFase) % tipes.length];
 
@@ -483,9 +503,9 @@ async function main() {
         const u = await prisma.unit.create({
           data: {
             kode, projectId: pid, phaseId: phaseId.get(`${P.kode}|${fase}`)!,
-            unitTypeId: typeId.get(`${P.kode}|${T.kode}`)!, nomor: i,
+            unitTypeId: typeId.get(`${P.kode}|${T.kode}`)!, nomor: nomorProyek,
             luasTanah: T.lt, statusPembangunan, statusJual, progress,
-            hargaJual, rapUpah: hitungUpahRap(T.lb),
+            hargaJual, rapUpahVolume: 1, rapUpahHarga: hitungUpahRap(T.lb),
             boqItems: { create: boq },
             rapItems: { create: rap },
           },
@@ -504,11 +524,13 @@ async function main() {
           await prisma.customWork.create({
             data: {
               unitId: u.id, judul: kt.judul,
-              rapUpah: kt.rap?.upah ?? generik?.upah ?? 0,
+              rapUpahVolume: 1, rapUpahHarga: kt.rap?.upah ?? generik?.upah ?? 0,
               docDesainId: await buatDokumen("desain", kt.docs.desain),
               docModel3dId: await buatDokumen("model3d", kt.docs.model3d),
-              docGambarKerjaId: await buatDokumen("gambarKerja", kt.docs.gambarKerja),
-              boqItems: { create: kt.boq.map((b, k) => ({ uraian: b.uraian, satuan: b.sat, volume: b.vol, hargaSatuan: b.harga, spesifikasi: b.spek, urutan: k })) },
+              docGambarKerjaPdfId: await buatDokumen("gambarKerjaPdf", kt.docs.gambarKerjaPdf),
+              docGambarKerjaDwgId: await buatDokumen("gambarKerjaDwg", kt.docs.gambarKerjaDwg),
+              docRabId: await buatDokumen("rab", kt.docs.rab),
+              boqItems: { create: kt.boq.map((b, k) => ({ grup: "Tambahan", uraian: b.uraian, satuan: b.sat, volume: b.vol, hargaSatuan: b.harga, spesifikasi: b.spek, urutan: k })) },
               rapItems: {
                 create: kt.rap
                   ? kt.rap.groups.flatMap((g, gi) =>
@@ -573,9 +595,11 @@ async function main() {
       const s = await prisma.infrastructure.create({
         data: {
           kode: S.id, projectId: pid, nama: S.nama, jenis: S.jenis, volume: S.vol,
-          status: S.status, progress: S.progress, rab: S.rab, rapUpah: rap.upah,
+          status: S.status, progress: S.progress, rab: S.rab,
+          rapUpahVolume: 1, rapUpahHarga: rap.upah,
           docModel3dId: await buatDokumen("model3d", S.docs.model3d),
-          docGambarKerjaId: await buatDokumen("gambarKerja", S.docs.gambarKerja),
+          docGambarKerjaPdfId: await buatDokumen("gambarKerjaPdf", S.docs.gambarKerjaPdf),
+          docGambarKerjaDwgId: await buatDokumen("gambarKerjaDwg", S.docs.gambarKerjaDwg),
           boqItems: { create: boqSarprasDefault(S.nama, S.jenis, S.rab) },
           rapItems: { create: rap.items },
         },

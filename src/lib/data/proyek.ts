@@ -73,7 +73,10 @@ export async function detailProyek(u: Pengguna, kode: string) {
         },
         orderBy: { luasBangunan: "asc" as const },
       },
-      fases: { select: { id: true, kode: true }, orderBy: { urutan: "asc" as const } },
+      fases: {
+        select: { id: true, kode: true, nama: true, urutan: true, _count: { select: { units: true } } },
+        orderBy: { urutan: "asc" as const },
+      },
     },
   });
 
@@ -94,14 +97,14 @@ export async function detailProyek(u: Pengguna, kode: string) {
     ? await prisma.legality.findMany({
         ...dasarLegalitas,
         select: {
-          id: true, nib: true, sertifikat: true, luas: true,
+          id: true, nib: true, jenisHak: true, nomorHak: true, sertifikat: true, luas: true,
           dokumen: { select: { id: true, kategori: true, versions: pilihVersi } },
         },
       })
     : (
         await prisma.legality.findMany({
           ...dasarLegalitas,
-          select: { id: true, nib: true, sertifikat: true, luas: true },
+          select: { id: true, nib: true, jenisHak: true, nomorHak: true, sertifikat: true, luas: true },
         })
       ).map((l) => ({ ...l, dokumen: null }));
 
@@ -121,12 +124,16 @@ export async function detailProyek(u: Pengguna, kode: string) {
             select: {
               judul: true,
               boqItems: bolehHarga ? { select: { volume: true, hargaSatuan: true } } : false,
+              rapItems: bolehHarga ? { select: { volume: true, hargaSatuan: true } } : false,
+              rapUpahVolume: bolehHarga,
+              rapUpahHarga: bolehHarga,
             },
           },
           ...(bolehHarga
             ? {
                 hargaJual: true,
-                rapUpah: true,
+                rapUpahVolume: true,
+                rapUpahHarga: true,
                 boqItems: { select: { volume: true, hargaSatuan: true } },
                 rapItems: { select: { volume: true, hargaSatuan: true } },
               }
@@ -142,7 +149,7 @@ export async function detailProyek(u: Pengguna, kode: string) {
         select: {
           id: true, kode: true, nama: true, jenis: true, volume: true,
           status: true, progress: true,
-          _count: { select: { contractItems: true } },
+          _count: { select: { contractItems: true, boqItems: true } },
           ...(bolehHarga
             ? { rab: true, boqItems: { select: { volume: true, hargaSatuan: true } } }
             : {}),
@@ -157,27 +164,45 @@ export async function detailProyek(u: Pengguna, kode: string) {
   };
 }
 
-/** Hitung RAB & RAP sebuah unit dari baris snapshot-nya. */
+/**
+ * Hitung RAB & RAP "unit ini" dari baris snapshot-nya — dasar Tipe DITAMBAH
+ * seluruh Kerja Tambah, disatukan jadi satu angka. Berlaku sama untuk unit
+ * default (tanpa kerja tambah, sehingga sama dengan RAB/RAP tipe) maupun
+ * unit custom.
+ */
 export function nilaiUnit(u: {
   boqItems?: { volume: number; hargaSatuan: number }[];
   rapItems?: { volume: number; hargaSatuan: number }[];
-  rapUpah?: number;
-  customWorks?: { boqItems?: { volume: number; hargaSatuan: number }[] | false }[];
+  rapUpahVolume?: number;
+  rapUpahHarga?: number;
+  customWorks?: {
+    boqItems?: { volume: number; hargaSatuan: number }[] | false;
+    rapItems?: { volume: number; hargaSatuan: number }[] | false;
+    rapUpahVolume?: number | false;
+    rapUpahHarga?: number | false;
+  }[];
 }) {
   const jumlah = (rows?: { volume: number; hargaSatuan: number }[] | false) =>
     (rows || []).reduce((s, r) => s + r.volume * r.hargaSatuan, 0);
 
   const rabStandar = jumlah(u.boqItems);
   const kerjaTambah = (u.customWorks ?? []).reduce((s, c) => s + jumlah(c.boqItems), 0);
-  const rapMaterial = jumlah(u.rapItems);
+
+  const rapMaterialStandar = jumlah(u.rapItems);
+  const rapUpahStandar = (u.rapUpahVolume ?? 0) * (u.rapUpahHarga ?? 0);
+  const rapKerjaTambah = (u.customWorks ?? []).reduce(
+    (s, c) => s + jumlah(c.rapItems) + (c.rapUpahVolume || 0) * (c.rapUpahHarga || 0),
+    0,
+  );
 
   return {
     rabStandar,
     kerjaTambah,
     rab: rabStandar + kerjaTambah,
-    rap: rapMaterial + (u.rapUpah ?? 0),
-    rapMaterial,
-    rapUpah: u.rapUpah ?? 0,
+    rap: rapMaterialStandar + rapUpahStandar + rapKerjaTambah,
+    rapMaterial: rapMaterialStandar,
+    rapUpah: rapUpahStandar,
+    rapKerjaTambah,
   };
 }
 

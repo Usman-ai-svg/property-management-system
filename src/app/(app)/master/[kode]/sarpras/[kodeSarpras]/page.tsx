@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
 import { Badge, CardHead, InfoRow, Kartu, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
+import { KATEGORI_EKSTENSI } from "@/lib/storage";
 import { unggahRevisi } from "../../../actions";
 import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
 import { rp, tanggalJam } from "@/lib/format";
@@ -50,13 +51,19 @@ export default async function RincianSarpras({
     select: {
       id: true, kode: true, nama: true, jenis: true, volume: true,
       status: true, progress: true, projectId: true,
+      // Jumlah baris BOQ menentukan apakah progres item ini turunan dari
+      // opname per baris (halaman Konstruksi) atau masih diisi satu angka
+      // manual — sama seperti pada unit.
+      _count: { select: { boqItems: true } },
       project: { select: { kode: true, nama: true } },
       docModel3d: pilihDokumen,
-      docGambarKerja: pilihDokumen,
+      docGambarKerjaPdf: pilihDokumen,
+      docGambarKerjaDwg: pilihDokumen,
       ...(bolehHarga
         ? {
             rab: true,
-            rapUpah: true,
+            rapUpahVolume: true,
+            rapUpahHarga: true,
             boqItems: {
               orderBy: { urutan: "asc" as const },
               select: {
@@ -108,10 +115,17 @@ export default async function RincianSarpras({
 
   const boqItems = "boqItems" in item ? item.boqItems : [];
   const rapItems = "rapItems" in item ? item.rapItems : [];
-  const rapUpah = "rapUpah" in item ? item.rapUpah : 0;
+  const rapUpahVolume = "rapUpahVolume" in item ? item.rapUpahVolume : 0;
+  const rapUpahHarga = "rapUpahHarga" in item ? item.rapUpahHarga : 0;
+
+  // Progres hanya bisa diketik manual selama item ini belum punya baris BOQ
+  // sama sekali — begitu ada, satu-satunya sumber adalah opname per baris di
+  // halaman Konstruksi (sama seperti aturan pada Unit).
+  const dariBoq = item._count.boqItems > 0;
 
   const rab = boqItems.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
   const rapMaterial = rapItems.reduce((s, r) => s + r.volume * r.hargaSatuan, 0);
+  const rapUpah = rapUpahVolume * rapUpahHarga;
 
   return (
     <div style={{ padding: 24 }}>
@@ -150,6 +164,7 @@ export default async function RincianSarpras({
                   data={{
                     id: item.id, nama: item.nama, jenis: item.jenis,
                     volume: item.volume, status: item.status, progress: item.progress,
+                    dariBoq,
                   }}
                 />
               )
@@ -160,7 +175,17 @@ export default async function RincianSarpras({
           <InfoRow label="Jenis" nilai={item.jenis} />
           <InfoRow label="Volume" nilai={item.volume} />
           <InfoRow label="Status Bangun" nilai={<Badge nilai={item.status} peta={WARNA_STATUS.bangun} />} />
-          <InfoRow label="Progres" nilai={`${item.progress}%`} />
+          <InfoRow
+            label="Progres"
+            nilai={
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                {item.progress}%
+                <span style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)" }}>
+                  {dariBoq ? "dari opname BOQ" : "diisi manual"}
+                </span>
+              </span>
+            }
+          />
           {bolehHarga && <InfoRow label="RAB" nilai={rp(rab)} />}
           {bolehHarga && <InfoRow label="RAP" nilai={rp(rapMaterial + rapUpah)} />}
         </Kartu>
@@ -173,7 +198,8 @@ export default async function RincianSarpras({
             (
               [
                 ["3D Model", item.docModel3d, "model3d"],
-                ["Gambar Kerja", item.docGambarKerja, "gambarKerja"],
+                ["Gambar Kerja PDF", item.docGambarKerjaPdf, "gambarKerjaPdf"],
+                ["Gambar Kerja DWG", item.docGambarKerjaDwg, "gambarKerjaDwg"],
               ] as const
             ).map(([judul, dok, kategori]) => (
               <FileRow
@@ -184,6 +210,7 @@ export default async function RincianSarpras({
                 konteks={`${judul} · ${item.nama}`}
                 pemilik={{ jenis: "sarpras", id: item.id, kategori }}
                 aksiUnggah={unggahRevisi}
+                terima={KATEGORI_EKSTENSI[kategori]?.join(",")}
               />
             ))
           )}
@@ -217,7 +244,8 @@ export default async function RincianSarpras({
             id={item.id}
             nama={item.nama}
             baris={rapItems}
-            upah={rapUpah}
+            upahVolume={rapUpahVolume}
+            upahHarga={rapUpahHarga}
             bolehHarga={bolehHarga}
             bolehUbah={ubahHarga}
             konteks={item.nama}

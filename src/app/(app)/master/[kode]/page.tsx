@@ -11,6 +11,7 @@ import {
   AksiSarpras, AksiTipeUnit, EditLegalitas, EditLokasi, EditLuasLahan, EditUnit,
   HapusUnit, TambahSarpras, TambahTipeUnit, TambahUnit,
 } from "./editors";
+import { HapusFase, HapusProyek, KelolaFase, UbahFase, UbahProyek } from "../editors-proyek";
 import { Tabel } from "@/components/kartu-tabel";
 
 export default async function DetailProyek({ params }: { params: Promise<{ kode: string }> }) {
@@ -71,7 +72,15 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
               {proyek.nama}
             </h3>
           </div>
-          <Badge nilai={proyek.statusLahan} peta={WARNA_STATUS.lahan} />
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <Badge nilai={proyek.statusLahan} peta={WARNA_STATUS.lahan} />
+            {ubahDeskripsi && (
+              <div style={{ display: "flex", gap: 2 }}>
+                <UbahProyek proyek={proyek} />
+                <HapusProyek id={proyek.id} kode={kodeProyek} />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ---------- baris 1: Lokasi | Legalitas ---------- */}
@@ -138,7 +147,8 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                   <EditLegalitas
                     kode={kodeProyek}
                     legalitas={proyek.legalitas.map((l) => ({
-                      id: l.id, nib: l.nib, sertifikat: l.sertifikat, luas: l.luas,
+                      id: l.id, nib: l.nib, jenisHak: l.jenisHak, nomorHak: l.nomorHak,
+                      sertifikat: l.sertifikat, luas: l.luas,
                     }))}
                   />
                 )
@@ -158,9 +168,14 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                     <div style={{ fontSize: 11, color: "var(--muted)" }}>{m2(lg.luas)}</div>
                   )}
                 </div>
-                <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.55, marginTop: 2 }}>
-                  {lg.sertifikat}
+                <div style={{ fontSize: 12, color: "var(--text)", marginTop: 3 }}>
+                  {lg.jenisHak} · No. {lg.nomorHak}
                 </div>
+                {lg.sertifikat && (
+                  <div style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.55, marginTop: 2 }}>
+                    {lg.sertifikat}
+                  </div>
+                )}
                 {bolehDokumen && (
                   <FileRow
                     label="Dokumen sertifikat"
@@ -177,6 +192,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                     konteks={`Sertifikat NIB ${lg.nib}`}
                     pemilik={{ jenis: "legalitas", id: lg.id, kategori: "legalitas" }}
                     aksiUnggah={unggahRevisi}
+                    terima=".pdf"
                   />
                 )}
               </div>
@@ -237,6 +253,40 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
           </div>
         </Kartu>
 
+        {/* ---------- Fase ---------- */}
+        <Kartu atas={16}>
+          <CardHead
+            judul={`Fase · ${proyek.fases.length} fase`}
+            aksi={
+              ubahDeskripsi && (
+                <KelolaFase
+                  projectId={proyek.id}
+                  kodeProyek={kodeProyek}
+                  fases={proyek.fases.map((f) => ({
+                    id: f.id, kode: f.kode, nama: f.nama,
+                    urutan: f.urutan, jumlahUnit: f._count.units,
+                  }))}
+                />
+              )
+            }
+          />
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {proyek.fases.map((f) => (
+              <span key={f.id} style={{ display: "flex", alignItems: "center" }}>
+                <span className="chip" style={{ background: "var(--rona-teal)", color: "var(--muted)" }}>
+                  {f.kode}{f.nama ? ` · ${f.nama}` : ""} · {f._count.units} unit
+                </span>
+                {ubahDeskripsi && (
+                  <>
+                    <UbahFase fase={f} />
+                    <HapusFase id={f.id} kode={f.kode} />
+                  </>
+                )}
+              </span>
+            ))}
+          </div>
+        </Kartu>
+
         {/* ---------- Tipe Unit ---------- */}
         <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
           <TabelHead
@@ -257,7 +307,14 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
           >
             {proyek.unitTypes.map((t) => (
               <tr key={t.id}>
-                <td style={{ fontWeight: 600 }}>{t.nama}</td>
+                <td>
+                  <Link
+                    href={`/master/${kodeProyek}/tipe/${t.kode}`}
+                    style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+                  >
+                    {t.nama}
+                  </Link>
+                </td>
                 <td style={{ color: "var(--muted)" }}>{t.kode}</td>
                 <td style={{ textAlign: "right" }}>{t.luasBangunan} m²</td>
                 <td style={{ textAlign: "right" }}>{t.luasTanah} m²</td>
@@ -386,7 +443,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
           <TabelHead
             judul={`Daftar Sarana & Prasarana · ${sarpras.length} item`}
             keterangan="Klik nama item untuk membuka Detail Data Sarana & Prasarana."
-            aksi={ubahSarprasData && <TambahSarpras kode={kodeProyek} bolehHarga={ubahHarga} />}
+            aksi={ubahSarprasData && <TambahSarpras kode={kodeProyek} />}
           />
 
           {!bolehSarpras ? (
@@ -431,9 +488,12 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                       <td>
                         <AksiSarpras
                           kode={kodeProyek}
-                          data={s as Parameters<typeof AksiSarpras>[0]["data"]}
+                          data={{
+                            id: s.id, nama: s.nama, jenis: s.jenis, volume: s.volume,
+                            status: s.status, progress: s.progress,
+                            dariBoq: s._count.boqItems > 0,
+                          }}
                           terkontrak={s._count.contractItems}
-                          bolehHarga={ubahHarga}
                         />
                       </td>
                     )}

@@ -53,7 +53,8 @@ export function RapTable({
   judul,
   keterangan,
   baris,
-  upah,
+  upahVolume,
+  upahHarga,
   bolehHarga,
   bolehUbah,
   aksiSimpan,
@@ -65,13 +66,15 @@ export function RapTable({
   judul: string;
   keterangan?: string;
   baris: BarisRapUI[];
-  upah: number;
+  /** Upah tenaga kerja disatuankan OH (orang-hari): jumlah = volume × harga. */
+  upahVolume: number;
+  upahHarga: number;
   bolehHarga: boolean;
   bolehUbah: boolean;
   /** Menerima kelompok + upah sebagai JSON. */
   aksiSimpan: (dataJson: string) => Promise<HasilAksi>;
   konteksImpor: string;
-  sasaranImpor: "unit" | "kerjaTambah" | "sarpras";
+  sasaranImpor: "unit" | "kerjaTambah" | "sarpras" | "tipeUnit";
   idImpor: string;
   /** Aksi impor Excel — diterima lewat prop supaya komponen ini tidak
    *  mengimpor dari `app/`. */
@@ -79,7 +82,8 @@ export function RapTable({
 }) {
   const [sunting, setSunting] = useState(false);
   const [draft, setDraft] = useState<Kelompok[]>(() => kelompokkan(baris));
-  const [draftUpah, setDraftUpah] = useState(upah);
+  const [draftUpahVolume, setDraftUpahVolume] = useState(upahVolume);
+  const [draftUpahHarga, setDraftUpahHarga] = useState(upahHarga);
   const [galat, setGalat] = useState<string | null>(null);
   const [menyimpan, mulai] = useTransition();
 
@@ -98,7 +102,9 @@ export function RapTable({
   }
 
   const kelompok = sunting ? draft : kelompokkan(baris);
-  const nilaiUpah = sunting ? draftUpah : upah;
+  const volUpah = sunting ? draftUpahVolume : upahVolume;
+  const hargaUpah = sunting ? draftUpahHarga : upahHarga;
+  const nilaiUpah = volUpah * hargaUpah;
   const material = kelompok.reduce(
     (s, g) => s + g.items.reduce((a, i) => a + i.volume * i.hargaSatuan, 0),
     0,
@@ -106,7 +112,8 @@ export function RapTable({
 
   const mulaiSunting = () => {
     setDraft(kelompokkan(baris).map((g) => ({ ...g, items: g.items.map((i) => ({ ...i })) })));
-    setDraftUpah(upah);
+    setDraftUpahVolume(upahVolume);
+    setDraftUpahHarga(upahHarga);
     setGalat(null);
     setSunting(true);
   };
@@ -118,7 +125,9 @@ export function RapTable({
 
   const simpan = () =>
     mulai(async () => {
-      const hasil = await aksiSimpan(JSON.stringify({ kelompok: draft, upah: draftUpah }));
+      const hasil = await aksiSimpan(
+        JSON.stringify({ kelompok: draft, upahVolume: draftUpahVolume, upahHarga: draftUpahHarga }),
+      );
       if (hasil.ok) {
         setSunting(false);
         setGalat(null);
@@ -358,19 +367,37 @@ export function RapTable({
               {sunting && <td />}
             </tr>
             <tr style={{ fontWeight: 700 }}>
-              <td colSpan={5}>UPAH TENAGA KERJA</td>
+              <td>—</td>
+              <td>UPAH TENAGA KERJA</td>
+              <td>OH</td>
               <td style={{ textAlign: "right" }}>
                 {sunting ? (
                   <input
                     className="inp"
                     type="number"
-                    value={draftUpah}
-                    onChange={(e) => setDraftUpah(Number(e.target.value) || 0)}
-                    style={{ ...sel, width: 120, textAlign: "right" }}
+                    value={draftUpahVolume}
+                    onChange={(e) => setDraftUpahVolume(Number(e.target.value) || 0)}
+                    style={{ ...sel, width: 64, textAlign: "right" }}
                   />
                 ) : (
-                  <span className="num" style={{ color: "var(--teal)" }}>{rp(nilaiUpah)}</span>
+                  volUpah.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 )}
+              </td>
+              <td style={{ textAlign: "right" }}>
+                {sunting ? (
+                  <input
+                    className="inp"
+                    type="number"
+                    value={draftUpahHarga}
+                    onChange={(e) => setDraftUpahHarga(Number(e.target.value) || 0)}
+                    style={{ ...sel, width: 96, textAlign: "right" }}
+                  />
+                ) : (
+                  rp(hargaUpah)
+                )}
+              </td>
+              <td style={{ textAlign: "right" }}>
+                <span className="num" style={{ color: "var(--teal)" }}>{rp(nilaiUpah)}</span>
               </td>
               <td />
               {sunting && <td />}

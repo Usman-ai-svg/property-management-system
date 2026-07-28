@@ -4,9 +4,11 @@ import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { Badge, CardHead, InfoRow, Kartu, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
+import { KATEGORI_EKSTENSI } from "@/lib/storage";
 import { unggahRevisi } from "../../../actions";
 import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
 import { rp } from "@/lib/format";
+import { nilaiUnit } from "@/lib/data/proyek";
 import {
   EditDeskripsiUnit, HapusKerjaTambah, TabelBoqKt, TabelBoqUnit,
   TabelRapKt, TabelRapUnit, TambahKerjaTambah, UbahJudulKerjaTambah,
@@ -61,7 +63,8 @@ export default async function RincianUnit({
         select: {
           kode: true, nama: true, luasBangunan: true,
           docModel3d: pilihDokumen,
-          docGambarKerja: pilihDokumen,
+          docGambarKerjaPdf: pilihDokumen,
+          docGambarKerjaDwg: pilihDokumen,
           docRender: pilihDokumen,
           docSpek: pilihDokumen,
         },
@@ -69,7 +72,8 @@ export default async function RincianUnit({
       ...(bolehHarga
         ? {
             hargaJual: true,
-            rapUpah: true,
+            rapUpahVolume: true,
+            rapUpahHarga: true,
             boqItems: {
               orderBy: { urutan: "asc" as const },
               select: {
@@ -89,14 +93,16 @@ export default async function RincianUnit({
       customWorks: {
         orderBy: { judul: "asc" as const },
         select: {
-          id: true, judul: true, rapUpah: true,
+          id: true, judul: true, rapUpahVolume: true, rapUpahHarga: true,
           docDesain: pilihDokumen,
           docModel3d: pilihDokumen,
-          docGambarKerja: pilihDokumen,
+          docGambarKerjaPdf: pilihDokumen,
+          docGambarKerjaDwg: pilihDokumen,
+          docRab: pilihDokumen,
           boqItems: {
             orderBy: { urutan: "asc" as const },
             select: {
-              id: true, uraian: true, satuan: true, volume: true,
+              id: true, grup: true, uraian: true, satuan: true, volume: true,
               hargaSatuan: true, spesifikasi: true,
             },
           },
@@ -136,7 +142,13 @@ export default async function RincianUnit({
 
   const boqItems = "boqItems" in unit ? unit.boqItems : [];
   const rapItems = "rapItems" in unit ? unit.rapItems : [];
-  const rapUpah = "rapUpah" in unit ? unit.rapUpah : 0;
+  const rapUpahVolume = "rapUpahVolume" in unit ? unit.rapUpahVolume : 0;
+  const rapUpahHarga = "rapUpahHarga" in unit ? unit.rapUpahHarga : 0;
+
+  // RAB & RAP "unit ini" — dasar Tipe ditambah seluruh Kerja Tambah,
+  // disatukan jadi satu angka. Sama untuk unit default (kts kosong, jadi
+  // sama dengan RAB/RAP tipe) maupun unit custom.
+  const nilai = nilaiUnit({ boqItems, rapItems, rapUpahVolume, rapUpahHarga, customWorks: kts });
 
   return (
     <div style={{ padding: 24 }}>
@@ -179,8 +191,7 @@ export default async function RincianUnit({
                   unit={{
                     id: unit.id, nomor: unit.nomor, luasTanah: unit.luasTanah,
                     phaseId: unit.phaseId, unitTypeId: unit.unitTypeId,
-                    statusPembangunan: unit.statusPembangunan,
-                    statusJual: unit.statusJual, progress: unit.progress,
+                    progress: unit.progress,
                     dariBoq,
                   }}
                   fases={unit.project.fases}
@@ -213,6 +224,9 @@ export default async function RincianUnit({
             label="Status Jual"
             nilai={<Badge nilai={unit.statusJual} peta={WARNA_STATUS.jual} />}
           />
+          <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 4 }}>
+            Status Bangun dan Status Jual diubah dari tabel Daftar Unit di halaman Master Proyek.
+          </div>
         </Kartu>
 
         <Kartu>
@@ -227,7 +241,8 @@ export default async function RincianUnit({
               {(
                 [
                   ["3D Model", unit.unitType.docModel3d, "model3d"],
-                  ["Gambar Kerja", unit.unitType.docGambarKerja, "gambarKerja"],
+                  ["Gambar Kerja PDF", unit.unitType.docGambarKerjaPdf, "gambarKerjaPdf"],
+                  ["Gambar Kerja DWG", unit.unitType.docGambarKerjaDwg, "gambarKerjaDwg"],
                   ["Render", unit.unitType.docRender, "render"],
                   ["Spesifikasi Material", unit.unitType.docSpek, "spek"],
                 ] as const
@@ -240,6 +255,7 @@ export default async function RincianUnit({
                   konteks={`${judul} · Tipe ${unit.unitType.nama}`}
                   pemilik={{ jenis: "tipeUnit", id: unit.unitTypeId, kategori }}
                   aksiUnggah={unggahRevisi}
+                  terima={KATEGORI_EKSTENSI[kategori]?.join(",")}
                 />
               ))}
 
@@ -250,8 +266,10 @@ export default async function RincianUnit({
                   {(
                     [
                       ["Desain (disetujui)", kt.docDesain, "desain"],
+                      ["RAB (disetujui)", kt.docRab, "rab"],
                       ["3D Model", kt.docModel3d, "model3d"],
-                      ["Gambar Kerja", kt.docGambarKerja, "gambarKerja"],
+                      ["Gambar Kerja PDF", kt.docGambarKerjaPdf, "gambarKerjaPdf"],
+                      ["Gambar Kerja DWG", kt.docGambarKerjaDwg, "gambarKerjaDwg"],
                     ] as const
                   ).map(([judul, dok, kategori]) => (
                     <FileRow
@@ -262,6 +280,7 @@ export default async function RincianUnit({
                       konteks={`${judul} · ${kt.judul}`}
                       pemilik={{ jenis: "kerjaTambah", id: kt.id, kategori }}
                       aksiUnggah={unggahRevisi}
+                      terima={KATEGORI_EKSTENSI[kategori]?.join(",")}
                     />
                   ))}
                 </div>
@@ -348,7 +367,7 @@ export default async function RincianUnit({
         <>
           <TabelBoqUnit
             unitId={unit.id}
-            judul={`Tabel RAB Unit · dasar Tipe ${unit.unitType.nama}`}
+            judul={`RAB Unit · dasar Tipe ${unit.unitType.nama}`}
             baris={boqItems}
             bolehHarga={bolehHarga}
             bolehUbah={ubahHarga}
@@ -358,7 +377,8 @@ export default async function RincianUnit({
           <TabelRapUnit
             unitId={unit.id}
             baris={rapItems}
-            upah={rapUpah}
+            upahVolume={rapUpahVolume}
+            upahHarga={rapUpahHarga}
             bolehHarga={bolehHarga}
             bolehUbah={ubahHarga}
             konteks={konteksImpor}
@@ -379,13 +399,24 @@ export default async function RincianUnit({
                 ktId={kt.id}
                 judul={kt.judul}
                 baris={kt.rapItems}
-                upah={kt.rapUpah}
+                upahVolume={kt.rapUpahVolume}
+                upahHarga={kt.rapUpahHarga}
                 bolehHarga={bolehHarga}
                 bolehUbah={ubahHarga}
                 konteks={`Unit ${unit.nomor} · ${kt.judul}`}
               />
             </div>
           ))}
+
+          <Kartu atas={20}>
+            <div className="eyebrow" style={{ marginBottom: 8 }}>Ringkasan RAB &amp; RAP Unit Ini</div>
+            <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 10, lineHeight: 1.6 }}>
+              Gabungan RAB dan RAP dasar Tipe {unit.unitType.nama}
+              {kts.length > 0 ? ` ditambah ${kts.length} kerja tambah di atas.` : " — unit ini masih Default, belum ada kerja tambah."}
+            </div>
+            <InfoRow label="RAB Unit Ini" nilai={rp(nilai.rab)} />
+            <InfoRow label="RAP Unit Ini" nilai={rp(nilai.rap)} />
+          </Kartu>
         </>
       )}
     </div>

@@ -28,7 +28,7 @@ export async function keuanganPerProyek(u: Pengguna) {
       id: true, kode: true, nama: true, status: true, statusLahan: true,
       units: {
         select: {
-          hargaJual: true, rapUpah: true,
+          hargaJual: true, rapUpahVolume: true, rapUpahHarga: true,
           rapItems: { select: { volume: true, hargaSatuan: true } },
         },
       },
@@ -37,10 +37,7 @@ export async function keuanganPerProyek(u: Pengguna) {
   });
 
   return proyek.map((p) => {
-    const rap = p.units.reduce(
-      (s, x) => s + x.rapUpah + x.rapItems.reduce((a, r) => a + r.volume * r.hargaSatuan, 0),
-      0,
-    );
+    const rap = p.units.reduce((s, x) => s + totalRapDari(x), 0);
     return {
       id: p.id, kode: p.kode, nama: p.nama,
       status: p.status, statusLahan: p.statusLahan,
@@ -119,6 +116,9 @@ export async function trenBulanan(u: Pengguna, projectId?: string) {
  * dengan bentuk yang sama, jadi rumusnya tidak perlu digandakan.
  */
 export const totalRapDari = (x: {
-  rapUpah: number;
+  rapUpahVolume: number;
+  rapUpahHarga: number;
   rapItems: { volume: number; hargaSatuan: number }[];
-}) => x.rapUpah + x.rapItems.reduce((a, r) => a + r.volume * r.hargaSatuan, 0);
+}) =>
+  x.rapUpahVolume * x.rapUpahHarga +
+  x.rapItems.reduce((a, r) => a + r.volume * r.hargaSatuan, 0);

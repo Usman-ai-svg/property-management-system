@@ -25,8 +25,8 @@ export function ModalImpor({
   jenis: string;
   konteks: string;
   kolom: string;
-  /** unit | kerjaTambah | sarpras */
-  sasaran: "unit" | "kerjaTambah" | "sarpras";
+  /** unit | kerjaTambah | sarpras | tipeUnit */
+  sasaran: "unit" | "kerjaTambah" | "sarpras" | "tipeUnit";
   id: string;
   aksiImpor: (sebelumnya: HasilAksi | null, form: FormData) => Promise<HasilAksi>;
 }) {

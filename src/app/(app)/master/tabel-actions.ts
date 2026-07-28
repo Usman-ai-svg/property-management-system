@@ -13,19 +13,32 @@ import { bacaBoqDariExcel, bacaRapDariExcel, GagalImpor } from "@/lib/impor-exce
  * Tabel dikirim sekaligus, bukan per baris, mengikuti cara kerja artifact:
  * pengguna menekan "Ubah", menyunting seluruh tabel, lalu "Simpan".
  *
+ * Baik BOQ maupun RAP dikirim terkelompok (`{kelompok: [...]}`) — BOQ dulu
+ * mengirim daftar datar dengan `grup` sebagai label saja; sekarang kelompok
+ * itu sendiri yang bisa diubah namanya, ditambah, atau dihapus, sama seperti
+ * RAP.
+ *
  * Baris lama dihapus dan diganti seluruhnya dalam satu transaksi. Ini aman
  * karena baris BOQ tidak dirujuk oleh tabel lain — yang dirujuk adalah unitnya.
  * Jejak audit mencatat pergeseran nilai totalnya, bukan tiap sel, supaya log
  * tetap terbaca saat satu penyimpanan mengubah puluhan baris sekaligus.
  */
 
-interface BarisBoqMasuk {
-  grup?: string | null;
+interface ItemBoqMasuk {
   uraian: string;
   satuan: string;
   volume: number;
   hargaSatuan: number;
   spesifikasi?: string | null;
+}
+
+interface KelompokBoqMasuk {
+  nama: string;
+  items: ItemBoqMasuk[];
+}
+
+interface BarisBoqMasuk extends ItemBoqMasuk {
+  grup: string;
 }
 
 interface KelompokRapMasuk {
@@ -42,40 +55,49 @@ interface KelompokRapMasuk {
 const jumlah = (rows: { volume: number; hargaSatuan: number }[]) =>
   rows.reduce((s, r) => s + r.volume * r.hargaSatuan, 0);
 
+/** Ratakan kelompok BOQ jadi baris siap simpan, dengan validasi tiap baris. */
 function bacaBoq(json: string): BarisBoqMasuk[] {
-  let baris: BarisBoqMasuk[];
+  let data: { kelompok: KelompokBoqMasuk[] };
   try {
-    baris = JSON.parse(json);
+    data = JSON.parse(json);
   } catch {
     throw new GagalIzin("Data BOQ tidak terbaca.");
   }
-  if (!Array.isArray(baris) || baris.length === 0) {
+  if (!Array.isArray(data.kelompok) || data.kelompok.length === 0) {
     throw new GagalIzin("Tabel BOQ tidak boleh kosong.");
   }
-  return baris.map((b) => {
-    if (!b.uraian?.trim()) throw new GagalIzin("Setiap baris BOQ harus punya uraian pekerjaan.");
-    if (!Number.isFinite(b.volume) || b.volume < 0) throw new GagalIzin(`Volume tidak sah pada "${b.uraian}".`);
-    if (!Number.isFinite(b.hargaSatuan) || b.hargaSatuan < 0) throw new GagalIzin(`Harga satuan tidak sah pada "${b.uraian}".`);
-    return {
-      grup: b.grup?.trim() || null,
-      uraian: b.uraian.trim(),
-      satuan: b.satuan?.trim() || "ls",
-      volume: b.volume,
-      hargaSatuan: b.hargaSatuan,
-      spesifikasi: b.spesifikasi?.trim() || null,
-    };
-  });
+
+  const baris: BarisBoqMasuk[] = [];
+  for (const g of data.kelompok) {
+    if (!g.nama?.trim()) throw new GagalIzin("Setiap kelompok BOQ harus punya nama.");
+    for (const it of g.items) {
+      if (!it.uraian?.trim()) throw new GagalIzin(`Ada baris tanpa uraian pekerjaan pada kelompok "${g.nama}".`);
+      if (!Number.isFinite(it.volume) || it.volume < 0) throw new GagalIzin(`Volume tidak sah pada "${it.uraian}".`);
+      if (!Number.isFinite(it.hargaSatuan) || it.hargaSatuan < 0) throw new GagalIzin(`Harga satuan tidak sah pada "${it.uraian}".`);
+      baris.push({
+        grup: g.nama.trim(),
+        uraian: it.uraian.trim(),
+        satuan: it.satuan?.trim() || "ls",
+        volume: it.volume,
+        hargaSatuan: it.hargaSatuan,
+        spesifikasi: it.spesifikasi?.trim() || null,
+      });
+    }
+  }
+  if (baris.length === 0) throw new GagalIzin("Tabel BOQ tidak boleh kosong.");
+  return baris;
 }
 
-function bacaRap(json: string): { kelompok: KelompokRapMasuk[]; upah: number } {
-  let data: { kelompok: KelompokRapMasuk[]; upah: number };
+function bacaRap(json: string): { kelompok: KelompokRapMasuk[]; upahVolume: number; upahHarga: number } {
+  let data: { kelompok: KelompokRapMasuk[]; upahVolume: number; upahHarga: number };
   try {
     data = JSON.parse(json);
   } catch {
     throw new GagalIzin("Data RAP tidak terbaca.");
   }
   if (!Array.isArray(data.kelompok)) throw new GagalIzin("Data RAP tidak terbaca.");
-  if (!Number.isFinite(data.upah) || data.upah < 0) throw new GagalIzin("Nilai upah tidak sah.");
+  if (!Number.isFinite(data.upahVolume) || data.upahVolume < 0) throw new GagalIzin("Volume upah tidak sah.");
+  if (!Number.isFinite(data.upahHarga) || data.upahHarga < 0) throw new GagalIzin("Harga upah tidak sah.");
 
   for (const g of data.kelompok) {
     if (!g.nama?.trim()) throw new GagalIzin("Setiap kelompok RAP harus punya nama.");
@@ -95,8 +117,8 @@ function bacaRap(json: string): { kelompok: KelompokRapMasuk[]; upah: number } {
  * material tanpa menyentuh upah, dan lognya lalu terbaca "tidak ada yang
  * berubah" padahal nilai RAP-nya bergeser jauh.
  */
-const totalRap = (rows: { volume: number; hargaSatuan: number }[], upah: number) =>
-  jumlah(rows) + upah;
+const totalRap = (rows: { volume: number; hargaSatuan: number }[], upahVolume: number, upahHarga: number) =>
+  jumlah(rows) + upahVolume * upahHarga;
 
 /** Ratakan kelompok jadi baris siap simpan. */
 const ratakan = (kelompok: KelompokRapMasuk[]) =>
@@ -116,7 +138,7 @@ const ratakan = (kelompok: KelompokRapMasuk[]) =>
 // BOQ
 // ===========================================================================
 
-export async function simpanBoqUnit(unitId: string, barisJson: string): Promise<HasilAksi> {
+export async function simpanBoqUnit(unitId: string, dataJson: string): Promise<HasilAksi> {
   return jalankan(async () => {
     const unit = await prisma.unit.findUnique({
       where: { id: unitId },
@@ -129,15 +151,13 @@ export async function simpanBoqUnit(unitId: string, barisJson: string): Promise<
     if (!unit) throw new GagalIzin("Unit tidak ditemukan.");
 
     const pengguna = await izinkan("hargaRabRap", unit.projectId);
-    const baris = bacaBoq(barisJson);
+    const baris = bacaBoq(dataJson);
     const sebelum = jumlah(unit.boqItems);
 
     await prisma.$transaction([
       prisma.unitBoqItem.deleteMany({ where: { unitId } }),
       prisma.unitBoqItem.createMany({
-        // Grup wajib terisi pada baris BOQ unit; baris baru yang dibuat lewat
-        // "+ Tambah Baris" belum tentu punya grup.
-        data: baris.map((b, i) => ({ ...b, grup: b.grup ?? "Tambahan", unitId, urutan: i })),
+        data: baris.map((b, i) => ({ ...b, unitId, urutan: i })),
       }),
     ]);
 
@@ -153,7 +173,7 @@ export async function simpanBoqUnit(unitId: string, barisJson: string): Promise<
   });
 }
 
-export async function simpanBoqKerjaTambah(customWorkId: string, barisJson: string): Promise<HasilAksi> {
+export async function simpanBoqKerjaTambah(customWorkId: string, dataJson: string): Promise<HasilAksi> {
   return jalankan(async () => {
     const kt = await prisma.customWork.findUnique({
       where: { id: customWorkId },
@@ -171,14 +191,14 @@ export async function simpanBoqKerjaTambah(customWorkId: string, barisJson: stri
     if (!kt) throw new GagalIzin("Kerja tambah tidak ditemukan.");
 
     const pengguna = await izinkan("hargaRabRap", kt.unit.projectId);
-    const baris = bacaBoq(barisJson);
+    const baris = bacaBoq(dataJson);
     const sebelum = jumlah(kt.boqItems);
 
     await prisma.$transaction([
       prisma.customWorkBoqItem.deleteMany({ where: { customWorkId } }),
       prisma.customWorkBoqItem.createMany({
         data: baris.map((b, i) => ({
-          customWorkId, uraian: b.uraian, satuan: b.satuan,
+          customWorkId, grup: b.grup, uraian: b.uraian, satuan: b.satuan,
           volume: b.volume, hargaSatuan: b.hargaSatuan,
           spesifikasi: b.spesifikasi, urutan: i,
         })),
@@ -197,7 +217,7 @@ export async function simpanBoqKerjaTambah(customWorkId: string, barisJson: stri
   });
 }
 
-export async function simpanBoqSarpras(infrastructureId: string, barisJson: string): Promise<HasilAksi> {
+export async function simpanBoqSarpras(infrastructureId: string, dataJson: string): Promise<HasilAksi> {
   return jalankan(async () => {
     const s = await prisma.infrastructure.findUnique({
       where: { id: infrastructureId },
@@ -210,7 +230,7 @@ export async function simpanBoqSarpras(infrastructureId: string, barisJson: stri
     if (!s) throw new GagalIzin("Item sarpras tidak ditemukan.");
 
     const pengguna = await izinkan("hargaRabRap", s.projectId);
-    const baris = bacaBoq(barisJson);
+    const baris = bacaBoq(dataJson);
     const sebelum = jumlah(s.boqItems);
     const sesudah = jumlah(baris);
 
@@ -218,7 +238,7 @@ export async function simpanBoqSarpras(infrastructureId: string, barisJson: stri
       prisma.infrastructureBoqItem.deleteMany({ where: { infrastructureId } }),
       prisma.infrastructureBoqItem.createMany({
         data: baris.map((b, i) => ({
-          infrastructureId, grup: b.grup ?? s.nama, uraian: b.uraian, satuan: b.satuan,
+          infrastructureId, grup: b.grup, uraian: b.uraian, satuan: b.satuan,
           volume: b.volume, hargaSatuan: b.hargaSatuan, spesifikasi: b.spesifikasi, urutan: i,
         })),
       }),
@@ -239,6 +259,41 @@ export async function simpanBoqSarpras(infrastructureId: string, barisJson: stri
   });
 }
 
+export async function simpanBoqTipe(unitTypeId: string, dataJson: string): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const tipe = await prisma.unitType.findUnique({
+      where: { id: unitTypeId },
+      select: {
+        id: true, kode: true, nama: true, projectId: true,
+        project: { select: { kode: true } },
+        boqItems: { select: { volume: true, hargaSatuan: true } },
+      },
+    });
+    if (!tipe) throw new GagalIzin("Tipe unit tidak ditemukan.");
+
+    const pengguna = await izinkan("dokumenTeknis", tipe.projectId);
+    const baris = bacaBoq(dataJson);
+    const sebelum = jumlah(tipe.boqItems);
+
+    await prisma.$transaction([
+      prisma.unitTypeBoqItem.deleteMany({ where: { unitTypeId } }),
+      prisma.unitTypeBoqItem.createMany({
+        data: baris.map((b, i) => ({ ...b, unitTypeId, urutan: i })),
+      }),
+    ]);
+
+    await catat({
+      pengguna, projectId: tipe.projectId,
+      objek: `Tipe unit ${tipe.kode} · RAB`,
+      aksi: "Ubah baris BOQ",
+      dari: rpLog(sebelum), ke: rpLog(jumlah(baris)),
+    });
+
+    revalidatePath(`/master/${tipe.project.kode}`);
+    revalidatePath(`/master/${tipe.project.kode}/tipe/${tipe.kode}`);
+  });
+}
+
 // ===========================================================================
 // RAP
 // ===========================================================================
@@ -248,7 +303,7 @@ export async function simpanRapUnit(unitId: string, dataJson: string): Promise<H
     const unit = await prisma.unit.findUnique({
       where: { id: unitId },
       select: {
-        id: true, nomor: true, projectId: true, rapUpah: true,
+        id: true, nomor: true, projectId: true, rapUpahVolume: true, rapUpahHarga: true,
         rapItems: { select: { volume: true, hargaSatuan: true } },
         phase: { select: { kode: true } }, project: { select: { kode: true } },
       },
@@ -256,22 +311,22 @@ export async function simpanRapUnit(unitId: string, dataJson: string): Promise<H
     if (!unit) throw new GagalIzin("Unit tidak ditemukan.");
 
     const pengguna = await izinkan("hargaRabRap", unit.projectId);
-    const { kelompok, upah } = bacaRap(dataJson);
-    const sebelum = totalRap(unit.rapItems, unit.rapUpah);
+    const { kelompok, upahVolume, upahHarga } = bacaRap(dataJson);
+    const sebelum = totalRap(unit.rapItems, unit.rapUpahVolume, unit.rapUpahHarga);
 
     await prisma.$transaction([
       prisma.unitRapItem.deleteMany({ where: { unitId } }),
       prisma.unitRapItem.createMany({
         data: ratakan(kelompok).map((r) => ({ ...r, unitId })),
       }),
-      prisma.unit.update({ where: { id: unitId }, data: { rapUpah: upah } }),
+      prisma.unit.update({ where: { id: unitId }, data: { rapUpahVolume: upahVolume, rapUpahHarga: upahHarga } }),
     ]);
 
     await catat({
       pengguna, projectId: unit.projectId,
       objek: `Unit ${unit.phase.kode}-${unit.nomor} · RAP`,
       aksi: "Ubah rincian RAP",
-      dari: rpLog(sebelum), ke: rpLog(totalRap(ratakan(kelompok), upah)),
+      dari: rpLog(sebelum), ke: rpLog(totalRap(ratakan(kelompok), upahVolume, upahHarga)),
     });
 
     revalidatePath(`/master/${unit.project.kode}`);
@@ -284,7 +339,7 @@ export async function simpanRapKerjaTambah(customWorkId: string, dataJson: strin
     const kt = await prisma.customWork.findUnique({
       where: { id: customWorkId },
       select: {
-        id: true, judul: true, rapUpah: true,
+        id: true, judul: true, rapUpahVolume: true, rapUpahHarga: true,
         rapItems: { select: { volume: true, hargaSatuan: true } },
         unit: {
           select: {
@@ -297,22 +352,22 @@ export async function simpanRapKerjaTambah(customWorkId: string, dataJson: strin
     if (!kt) throw new GagalIzin("Kerja tambah tidak ditemukan.");
 
     const pengguna = await izinkan("hargaRabRap", kt.unit.projectId);
-    const { kelompok, upah } = bacaRap(dataJson);
-    const sebelum = totalRap(kt.rapItems, kt.rapUpah);
+    const { kelompok, upahVolume, upahHarga } = bacaRap(dataJson);
+    const sebelum = totalRap(kt.rapItems, kt.rapUpahVolume, kt.rapUpahHarga);
 
     await prisma.$transaction([
       prisma.customWorkRapItem.deleteMany({ where: { customWorkId } }),
       prisma.customWorkRapItem.createMany({
         data: ratakan(kelompok).map((r) => ({ ...r, customWorkId })),
       }),
-      prisma.customWork.update({ where: { id: customWorkId }, data: { rapUpah: upah } }),
+      prisma.customWork.update({ where: { id: customWorkId }, data: { rapUpahVolume: upahVolume, rapUpahHarga: upahHarga } }),
     ]);
 
     await catat({
       pengguna, projectId: kt.unit.projectId,
       objek: `Unit ${kt.unit.phase.kode}-${kt.unit.nomor} · ${kt.judul} · RAP`,
       aksi: "Ubah rincian RAP",
-      dari: rpLog(sebelum), ke: rpLog(totalRap(ratakan(kelompok), upah)),
+      dari: rpLog(sebelum), ke: rpLog(totalRap(ratakan(kelompok), upahVolume, upahHarga)),
     });
 
     revalidatePath(`/master/${kt.unit.project.kode}`);
@@ -325,7 +380,7 @@ export async function simpanRapSarpras(infrastructureId: string, dataJson: strin
     const s = await prisma.infrastructure.findUnique({
       where: { id: infrastructureId },
       select: {
-        id: true, nama: true, projectId: true, rapUpah: true,
+        id: true, nama: true, projectId: true, rapUpahVolume: true, rapUpahHarga: true,
         rapItems: { select: { volume: true, hargaSatuan: true } },
         project: { select: { kode: true } },
       },
@@ -333,22 +388,22 @@ export async function simpanRapSarpras(infrastructureId: string, dataJson: strin
     if (!s) throw new GagalIzin("Item sarpras tidak ditemukan.");
 
     const pengguna = await izinkan("hargaRabRap", s.projectId);
-    const { kelompok, upah } = bacaRap(dataJson);
-    const sebelum = totalRap(s.rapItems, s.rapUpah);
+    const { kelompok, upahVolume, upahHarga } = bacaRap(dataJson);
+    const sebelum = totalRap(s.rapItems, s.rapUpahVolume, s.rapUpahHarga);
 
     await prisma.$transaction([
       prisma.infrastructureRapItem.deleteMany({ where: { infrastructureId } }),
       prisma.infrastructureRapItem.createMany({
         data: ratakan(kelompok).map((r) => ({ ...r, infrastructureId })),
       }),
-      prisma.infrastructure.update({ where: { id: infrastructureId }, data: { rapUpah: upah } }),
+      prisma.infrastructure.update({ where: { id: infrastructureId }, data: { rapUpahVolume: upahVolume, rapUpahHarga: upahHarga } }),
     ]);
 
     await catat({
       pengguna, projectId: s.projectId,
       objek: `Sarpras · ${s.nama} · RAP`,
       aksi: "Ubah rincian RAP",
-      dari: rpLog(sebelum), ke: rpLog(totalRap(ratakan(kelompok), upah)),
+      dari: rpLog(sebelum), ke: rpLog(totalRap(ratakan(kelompok), upahVolume, upahHarga)),
     });
 
     revalidatePath(`/master/${s.project.kode}`);
@@ -356,9 +411,61 @@ export async function simpanRapSarpras(infrastructureId: string, dataJson: strin
   });
 }
 
+export async function simpanRapTipe(unitTypeId: string, dataJson: string): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const tipe = await prisma.unitType.findUnique({
+      where: { id: unitTypeId },
+      select: {
+        id: true, kode: true, projectId: true, rapUpahVolume: true, rapUpahHarga: true,
+        rapItems: { select: { volume: true, hargaSatuan: true } },
+        project: { select: { kode: true } },
+      },
+    });
+    if (!tipe) throw new GagalIzin("Tipe unit tidak ditemukan.");
+
+    const pengguna = await izinkan("dokumenTeknis", tipe.projectId);
+    const { kelompok, upahVolume, upahHarga } = bacaRap(dataJson);
+    const sebelum = totalRap(tipe.rapItems, tipe.rapUpahVolume, tipe.rapUpahHarga);
+
+    await prisma.$transaction([
+      prisma.unitTypeRapItem.deleteMany({ where: { unitTypeId } }),
+      prisma.unitTypeRapItem.createMany({
+        data: ratakan(kelompok).map((r) => ({ ...r, unitTypeId })),
+      }),
+      prisma.unitType.update({ where: { id: unitTypeId }, data: { rapUpahVolume: upahVolume, rapUpahHarga: upahHarga } }),
+    ]);
+
+    await catat({
+      pengguna, projectId: tipe.projectId,
+      objek: `Tipe unit ${tipe.kode} · RAP`,
+      aksi: "Ubah rincian RAP",
+      dari: rpLog(sebelum), ke: rpLog(totalRap(ratakan(kelompok), upahVolume, upahHarga)),
+    });
+
+    revalidatePath(`/master/${tipe.project.kode}`);
+    revalidatePath(`/master/${tipe.project.kode}/tipe/${tipe.kode}`);
+  });
+}
+
 // ===========================================================================
 // IMPOR EXCEL
 // ===========================================================================
+
+/** Kelompokkan baris BOQ datar (hasil baca Excel) menurut `grup`-nya. */
+function kelompokkanBoqImpor(
+  baris: { grup: string | null; uraian: string; satuan: string; volume: number; hargaSatuan: number; spesifikasi: string | null }[],
+  grupBawaan: string,
+): KelompokBoqMasuk[] {
+  const peta = new Map<string, KelompokBoqMasuk>();
+  for (const b of baris) {
+    const nama = b.grup || grupBawaan;
+    const item = { uraian: b.uraian, satuan: b.satuan, volume: b.volume, hargaSatuan: b.hargaSatuan, spesifikasi: b.spesifikasi };
+    const ada = peta.get(nama);
+    if (ada) ada.items.push(item);
+    else peta.set(nama, { nama, items: [item] });
+  }
+  return [...peta.values()];
+}
 
 /**
  * Impor tabel BOQ atau RAP dari berkas Excel.
@@ -370,7 +477,7 @@ export async function simpanRapSarpras(infrastructureId: string, dataJson: strin
  */
 export async function imporTabel(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
   return jalankan(async () => {
-    const sasaran = teks(form, "sasaran", true);   // unit | kerjaTambah | sarpras
+    const sasaran = teks(form, "sasaran", true);   // unit | kerjaTambah | sarpras | tipeUnit
     const jenis = teks(form, "jenis", true);       // boq | rap
     const id = teks(form, "id", true);
 
@@ -389,45 +496,56 @@ export async function imporTabel(_s: HasilAksi | null, form: FormData): Promise<
 
     try {
       if (jenis === "boq") {
-        const baris = await bacaBoqDariExcel(data);
-        const json = JSON.stringify(
-          baris.map((b) => ({
-            grup: b.grup, uraian: b.uraian, satuan: b.satuan,
-            volume: b.volume, hargaSatuan: b.hargaSatuan, spesifikasi: b.spesifikasi,
-          })),
-        );
+        const barisDatar = await bacaBoqDariExcel(data);
+        const kelompok = kelompokkanBoqImpor(barisDatar, "Tambahan");
+        const json = JSON.stringify({ kelompok });
 
         const hasil =
           sasaran === "unit" ? await simpanBoqUnit(id, json)
           : sasaran === "kerjaTambah" ? await simpanBoqKerjaTambah(id, json)
           : sasaran === "sarpras" ? await simpanBoqSarpras(id, json)
+          : sasaran === "tipeUnit" ? await simpanBoqTipe(id, json)
           : null;
 
         if (!hasil) throw new GagalIzin(`Sasaran impor "${sasaran}" tidak dikenal.`);
         if (!hasil.ok) throw new GagalIzin(hasil.error);
-        return `${baris.length} baris BOQ berhasil diimpor menggantikan isi tabel sebelumnya.`;
+        return `${barisDatar.length} baris BOQ berhasil diimpor menggantikan isi tabel sebelumnya.`;
       }
 
       if (jenis === "rap") {
         const { kelompok, upah } = await bacaRapDariExcel(data);
 
         // Upah yang tidak ada di berkas tidak boleh menimpa nilai yang sudah
-        // tersimpan menjadi nol — itu diam-diam menghapus data.
-        const upahSekarang =
-          upah ??
-          (sasaran === "unit"
-            ? (await prisma.unit.findUnique({ where: { id }, select: { rapUpah: true } }))?.rapUpah
-            : sasaran === "kerjaTambah"
-              ? (await prisma.customWork.findUnique({ where: { id }, select: { rapUpah: true } }))?.rapUpah
-              : (await prisma.infrastructure.findUnique({ where: { id }, select: { rapUpah: true } }))?.rapUpah) ??
-          0;
+        // tersimpan menjadi nol — itu diam-diam menghapus data. Upah yang ADA
+        // di berkas datang sebagai satu angka lump-sum (belum dipisah
+        // volume/harga OH); dipetakan sebagai volume=1, harga=nilai itu,
+        // supaya totalnya tidak berubah dan tetap bisa dipecah manual sesudahnya.
+        let upahVolume: number;
+        let upahHarga: number;
 
-        const json = JSON.stringify({ kelompok, upah: upahSekarang });
+        if (upah !== null) {
+          upahVolume = 1;
+          upahHarga = upah;
+        } else {
+          const sekarang =
+            sasaran === "unit"
+              ? await prisma.unit.findUnique({ where: { id }, select: { rapUpahVolume: true, rapUpahHarga: true } })
+              : sasaran === "kerjaTambah"
+                ? await prisma.customWork.findUnique({ where: { id }, select: { rapUpahVolume: true, rapUpahHarga: true } })
+                : sasaran === "tipeUnit"
+                  ? await prisma.unitType.findUnique({ where: { id }, select: { rapUpahVolume: true, rapUpahHarga: true } })
+                  : await prisma.infrastructure.findUnique({ where: { id }, select: { rapUpahVolume: true, rapUpahHarga: true } });
+          upahVolume = sekarang?.rapUpahVolume ?? 1;
+          upahHarga = sekarang?.rapUpahHarga ?? 0;
+        }
+
+        const json = JSON.stringify({ kelompok, upahVolume, upahHarga });
 
         const hasil =
           sasaran === "unit" ? await simpanRapUnit(id, json)
           : sasaran === "kerjaTambah" ? await simpanRapKerjaTambah(id, json)
           : sasaran === "sarpras" ? await simpanRapSarpras(id, json)
+          : sasaran === "tipeUnit" ? await simpanRapTipe(id, json)
           : null;
 
         if (!hasil) throw new GagalIzin(`Sasaran impor "${sasaran}" tidak dikenal.`);
@@ -478,9 +596,9 @@ export async function tambahKerjaTambah(_s: HasilAksi | null, form: FormData): P
 
     await prisma.customWork.create({
       data: {
-        unitId, judul, rapUpah: rap.upah,
+        unitId, judul, rapUpahVolume: 1, rapUpahHarga: rap.upah,
         boqItems: {
-          create: [{ uraian: "Pekerjaan tambahan", satuan: "ls", volume: 1, hargaSatuan: 0, urutan: 0 }],
+          create: [{ grup: "Tambahan", uraian: "Pekerjaan tambahan", satuan: "ls", volume: 1, hargaSatuan: 0, urutan: 0 }],
         },
         rapItems: { create: rap.items },
       },

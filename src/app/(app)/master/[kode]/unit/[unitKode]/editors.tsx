@@ -3,7 +3,6 @@
 import { BarisField, Field, FormModal, TombolHapus, TombolIkon, TombolTambah, TombolUbah } from "@/components/form";
 import { BoqTable, type BarisBoqUI } from "@/components/boq-table";
 import { RapTable, type BarisRapUI } from "@/components/rap-table";
-import { STATUS_JUAL, STATUS_PEMBANGUNAN } from "@/lib/domain/enums";
 import { ubahUnit } from "../../../actions";
 import {
   hapusKerjaTambah, imporTabel, simpanBoqKerjaTambah, simpanBoqUnit,
@@ -20,7 +19,7 @@ export function EditDeskripsiUnit({
 }: {
   unit: {
     id: string; nomor: number; luasTanah: number; phaseId: string; unitTypeId: string;
-    statusPembangunan: string; statusJual: string; progress: number;
+    progress: number;
     /** Benar bila progres unit ini turunan dari BOQ Master, bukan isian satu angka. */
     dariBoq: boolean;
   };
@@ -65,13 +64,9 @@ export function EditDeskripsiUnit({
       <Petunjuk jarak={"0 0 14px"}>
         Tipe menentukan luas bangunan dan dokumen. Luas tanah diisi per unit karena
         bisa berbeda meski tipenya sama. Mengubah tipe tidak menghitung ulang baris
-        BOQ dan RAP unit ini — keduanya salinan milik unit.
+        BOQ dan RAP unit ini — keduanya salinan milik unit. Status Bangun dan Status
+        Jual hanya bisa diubah dari tabel Daftar Unit di halaman Master Proyek.
       </Petunjuk>
-
-      <BarisField>
-        <Field label="Status Bangun" nama="statusPembangunan" nilai={unit.statusPembangunan} pilihan={STATUS_PEMBANGUNAN} />
-        <Field label="Status Jual" nama="statusJual" nilai={unit.statusJual} pilihan={STATUS_JUAL} />
-      </BarisField>
 
       {unit.dariBoq ? (
         <>
@@ -167,9 +162,9 @@ export function TabelBoqUnit({
 }
 
 export function TabelRapUnit({
-  unitId, baris, upah, bolehHarga, bolehUbah, konteks, keterangan,
+  unitId, baris, upahVolume, upahHarga, bolehHarga, bolehUbah, konteks, keterangan,
 }: {
-  unitId: string; baris: BarisRapUI[]; upah: number; bolehHarga: boolean;
+  unitId: string; baris: BarisRapUI[]; upahVolume: number; upahHarga: number; bolehHarga: boolean;
   bolehUbah: boolean; konteks: string; keterangan: string;
 }) {
   return (
@@ -177,7 +172,8 @@ export function TabelRapUnit({
       judul="RAP Unit · rincian material & upah"
       keterangan={keterangan}
       baris={baris}
-      upah={upah}
+      upahVolume={upahVolume}
+      upahHarga={upahHarga}
       bolehHarga={bolehHarga}
       bolehUbah={bolehUbah}
       konteksImpor={konteks}
@@ -197,7 +193,7 @@ export function TabelBoqKt({
 }) {
   return (
     <BoqTable
-      judul={`Tabel RAB Kerja Tambah · ${judul}`}
+      judul={`RAB Kerja Tambah · ${judul}`}
       baris={baris}
       bolehHarga={bolehHarga}
       bolehUbah={bolehUbah}
@@ -205,16 +201,15 @@ export function TabelBoqKt({
       sasaranImpor="kerjaTambah"
       idImpor={ktId}
       aksiImpor={imporTabel}
-      grupBaru="Kerja Tambah"
       aksiSimpan={(json) => simpanBoqKerjaTambah(ktId, json)}
     />
   );
 }
 
 export function TabelRapKt({
-  ktId, judul, baris, upah, bolehHarga, bolehUbah, konteks,
+  ktId, judul, baris, upahVolume, upahHarga, bolehHarga, bolehUbah, konteks,
 }: {
-  ktId: string; judul: string; baris: BarisRapUI[]; upah: number;
+  ktId: string; judul: string; baris: BarisRapUI[]; upahVolume: number; upahHarga: number;
   bolehHarga: boolean; bolehUbah: boolean; konteks: string;
 }) {
   return (
@@ -222,7 +217,8 @@ export function TabelRapKt({
       judul={`RAP Kerja Tambah · ${judul}`}
       keterangan={`Rencana Anggaran Pelaksana — ${judul}`}
       baris={baris}
-      upah={upah}
+      upahVolume={upahVolume}
+      upahHarga={upahHarga}
       bolehHarga={bolehHarga}
       bolehUbah={bolehUbah}
       konteksImpor={konteks}

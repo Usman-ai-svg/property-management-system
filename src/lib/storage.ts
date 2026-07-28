@@ -113,6 +113,41 @@ export async function hapusBerkas(objectKey: string): Promise<void> {
   await unlink(tujuan).catch(() => {});
 }
 
+/**
+ * Ekstensi yang diterima per kategori dokumen — lebih sempit daripada
+ * `JENIS_DITERIMA` di atas, yang hanya menyaring jenis berkas secara umum.
+ * Tiap kategori dokumen (3D Model, Gambar Kerja PDF, dsb.) hanya menerima
+ * SATU jenis berkas, supaya salah unggah (mis. DWG ke slot PDF) ditolak
+ * sebelum tersimpan.
+ */
+export const KATEGORI_EKSTENSI: Record<string, string[]> = {
+  model3d: [".skp"],
+  gambarKerjaPdf: [".pdf"],
+  gambarKerjaDwg: [".dwg"],
+  render: [".pdf"],
+  spek: [".xlsx", ".xls"],
+  desain: [".pdf"],
+  rab: [".pdf"],
+  legalitas: [".pdf"],
+};
+
+/**
+ * Periksa berkas terhadap batasan kategori dokumennya, di atas pemeriksaan
+ * umum `periksaBerkas`. Kategori yang tidak terdaftar di `KATEGORI_EKSTENSI`
+ * (mis. "analisa", "lain") tidak dibatasi lebih lanjut di sini.
+ */
+export function periksaBerkasKategori(nama: string, kategori: string): void {
+  const diizinkan = KATEGORI_EKSTENSI[kategori];
+  if (!diizinkan) return;
+
+  const ext = path.extname(nama).toLowerCase();
+  if (!diizinkan.includes(ext)) {
+    throw new GagalUnggah(
+      `Dokumen ini hanya menerima berkas ${diizinkan.join(" atau ")}, bukan "${ext || "tanpa ekstensi"}".`,
+    );
+  }
+}
+
 /** Tipe MIME untuk dikirim saat mengunduh. */
 export function tipeDari(nama: string): string {
   const ext = path.extname(nama).toLowerCase();

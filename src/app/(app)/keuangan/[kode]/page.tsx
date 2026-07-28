@@ -40,7 +40,8 @@ export default async function KeuanganProyek({
       units: {
         orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
         select: {
-          id: true, kode: true, nomor: true, hargaJual: true, rapUpah: true,
+          id: true, kode: true, nomor: true, hargaJual: true,
+          rapUpahVolume: true, rapUpahHarga: true,
           phase: { select: { kode: true } },
           unitType: { select: { nama: true } },
           rapItems: { select: { volume: true, hargaSatuan: true } },
@@ -50,7 +51,8 @@ export default async function KeuanganProyek({
         orderBy: { kode: "asc" },
         select: {
           id: true, kode: true, nama: true, jenis: true, volume: true,
-          status: true, progress: true, rab: true, rapUpah: true,
+          status: true, progress: true, rab: true,
+          rapUpahVolume: true, rapUpahHarga: true,
           rapItems: { select: { volume: true, hargaSatuan: true } },
         },
       },

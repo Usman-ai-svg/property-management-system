@@ -36,6 +36,16 @@ export const STATUS_SARPRAS = ["Belum terbangun", "Progress", "Selesai"] as cons
 
 export const JENIS_SARPRAS = ["Sarana", "Prasarana"] as const;
 
+/** Jenis hak atas tanah pada legalitas proyek. */
+export const JENIS_HAK_ATAS_TANAH = [
+  "Hak Milik (HM)",
+  "Hak Guna Usaha (HGU)",
+  "Hak Guna Bangunan (HGB)",
+  "Hak Pakai",
+  "Hak Pengelolaan (HPL)",
+  "Hak Tanggungan",
+] as const;
+
 export const JENIS_KONTRAK = ["Unit", "Sarpras"] as const;
 
 export const STATUS_VO = ["Diajukan", "Disetujui", "Ditolak"] as const;
@@ -170,6 +180,7 @@ export type StatusPembangunan = (typeof STATUS_PEMBANGUNAN)[number];
 export type StatusJual = (typeof STATUS_JUAL)[number];
 export type StatusSarpras = (typeof STATUS_SARPRAS)[number];
 export type JenisSarpras = (typeof JENIS_SARPRAS)[number];
+export type JenisHakAtasTanah = (typeof JENIS_HAK_ATAS_TANAH)[number];
 export type JenisKontrak = (typeof JENIS_KONTRAK)[number];
 export type StatusVo = (typeof STATUS_VO)[number];
 export type StatusTender = (typeof STATUS_TENDER)[number];

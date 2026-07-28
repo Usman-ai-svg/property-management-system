@@ -5,7 +5,9 @@ import { Plus } from "lucide-react";
 import {
   BarisField, Field, FormModal, TombolHapus, TombolIkon, TombolTambah, TombolUbah,
 } from "@/components/form";
-import { JENIS_SARPRAS, STATUS_JUAL, STATUS_PEMBANGUNAN, STATUS_SARPRAS } from "@/lib/domain/enums";
+import {
+  JENIS_HAK_ATAS_TANAH, JENIS_SARPRAS, STATUS_JUAL, STATUS_PEMBANGUNAN, STATUS_SARPRAS,
+} from "@/lib/domain/enums";
 import {
   hapusSarpras, hapusTipeUnit, hapusUnit, simpanSarpras, simpanTipeUnit,
   tambahUnit, ubahLegalitas, ubahLokasiProyek, ubahLuasLahan, ubahUnit,
@@ -93,6 +95,8 @@ export function EditLuasLahan({
 interface BarisLegal {
   id?: string;
   nib: string;
+  jenisHak: string;
+  nomorHak: string;
   sertifikat: string;
   luas: number;
 }
@@ -107,7 +111,7 @@ export function EditLegalitas({
   legalitas,
 }: {
   kode: string;
-  legalitas: { id: string; nib: string; sertifikat: string; luas: number }[];
+  legalitas: { id: string; nib: string; jenisHak: string; nomorHak: string; sertifikat: string; luas: number }[];
 }) {
   const [draft, setDraft] = useState<BarisLegal[]>(legalitas);
 
@@ -174,8 +178,35 @@ export function EditLegalitas({
             </div>
           </div>
 
+          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10, marginTop: 10 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+                Jenis Hak Atas Tanah
+              </label>
+              <select
+                className="inp"
+                value={lg.jenisHak}
+                onChange={(e) => ubah(i, { jenisHak: e.target.value })}
+              >
+                {JENIS_HAK_ATAS_TANAH.map((j) => (
+                  <option key={j} value={j}>{j}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+                Nomor Hak Atas Tanah
+              </label>
+              <input
+                className="inp"
+                value={lg.nomorHak}
+                onChange={(e) => ubah(i, { nomorHak: e.target.value })}
+              />
+            </div>
+          </div>
+
           <label style={{ display: "block", fontSize: 12, fontWeight: 600, margin: "10px 0 5px" }}>
-            Keterangan Sertifikat
+            Catatan Sertifikat <span style={{ fontWeight: 400, color: "var(--muted)" }}>(opsional)</span>
           </label>
           <textarea
             className="inp"
@@ -188,7 +219,12 @@ export function EditLegalitas({
 
       <button
         type="button"
-        onClick={() => setDraft((d) => [...d, { nib: "", sertifikat: "", luas: 0 }])}
+        onClick={() =>
+          setDraft((d) => [
+            ...d,
+            { nib: "", jenisHak: JENIS_HAK_ATAS_TANAH[0], nomorHak: "", sertifikat: "", luas: 0 },
+          ])
+        }
         style={{
           marginBottom: 14, border: "1px dashed var(--line)", background: "#fff",
           borderRadius: 9, padding: "9px 14px", width: "100%", fontSize: 12.5,
@@ -391,19 +427,20 @@ function FormSarpras({
   kode,
   data,
   pemicu,
-  bolehHarga,
 }: {
   kode: string;
   data?: {
     id: string; nama: string; jenis: string; volume: string;
-    status: string; progress: number; rab?: number;
+    status: string; progress: number;
+    /** Benar bila item ini sudah punya baris BOQ — progres jadi turunan opname. */
+    dariBoq: boolean;
   };
   pemicu: (buka: () => void) => React.ReactNode;
-  bolehHarga: boolean;
 }) {
   return (
     <FormModal
       judul={data ? "Ubah Data Sarana & Prasarana" : "Tambah Item Sarana & Prasarana"}
+      keterangan={data ? "RAB mengikuti tabel BOQ di Detail Sarana & Prasarana — ubah lewat tabelnya." : undefined}
       aksi={simpanSarpras}
       pemicu={pemicu}
     >
@@ -418,22 +455,27 @@ function FormSarpras({
       </BarisField>
       <BarisField>
         <Field label="Status Bangun" nama="status" nilai={data?.status ?? "Belum terbangun"} pilihan={STATUS_SARPRAS} />
-        <Field label="Progres" nama="progress" nilai={data?.progress ?? 0} tipe="number" satuan="%" />
+        {data?.dariBoq ? (
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+              Progres
+            </label>
+            <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
+              <b>{data.progress}%</b> — dari opname BOQ, tidak bisa diisi di sini.
+            </div>
+          </div>
+        ) : (
+          <Field label="Progres" nama="progress" nilai={data?.progress ?? 0} tipe="number" satuan="%" />
+        )}
       </BarisField>
-      {bolehHarga && (
-        <BarisField kolom={1}>
-          <Field label="RAB" nama="rab" nilai={data?.rab ?? 0} tipe="number" satuan="Rp" />
-        </BarisField>
-      )}
     </FormModal>
   );
 }
 
-export function TambahSarpras({ kode, bolehHarga }: { kode: string; bolehHarga: boolean }) {
+export function TambahSarpras({ kode }: { kode: string }) {
   return (
     <FormSarpras
       kode={kode}
-      bolehHarga={bolehHarga}
       pemicu={(buka) => <TombolTambah onClick={buka} label="Tambah Item" />}
     />
   );
@@ -443,22 +485,19 @@ export function AksiSarpras({
   kode,
   data,
   terkontrak,
-  bolehHarga,
 }: {
   kode: string;
   data: {
     id: string; nama: string; jenis: string; volume: string;
-    status: string; progress: number; rab?: number;
+    status: string; progress: number; dariBoq: boolean;
   };
   terkontrak: number;
-  bolehHarga: boolean;
 }) {
   return (
     <div style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
       <FormSarpras
         kode={kode}
         data={data}
-        bolehHarga={bolehHarga}
         pemicu={(buka) => <TombolIkon onClick={buka} judul={`Ubah ${data.nama}`} />}
       />
       {terkontrak === 0 && <TombolHapus aksi={hapusSarpras} id={data.id} nama={data.nama} />}

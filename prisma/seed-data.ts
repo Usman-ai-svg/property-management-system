@@ -120,8 +120,8 @@ export const PROYEK = [
     biaya: { hargaPerM2: 98000, pembelian: 1043300000, notaris: 26000000, balikNama: 21000000, legalLain: 15700000 },
     analisa: { file: "Analisa-Lahan-NT2.pdf", size: "2,1 MB", tgl: "18 Nov 2022" },
     legalitas: [
-      { nib: "8120003344215", sertifikat: "SHM No. 412 — Induk, pemecahan selesai 8 unit", luas: 5200, dok: { file: "NT2-SHM-412.pdf", size: "3,1 MB", tgl: "14 Okt 2022" } },
-      { nib: "8120003344216", sertifikat: "SHM No. 413 — Induk, pemecahan selesai 4 unit", luas: 3450, dok: { file: "NT2-SHM-413.pdf", size: "2,8 MB", tgl: "14 Okt 2022" } },
+      { nib: "8120003344215", jenisHak: "Hak Milik (HM)", nomorHak: "412", sertifikat: "Induk, pemecahan selesai 8 unit", luas: 5200, dok: { file: "NT2-SHM-412.pdf", size: "3,1 MB", tgl: "14 Okt 2022" } },
+      { nib: "8120003344216", jenisHak: "Hak Milik (HM)", nomorHak: "413", sertifikat: "Induk, pemecahan selesai 4 unit", luas: 3450, dok: { file: "NT2-SHM-413.pdf", size: "2,8 MB", tgl: "14 Okt 2022" } },
     ],
     market: [
       { nama: "Bojongsari Green", jarak: 1.3, tipe: [{ tipe: "Tipe 36", jml: 68, luasUnit: 36, luasLahan: 60, harga: 745000000 }, { tipe: "Tipe 45", jml: 34, luasUnit: 45, luasLahan: 72, harga: 940000000 }] },
@@ -142,9 +142,9 @@ export const PROYEK = [
     biaya: { hargaPerM2: 165000, pembelian: 5610000000, notaris: 62000000, balikNama: 48000000, legalLain: 35000000 },
     analisa: { file: "Analisa-Lahan-NT4.pdf", size: "3,8 MB", tgl: "22 Okt 2024" },
     legalitas: [
-      { nib: "8120006677230", sertifikat: "SHGB No. 118 — Induk, proses pemecahan per kavling", luas: 14200, dok: { file: "NT4-SHGB-118.pdf", size: "4,6 MB", tgl: "08 Sep 2024" } },
-      { nib: "8120006677231", sertifikat: "SHGB No. 119 — Induk, proses pemecahan per kavling", luas: 11800, dok: { file: "NT4-SHGB-119.pdf", size: "4,2 MB", tgl: "08 Sep 2024" } },
-      { nib: "8120006677232", sertifikat: "SHM No. 87 — proses balik nama", luas: 8000, dok: null },
+      { nib: "8120006677230", jenisHak: "Hak Guna Bangunan (HGB)", nomorHak: "118", sertifikat: "Induk, proses pemecahan per kavling", luas: 14200, dok: { file: "NT4-SHGB-118.pdf", size: "4,6 MB", tgl: "08 Sep 2024" } },
+      { nib: "8120006677231", jenisHak: "Hak Guna Bangunan (HGB)", nomorHak: "119", sertifikat: "Induk, proses pemecahan per kavling", luas: 11800, dok: { file: "NT4-SHGB-119.pdf", size: "4,2 MB", tgl: "08 Sep 2024" } },
+      { nib: "8120006677232", jenisHak: "Hak Milik (HM)", nomorHak: "87", sertifikat: "Proses balik nama", luas: 8000, dok: null },
     ],
     market: [
       { nama: "Tapos Residence", jarak: 1.6, tipe: [{ tipe: "Tipe 45", jml: 96, luasUnit: 45, luasLahan: 72, harga: 1080000000 }, { tipe: "Tipe 60", jml: 44, luasUnit: 60, luasLahan: 90, harga: 1520000000 }] },
@@ -166,7 +166,7 @@ export const PROYEK = [
     biaya: { hargaPerM2: 115000, pembelian: 1426000000, notaris: 30000000, balikNama: 25000000, legalLain: 19000000 },
     analisa: { file: "Analisa-Lahan-GN2.pdf", size: "2,6 MB", tgl: "04 Sep 2024" },
     legalitas: [
-      { nib: "8120009982114", sertifikat: "SHM No. 271 — Induk, pemecahan selesai 15 unit", luas: 12400, dok: { file: "GN2-SHM-271.pdf", size: "3,4 MB", tgl: "22 Jul 2024" } },
+      { nib: "8120009982114", jenisHak: "Hak Milik (HM)", nomorHak: "271", sertifikat: "Induk, pemecahan selesai 15 unit", luas: 12400, dok: { file: "GN2-SHM-271.pdf", size: "3,4 MB", tgl: "22 Jul 2024" } },
     ],
     market: [
       { nama: "Cibinong Green Park", jarak: 1.1, tipe: [{ tipe: "Tipe 36", jml: 72, luasUnit: 36, luasLahan: 60, harga: 780000000 }, { tipe: "Tipe 45", jml: 40, luasUnit: 45, luasLahan: 72, harga: 985000000 }] },
@@ -188,20 +188,23 @@ export const PROYEK = [
 
 export const TIPE_UNIT: Record<string, {
   kode: string; nama: string; lb: number; lt: number;
-  docs: { model3d?: Dok | null; gambarKerja?: Dok | null; render?: Dok | null; spek?: Dok | null };
+  docs: {
+    model3d?: Dok | null; gambarKerjaPdf?: Dok | null; gambarKerjaDwg?: Dok | null;
+    render?: Dok | null; spek?: Dok | null;
+  };
 }[]> = {
   NT2: [
-    { kode: "T36", nama: "Tipe 36", lb: 36, lt: 60, docs: { model3d: { file: "NT2-T36-3D.skp", size: "24,5 MB", tgl: "12 Feb 2023" }, gambarKerja: { file: "NT2-T36-GambarKerja.pdf", size: "8,2 MB", tgl: "12 Feb 2023" }, render: { file: "NT2-T36-Render.jpg", size: "6,1 MB", tgl: "20 Feb 2023" }, spek: { file: "NT2-T36-SpekMaterial.pdf", size: "1,4 MB", tgl: "20 Feb 2023" } } },
-    { kode: "T45", nama: "Tipe 45", lb: 45, lt: 72, docs: { model3d: { file: "NT2-T45-3D.skp", size: "27,8 MB", tgl: "12 Feb 2023" }, gambarKerja: { file: "NT2-T45-GambarKerja.pdf", size: "9,0 MB", tgl: "12 Feb 2023" }, render: { file: "NT2-T45-Render.jpg", size: "6,8 MB", tgl: "20 Feb 2023" }, spek: { file: "NT2-T45-SpekMaterial.pdf", size: "1,5 MB", tgl: "20 Feb 2023" } } },
+    { kode: "T36", nama: "Tipe 36", lb: 36, lt: 60, docs: { model3d: { file: "NT2-T36-3D.skp", size: "24,5 MB", tgl: "12 Feb 2023" }, gambarKerjaPdf: { file: "NT2-T36-GambarKerja.pdf", size: "8,2 MB", tgl: "12 Feb 2023" }, render: { file: "NT2-T36-Render.jpg", size: "6,1 MB", tgl: "20 Feb 2023" }, spek: { file: "NT2-T36-SpekMaterial.pdf", size: "1,4 MB", tgl: "20 Feb 2023" } } },
+    { kode: "T45", nama: "Tipe 45", lb: 45, lt: 72, docs: { model3d: { file: "NT2-T45-3D.skp", size: "27,8 MB", tgl: "12 Feb 2023" }, gambarKerjaPdf: { file: "NT2-T45-GambarKerja.pdf", size: "9,0 MB", tgl: "12 Feb 2023" }, render: { file: "NT2-T45-Render.jpg", size: "6,8 MB", tgl: "20 Feb 2023" }, spek: { file: "NT2-T45-SpekMaterial.pdf", size: "1,5 MB", tgl: "20 Feb 2023" } } },
   ],
   NT4: [
-    { kode: "NWT", nama: "Newton", lb: 50, lt: 78, docs: { model3d: { file: "NT4-Newton-3D.skp", size: "31,2 MB", tgl: "05 Jan 2025" }, gambarKerja: { file: "NT4-Newton-GambarKerja.pdf", size: "11,4 MB", tgl: "05 Jan 2025" }, render: { file: "NT4-Newton-Render.jpg", size: "7,3 MB", tgl: "18 Jan 2025" }, spek: { file: "NT4-Newton-SpekMaterial.pdf", size: "1,8 MB", tgl: "18 Jan 2025" } } },
-    { kode: "TSL", nama: "Tesla", lb: 60, lt: 90, docs: { model3d: { file: "NT4-Tesla-3D.skp", size: "34,6 MB", tgl: "05 Jan 2025" }, gambarKerja: { file: "NT4-Tesla-GambarKerja.pdf", size: "12,8 MB", tgl: "05 Jan 2025" }, render: { file: "NT4-Tesla-Render.jpg", size: "7,9 MB", tgl: "18 Jan 2025" }, spek: null } },
-    { kode: "GLL", nama: "Galileo", lb: 72, lt: 105, docs: { model3d: { file: "NT4-Galileo-3D.skp", size: "38,1 MB", tgl: "22 Feb 2025" }, gambarKerja: { file: "NT4-Galileo-GambarKerja.pdf", size: "13,5 MB", tgl: "22 Feb 2025" }, render: null, spek: null } },
+    { kode: "NWT", nama: "Newton", lb: 50, lt: 78, docs: { model3d: { file: "NT4-Newton-3D.skp", size: "31,2 MB", tgl: "05 Jan 2025" }, gambarKerjaPdf: { file: "NT4-Newton-GambarKerja.pdf", size: "11,4 MB", tgl: "05 Jan 2025" }, render: { file: "NT4-Newton-Render.jpg", size: "7,3 MB", tgl: "18 Jan 2025" }, spek: { file: "NT4-Newton-SpekMaterial.pdf", size: "1,8 MB", tgl: "18 Jan 2025" } } },
+    { kode: "TSL", nama: "Tesla", lb: 60, lt: 90, docs: { model3d: { file: "NT4-Tesla-3D.skp", size: "34,6 MB", tgl: "05 Jan 2025" }, gambarKerjaPdf: { file: "NT4-Tesla-GambarKerja.pdf", size: "12,8 MB", tgl: "05 Jan 2025" }, render: { file: "NT4-Tesla-Render.jpg", size: "7,9 MB", tgl: "18 Jan 2025" }, spek: null } },
+    { kode: "GLL", nama: "Galileo", lb: 72, lt: 105, docs: { model3d: { file: "NT4-Galileo-3D.skp", size: "38,1 MB", tgl: "22 Feb 2025" }, gambarKerjaPdf: { file: "NT4-Galileo-GambarKerja.pdf", size: "13,5 MB", tgl: "22 Feb 2025" }, render: null, spek: null } },
   ],
   GN2: [
-    { kode: "F1", nama: "Tipe F1", lb: 36, lt: 45, docs: { model3d: { file: "GN2-F1-3D.skp", size: "22,0 MB", tgl: "10 Agu 2024" }, gambarKerja: { file: "GN2-F1-GambarKerja.pdf", size: "7,6 MB", tgl: "10 Agu 2024" }, render: { file: "GN2-F1-Render.jpg", size: "5,4 MB", tgl: "28 Agu 2024" }, spek: { file: "GN2-F1-SpekMaterial.pdf", size: "1,2 MB", tgl: "28 Agu 2024" } } },
-    { kode: "F2", nama: "Tipe F2", lb: 45, lt: 54, docs: { model3d: { file: "GN2-F2-3D.skp", size: "25,3 MB", tgl: "10 Agu 2024" }, gambarKerja: { file: "GN2-F2-GambarKerja.pdf", size: "8,4 MB", tgl: "10 Agu 2024" }, render: { file: "GN2-F2-Render.jpg", size: "5,9 MB", tgl: "28 Agu 2024" }, spek: { file: "GN2-F2-SpekMaterial.pdf", size: "1,3 MB", tgl: "28 Agu 2024" } } },
+    { kode: "F1", nama: "Tipe F1", lb: 36, lt: 45, docs: { model3d: { file: "GN2-F1-3D.skp", size: "22,0 MB", tgl: "10 Agu 2024" }, gambarKerjaPdf: { file: "GN2-F1-GambarKerja.pdf", size: "7,6 MB", tgl: "10 Agu 2024" }, render: { file: "GN2-F1-Render.jpg", size: "5,4 MB", tgl: "28 Agu 2024" }, spek: { file: "GN2-F1-SpekMaterial.pdf", size: "1,2 MB", tgl: "28 Agu 2024" } } },
+    { kode: "F2", nama: "Tipe F2", lb: 45, lt: 54, docs: { model3d: { file: "GN2-F2-3D.skp", size: "25,3 MB", tgl: "10 Agu 2024" }, gambarKerjaPdf: { file: "GN2-F2-GambarKerja.pdf", size: "8,4 MB", tgl: "10 Agu 2024" }, render: { file: "GN2-F2-Render.jpg", size: "5,9 MB", tgl: "28 Agu 2024" }, spek: { file: "GN2-F2-SpekMaterial.pdf", size: "1,3 MB", tgl: "28 Agu 2024" } } },
   ],
 };
 
@@ -213,13 +216,16 @@ export interface Dok { file: string; size: string; tgl: string }
 
 export const KERJA_TAMBAH: Record<string, {
   judul: string;
-  docs: { desain?: Dok | null; model3d?: Dok | null; gambarKerja?: Dok | null };
+  docs: {
+    desain?: Dok | null; model3d?: Dok | null; gambarKerjaPdf?: Dok | null;
+    gambarKerjaDwg?: Dok | null; rab?: Dok | null;
+  };
   boq: { uraian: string; sat: string; vol: number; harga: number; spek: string }[];
   rap: { upah: number; groups: { nama: string; items: { nama: string; sat: string; vol: number; harga: number; ket?: string }[] }[] } | null;
 }> = {
   "NT4-F2-3": {
     judul: "Kerja Tambah Opsi 1 — kanopi, railing & finishing",
-    docs: { desain: { file: "NT4-F2-3-Desain-Disetujui.pdf", size: "3,4 MB", tgl: "10 Mei 2026" }, model3d: { file: "NT4-F2-3-KerjaTambah-3D.skp", size: "12,8 MB", tgl: "12 Mei 2026" }, gambarKerja: { file: "NT4-F2-3-KerjaTambah-R3.pdf", size: "2,1 MB", tgl: "14 Mei 2026" } },
+    docs: { desain: { file: "NT4-F2-3-Desain-Disetujui.pdf", size: "3,4 MB", tgl: "10 Mei 2026" }, model3d: { file: "NT4-F2-3-KerjaTambah-3D.skp", size: "12,8 MB", tgl: "12 Mei 2026" }, gambarKerjaPdf: { file: "NT4-F2-3-KerjaTambah-R3.pdf", size: "2,1 MB", tgl: "14 Mei 2026" } },
     boq: [
       { uraian: "Pek. Struktur & dinding tambahan", sat: "ls", vol: 1, harga: 8850000, spek: "Bata ringan hebel 10, sloof praktis besi D12, plester aci" },
       { uraian: "Pek. Plafon & atap tambahan", sat: "ls", vol: 1, harga: 6420000, spek: "Gypsum 9 mm rangka hollow, baja ringan 0,75 + metal pasir" },
@@ -281,7 +287,7 @@ export const KERJA_TAMBAH: Record<string, {
   },
   "NT4-F3-7": {
     judul: "Perluasan ruang keluarga 12 m²",
-    docs: { desain: { file: "NT4-F3-7-Desain-Disetujui.pdf", size: "2,9 MB", tgl: "28 Mei 2026" }, model3d: null, gambarKerja: { file: "NT4-F3-7-KerjaTambah.pdf", size: "2,6 MB", tgl: "02 Jun 2026" } },
+    docs: { desain: { file: "NT4-F3-7-Desain-Disetujui.pdf", size: "2,9 MB", tgl: "28 Mei 2026" }, model3d: null, gambarKerjaPdf: { file: "NT4-F3-7-KerjaTambah.pdf", size: "2,6 MB", tgl: "02 Jun 2026" } },
     boq: [
       { uraian: "Pek. Struktur & dinding perluasan", sat: "m2", vol: 12, harga: 1850000, spek: "Sloof & kolom praktis besi D12, bata ringan hebel 10, plester aci" },
       { uraian: "Pek. Atap perluasan", sat: "m2", vol: 14, harga: 385000, spek: "Baja ringan 0,75 mm + penutup metal pasir" },
@@ -290,7 +296,7 @@ export const KERJA_TAMBAH: Record<string, {
   },
   "GN2-F1-2": {
     judul: "Perluasan dapur & taman belakang",
-    docs: { desain: { file: "GN2-F1-2-Desain-Disetujui.pdf", size: "2,2 MB", tgl: "15 Apr 2026" }, model3d: null, gambarKerja: { file: "GN2-F1-2-KerjaTambah.pdf", size: "1,8 MB", tgl: "20 Apr 2026" } },
+    docs: { desain: { file: "GN2-F1-2-Desain-Disetujui.pdf", size: "2,2 MB", tgl: "15 Apr 2026" }, model3d: null, gambarKerjaPdf: { file: "GN2-F1-2-KerjaTambah.pdf", size: "1,8 MB", tgl: "20 Apr 2026" } },
     boq: [
       { uraian: "Pek. Perluasan dapur", sat: "m2", vol: 8, harga: 1650000, spek: "Dinding hebel, keramik dinding 30x60, meja beton finishing granit" },
       { uraian: "Pek. Taman & paving belakang", sat: "m2", vol: 15, harga: 320000, spek: "Paving block K-300, kerikil sikat, paranet" },
@@ -299,7 +305,7 @@ export const KERJA_TAMBAH: Record<string, {
   },
   "NT2-F2-5": {
     judul: "Carport tambahan",
-    docs: { desain: null, model3d: null, gambarKerja: { file: "NT2-F2-5-KerjaTambah.pdf", size: "1,1 MB", tgl: "08 Nov 2023" } },
+    docs: { desain: null, model3d: null, gambarKerjaPdf: { file: "NT2-F2-5-KerjaTambah.pdf", size: "1,1 MB", tgl: "08 Nov 2023" } },
     boq: [{ uraian: "Pek. Carport beton + kanopi", sat: "m2", vol: 15, harga: 520000, spek: "Beton K-225 t-10 cm, kanopi baja ringan + solar tuff" }],
     rap: null,
   },
@@ -311,24 +317,24 @@ export const KERJA_TAMBAH: Record<string, {
 
 export const SARPRAS: Record<string, {
   id: string; nama: string; jenis: string; vol: string; status: string; progress: number; rab: number;
-  docs: { model3d?: Dok | null; gambarKerja?: Dok | null };
+  docs: { model3d?: Dok | null; gambarKerjaPdf?: Dok | null; gambarKerjaDwg?: Dok | null };
 }[]> = {
   NT2: [
-    { id: "NT2-S1", progress: 100, nama: "Jalan Lingkungan", jenis: "Prasarana", vol: "820 m²", status: "Selesai", rab: 385000000, docs: { model3d: null, gambarKerja: { file: "NT2-Jalan-GambarKerja.pdf", size: "3,2 MB", tgl: "05 Mar 2023" } } },
-    { id: "NT2-S2", progress: 100, nama: "Taman & RTH", jenis: "Sarana", vol: "310 m²", status: "Selesai", rab: 96000000, docs: { model3d: null, gambarKerja: { file: "NT2-Taman-Layout.pdf", size: "1,6 MB", tgl: "18 Mar 2023" } } },
+    { id: "NT2-S1", progress: 100, nama: "Jalan Lingkungan", jenis: "Prasarana", vol: "820 m²", status: "Selesai", rab: 385000000, docs: { model3d: null, gambarKerjaPdf: { file: "NT2-Jalan-GambarKerja.pdf", size: "3,2 MB", tgl: "05 Mar 2023" } } },
+    { id: "NT2-S2", progress: 100, nama: "Taman & RTH", jenis: "Sarana", vol: "310 m²", status: "Selesai", rab: 96000000, docs: { model3d: null, gambarKerjaPdf: { file: "NT2-Taman-Layout.pdf", size: "1,6 MB", tgl: "18 Mar 2023" } } },
   ],
   NT4: [
-    { id: "NT4-S1", progress: 72, nama: "Jalan Lingkungan", jenis: "Prasarana", vol: "3.400 m²", status: "Progress", rab: 1620000000, docs: { model3d: { file: "NT4-Jalan-3D.skp", size: "12,4 MB", tgl: "10 Jan 2025" }, gambarKerja: { file: "NT4-Jalan-GambarKerja.pdf", size: "5,8 MB", tgl: "10 Jan 2025" } } },
-    { id: "NT4-S2", progress: 58, nama: "Saluran Drainase", jenis: "Prasarana", vol: "1.250 m", status: "Progress", rab: 740000000, docs: { model3d: null, gambarKerja: { file: "NT4-Drainase-GambarKerja.pdf", size: "4,1 MB", tgl: "10 Jan 2025" } } },
-    { id: "NT4-S3", progress: 35, nama: "Gerbang & Pos Jaga", jenis: "Sarana", vol: "1 unit", status: "Progress", rab: 385000000, docs: { model3d: { file: "NT4-Gerbang-3D.skp", size: "8,9 MB", tgl: "22 Feb 2025" }, gambarKerja: { file: "NT4-Gerbang-GambarKerja.pdf", size: "2,7 MB", tgl: "22 Feb 2025" } } },
-    { id: "NT4-S4", progress: 0, nama: "Taman & RTH", jenis: "Sarana", vol: "1.900 m²", status: "Belum terbangun", rab: 520000000, docs: { model3d: null, gambarKerja: { file: "NT4-Taman-Layout.pdf", size: "3,3 MB", tgl: "04 Mar 2025" } } },
-    { id: "NT4-S5", progress: 45, nama: "Jaringan Listrik", jenis: "Prasarana", vol: "51 sambungan", status: "Progress", rab: 612000000, docs: { model3d: null, gambarKerja: { file: "NT4-Listrik-Skematik.pdf", size: "2,2 MB", tgl: "04 Mar 2025" } } },
-    { id: "NT4-S6", progress: 0, nama: "Jaringan Air Bersih", jenis: "Prasarana", vol: "51 sambungan", status: "Belum terbangun", rab: 428000000, docs: { model3d: null, gambarKerja: null } },
+    { id: "NT4-S1", progress: 72, nama: "Jalan Lingkungan", jenis: "Prasarana", vol: "3.400 m²", status: "Progress", rab: 1620000000, docs: { model3d: { file: "NT4-Jalan-3D.skp", size: "12,4 MB", tgl: "10 Jan 2025" }, gambarKerjaPdf: { file: "NT4-Jalan-GambarKerja.pdf", size: "5,8 MB", tgl: "10 Jan 2025" } } },
+    { id: "NT4-S2", progress: 58, nama: "Saluran Drainase", jenis: "Prasarana", vol: "1.250 m", status: "Progress", rab: 740000000, docs: { model3d: null, gambarKerjaPdf: { file: "NT4-Drainase-GambarKerja.pdf", size: "4,1 MB", tgl: "10 Jan 2025" } } },
+    { id: "NT4-S3", progress: 35, nama: "Gerbang & Pos Jaga", jenis: "Sarana", vol: "1 unit", status: "Progress", rab: 385000000, docs: { model3d: { file: "NT4-Gerbang-3D.skp", size: "8,9 MB", tgl: "22 Feb 2025" }, gambarKerjaPdf: { file: "NT4-Gerbang-GambarKerja.pdf", size: "2,7 MB", tgl: "22 Feb 2025" } } },
+    { id: "NT4-S4", progress: 0, nama: "Taman & RTH", jenis: "Sarana", vol: "1.900 m²", status: "Belum terbangun", rab: 520000000, docs: { model3d: null, gambarKerjaPdf: { file: "NT4-Taman-Layout.pdf", size: "3,3 MB", tgl: "04 Mar 2025" } } },
+    { id: "NT4-S5", progress: 45, nama: "Jaringan Listrik", jenis: "Prasarana", vol: "51 sambungan", status: "Progress", rab: 612000000, docs: { model3d: null, gambarKerjaPdf: { file: "NT4-Listrik-Skematik.pdf", size: "2,2 MB", tgl: "04 Mar 2025" } } },
+    { id: "NT4-S6", progress: 0, nama: "Jaringan Air Bersih", jenis: "Prasarana", vol: "51 sambungan", status: "Belum terbangun", rab: 428000000, docs: { model3d: null, gambarKerjaPdf: null } },
   ],
   GN2: [
-    { id: "GN2-S1", progress: 64, nama: "Jalan Lingkungan", jenis: "Prasarana", vol: "980 m²", status: "Progress", rab: 465000000, docs: { model3d: null, gambarKerja: { file: "GN2-Jalan-GambarKerja.pdf", size: "3,6 MB", tgl: "15 Sep 2024" } } },
-    { id: "GN2-S2", progress: 100, nama: "Saluran Drainase", jenis: "Prasarana", vol: "420 m", status: "Selesai", rab: 248000000, docs: { model3d: null, gambarKerja: { file: "GN2-Drainase-GambarKerja.pdf", size: "2,4 MB", tgl: "15 Sep 2024" } } },
-    { id: "GN2-S3", progress: 0, nama: "Gerbang & Pos Jaga", jenis: "Sarana", vol: "1 unit", status: "Belum terbangun", rab: 275000000, docs: { model3d: { file: "GN2-Gerbang-3D.skp", size: "7,2 MB", tgl: "02 Okt 2024" }, gambarKerja: { file: "GN2-Gerbang-GambarKerja.pdf", size: "2,1 MB", tgl: "02 Okt 2024" } } },
+    { id: "GN2-S1", progress: 64, nama: "Jalan Lingkungan", jenis: "Prasarana", vol: "980 m²", status: "Progress", rab: 465000000, docs: { model3d: null, gambarKerjaPdf: { file: "GN2-Jalan-GambarKerja.pdf", size: "3,6 MB", tgl: "15 Sep 2024" } } },
+    { id: "GN2-S2", progress: 100, nama: "Saluran Drainase", jenis: "Prasarana", vol: "420 m", status: "Selesai", rab: 248000000, docs: { model3d: null, gambarKerjaPdf: { file: "GN2-Drainase-GambarKerja.pdf", size: "2,4 MB", tgl: "15 Sep 2024" } } },
+    { id: "GN2-S3", progress: 0, nama: "Gerbang & Pos Jaga", jenis: "Sarana", vol: "1 unit", status: "Belum terbangun", rab: 275000000, docs: { model3d: { file: "GN2-Gerbang-3D.skp", size: "7,2 MB", tgl: "02 Okt 2024" }, gambarKerjaPdf: { file: "GN2-Gerbang-GambarKerja.pdf", size: "2,1 MB", tgl: "02 Okt 2024" } } },
   ],
 };
 

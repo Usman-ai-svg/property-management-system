@@ -3,18 +3,13 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehUbah, filterProjectIdOpsional, filterProyek } from "@/lib/auth/rbac";
 import { SECTION_LABELS, SECTIONS, type Section } from "@/lib/domain/enums";
-import { luasTotal } from "@/lib/data/proyek";
-import { m2, tanggalJam } from "@/lib/format";
-import { Badge, TabelHead, Terbatas, WARNA_STATUS } from "@/components/ui";
+import { tanggalJam } from "@/lib/format";
+import { TabelHead, Terbatas } from "@/components/ui";
 import { SelIzin, TombolStatusUser } from "./matriks";
-import {
-  HapusFase, HapusProyek, HapusUser, KelolaFase, TambahProyek, TambahUser,
-  UbahFase, UbahProyek, UbahUser,
-} from "./editors-admin";
+import { HapusUser, TambahUser, UbahUser } from "./editors-admin";
 import { Tabel } from "@/components/kartu-tabel";
 
 const TAB = [
-  ["proyek", "Pengelolaan Proyek"],
   ["akses", "Kelola Hak Akses"],
   ["user", "Kelola User"],
   ["log", "Log Perubahan"],
@@ -42,26 +37,21 @@ export default async function Admin({
   const pengguna = await ambilPengguna();
   if (!pengguna) redirect("/login");
 
-  const { tab = "proyek" } = await searchParams;
-  const tabAktif = TAB.some(([t]) => t === tab) ? tab : "proyek";
+  const { tab = "akses" } = await searchParams;
+  const tabAktif = TAB.some(([t]) => t === tab) ? tab : "akses";
 
   // Halaman Admin dibuka untuk semua peran yang bisa melihat deskripsi proyek,
   // tetapi hanya yang boleh MENGUBAHNYA yang bisa menyunting matriks.
   const bisaKelola = bolehUbah(pengguna, "deskripsi");
 
+  // Daftar proyek di sini hanya dipakai untuk menyusun akses proyek pengguna
+  // di tab Kelola User — pembuatan/penyuntingan proyek sendiri sudah pindah
+  // ke Master Proyek.
   const [proyek, peran, users, log] = await Promise.all([
     prisma.project.findMany({
       where: filterProyek(pengguna),
       orderBy: { kode: "asc" },
-      select: {
-        id: true, kode: true, nama: true, status: true, statusLahan: true,
-        luasKavlingEfektif: true, luasSarana: true, luasPrasarana: true, luasRth: true,
-        fases: {
-          orderBy: { urutan: "asc" as const },
-          select: { id: true, kode: true, nama: true, urutan: true, _count: { select: { units: true } } },
-        },
-        _count: { select: { units: true, infrastructures: true, contracts: true } },
-      },
+      select: { id: true, kode: true, nama: true },
     }),
     prisma.role.findMany({
       orderBy: { nama: "asc" },
@@ -113,90 +103,6 @@ export default async function Admin({
           </Link>
         ))}
       </div>
-
-      {/* ================= PENGELOLAAN PROYEK ================= */}
-      {tabAktif === "proyek" && (
-        <div className="card" style={{ overflow: "hidden" }}>
-          <TabelHead
-            judul={`Pengelolaan Proyek · ${proyek.length} proyek`}
-            keterangan="Fase dikelola di sini. Lokasi, luas, unit, dan sarpras disunting dari Master Proyek."
-            aksi={bisaKelola && <TambahProyek />}
-          />
-          <Tabel
-            kolom={[
-              { label: "Proyek" },
-              { label: "Status" },
-              { label: "Status Lahan" },
-              { label: "Luas Total", rata: "kanan" },
-              { label: "Unit", rata: "kanan" },
-              { label: "Sarpras", rata: "kanan" },
-              { label: "Kontrak", rata: "kanan" },
-              { label: "Fase", minLebar: 150 },
-              {},
-            ]}
-          >
-            {proyek.map((p) => (
-              <tr key={p.id}>
-                <td>
-                  <div style={{ fontWeight: 600 }}>{p.nama}</div>
-                  <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{p.kode}</div>
-                </td>
-                <td style={{ color: "var(--muted)" }}>{p.status}</td>
-                <td>
-                  <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
-                </td>
-                <td style={{ textAlign: "right" }}>{m2(luasTotal(p))}</td>
-                <td style={{ textAlign: "right" }}>{p._count.units}</td>
-                <td style={{ textAlign: "right" }}>{p._count.infrastructures}</td>
-                <td style={{ textAlign: "right" }}>{p._count.contracts}</td>
-                <td>
-                  <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
-                    {p.fases.map((f) => (
-                      <span key={f.id} style={{ display: "flex", alignItems: "center" }}>
-                        <span className="chip" style={{ background: "var(--rona-teal)", color: "var(--muted)" }}>
-                          {f.kode}
-                        </span>
-                        {bisaKelola && (
-                          <>
-                            <UbahFase fase={f} />
-                            <HapusFase id={f.id} kode={f.kode} />
-                          </>
-                        )}
-                      </span>
-                    ))}
-                    {bisaKelola && (
-                      <KelolaFase
-                        projectId={p.id}
-                        kodeProyek={p.kode}
-                        fases={p.fases.map((f) => ({
-                          id: f.id, kode: f.kode, nama: f.nama,
-                          urutan: f.urutan, jumlahUnit: f._count.units,
-                        }))}
-                      />
-                    )}
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                    <Link
-                      href={`/master/${p.kode}`}
-                      style={{ color: "var(--teal)", fontSize: 12, fontWeight: 600, textDecoration: "none" }}
-                    >
-                      Buka →
-                    </Link>
-                    {bisaKelola && (
-                      <>
-                        <UbahProyek proyek={p} />
-                        <HapusProyek id={p.id} kode={p.kode} />
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </Tabel>
-        </div>
-      )}
 
       {/* ================= KELOLA HAK AKSES ================= */}
       {tabAktif === "akses" && (

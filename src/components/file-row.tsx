@@ -57,6 +57,9 @@ function TautanLihat({ versi }: { versi: VersiDokumen }) {
   );
 }
 
+/** Jenis berkas yang diterima bila kategorinya tidak eksplisit membatasi. */
+const TERIMA_BAWAAN = ".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.docx,.skp,.dwg,.rvt";
+
 export function FileRow({
   label,
   dokumen,
@@ -64,6 +67,7 @@ export function FileRow({
   konteks,
   pemilik,
   aksiUnggah,
+  terima,
 }: {
   label: string;
   dokumen: DokumenTampil | null;
@@ -71,6 +75,10 @@ export function FileRow({
   konteks: string;
   pemilik: { jenis: string; id: string; kategori: string };
   aksiUnggah: (sebelumnya: HasilAksi | null, form: FormData) => Promise<HasilAksi>;
+  /** Ekstensi yang diterima untuk kategori dokumen ini, mis. ".pdf". Bila
+   *  kosong, dipakai daftar umum yang mencakup seluruh jenis berkas yang
+   *  didukung aplikasi. */
+  terima?: string;
 }) {
   const [bukaVersi, setBukaVersi] = useState(false);
 
@@ -156,7 +164,7 @@ export function FileRow({
                   type="file"
                   name="berkas"
                   required
-                  accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.docx,.skp,.dwg,.rvt"
+                  accept={terima || TERIMA_BAWAAN}
                   style={{ padding: "8px 10px" }}
                 />
               </div>
@@ -165,7 +173,7 @@ export function FileRow({
             <Petunjuk>
               Nomor revisi ditentukan otomatis dan versi sebelumnya tetap tersimpan —
               unggahan baru tidak pernah menimpa yang lama. Maksimum 64 MB.
-              Diterima: PDF, JPG, PNG, WEBP, XLSX, DOCX, SKP, DWG, RVT.
+              Diterima: {terima ? terima.replace(/\./g, "").toUpperCase() : "PDF, JPG, PNG, WEBP, XLSX, DOCX, SKP, DWG, RVT"}.
             </Petunjuk>
           </FormModal>
         )}

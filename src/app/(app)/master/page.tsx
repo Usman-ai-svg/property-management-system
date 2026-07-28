@@ -1,14 +1,17 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ambilPengguna } from "@/lib/auth/rbac";
+import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
 import { daftarProyek, kpiMaster, luasTotal } from "@/lib/data/proyek";
 import { m2 } from "@/lib/format";
 import { Badge, TabelHead, WARNA_STATUS } from "@/components/ui";
 import { Tabel } from "@/components/kartu-tabel";
+import { TambahProyek } from "./editors-proyek";
 
 export default async function MasterProyek() {
   const pengguna = await ambilPengguna();
   if (!pengguna) redirect("/login");
+
+  const bisaKelola = bolehUbah(pengguna, "deskripsi");
 
   const [proyek, kpi] = await Promise.all([daftarProyek(pengguna), kpiMaster(pengguna)]);
 
@@ -41,6 +44,7 @@ export default async function MasterProyek() {
         <TabelHead
           judul="Daftar Proyek"
           keterangan="Klik nama proyek untuk membuka detailnya."
+          aksi={bisaKelola && <TambahProyek />}
         />
         <Tabel
           kolom={[

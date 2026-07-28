@@ -6,12 +6,13 @@ import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
 } from "@/lib/actions/guard";
-import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
-import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
+import { ambilPengguna } from "@/lib/auth/rbac";
+import { bersihkanNamaFile, periksaBerkas, periksaBerkasKategori, simpanBerkas } from "@/lib/storage";
 import {
-  JENIS_SARPRAS, STATUS_JUAL, STATUS_PEMBANGUNAN, STATUS_SARPRAS,
+  JENIS_HAK_ATAS_TANAH, JENIS_SARPRAS, STATUS_JUAL, STATUS_LAHAN, STATUS_PEMBANGUNAN,
+  STATUS_PROYEK, STATUS_SARPRAS,
 } from "@/lib/domain/enums";
-import { buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap, rabAcuan } from "@/lib/calc/boq";
+import { buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap, rabAcuan, totalBaris } from "@/lib/calc/boq";
 import { statusSelaras } from "@/lib/calc/kontrak-boq";
 
 /** Segarkan halaman proyek dan ringkasan setelah perubahan. */
@@ -19,6 +20,246 @@ function segarkan(kode: string) {
   revalidatePath(`/master/${kode}`);
   revalidatePath("/master");
   revalidatePath("/");
+}
+
+// ===========================================================================
+// PENGELOLAAN PROYEK & FASE
+//
+// Dipindahkan dari Admin → "Pengelolaan Proyek" ke Master Proyek: lokasi,
+// legalitas, luas, unit, dan sarpras sudah disunting dari sini, jadi
+// pembuatan/penyuntingan proyek dan fase juga lebih wajar di sini.
+// ===========================================================================
+
+/**
+ * Buat proyek baru.
+ *
+ * Proyek dibuat sekaligus dengan business plan kosong dan fase pertamanya:
+ * tanpa business plan, halaman Landbank dan Plan vs Realisasi tidak punya
+ * apa pun untuk dibandingkan; tanpa fase, unit tidak bisa ditambahkan sama
+ * sekali. Keduanya bisa disunting setelahnya.
+ */
+export async function tambahProyek(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const pengguna = await izinkan("deskripsi");
+
+    const kode = teks(form, "kode", true).toUpperCase();
+    if (!/^[A-Z0-9]{2,8}$/.test(kode)) {
+      throw new GagalIzin("Kode proyek hanya boleh huruf dan angka, 2–8 karakter.");
+    }
+
+    const bentrok = await prisma.project.count({ where: { kode } });
+    if (bentrok) throw new GagalIzin(`Kode proyek "${kode}" sudah dipakai.`);
+
+    const nama = teks(form, "nama", true);
+    const kodeFase = (teks(form, "kodeFase") || "F1").toUpperCase();
+
+    const proyek = await prisma.project.create({
+      data: {
+        kode, nama,
+        status: pilihan(form, "status", STATUS_PROYEK),
+        statusLahan: pilihan(form, "statusLahan", STATUS_LAHAN),
+        alamat: teks(form, "alamat", true),
+        kelurahan: teks(form, "kelurahan", true),
+        kecamatan: teks(form, "kecamatan", true),
+        kota: teks(form, "kota", true),
+        provinsi: teks(form, "provinsi", true),
+        luasKavlingEfektif: angka(form, "luasKavlingEfektif", { min: 0 }),
+        luasSarana: angka(form, "luasSarana", { min: 0 }),
+        luasPrasarana: angka(form, "luasPrasarana", { min: 0 }),
+        luasRth: angka(form, "luasRth", { min: 0 }),
+        fases: { create: [{ kode: kodeFase, urutan: 0 }] },
+        businessPlan: { create: {} },
+      },
+      select: { id: true, kode: true },
+    });
+
+    await catat({
+      pengguna, projectId: proyek.id,
+      objek: `Proyek ${kode}`,
+      aksi: "Buat proyek",
+      ke: `${nama} · fase awal ${kodeFase}`,
+    });
+
+    revalidatePath("/master");
+    revalidatePath("/");
+    return `Proyek ${kode} dibuat beserta fase ${kodeFase} dan business plan kosong.`;
+  });
+}
+
+export async function ubahProyek(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = teks(form, "id", true);
+
+    const lama = await prisma.project.findUnique({
+      where: { id },
+      select: { id: true, kode: true, nama: true, status: true, statusLahan: true },
+    });
+    if (!lama) throw new GagalIzin("Proyek tidak ditemukan.");
+
+    const pengguna = await izinkan("deskripsi", id);
+
+    const data = {
+      nama: teks(form, "nama", true),
+      status: pilihan(form, "status", STATUS_PROYEK),
+      statusLahan: pilihan(form, "statusLahan", STATUS_LAHAN),
+    };
+
+    await prisma.project.update({ where: { id }, data });
+
+    const jml = await catatDiff({
+      pengguna, projectId: id,
+      objek: `Proyek ${lama.kode}`,
+      sebelum: lama, sesudah: data,
+      label: { nama: "Nama proyek", status: "Status", statusLahan: "Status lahan" },
+    });
+
+    segarkan(lama.kode);
+    return jml === 0 ? "Tidak ada yang berubah." : `${jml} perubahan tersimpan.`;
+  });
+}
+
+/**
+ * Hapus proyek.
+ *
+ * Hanya proyek yang benar-benar masih kosong. Prisma akan menghapus unit,
+ * kontrak, dan seluruh transaksinya secara berantai — itu terlalu banyak yang
+ * hilang dari satu klik.
+ */
+export async function hapusProyek(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = String(form.get("id") ?? "");
+
+    const lama = await prisma.project.findUnique({
+      where: { id },
+      select: {
+        id: true, kode: true, nama: true,
+        _count: { select: { units: true, infrastructures: true, contracts: true, expenses: true } },
+      },
+    });
+    if (!lama) return;
+
+    const pengguna = await izinkan("deskripsi", id);
+
+    const { units, infrastructures, contracts, expenses } = lama._count;
+    if (units + infrastructures + contracts + expenses > 0) {
+      throw new GagalIzin(
+        `Proyek ${lama.kode} masih berisi ${units} unit, ${infrastructures} sarpras, ` +
+          `${contracts} kontrak, dan ${expenses} transaksi. Hanya proyek kosong yang boleh dihapus.`,
+      );
+    }
+
+    await prisma.project.delete({ where: { id } });
+
+    await catat({
+      pengguna,
+      objek: `Proyek ${lama.kode}`,
+      aksi: "Hapus proyek",
+      dari: lama.nama,
+      ke: "dihapus",
+    });
+
+    revalidatePath("/master");
+    revalidatePath("/");
+  });
+}
+
+export async function simpanFase(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = String(form.get("id") ?? "").trim();
+    const kode = teks(form, "kode", true).toUpperCase();
+    const nama = teksOpsional(form, "nama");
+
+    if (id) {
+      const lama = await prisma.phase.findUnique({
+        where: { id },
+        select: {
+          id: true, kode: true, nama: true, urutan: true, projectId: true,
+          project: { select: { kode: true } },
+        },
+      });
+      if (!lama) throw new GagalIzin("Fase tidak ditemukan.");
+      const pengguna = await izinkan("deskripsi", lama.projectId);
+
+      if (kode !== lama.kode) {
+        const bentrok = await prisma.phase.count({ where: { projectId: lama.projectId, kode } });
+        if (bentrok) throw new GagalIzin(`Fase "${kode}" sudah ada pada proyek ini.`);
+      }
+
+      const urutan = angka(form, "urutan", { min: 0 });
+      await prisma.phase.update({ where: { id }, data: { kode, nama, urutan } });
+
+      const jml = await catatDiff({
+        pengguna, projectId: lama.projectId,
+        objek: `Proyek ${lama.project.kode} · Fase ${lama.kode}`,
+        sebelum: lama, sesudah: { kode, nama, urutan },
+        label: { kode: "Kode fase", nama: "Nama fase", urutan: "Urutan" },
+      });
+
+      revalidatePath(`/master/${lama.project.kode}`);
+      return jml === 0 ? "Tidak ada yang berubah." : `${jml} perubahan tersimpan.`;
+    }
+
+    const projectId = teks(form, "projectId", true);
+    const pengguna = await izinkan("deskripsi", projectId);
+
+    const proyek = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { kode: true },
+    });
+    if (!proyek) throw new GagalIzin("Proyek tidak ditemukan.");
+
+    const bentrok = await prisma.phase.count({ where: { projectId, kode } });
+    if (bentrok) throw new GagalIzin(`Fase "${kode}" sudah ada pada proyek ini.`);
+
+    const urutan = await prisma.phase.count({ where: { projectId } });
+    await prisma.phase.create({ data: { projectId, kode, nama, urutan } });
+
+    await catat({
+      pengguna, projectId,
+      objek: `Proyek ${proyek.kode}`,
+      aksi: "Tambah fase",
+      ke: kode,
+    });
+
+    revalidatePath(`/master/${proyek.kode}`);
+  });
+}
+
+/** Fase yang masih dipakai unit tidak boleh dihapus — unitnya akan yatim. */
+export async function hapusFase(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = String(form.get("id") ?? "");
+
+    const lama = await prisma.phase.findUnique({
+      where: { id },
+      select: {
+        id: true, kode: true, projectId: true,
+        project: { select: { kode: true } },
+        _count: { select: { units: true } },
+      },
+    });
+    if (!lama) return;
+
+    const pengguna = await izinkan("deskripsi", lama.projectId);
+
+    if (lama._count.units > 0) {
+      throw new GagalIzin(
+        `Fase ${lama.kode} masih dipakai ${lama._count.units} unit. Pindahkan unit itu lebih dulu.`,
+      );
+    }
+
+    await prisma.phase.delete({ where: { id } });
+
+    await catat({
+      pengguna, projectId: lama.projectId,
+      objek: `Proyek ${lama.project.kode}`,
+      aksi: "Hapus fase",
+      dari: lama.kode,
+      ke: "dihapus",
+    });
+
+    revalidatePath(`/master/${lama.project.kode}`);
+  });
 }
 
 // ===========================================================================
@@ -182,7 +423,9 @@ export async function ubahLegalitas(_s: HasilAksi | null, form: FormData): Promi
 
     const pengguna = await izinkan("deskripsi", proyek.id);
 
-    let baris: { id?: string; nib: string; sertifikat: string; luas: number }[];
+    let baris: {
+      id?: string; nib: string; jenisHak: string; nomorHak: string; sertifikat: string; luas: number;
+    }[];
     try {
       baris = JSON.parse(teks(form, "baris", true));
     } catch {
@@ -191,6 +434,15 @@ export async function ubahLegalitas(_s: HasilAksi | null, form: FormData): Promi
 
     const sah = baris.filter((b) => b.nib?.trim());
     if (sah.length === 0) throw new GagalIzin("Isi minimal satu NIB.");
+
+    for (const b of sah) {
+      if (!JENIS_HAK_ATAS_TANAH.includes(b.jenisHak as (typeof JENIS_HAK_ATAS_TANAH)[number])) {
+        throw new GagalIzin(`Jenis hak atas tanah "${b.jenisHak}" pada NIB ${b.nib} tidak sah.`);
+      }
+      if (!b.nomorHak?.trim()) {
+        throw new GagalIzin(`Nomor hak atas tanah pada NIB ${b.nib} wajib diisi.`);
+      }
+    }
 
     const idDikirim = new Set(sah.map((b) => b.id).filter(Boolean));
     const dihapus = proyek.legalitas.filter((l) => !idDikirim.has(l.id));
@@ -202,6 +454,8 @@ export async function ubahLegalitas(_s: HasilAksi | null, form: FormData): Promi
     for (const b of sah) {
       const data = {
         nib: b.nib.trim(),
+        jenisHak: b.jenisHak,
+        nomorHak: b.nomorHak.trim(),
         sertifikat: (b.sertifikat ?? "").trim(),
         luas: Number(b.luas) || 0,
       };
@@ -271,7 +525,21 @@ export async function simpanTipeUnit(_s: HasilAksi | null, form: FormData): Prom
       });
       if (bentrok) throw new GagalIzin(`Kode tipe "${data.kode}" sudah dipakai di proyek ini.`);
 
-      await prisma.unitType.create({ data: { ...data, projectId: proyek.id } });
+      // Tipe baru langsung dibekali draft RAB & RAP dari formula lama (berbasis
+      // luas bangunan), supaya tabelnya bisa langsung disunting alih-alih
+      // kosong sama sekali — ini yang lalu jadi acuan disalin ke unit baru
+      // bertipe ini (lihat tambahUnit).
+      const boq = buatBoqDariTemplate(data.luasBangunan);
+      const rap = buatRapDariTemplate(data.luasBangunan);
+
+      await prisma.unitType.create({
+        data: {
+          ...data, projectId: proyek.id,
+          rapUpahVolume: 1, rapUpahHarga: hitungUpahRap(data.luasBangunan),
+          boqItems: { create: boq },
+          rapItems: { create: rap },
+        },
+      });
       await catat({
         pengguna, projectId: proyek.id, objek: `Tipe unit ${data.kode}`,
         aksi: "Tambah tipe unit", ke: `${data.nama} — LB ${data.luasBangunan} m², LT ${data.luasTanah} m²`,
@@ -342,6 +610,20 @@ export async function ubahUnit(_s: HasilAksi | null, form: FormData): Promise<Ha
     const progresDiminta = angka(form, "progress", { min: 0, max: 100 });
     const progress = dikendalikanBoq ? lama.progress : progresDiminta;
 
+    // Status bangun dan status jual hanya ikut bila formulir mengirimnya —
+    // fitur Ubah pada tabel Daftar Unit mengirim keduanya, sedangkan fitur
+    // Ubah Deskripsi Unit di halaman Detail Unit sengaja tidak lagi
+    // menyertakannya (status hanya boleh diubah dari Daftar Unit). Bila
+    // absen, nilai lama dipertahankan.
+    const statusPembangunanDiminta = teksOpsional(form, "statusPembangunan");
+    if (statusPembangunanDiminta !== null && !STATUS_PEMBANGUNAN.includes(statusPembangunanDiminta as (typeof STATUS_PEMBANGUNAN)[number])) {
+      throw new GagalIzin(`Nilai "${statusPembangunanDiminta}" tidak sah untuk kolom "statusPembangunan".`);
+    }
+    const statusJualDiminta = teksOpsional(form, "statusJual");
+    if (statusJualDiminta !== null && !STATUS_JUAL.includes(statusJualDiminta as (typeof STATUS_JUAL)[number])) {
+      throw new GagalIzin(`Nilai "${statusJualDiminta}" tidak sah untuk kolom "statusJual".`);
+    }
+
     const baru: {
       statusPembangunan: string; statusJual: string; progress: number; luasTanah: number;
       nomor?: number; phaseId?: string; unitTypeId?: string; kode?: string;
@@ -350,11 +632,8 @@ export async function ubahUnit(_s: HasilAksi | null, form: FormData): Promise<Ha
       // Sebelumnya keduanya isian terpisah, sehingga sebuah unit bisa
       // tersimpan sebagai "progres 100%, status Belum terbangun" — dua halaman
       // menampilkan keadaan berbeda untuk unit yang sama.
-      statusPembangunan: statusSelaras(
-        progress,
-        pilihan(form, "statusPembangunan", STATUS_PEMBANGUNAN),
-      ),
-      statusJual: pilihan(form, "statusJual", STATUS_JUAL),
+      statusPembangunan: statusSelaras(progress, statusPembangunanDiminta ?? lama.statusPembangunan),
+      statusJual: statusJualDiminta ?? lama.statusJual,
       progress,
       luasTanah: angka(form, "luasTanah", { min: 1, wajib: true }),
     };
@@ -380,6 +659,20 @@ export async function ubahUnit(_s: HasilAksi | null, form: FormData): Promise<Ha
       if (unitTypeId && (!tipe || tipe.projectId !== lama.projectId)) throw new GagalIzin("Tipe unit tidak sah.");
 
       const nomor = nomorIsian ? angka(form, "nomor", { min: 1 }) : lama.nomor;
+
+      // Nomor unit tidak boleh dobel dalam satu proyek — fase tidak
+      // membebaskan nomor yang sama dipakai lagi.
+      if (nomor !== lama.nomor) {
+        const nomorBentrok = await prisma.unit.findFirst({
+          where: { projectId: lama.projectId, nomor, NOT: { id } }, select: { kode: true },
+        });
+        if (nomorBentrok) {
+          throw new GagalIzin(
+            `Nomor unit ${nomor} sudah dipakai di proyek ini (unit ${nomorBentrok.kode}). Fase tidak membebaskan nomor yang sama.`,
+          );
+        }
+      }
+
       const kodeFase = fase?.kode ?? lama.phase.kode;
       const kodeBaru = `${lama.project.kode}-${kodeFase}-${nomor}`;
 
@@ -447,7 +740,21 @@ export async function tambahUnit(_s: HasilAksi | null, form: FormData): Promise<
 
     const [fase, tipe] = await Promise.all([
       prisma.phase.findUnique({ where: { id: phaseId }, select: { id: true, kode: true, projectId: true } }),
-      prisma.unitType.findUnique({ where: { id: unitTypeId }, select: { id: true, luasBangunan: true, luasTanah: true, projectId: true } }),
+      prisma.unitType.findUnique({
+        where: { id: unitTypeId },
+        select: {
+          id: true, luasBangunan: true, luasTanah: true, projectId: true,
+          rapUpahVolume: true, rapUpahHarga: true,
+          boqItems: {
+            orderBy: { urutan: "asc" as const },
+            select: { grup: true, uraian: true, satuan: true, volume: true, hargaSatuan: true, spesifikasi: true },
+          },
+          rapItems: {
+            orderBy: { urutan: "asc" as const },
+            select: { grup: true, nama: true, satuan: true, volume: true, hargaSatuan: true, keterangan: true },
+          },
+        },
+      }),
     ]);
     if (!fase || fase.projectId !== proyek.id) throw new GagalIzin("Fase tidak sah.");
     if (!tipe || tipe.projectId !== proyek.id) throw new GagalIzin("Tipe unit tidak sah.");
@@ -460,6 +767,17 @@ export async function tambahUnit(_s: HasilAksi | null, form: FormData): Promise<
     const luasTanahIsian = angka(form, "luasTanah", { min: 0 });
     const luasTanah = luasTanahIsian > 0 ? luasTanahIsian : tipe.luasTanah;
 
+    // Nomor unit tidak boleh dobel dalam SATU PROYEK — fase tidak membebaskan
+    // nomor yang sama dipakai lagi.
+    const nomorBentrok = await prisma.unit.findFirst({
+      where: { projectId: proyek.id, nomor }, select: { kode: true },
+    });
+    if (nomorBentrok) {
+      throw new GagalIzin(
+        `Nomor unit ${nomor} sudah dipakai di proyek ini (unit ${nomorBentrok.kode}). Fase tidak membebaskan nomor yang sama.`,
+      );
+    }
+
     const kodeUnit = `${proyek.kode}-${fase.kode}-${nomor}`;
     const bentrok = await prisma.unit.findUnique({ where: { kode: kodeUnit }, select: { id: true } });
     if (bentrok) throw new GagalIzin(`Unit ${kodeUnit} sudah ada. Pakai nomor lain.`);
@@ -471,16 +789,28 @@ export async function tambahUnit(_s: HasilAksi | null, form: FormData): Promise<
         ? 10
         : 0;
 
-    // Snapshot BOQ & RAP dibuat SEKALI di sini, dari template yang berlaku
-    // saat ini. Sesudah tersimpan, unit tidak lagi membaca template.
+    // Snapshot BOQ & RAP dibuat SEKALI di sini. Sumber utamanya adalah RAB/RAP
+    // master milik Tipe Unit ini (disunting dari halaman Detail Tipe Unit) —
+    // formula lama berbasis luas bangunan hanya dipakai sebagai fallback bila
+    // tipe ini belum punya rincian sendiri sama sekali. Sesudah tersimpan,
+    // unit tidak lagi membaca tipe maupun formula.
+    const dariTipe = tipe.boqItems.length > 0;
+    const boq = dariTipe ? tipe.boqItems : buatBoqDariTemplate(tipe.luasBangunan);
+    const rap = dariTipe && tipe.rapItems.length > 0 ? tipe.rapItems : buatRapDariTemplate(tipe.luasBangunan);
+    const rapUpahVolume = dariTipe ? tipe.rapUpahVolume : 1;
+    const rapUpahHarga = dariTipe ? tipe.rapUpahHarga : hitungUpahRap(tipe.luasBangunan);
+
     await prisma.unit.create({
       data: {
         kode: kodeUnit, projectId: proyek.id, phaseId: fase.id, unitTypeId: tipe.id,
         nomor, luasTanah, statusPembangunan, statusJual, progress,
-        hargaJual: Math.round(rabAcuan(tipe.luasBangunan) * 1.42),
-        rapUpah: hitungUpahRap(tipe.luasBangunan),
-        boqItems: { create: buatBoqDariTemplate(tipe.luasBangunan) },
-        rapItems: { create: buatRapDariTemplate(tipe.luasBangunan) },
+        hargaJual: Math.round((dariTipe ? totalBaris(boq) : rabAcuan(tipe.luasBangunan)) * 1.42),
+        rapUpahVolume, rapUpahHarga,
+        // Urutan diberi ulang secara eksplisit (bukan diwariskan) supaya baris
+        // tetap tampil sesuai urutan sumbernya walau field `urutan` tidak ikut
+        // terbaca dari tipe (defaultnya 0 untuk semua baris bila tidak diisi).
+        boqItems: { create: boq.map((b, i) => ({ ...b, urutan: i })) },
+        rapItems: { create: rap.map((r, i) => ({ ...r, urutan: i })) },
       },
     });
 
@@ -626,41 +956,6 @@ export async function ubahBarisRap(_s: HasilAksi | null, form: FormData): Promis
   });
 }
 
-/** Upah tenaga kerja pada RAP unit — pasangan dari rincian materialnya. */
-export async function ubahUpahRap(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
-  return jalankan(async () => {
-    const id = teks(form, "id", true);
-
-    const lama = await prisma.unit.findUnique({
-      where: { id },
-      select: {
-        id: true, nomor: true, rapUpah: true, hargaJual: true, projectId: true,
-        phase: { select: { kode: true } }, project: { select: { kode: true } },
-      },
-    });
-    if (!lama) throw new GagalIzin("Unit tidak ditemukan.");
-
-    const pengguna = await izinkan("hargaRabRap", lama.projectId);
-
-    const baru = {
-      rapUpah: angka(form, "rapUpah", { min: 0 }),
-      hargaJual: angka(form, "hargaJual", { min: 0 }),
-    };
-
-    await prisma.unit.update({ where: { id }, data: baru });
-
-    await catatDiff({
-      pengguna, projectId: lama.projectId,
-      objek: `Unit ${lama.phase.kode}-${lama.nomor}`,
-      sebelum: lama, sesudah: baru,
-      label: { rapUpah: "Upah RAP", hargaJual: "Harga jual" },
-      format: { rapUpah: rpLog, hargaJual: rpLog },
-    });
-
-    segarkan(lama.project.kode);
-  });
-}
-
 // ===========================================================================
 // DOKUMEN — unggah revisi
 // ===========================================================================
@@ -686,6 +981,7 @@ export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promis
 
     const namaFile = bersihkanNamaFile(berkas.name);
     periksaBerkas(namaFile, berkas.type, berkas.size);
+    periksaBerkasKategori(namaFile, kategori);
 
     // Cari proyek pemilik dokumen, sekaligus memastikan pengguna berhak.
     let projectId: string;
@@ -760,12 +1056,16 @@ export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promis
 
       // Tautkan dokumen baru ke pemiliknya. Nama kolomnya berbeda-beda, jadi
       // dipetakan secara eksplisit alih-alih dibangun dari string.
-      const kolomTipe: Record<string, "docModel3dId" | "docGambarKerjaId" | "docRenderId" | "docSpekId"> = {
-        model3d: "docModel3dId", gambarKerja: "docGambarKerjaId",
+      const kolomTipe: Record<string, "docModel3dId" | "docGambarKerjaPdfId" | "docGambarKerjaDwgId" | "docRenderId" | "docSpekId"> = {
+        model3d: "docModel3dId", gambarKerjaPdf: "docGambarKerjaPdfId", gambarKerjaDwg: "docGambarKerjaDwgId",
         render: "docRenderId", spek: "docSpekId",
       };
-      const kolomKt: Record<string, "docDesainId" | "docModel3dId" | "docGambarKerjaId"> = {
-        desain: "docDesainId", model3d: "docModel3dId", gambarKerja: "docGambarKerjaId",
+      const kolomKt: Record<string, "docDesainId" | "docModel3dId" | "docGambarKerjaPdfId" | "docGambarKerjaDwgId" | "docRabId"> = {
+        desain: "docDesainId", model3d: "docModel3dId",
+        gambarKerjaPdf: "docGambarKerjaPdfId", gambarKerjaDwg: "docGambarKerjaDwgId", rab: "docRabId",
+      };
+      const kolomSarpras: Record<string, "docModel3dId" | "docGambarKerjaPdfId" | "docGambarKerjaDwgId"> = {
+        model3d: "docModel3dId", gambarKerjaPdf: "docGambarKerjaPdfId", gambarKerjaDwg: "docGambarKerjaDwgId",
       };
 
       if (pemilikJenis === "legalitas") {
@@ -783,7 +1083,8 @@ export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promis
       } else if (pemilikJenis === "kontrak") {
         await prisma.contract.update({ where: { id: pemilikId }, data: { docSpkId: dokId } });
       } else if (pemilikJenis === "sarpras") {
-        const kolom = kategori === "model3d" ? "docModel3dId" : "docGambarKerjaId";
+        const kolom = kolomSarpras[kategori];
+        if (!kolom) throw new GagalIzin(`Kategori dokumen "${kategori}" tidak dikenal untuk sarana & prasarana.`);
         await prisma.infrastructure.update({ where: { id: pemilikId }, data: { [kolom]: dokId } });
       }
     }
@@ -851,30 +1152,41 @@ export async function simpanSarpras(_s: HasilAksi | null, form: FormData): Promi
 
     const pengguna = await izinkan("daftarSarpras", proyek.id);
 
-    // RAB berada di bawah izin terpisah. Peran yang boleh mengelola daftar
-    // sarpras belum tentu boleh menyentuh angkanya — bila tidak berhak, kolom
-    // rab tidak ikut diubah sama sekali (bukan ditimpa nol).
-    const bolehHarga = bolehUbah(pengguna, "hargaRabRap");
-
+    // Deskripsi dasar selalu ikut disunting. RAB dan Progres TIDAK — keduanya
+    // diturunkan dari tabel BOQ (RAB = jumlah baris BOQ, Progres = opname per
+    // baris BOQ di halaman Konstruksi), sama seperti unit. Mengisinya manual
+    // di sini akan tertimpa oleh nilai turunan itu pada kesempatan berikutnya.
     const data = {
       nama: teks(form, "nama", true),
       jenis: pilihan(form, "jenis", JENIS_SARPRAS),
       volume: teks(form, "volume", true),
       status: pilihan(form, "status", STATUS_SARPRAS),
-      progress: angka(form, "progress", { min: 0, max: 100 }),
-      ...(bolehHarga ? { rab: angka(form, "rab", { min: 0 }) } : {}),
     };
 
     if (id) {
-      const lama = await prisma.infrastructure.findUnique({ where: { id } });
+      const lama = await prisma.infrastructure.findUnique({
+        where: { id },
+        include: { _count: { select: { boqItems: true } } },
+      });
       if (!lama || lama.projectId !== proyek.id) throw new GagalIzin("Item sarpras tidak ditemukan.");
 
-      await prisma.infrastructure.update({ where: { id }, data });
+      // Progres hanya bisa diketik manual selama item ini belum punya baris
+      // BOQ sama sekali — begitu ada, satu-satunya sumber adalah opname per
+      // baris di halaman Konstruksi (sama seperti aturan pada `ubahUnit`).
+      const dikendalikanBoq = lama._count.boqItems > 0;
+      const progresDiminta = teksOpsional(form, "progress");
+      const progress = dikendalikanBoq || progresDiminta === null
+        ? lama.progress
+        : angka(form, "progress", { min: 0, max: 100 });
 
-      if (data.progress !== lama.progress) {
+      const sesudah = { ...data, progress };
+
+      await prisma.infrastructure.update({ where: { id }, data: sesudah });
+
+      if (progress !== lama.progress) {
         await prisma.progressRecord.create({
           data: {
-            infrastructureId: id, tanggal: new Date(), progress: data.progress,
+            infrastructureId: id, tanggal: new Date(), progress,
             catatan: "Diubah lewat aplikasi", dicatatOleh: pengguna.nama,
           },
         });
@@ -882,22 +1194,19 @@ export async function simpanSarpras(_s: HasilAksi | null, form: FormData): Promi
 
       await catatDiff({
         pengguna, projectId: proyek.id, objek: `Sarpras · ${lama.nama}`,
-        sebelum: lama, sesudah: data,
-        label: {
-          nama: "Nama", jenis: "Jenis", volume: "Volume",
-          status: "Status", progress: "Progres", rab: "RAB",
-        },
-        format: { rab: rpLog, progress: (v) => `${v}%` },
+        sebelum: lama, sesudah,
+        label: { nama: "Nama", jenis: "Jenis", volume: "Volume", status: "Status", progress: "Progres" },
+        format: { progress: (v) => `${v}%` },
       });
     } else {
       const urut = await prisma.infrastructure.count({ where: { projectId: proyek.id } });
       await prisma.infrastructure.create({
-        data: { ...data, rab: data.rab ?? 0, projectId: proyek.id, kode: `${proyek.kode}-S${urut + 1}` },
+        data: { ...data, rab: 0, progress: 0, projectId: proyek.id, kode: `${proyek.kode}-S${urut + 1}` },
       });
       await catat({
         pengguna, projectId: proyek.id, objek: `Sarpras · ${data.nama}`,
         aksi: "Tambah sarpras",
-        ke: `${data.jenis} — ${data.volume}` + (bolehHarga ? `, RAB ${rpLog(data.rab)}` : ""),
+        ke: `${data.jenis} — ${data.volume}`,
       });
     }
 

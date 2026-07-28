@@ -38,7 +38,7 @@ export async function ringkasanProyek(u: Pengguna): Promise<RingkasProyek[]> {
         select: {
           progress: true,
           statusPembangunan: true,
-          ...(bolehHarga ? { hargaJual: true, rapUpah: true } : {}),
+          ...(bolehHarga ? { hargaJual: true } : {}),
         },
       },
     },
@@ -96,7 +96,8 @@ async function hitungAnggaran(u: Pengguna): Promise<Map<string, number>> {
     where: { project: filterProyek(u) },
     select: {
       projectId: true,
-      rapUpah: true,
+      rapUpahVolume: true,
+      rapUpahHarga: true,
       rapItems: { select: { volume: true, hargaSatuan: true } },
     },
   });
@@ -104,7 +105,7 @@ async function hitungAnggaran(u: Pengguna): Promise<Map<string, number>> {
   const peta = new Map<string, number>();
   for (const x of unit) {
     const material = x.rapItems.reduce((s, r) => s + r.volume * r.hargaSatuan, 0);
-    peta.set(x.projectId, (peta.get(x.projectId) ?? 0) + material + x.rapUpah);
+    peta.set(x.projectId, (peta.get(x.projectId) ?? 0) + material + x.rapUpahVolume * x.rapUpahHarga);
   }
   return peta;
 }
