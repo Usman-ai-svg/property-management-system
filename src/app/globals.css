@@ -88,6 +88,11 @@ body {
   min-height: 100vh;
 }
 
+/*
+ * Sidebar menempel di layar: halaman panjang (daftar unit, BOQ) discroll tanpa
+ * menu ikut hilang ke atas. Sticky, bukan fixed, supaya lebarnya tetap ikut
+ * flex .shell dan .main tidak perlu diberi margin kiri manual.
+ */
 .side {
   width: 238px;
   background: var(--ink);
@@ -96,6 +101,11 @@ body {
   display: flex;
   flex-direction: column;
   padding: 18px 14px;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .main {
@@ -473,8 +483,12 @@ select.inp {
   .shell {
     flex-direction: column;
   }
+  /* Di layar sempit sidebar jadi tumpukan di atas konten, jadi tidak dilekatkan. */
   .side {
     width: 100%;
+    position: static;
+    height: auto;
+    overflow-y: visible;
   }
   .grid4,
   .grid3,

@@ -3,8 +3,9 @@ import Link from "next/link";
 import { ArrowUpRight, Lightbulb } from "lucide-react";
 import { ambilPengguna, bolehLihat } from "@/lib/auth/rbac";
 import { ringkasanProyek } from "@/lib/data/ringkasan";
+import { kpiSeluruhFitur } from "@/lib/data/kpi-ringkasan";
 import { statusSerapan } from "@/lib/calc/keuangan";
-import { pct, rpRingkas } from "@/lib/format";
+import { rpRingkas } from "@/lib/format";
 import { Badge, JudulHalaman, Kpi, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { Tabel } from "@/components/kartu-tabel";
 
@@ -13,16 +14,11 @@ export default async function Ringkasan() {
   if (!pengguna) redirect("/login");
 
   const proyek = await ringkasanProyek(pengguna);
+  const grup = await kpiSeluruhFitur(pengguna, proyek);
   const bolehKeuangan = bolehLihat(pengguna, "keuangan");
 
-  const totalUnit = proyek.reduce((s, p) => s + p.jumlahUnit, 0);
   const totalProgress = proyek.reduce((s, p) => s + p.unitProgress, 0);
-  const totalSelesai = proyek.reduce((s, p) => s + p.unitSelesai, 0);
   const aktif = proyek.filter((p) => p.status === "Dalam Pembangunan");
-
-  const totalAnggaran = proyek.reduce((s, p) => s + (p.anggaran ?? 0), 0);
-  const totalRealisasi = proyek.reduce((s, p) => s + (p.realisasi ?? 0), 0);
-
   const tertinggi = [...aktif].sort((a, b) => b.rataProgress - a.rataProgress)[0];
 
   return (
@@ -34,26 +30,11 @@ export default async function Ringkasan() {
         }`}
       />
 
-      <div className="grid grid4">
-        <Kpi label="Proyek" nilai={String(proyek.length)} catatan={`${aktif.length} dalam pembangunan`} />
-        <Kpi label="Total unit" nilai={String(totalUnit)} catatan={`${totalSelesai} selesai`} />
-        <Kpi label="Unit berjalan" nilai={String(totalProgress)} catatan="sedang dibangun" />
-        {bolehKeuangan ? (
-          <Kpi
-            label="Serapan anggaran"
-            nilai={totalAnggaran ? pct(totalRealisasi / totalAnggaran, 1) : "—"}
-            catatan={`${rpRingkas(totalRealisasi)} dari ${rpRingkas(totalAnggaran)}`}
-          />
-        ) : (
-          <Kpi label="Serapan anggaran" nilai="—" catatan="tidak tersedia untuk peran ini" />
-        )}
-      </div>
-
       {aktif.length > 0 && (
         <div
           className="card"
           style={{
-            marginTop: 14, padding: "13px 16px", display: "flex",
+            marginBottom: 18, padding: "13px 16px", display: "flex",
             alignItems: "flex-start", gap: 10, background: "var(--rona-krem)",
             borderColor: "var(--garis-krem)",
           }}
@@ -65,6 +46,41 @@ export default async function Ringkasan() {
           </div>
         </div>
       )}
+
+      {/*
+        KPI seluruh modul, dikelompokkan per fitur.
+
+        Grup yang tidak muncul di sini bukan disembunyikan di sisi tampilan:
+        angkanya memang tidak pernah dihitung untuk peran ini. Urutannya
+        mengikuti urutan menu supaya "Vendor Management" ada di tempat yang
+        sama, baik dicari lewat sidebar maupun lewat halaman ini.
+      */}
+      {grup.map((g) => (
+        <section key={g.id} style={{ marginBottom: 18 }}>
+          <div
+            style={{
+              display: "flex", alignItems: "baseline", justifyContent: "space-between",
+              gap: 12, marginBottom: 8,
+            }}
+          >
+            <div className="eyebrow">{g.judul}</div>
+            <Link
+              href={g.href}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                color: "var(--teal)", fontSize: 12, fontWeight: 600, textDecoration: "none",
+              }}
+            >
+              Buka <ArrowUpRight size={13} />
+            </Link>
+          </div>
+          <div className="grid grid4">
+            {g.angka.map((a) => (
+              <Kpi key={a.label} label={a.label} nilai={a.nilai} catatan={a.catatan} />
+            ))}
+          </div>
+        </section>
+      ))}
 
       <div className="sectitle">Progres per proyek</div>
 

@@ -20,14 +20,14 @@ daftar ini, semakin mudah dipindahkan.
 
 | Lapisan | Lokasi | Baris | Bergantung pada |
 |---|---|---:|---|
-| Aturan hitung | `src/lib/calc/` | 952 | tidak ada — TypeScript murni |
-| Enum & template | `src/lib/domain/` | 339 | tidak ada — TypeScript murni |
-| Pengambilan data | `src/lib/data/` | 664 | Prisma |
-| Hak akses | `src/lib/auth/` | 296 | Prisma, `jose`, cookie Next.js |
-| Komponen tampilan | `src/components/` | 2.579 | React |
-| Halaman & aksi | `src/app/(app)/` | 12.366 | Next.js App Router |
+| Aturan hitung | `src/lib/calc/` | 908 | tidak ada — TypeScript murni |
+| Enum & template | `src/lib/domain/` | 358 | tidak ada — TypeScript murni |
+| Pengambilan data | `src/lib/data/` | 1.126 | Prisma |
+| Hak akses | `src/lib/auth/` | 300 | Prisma, `jose`, cookie Next.js |
+| Komponen tampilan | `src/components/` | 2.930 | React |
+| Halaman & aksi | `src/app/(app)/` | 14.255 | Next.js App Router |
 
-Dua lapisan teratas — 1.291 baris — **tidak mengimpor apa pun dari framework
+Dua lapisan teratas — 1.266 baris — **tidak mengimpor apa pun dari framework
 maupun dari Prisma**. Keduanya bisa disalin ke ERP tanpa perubahan sebaris
 pun, dan itu memang disengaja sejak awal: di situlah seluruh rumus bisnis
 berada. Sifat ini gampang rusak tanpa terasa, jadi lihat
@@ -245,6 +245,25 @@ Tiap peran punya satu dari tiga tingkat per sub-bagian: tidak boleh lihat,
 boleh lihat, atau boleh ubah. Tersimpan di `RoleSectionPermission`, bisa
 disunting lewat halaman Admin.
 
+### Halaman Ringkasan menyaring per grup, bukan per angka
+
+`src/lib/data/kpi-ringkasan.ts` menyusun KPI seluruh modul untuk halaman
+depan. Penyaringnya sengaja disamakan persis dengan penyaring menu di
+`src/lib/nav.ts` — termasuk Landbank yang disaring per **peran** (`PIMPINAN`),
+bukan per sub-bagian. Halaman depan tidak boleh memamerkan angka dari modul
+yang menunya sendiri tidak muncul, dan grup yang tidak lolos tidak dihitung
+sama sekali: query-nya memang tidak dijalankan.
+
+Di dalam grup yang lolos, kolom rupiah masih bisa tertutup sendiri lewat
+`hargaRabRap`. Saat itu terjadi KPI-nya **berganti isi**, bukan berganti nilai
+jadi nol — "Nilai Aset Sendiri" berubah menjadi "Servis ≤ 30 Hari". Nol yang
+sebenarnya berarti "tidak boleh dilihat" adalah angka yang menyesatkan.
+
+Angkanya memakai rumus yang sama persis dengan halaman asalnya (rata-rata
+progres ditimbang jumlah unit, `ringkasKontrak()` untuk nilai kontrak). Bila
+Ringkasan dan modul asal menyebut angka berbeda untuk hal yang sama, yang
+rusak adalah kepercayaan pada keduanya.
+
 ### Satu perilaku yang sering disangka bug
 
 **Izin mengikuti peran yang sedang aktif saja, bukan gabungan semua peran
@@ -283,7 +302,7 @@ ini bila menulis ulang query, karena salah tulis di sini membuka semuanya.
 | Bagian sekarang | Di ERP |
 |---|---|
 | Login sendiri (`jose` JWT + `crypto.scrypt`) | Ganti dengan login ERP |
-| Sidebar (`src/app/(app)/sidebar.tsx`) | Ganti dengan navigasi ERP |
+| Sidebar (`src/app/(app)/sidebar.tsx` + aturan `.side` di `globals.css`) | Ganti dengan navigasi ERP |
 | Halaman login (`src/app/login/`) | Hapus |
 | SQLite + `@prisma/adapter-better-sqlite3` | Basis data ERP |
 | Palet warna di `globals.css` | Timpa token, lihat bagian 6 |

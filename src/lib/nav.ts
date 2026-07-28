@@ -20,7 +20,7 @@ export interface ItemNav {
  * seluruh modul — dua menu di bawah disaring per PERAN, bukan per izin
  * sub-bagian, sehingga tidak otomatis terbuka hanya dengan memberi izin.
  */
-const PIMPINAN = ["Administrator Sistem", "Komisaris", "BOD", "Business Development"];
+export const PIMPINAN = ["Administrator Sistem", "Komisaris", "BOD", "Business Development"];
 
 export const NAV: ItemNav[] = [
   { id: "ringkasan", label: "Ringkasan", href: "/", ikon: "LayoutGrid" },
