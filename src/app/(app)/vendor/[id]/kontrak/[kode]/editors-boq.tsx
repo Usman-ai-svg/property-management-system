@@ -8,6 +8,7 @@ import {
   tambahBarisBoqSpk,
   ubahBarisBoqSpk,
 } from "../../../boq-actions";
+import { Petunjuk } from "@/components/ui";
 
 export interface PilihanObjek {
   kunci: string;
@@ -152,12 +153,12 @@ export function ImporBoqSpk({
       <BarisField kolom={1}>
         <Field label="Berkas Excel" nama="berkas" tipe="berkas" wajib />
       </BarisField>
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+      <Petunjuk>
         Impor <b>mengganti</b> seluruh baris BOQ objek yang dipilih pada SPK ini,
         supaya mengimpor ulang berkas yang sama tidak menggandakan isinya. Kolom
         progres tidak ikut diimpor — berkas SPK berisi lingkup pekerjaan,
         sedangkan progres adalah hasil opname.
-      </p>
+      </Petunjuk>
     </FormModal>
   );
 }
@@ -199,10 +200,10 @@ export function SalinBoqKeSemua({
           wajib
         />
       </BarisField>
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+      <Petunjuk>
         BOQ unit lain akan <b>diganti</b>, dan progresnya dimulai dari nol —
         yang disalin lingkup pekerjaannya, bukan capaian lapangannya.
-      </p>
+      </Petunjuk>
     </FormModal>
   );
 }

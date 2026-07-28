@@ -5,6 +5,7 @@ import { BarisField, Field, FormModal, TombolHapus, TombolIkon } from "@/compone
 import { AlokasiBiaya } from "@/components/alokasi-biaya";
 import { JENIS_BIAYA, METODE_BAYAR, PERUNTUKAN_BIAYA, STATUS_BAYAR } from "@/lib/domain/enums";
 import { hapusPengeluaran, ubahPengeluaran } from "../actions";
+import { Petunjuk } from "@/components/ui";
 
 /**
  * Penyuntingan satu baris transaksi pengeluaran.
@@ -98,10 +99,10 @@ export function UbahTransaksi({
         </div>
       </BarisField>
 
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+      <Petunjuk>
         Tiap field yang berubah dicatat sendiri-sendiri di Log Perubahan, lengkap
         dengan nilai sebelum dan sesudahnya.
-      </p>
+      </Petunjuk>
     </FormModal>
   );
 }

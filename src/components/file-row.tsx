@@ -5,6 +5,7 @@ import { FileText } from "lucide-react";
 import { BarisField, FormModal } from "@/components/form";
 import type { HasilAksi } from "@/lib/actions/guard";
 import { tanggal, ukuranFile } from "@/lib/format";
+import { Petunjuk } from "@/components/ui";
 
 /**
  * Baris dokumen dengan nomor revisi dan riwayat versi.
@@ -161,11 +162,11 @@ export function FileRow({
               </div>
             </BarisField>
 
-            <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+            <Petunjuk>
               Nomor revisi ditentukan otomatis dan versi sebelumnya tetap tersimpan —
               unggahan baru tidak pernah menimpa yang lama. Maksimum 64 MB.
               Diterima: PDF, JPG, PNG, WEBP, XLSX, DOCX, SKP, DWG, RVT.
-            </p>
+            </Petunjuk>
           </FormModal>
         )}
       </div>

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { luasTotal } from "@/lib/data/proyek";
 import { m2, pct, rp } from "@/lib/format";
-import { Badge, CardHead, InfoRow, TabelHead, WARNA_STATUS } from "@/components/ui";
+import { Badge, CardHead, InfoRow, Kartu, TabelHead, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
 import { unggahRevisi } from "../../master/actions";
 import {
@@ -147,7 +147,7 @@ export default async function DetailLandbank({
       {tabAktif === "fs" && (
         <>
           <div className="grid grid2">
-            <div className="card" style={{ padding: "16px 20px" }}>
+            <Kartu>
               <CardHead judul="Luas & Perolehan Lahan" aksi={
                 bolehHarga && ubahHarga ? (
                   <EditBiayaLahan
@@ -186,9 +186,9 @@ export default async function DetailLandbank({
                   Angka biaya perolehan tidak ditampilkan untuk peran Anda.
                 </div>
               )}
-            </div>
+            </Kartu>
 
-            <div className="card" style={{ padding: "16px 20px" }}>
+            <Kartu>
               <div className="eyebrow" style={{ marginBottom: 4 }}>Analisis Lahan</div>
               <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
                 Dilampirkan sebagai dokumen PDF.
@@ -209,7 +209,7 @@ export default async function DetailLandbank({
                 pemilik={{ jenis: "proyek", id: proyek.id, kategori: "analisa" }}
                 aksiUnggah={unggahRevisi}
               />
-            </div>
+            </Kartu>
           </div>
 
           <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>

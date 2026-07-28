@@ -4,7 +4,7 @@ import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { ambilPengguna, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { daftarProyekPlanReal, planVsRealisasi } from "@/lib/data/plan-real";
 import { pct, rp } from "@/lib/format";
-import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
+import { Badge, Kartu, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { CatatBiayaOperasional } from "./catat-ops";
 import { HapusPembayaranJual, KelolaPembayaranJual, UbahPembayaranJual } from "./bayar-jual";
 import { Tabel } from "@/components/kartu-tabel";
@@ -208,7 +208,7 @@ export default async function PlanRealisasi({
             ]}
           />
 
-          <div className="card" style={{ padding: "16px 20px", marginTop: 16 }}>
+          <Kartu atas={16}>
             <div className="eyebrow" style={{ marginBottom: 4 }}>Realisasi HPP per kategori</div>
             <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, lineHeight: 1.6 }}>
               Penanda segitiga menunjukkan progres fisik. Batang yang melewatinya berarti biaya
@@ -241,7 +241,7 @@ export default async function PlanRealisasi({
                 </span>
               </span>
             </div>
-          </div>
+          </Kartu>
         </>
       )}
 
@@ -345,7 +345,7 @@ export default async function PlanRealisasi({
 
       {/* ================= OPERASIONAL ================= */}
       {tabAktif === "operasional" && (
-        <div className="card" style={{ padding: "16px 20px" }}>
+        <Kartu>
           <div
             style={{
               display: "flex", justifyContent: "space-between", alignItems: "flex-start",
@@ -385,7 +385,7 @@ export default async function PlanRealisasi({
               </span>
             </span>
           </div>
-        </div>
+        </Kartu>
       )}
 
       {/* ================= LABA ================= */}

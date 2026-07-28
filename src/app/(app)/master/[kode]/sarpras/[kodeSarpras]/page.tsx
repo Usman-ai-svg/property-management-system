@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
-import { Badge, CardHead, InfoRow, Terbatas, WARNA_STATUS } from "@/components/ui";
+import { Badge, CardHead, InfoRow, Kartu, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
 import { unggahRevisi } from "../../../actions";
 import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
@@ -140,7 +140,7 @@ export default async function RincianSarpras({
 
       {/* ---------- baris 1: Deskripsi | Dokumen ---------- */}
       <div className="grid grid2">
-        <div className="card" style={{ padding: "16px 20px" }}>
+        <Kartu>
           <CardHead
             judul="Deskripsi"
             aksi={
@@ -163,9 +163,9 @@ export default async function RincianSarpras({
           <InfoRow label="Progres" nilai={`${item.progress}%`} />
           {bolehHarga && <InfoRow label="RAB" nilai={rp(rab)} />}
           {bolehHarga && <InfoRow label="RAP" nilai={rp(rapMaterial + rapUpah)} />}
-        </div>
+        </Kartu>
 
-        <div className="card" style={{ padding: "16px 20px" }}>
+        <Kartu>
           <div className="eyebrow" style={{ marginBottom: 6 }}>Dokumen</div>
           {!bolehDokumen ? (
             <Terbatas apa="Dokumen teknis" />
@@ -187,17 +187,17 @@ export default async function RincianSarpras({
               />
             ))
           )}
-        </div>
+        </Kartu>
       </div>
 
       {/* ---------- kontrak ---------- */}
-      <div className="card" style={{ padding: "16px 20px", marginTop: 16 }}>
+      <Kartu atas={16}>
         <KontrakBacaSaja
           daftar={kontrak}
           bolehHarga={bolehHarga}
           kosong="Belum ada kontrak vendor untuk item ini."
         />
-      </div>
+      </Kartu>
 
       {/* ---------- BOQ & RAP ---------- */}
       {!bolehHarga ? (

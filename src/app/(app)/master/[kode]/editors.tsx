@@ -10,6 +10,7 @@ import {
   hapusSarpras, hapusTipeUnit, hapusUnit, simpanSarpras, simpanTipeUnit,
   tambahUnit, ubahLegalitas, ubahLokasiProyek, ubahLuasLahan, ubahUnit,
 } from "../actions";
+import { Petunjuk } from "@/components/ui";
 
 /* ===================== LOKASI PROYEK ===================== */
 
@@ -80,9 +81,9 @@ export function EditLuasLahan({
         <Field label="Prasarana" nama="luasPrasarana" nilai={luas.luasPrasarana} tipe="number" satuan="m²" />
         <Field label="RTH" nama="luasRth" nilai={luas.luasRth} tipe="number" satuan="m²" />
       </BarisField>
-      <p style={{ fontSize: 11.5, color: "var(--muted)", margin: 0 }}>
+      <Petunjuk>
         Luas total dihitung otomatis dari keempat isian di atas.
-      </p>
+      </Petunjuk>
     </FormModal>
   );
 }
@@ -198,10 +199,10 @@ export function EditLegalitas({
         <Plus size={13} /> Tambah NIB
       </button>
 
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+      <Petunjuk>
         Dokumen sertifikat tiap NIB diunggah dari kartu Legalitas, dan mendukung
         revisi berversi.
-      </p>
+      </Petunjuk>
     </FormModal>
   );
 }
@@ -368,9 +369,9 @@ export function TambahUnit({
         />
       </BarisField>
 
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: "0 0 14px" }}>
+      <Petunjuk jarak={"0 0 14px"}>
         Luas bangunan, dokumen, BOQ, RAB &amp; RAP mengikuti tipe. Luas tanah diisi per unit.
-      </p>
+      </Petunjuk>
 
       <BarisField>
         <Field label="Status Bangun" nama="statusPembangunan" nilai="Belum terbangun" pilihan={STATUS_PEMBANGUNAN} />

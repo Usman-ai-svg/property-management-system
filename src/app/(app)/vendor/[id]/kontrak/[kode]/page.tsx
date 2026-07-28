@@ -8,7 +8,7 @@ import { pct, rp, tanggal } from "@/lib/format";
 import { Tabel } from "@/components/kartu-tabel";
 import { FileRow } from "@/components/file-row";
 import { unggahRevisi } from "../../../../master/actions";
-import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
+import { Badge, Kartu, Petunjuk, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import {
   HapusBarisBoq,
   ImporBoqSpk,
@@ -163,7 +163,7 @@ export default async function DetailKontrak({
       </Link>
 
       {/* ---------- dokumen SPK ---------- */}
-      <div className="card" style={{ padding: "14px 18px", marginBottom: 16 }}>
+      <Kartu padding="14px 18px" bawah={16}>
         <div className="eyebrow" style={{ marginBottom: 6 }}>Dokumen SPK</div>
         <FileRow
           label={`SPK ${kontrak.kode}`}
@@ -177,11 +177,11 @@ export default async function DetailKontrak({
           pemilik={{ jenis: "kontrak", id: kontrak.id, kategori: "spk" }}
           aksiUnggah={unggahRevisi}
         />
-        <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: "8px 0 0" }}>
+        <Petunjuk jarak={"8px 0 0"}>
           SPK yang direvisi diunggah sebagai revisi baru, bukan menimpa yang lama —
           versi mana yang berlaku saat sebuah opname disetujui tetap bisa ditelusuri.
-        </p>
-      </div>
+        </Petunjuk>
+      </Kartu>
 
       <RingkasOpname
         nilaiKontrak={ringkas.nilaiEfektif}

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
 import { rp, tanggal } from "@/lib/format";
-import { Badge, TabelHead } from "@/components/ui";
+import { Badge, BarisKpi, TabelHead } from "@/components/ui";
 import { unitTerpakai } from "@/lib/calc/aset";
 import { HapusAset, PenyesuaianAset, TambahAset, UbahAset } from "./editors";
 import { Tabel } from "@/components/kartu-tabel";
@@ -93,14 +93,7 @@ export default async function EquipmentAsset() {
       <div className="eyebrow">Manajemen Proyek · Equipment &amp; Asset</div>
       <h2 className="disp" style={{ margin: "4px 0 0", fontSize: 20 }}>Equipment &amp; Asset</h2>
 
-      <div className="grid grid4" style={{ marginTop: 16 }}>
-        {kpi.map(([label, nilai]) => (
-          <div key={label} className="card kpi">
-            <div className="eyebrow">{label}</div>
-            <div className="v" style={{ fontSize: 15 }}>{nilai}</div>
-          </div>
-        ))}
-      </div>
+      <BarisKpi kpi={kpi} />
 
       <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
         <TabelHead

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
 import { ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
-import { Badge, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
+import { Badge, Kartu, KartuKosong, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { TambahPembayaran, TambahVo } from "./editors";
 import { HapusKontrak, TambahKontrak, UbahKontrak } from "../editors-vendor";
 import { Tabel } from "@/components/kartu-tabel";
@@ -143,7 +143,7 @@ export default async function DetailVendor({
         ← Kembali ke daftar vendor
       </Link>
 
-      <div className="card" style={{ padding: "14px 18px", marginBottom: 16 }}>
+      <Kartu padding="14px 18px" bawah={16}>
         <div style={{ display: "flex", gap: 26, flexWrap: "wrap", fontSize: 12.5 }}>
           <div>
             <div className="eyebrow" style={{ fontSize: 10 }}>Bidang</div>
@@ -162,7 +162,7 @@ export default async function DetailVendor({
             {vendor.sejak}
           </div>
         </div>
-      </div>
+      </Kartu>
 
       <div
         style={{
@@ -185,9 +185,9 @@ export default async function DetailVendor({
       {/* ================= KONTRAK ================= */}
       {tabAktif === "kontrak" &&
         (vendor.contracts.length === 0 ? (
-          <div className="card" style={{ padding: 30, textAlign: "center", color: "var(--muted)" }}>
+          <KartuKosong>
             Vendor ini belum punya kontrak pada proyek yang dapat Anda akses.
-          </div>
+          </KartuKosong>
         ) : (
           [...perProyek.entries()].map(([kodeProyek, daftar]) => {
             const ringkas = daftar.map(ringkasKontrak);
@@ -411,9 +411,9 @@ export default async function DetailVendor({
       {/* ================= PENAWARAN ================= */}
       {tabAktif === "tender" &&
         (vendor.tenderPeserta.length === 0 ? (
-          <div className="card" style={{ padding: 30, textAlign: "center", color: "var(--muted)" }}>
+          <KartuKosong>
             Vendor ini belum pernah ikut tender.
-          </div>
+          </KartuKosong>
         ) : (
           vendor.tenderPeserta.map((p) => {
             const t = p.tender;
@@ -482,9 +482,9 @@ export default async function DetailVendor({
         (!bolehHarga ? (
           <Terbatas apa="Riwayat pembayaran" />
         ) : vendor.contracts.length === 0 ? (
-          <div className="card" style={{ padding: 30, textAlign: "center", color: "var(--muted)" }}>
+          <KartuKosong>
             Belum ada kontrak.
-          </div>
+          </KartuKosong>
         ) : (
           vendor.contracts.map((k) => {
             const r = ringkasKontrak(k);

@@ -9,6 +9,7 @@ import {
   hapusFase, hapusProyek, hapusUser, simpanFase, tambahProyek, tambahUser,
   ubahProyek, ubahUser,
 } from "./actions";
+import { Petunjuk } from "@/components/ui";
 
 /* ===================== PROYEK ===================== */
 
@@ -60,10 +61,10 @@ export function TambahProyek() {
         <Field label="Luas RTH" nama="luasRth" nilai={0} tipe="number" satuan="m²" />
       </BarisField>
 
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+      <Petunjuk>
         Biaya perolehan lahan diisi kemudian dari halaman Landbank. Pin lokasi diisi
         dari Master Proyek.
-      </p>
+      </Petunjuk>
     </FormModal>
   );
 }
@@ -149,9 +150,9 @@ export function KelolaFase({
         </div>
       )}
 
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+      <Petunjuk>
         Fase yang masih dipakai unit tidak bisa dihapus — unitnya akan kehilangan fase.
-      </p>
+      </Petunjuk>
     </FormModal>
   );
 }

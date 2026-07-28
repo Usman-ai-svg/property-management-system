@@ -6,7 +6,7 @@ import { komposisi, totalRapDari, WARNA_JENIS } from "@/lib/data/keuangan";
 import { alokasiKontrak, ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Donut, LegendaDonut, RvsRAP } from "@/components/charts";
-import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
+import { Badge, Kartu, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { HapusTransaksi, UbahTransaksi } from "./ubah-transaksi";
 import { Tabel } from "@/components/kartu-tabel";
 
@@ -209,15 +209,15 @@ export default async function KeuanganProyek({
       </div>
 
       <div className="grid grid2">
-        <div className="card" style={{ padding: "16px 20px" }}>
+        <Kartu>
           <div className="eyebrow" style={{ marginBottom: 10 }}>Realisasi vs RAP</div>
           <div className="num" style={{ fontSize: 20, color: "var(--ink)", marginBottom: 8 }}>
             {rp(totalRealisasi)}
           </div>
           <RvsRAP realisasi={totalRealisasi} rap={totalRap} denganLabel />
-        </div>
+        </Kartu>
 
-        <div className="card" style={{ padding: "16px 20px" }}>
+        <Kartu>
           <div
             style={{
               display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -236,7 +236,7 @@ export default async function KeuanganProyek({
             <Donut data={komp} ukuran={130} />
             <LegendaDonut data={komp} />
           </div>
-        </div>
+        </Kartu>
       </div>
 
       {/* ---------- pengeluaran per unit ---------- */}

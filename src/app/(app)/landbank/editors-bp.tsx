@@ -5,6 +5,7 @@ import {
   hapusCashflow, hapusPembanding, hapusPosHpp, hapusPosOmzet, hapusPosOperasional,
   simpanCashflow, simpanPembanding, simpanPosHpp, simpanPosOmzet, simpanPosOperasional,
 } from "./actions";
+import { Petunjuk } from "@/components/ui";
 
 /**
  * Formulir business plan.
@@ -129,10 +130,10 @@ export function FormPosOperasional({
         <Field label="Anggaran" nama="nilai" nilai={pos?.nilai ?? 0} tipe="number" satuan="Rp" wajib />
       </BarisField>
       {pos && (
-        <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+        <Petunjuk>
           Biaya operasional yang sudah dicatat dicocokkan lewat <b>nama pos</b>. Bila namanya
           diganti, biaya yang sudah ada ikut dipindahkan supaya realisasinya tidak hilang.
-        </p>
+        </Petunjuk>
       )}
     </FormModal>
   );

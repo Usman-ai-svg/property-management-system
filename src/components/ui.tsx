@@ -182,3 +182,138 @@ export function JudulHalaman({
     </div>
   );
 }
+
+/**
+ * Paragraf keterangan kecil berwarna redup.
+ *
+ * Ditulis ulang di 41 tempat sebelum ini, dengan margin yang berbeda-beda tapi
+ * ukuran dan warna yang selalu sama. Dijadikan komponen supaya penyesuaian
+ * tipografi saat migrasi cukup dilakukan di satu tempat.
+ */
+export function Petunjuk({
+  children,
+  jarak,
+  gaya,
+}: {
+  children: React.ReactNode;
+  /** Margin CSS, mis. 0 atau "8px 0 0". Bawaannya tanpa margin atas-bawah. */
+  jarak?: string | number;
+  gaya?: React.CSSProperties;
+}) {
+  return (
+    <p
+      style={{
+        fontSize: 11.5,
+        color: "var(--muted)",
+        lineHeight: 1.6,
+        margin: jarak ?? 0,
+        ...gaya,
+      }}
+    >
+      {children}
+    </p>
+  );
+}
+
+/**
+ * Kepala halaman: baris eyebrow di atas judul.
+ *
+ * Berbeda dari `JudulHalaman` yang dipakai halaman bergaya dasbor; bentuk ini
+ * yang dipakai 16 halaman modul.
+ */
+export function KepalaHalaman({
+  induk,
+  judul,
+  keterangan,
+  kanan,
+  ukuran = 20,
+}: {
+  /** Baris kecil di atas judul, mis. "Manajemen Proyek · Konstruksi". */
+  induk: string;
+  judul: React.ReactNode;
+  keterangan?: React.ReactNode;
+  kanan?: React.ReactNode;
+  ukuran?: number;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex", justifyContent: "space-between", alignItems: "flex-end",
+        flexWrap: "wrap", gap: 12,
+      }}
+    >
+      <div>
+        <div className="eyebrow">{induk}</div>
+        <h2 className="disp" style={{ margin: "4px 0 0", fontSize: ukuran }}>
+          {judul}
+        </h2>
+        {keterangan && <Petunjuk jarak="5px 0 0">{keterangan}</Petunjuk>}
+      </div>
+      {kanan}
+    </div>
+  );
+}
+
+/**
+ * Kartu ber-padding — pembungkus paling sering dipakai di aplikasi ini.
+ *
+ * Padding bawaannya "16px 20px", yaitu bentuk yang dipakai 21 dari 34 kartu.
+ * Sisanya menyesuaikan lewat prop, bukan menulis ulang style-nya.
+ */
+export function Kartu({
+  children,
+  padding = "16px 20px",
+  atas,
+  bawah,
+  gaya,
+}: {
+  children: React.ReactNode;
+  padding?: string | number;
+  /** Jarak ke elemen di atasnya, dalam piksel. */
+  atas?: number;
+  bawah?: number;
+  gaya?: React.CSSProperties;
+}) {
+  return (
+    <div
+      className="card"
+      style={{
+        padding,
+        ...(atas != null && { marginTop: atas }),
+        ...(bawah != null && { marginBottom: bawah }),
+        ...gaya,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Kartu berisi pesan "belum ada apa-apa", rata tengah. */
+export function KartuKosong({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="card" style={{ padding: 30, textAlign: "center", color: "var(--muted)" }}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Baris KPI empat kolom di kepala halaman modul.
+ *
+ * Ditulis identik di empat halaman sebelum ini.
+ */
+export function BarisKpi({ kpi, atas = 16 }: { kpi: [string, string][]; atas?: number }) {
+  return (
+    <div className="grid grid4" style={{ marginTop: atas }}>
+      {kpi.map(([label, nilai]) => (
+        <div key={label} className="card kpi">
+          <div className="eyebrow">{label}</div>
+          <div className="v" style={{ fontSize: 15 }}>
+            {nilai}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

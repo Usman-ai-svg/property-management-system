@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
 import { ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
-import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
+import { Badge, BarisKpi, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import {
   HapusTender, HapusVendor, TambahPeserta, TambahTender, TambahVendor,
   UbahStatusTender, UbahVendor,
@@ -103,14 +103,7 @@ export default async function VendorManagement() {
       <div className="eyebrow">Manajemen Proyek · Vendor Management</div>
       <h2 className="disp" style={{ margin: "4px 0 0", fontSize: 20 }}>Vendor Management</h2>
 
-      <div className="grid grid4" style={{ marginTop: 16 }}>
-        {kpi.map(([label, nilai]) => (
-          <div key={label} className="card kpi">
-            <div className="eyebrow">{label}</div>
-            <div className="v" style={{ fontSize: 15 }}>{nilai}</div>
-          </div>
-        ))}
-      </div>
+      <BarisKpi kpi={kpi} />
 
       <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
         <TabelHead

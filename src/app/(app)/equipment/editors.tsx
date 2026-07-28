@@ -8,6 +8,7 @@ import {
   JENIS_PENYESUAIAN_ASET, KEPEMILIKAN_ASET, SATUAN_PAKAI, STATUS_ASET,
 } from "@/lib/domain/enums";
 import { catatPenyesuaianAset, hapusAset, tambahAset, ubahAset } from "./actions";
+import { Petunjuk } from "@/components/ui";
 
 export interface AsetForm {
   id: string;
@@ -273,7 +274,7 @@ export function PenyesuaianAset({
         />
       </BarisField>
 
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+      <Petunjuk>
         <b>Hilang</b> mengurangi jumlah tercatat. <b>Rusak</b> tidak — barangnya masih
         dimiliki, hanya tidak bisa dipakai, dan bisa dikembalikan lewat{" "}
         <b>Perbaikan Selesai</b>. <b>Koreksi Stok</b> untuk hasil opname fisik; isi
@@ -283,7 +284,7 @@ export function PenyesuaianAset({
         Riwayat penyesuaian bersifat tetap. Pencatatan yang telanjur salah diperbaiki
         dengan Koreksi Stok baru, bukan dengan menghapus catatan lama. Nilai rupiah aset
         tidak berubah — penyusutan dibukukan Finance di luar sistem ini.
-      </p>
+      </Petunjuk>
     </FormModal>
   );
 }

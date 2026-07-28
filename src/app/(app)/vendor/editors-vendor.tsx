@@ -11,6 +11,7 @@ import {
   hapusKontrak, hapusTender, hapusVendor, tambahKontrak, tambahPesertaTender,
   tambahTender, tambahVendor, ubahKontrak, ubahStatusTender, ubahVendor,
 } from "./actions";
+import { Petunjuk } from "@/components/ui";
 
 type Pilihan = { id: string; nama: string }[];
 
@@ -252,10 +253,10 @@ export function UbahKontrak({ kontrak }: { kontrak: KontrakForm }) {
         <Field label="Retensi" nama="retensiPct" nilai={kontrak.retensiPct} tipe="number" satuan="%" />
         <Field label="Masa Pemeliharaan" nama="jatuhTempoBln" nilai={kontrak.jatuhTempoBln} tipe="number" satuan="bulan" />
       </BarisField>
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+      <Petunjuk>
         Menaikkan nilai kontrak di sini berbeda dari Variation Order: VO menyimpan
         riwayat pekerjaan tambah/kurang, sedangkan ini mengoreksi nilai awalnya.
-      </p>
+      </Petunjuk>
     </FormModal>
   );
 }
@@ -407,9 +408,9 @@ export function UbahStatusTender({
         </BarisField>
       )}
 
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+      <Petunjuk>
         Status Ditetapkan mengunci tender: pesertanya tidak bisa ditambah lagi.
-      </p>
+      </Petunjuk>
     </FormModal>
   );
 }

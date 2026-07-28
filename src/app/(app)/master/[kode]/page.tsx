@@ -4,9 +4,7 @@ import { ExternalLink, MapPin } from "lucide-react";
 import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
 import { detailProyek, luasTotal, nilaiSarpras, nilaiUnit } from "@/lib/data/proyek";
 import { m2, pct, rp } from "@/lib/format";
-import {
-  Badge, CardHead, InfoRow, TabelHead, Terbatas, WARNA_STATUS,
-} from "@/components/ui";
+import { Badge, CardHead, InfoRow, Kartu, TabelHead, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
 import { unggahRevisi } from "../actions";
 import {
@@ -78,7 +76,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
 
         {/* ---------- baris 1: Lokasi | Legalitas ---------- */}
         <div className="grid grid2">
-          <div className="card" style={{ padding: "16px 20px" }}>
+          <Kartu>
             <CardHead
               judul="Lokasi Proyek"
               aksi={
@@ -130,9 +128,9 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                 </span>
               )}
             </div>
-          </div>
+          </Kartu>
 
-          <div className="card" style={{ padding: "16px 20px" }}>
+          <Kartu>
             <CardHead
               judul={`Legalitas · ${proyek.legalitas.length} NIB`}
               aksi={
@@ -194,11 +192,11 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                 <span className="num">{m2(totalBersertifikat)}</span>
               </div>
             )}
-          </div>
+          </Kartu>
         </div>
 
         {/* ---------- baris 2: Luas Lahan ---------- */}
-        <div className="card" style={{ padding: "16px 20px", marginTop: 16 }}>
+        <Kartu atas={16}>
           <CardHead
             judul="Luas Lahan"
             aksi={ubahDeskripsi && <EditLuasLahan kode={kodeProyek} luas={proyek} />}
@@ -237,7 +235,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
             </Link>
             .
           </div>
-        </div>
+        </Kartu>
 
         {/* ---------- Tipe Unit ---------- */}
         <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>

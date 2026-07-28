@@ -9,6 +9,7 @@ import {
   hapusKerjaTambah, imporTabel, simpanBoqKerjaTambah, simpanBoqUnit,
   simpanRapKerjaTambah, simpanRapUnit, tambahKerjaTambah, ubahJudulKerjaTambah,
 } from "../../../tabel-actions";
+import { Petunjuk } from "@/components/ui";
 
 /* ===================== DESKRIPSI UNIT ===================== */
 
@@ -61,11 +62,11 @@ export function EditDeskripsiUnit({
         <Field label="Luas Tanah" nama="luasTanah" nilai={unit.luasTanah} tipe="number" satuan="m²" wajib />
       </BarisField>
 
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: "0 0 14px" }}>
+      <Petunjuk jarak={"0 0 14px"}>
         Tipe menentukan luas bangunan dan dokumen. Luas tanah diisi per unit karena
         bisa berbeda meski tipenya sama. Mengubah tipe tidak menghitung ulang baris
         BOQ dan RAP unit ini — keduanya salinan milik unit.
-      </p>
+      </Petunjuk>
 
       <BarisField>
         <Field label="Status Bangun" nama="statusPembangunan" nilai={unit.statusPembangunan} pilihan={STATUS_PEMBANGUNAN} />
@@ -75,23 +76,23 @@ export function EditDeskripsiUnit({
       {unit.dariBoq ? (
         <>
           <input type="hidden" name="progress" value={unit.progress} />
-          <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+          <Petunjuk>
             Progres unit ini <b>{unit.progress}%</b>, dihitung dari BOQ Master Proyek dan
             tertimbang nilai tiap pekerjaan — karena itu tidak bisa diisi di sini.
             Isi lewat tabel opname di halaman Konstruksi unit ini. Status bangun mengikuti angka itu
             selama belum 100%.
-          </p>
+          </Petunjuk>
         </>
       ) : (
         <>
           <BarisField kolom={1}>
             <Field label="Progres" nama="progress" nilai={unit.progress} tipe="number" satuan="%" />
           </BarisField>
-          <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+          <Petunjuk>
             Angka progres ini sama dengan yang tampil di halaman Konstruksi — keduanya
             membaca kolom yang sama. Status bangun mengikuti progres selama belum
             100%; setelah 100% barulah Serah Terima dan Habis Masa Garansi bisa dipilih.
-          </p>
+          </Petunjuk>
         </>
       )}
     </FormModal>
@@ -112,10 +113,10 @@ export function TambahKerjaTambah({ unitId }: { unitId: string }) {
       <BarisField kolom={1}>
         <Field label="Judul Kerja Tambah" nama="judul" wajib petunjuk="mis. Kanopi carport & pagar depan" />
       </BarisField>
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+      <Petunjuk>
         Satu unit boleh punya beberapa kerja tambah. Tiap kerja tambah punya dokumen
         sendiri (Desain, 3D Model, Gambar Kerja) serta tabel BOQ dan RAP-nya sendiri.
-      </p>
+      </Petunjuk>
     </FormModal>
   );
 }
@@ -131,9 +132,9 @@ export function UbahJudulKerjaTambah({ id, judul }: { id: string; judul: string 
       <BarisField kolom={1}>
         <Field label="Judul Kerja Tambah" nama="judul" nilai={judul} wajib />
       </BarisField>
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+      <Petunjuk>
         Tabel BOQ dan RAP kerja tambah ini disunting langsung dari tabelnya di bawah.
-      </p>
+      </Petunjuk>
     </FormModal>
   );
 }

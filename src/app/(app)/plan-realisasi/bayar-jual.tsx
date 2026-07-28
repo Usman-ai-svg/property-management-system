@@ -3,6 +3,7 @@
 import { BarisField, Field, FormModal, TombolHapus, TombolIkon } from "@/components/form";
 import { rp, tanggal as fmtTanggal } from "@/lib/format";
 import { hapusPembayaranJual, simpanPembayaranJual } from "./actions";
+import { Petunjuk } from "@/components/ui";
 
 /**
  * Pencairan pembayaran dari pembeli.
@@ -80,11 +81,11 @@ export function KelolaPembayaranJual({
         </div>
       )}
 
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
+      <Petunjuk>
         Pencairan boleh dicatat sebelum akad — booking fee biasanya dibayar lebih dulu.
         Bila totalnya melampaui harga jual, aplikasi tetap menyimpannya tetapi
         memberi tahu, karena bisa jadi memang ada biaya tambahan.
-      </p>
+      </Petunjuk>
     </FormModal>
   );
 }

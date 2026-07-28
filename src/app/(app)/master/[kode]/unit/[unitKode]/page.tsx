@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
-import { Badge, CardHead, InfoRow, Terbatas, WARNA_STATUS } from "@/components/ui";
+import { Badge, CardHead, InfoRow, Kartu, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
 import { unggahRevisi } from "../../../actions";
 import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
@@ -170,7 +170,7 @@ export default async function RincianUnit({
 
       {/* ---------- baris 1: Deskripsi | Dokumen ---------- */}
       <div className="grid grid2">
-        <div className="card" style={{ padding: "16px 20px" }}>
+        <Kartu>
           <CardHead
             judul="Deskripsi Unit"
             aksi={
@@ -213,9 +213,9 @@ export default async function RincianUnit({
             label="Status Jual"
             nilai={<Badge nilai={unit.statusJual} peta={WARNA_STATUS.jual} />}
           />
-        </div>
+        </Kartu>
 
-        <div className="card" style={{ padding: "16px 20px" }}>
+        <Kartu>
           <div className="eyebrow" style={{ marginBottom: 6 }}>Dokumen Unit</div>
           {!bolehDokumen ? (
             <Terbatas apa="Dokumen teknis" />
@@ -268,12 +268,12 @@ export default async function RincianUnit({
               ))}
             </>
           )}
-        </div>
+        </Kartu>
       </div>
 
       {/* ---------- baris 2: Konfigurasi | Kontrak ---------- */}
       <div className="grid grid2" style={{ marginTop: 16 }}>
-        <div className="card" style={{ padding: "16px 20px" }}>
+        <Kartu>
           <div
             style={{
               display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -328,15 +328,15 @@ export default async function RincianUnit({
               <TambahKerjaTambah unitId={unit.id} />
             </div>
           )}
-        </div>
+        </Kartu>
 
-        <div className="card" style={{ padding: "16px 20px" }}>
+        <Kartu>
           <KontrakBacaSaja
             daftar={kontrak}
             bolehHarga={bolehHarga}
             kosong="Unit ini belum tercakup kontrak vendor mana pun."
           />
-        </div>
+        </Kartu>
       </div>
 
       {/* ---------- RAB & RAP unit ---------- */}

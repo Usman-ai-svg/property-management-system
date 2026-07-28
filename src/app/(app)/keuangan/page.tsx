@@ -6,7 +6,7 @@ import { keuanganPerProyek, komposisi, trenBulanan, WARNA_JENIS } from "@/lib/da
 import { rp, rpRingkas, tanggal } from "@/lib/format";
 import { Donut, LegendaDonut, RvsRAP } from "@/components/charts";
 import { TrenChart } from "@/components/tren-chart";
-import { TabelHead } from "@/components/ui";
+import { BarisKpi, Kartu, TabelHead } from "@/components/ui";
 import { CatatPengeluaran } from "./catat";
 import { Tabel } from "@/components/kartu-tabel";
 
@@ -92,19 +92,12 @@ export default async function DashboardKeuangan({
         )}
       </div>
 
-      <div className="grid grid4" style={{ marginTop: 16 }}>
-        {kpi.map(([label, nilai]) => (
-          <div key={label} className="card kpi">
-            <div className="eyebrow">{label}</div>
-            <div className="v" style={{ fontSize: 15 }}>{nilai}</div>
-          </div>
-        ))}
-      </div>
+      <BarisKpi kpi={kpi} />
 
-      <div className="card" style={{ padding: "16px 20px", marginTop: 16 }}>
+      <Kartu atas={16}>
         <div className="eyebrow" style={{ marginBottom: 6 }}>Tren Pengeluaran · 12 bulan</div>
         <TrenChart data={tren} />
-      </div>
+      </Kartu>
 
       <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
         <TabelHead
@@ -148,7 +141,7 @@ export default async function DashboardKeuangan({
       </div>
 
       <div className="grid grid2" style={{ marginTop: 16 }}>
-        <div className="card" style={{ padding: "16px 20px" }}>
+        <Kartu>
           <div
             style={{
               display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -167,9 +160,9 @@ export default async function DashboardKeuangan({
             <Donut data={komp} />
             <LegendaDonut data={komp} />
           </div>
-        </div>
+        </Kartu>
 
-        <div className="card" style={{ padding: "16px 20px" }}>
+        <Kartu>
           <div className="eyebrow" style={{ marginBottom: 10 }}>Aktivitas Terbaru</div>
           <div style={{ maxHeight: 300, overflow: "auto" }}>
             {expenses.slice(0, 8).map((e) => (
@@ -208,7 +201,7 @@ export default async function DashboardKeuangan({
               <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Belum ada pengeluaran tercatat.</div>
             )}
           </div>
-        </div>
+        </Kartu>
       </div>
     </div>
   );

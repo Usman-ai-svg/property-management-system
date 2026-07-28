@@ -3,6 +3,7 @@
 import { BarisField, Field, FormModal, TombolTambah } from "@/components/form";
 import { STATUS_BAYAR } from "@/lib/domain/enums";
 import { catatBiayaOperasional } from "./actions";
+import { Petunjuk } from "@/components/ui";
 
 export function CatatBiayaOperasional({
   projectId,
@@ -33,10 +34,10 @@ export function CatatBiayaOperasional({
           pilihan={pos}
         />
       </BarisField>
-      <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6, margin: "-6px 0 14px" }}>
+      <Petunjuk jarak={"-6px 0 14px"}>
         Pilihan pos mengikuti business plan proyek ini, supaya realisasinya bisa
         dibandingkan langsung dengan rencananya.
-      </p>
+      </Petunjuk>
 
       <BarisField kolom={1}>
         <Field label="Keterangan" nama="uraian" wajib petunjuk="mis. Biaya iklan properti kuartal III" />
