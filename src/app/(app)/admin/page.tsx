@@ -1,8 +1,9 @@
+import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehUbah, filterProjectIdOpsional, filterProyek } from "@/lib/auth/rbac";
-import { SECTION_LABELS, SECTIONS, type Section } from "@/lib/domain/enums";
+import { DIVISI, divisiPeran, SECTION_LABELS, SECTIONS, type Section } from "@/lib/domain/enums";
 import { tanggalJam } from "@/lib/format";
 import { TabelHead, Terbatas } from "@/components/ui";
 import { SelIzin, TombolStatusUser } from "./matriks";
@@ -28,6 +29,30 @@ const WARNA_GRUP: Record<string, [string, string]> = {
   mkt: ["var(--rona-biru)", "var(--blue)"],
   media: ["var(--rona-ungu)", "var(--ungu)"],
 };
+
+/**
+ * Baris kepala divisi yang membentang penuh, memisahkan kelompok peran/user
+ * di bawahnya. Mengikuti pola baris kelompok pada tabel RAB & RAP (latar teal).
+ * Labelnya dibuat lengket ke kiri supaya tetap terlihat saat tabel digulir
+ * mendatar — sejajar dengan kolom "Peran" yang dibekukan.
+ */
+function BarisDivisi({ nama, kolom }: { nama: string; kolom: number }) {
+  return (
+    <tr style={{ background: "var(--rona-teal)" }}>
+      <td colSpan={kolom} style={{ padding: 0 }}>
+        <div
+          style={{
+            position: "sticky", left: 0, display: "inline-block",
+            padding: "6px 10px", fontWeight: 700, fontSize: 10.5,
+            letterSpacing: ".06em", textTransform: "uppercase", color: "var(--ink)",
+          }}
+        >
+          {nama}
+        </div>
+      </td>
+    </tr>
+  );
+}
 
 export default async function Admin({
   searchParams,
@@ -91,6 +116,40 @@ export default async function Admin({
     return izin.bolehUbah ? "ubah" : "lihat";
   };
 
+  // --------- Pengelompokan per divisi (bagan organisasi) ---------
+  // Baris matriks hak akses dan daftar user disusun ulang mengikuti DIVISI,
+  // bukan urut abjad. Peran/user yang tak masuk divisi mana pun dikumpulkan
+  // di grup "Lainnya" agar tidak ada yang hilang dari tabel.
+  type Peran = (typeof peran)[number];
+  type UserRow = (typeof users)[number];
+
+  const petaPeran = new Map(peran.map((r) => [r.nama, r]));
+  const grupPeran: { divisi: string; roles: Peran[] }[] = DIVISI.map((d) => ({
+    divisi: d.nama,
+    roles: d.peran.map((n) => petaPeran.get(n)).filter((r): r is Peran => Boolean(r)),
+  }));
+  const dipakaiPeran = new Set(DIVISI.flatMap((d) => d.peran));
+  const sisaPeran = peran.filter((r) => !dipakaiPeran.has(r.nama));
+  if (sisaPeran.length) grupPeran.push({ divisi: "Lainnya", roles: sisaPeran });
+  const grupPeranTampil = grupPeran.filter((g) => g.roles.length > 0);
+
+  // User dikelompokkan menurut divisi peran utamanya (peran pertama —
+  // sama dengan peran aktif saat login).
+  const idxDivisiUser = (u: UserRow) => {
+    const utama = u.roles[0]?.role.nama;
+    return utama ? divisiPeran(utama) : -1;
+  };
+  const grupUser: { divisi: string; anggota: UserRow[] }[] = DIVISI.map((d, i) => ({
+    divisi: d.nama,
+    anggota: users.filter((u) => idxDivisiUser(u) === i),
+  }));
+  const sisaUser = users.filter((u) => idxDivisiUser(u) === -1);
+  if (sisaUser.length) grupUser.push({ divisi: "Lainnya", anggota: sisaUser });
+  const grupUserTampil = grupUser.filter((g) => g.anggota.length > 0);
+
+  const kolomMatriks = 1 + SECTIONS.length;
+  const kolomUser = 5 + (bisaKelola ? 1 : 0);
+
   return (
     <div style={{ padding: 24 }}>
       <div className="eyebrow">Administrasi Sistem</div>
@@ -133,31 +192,36 @@ export default async function Admin({
               })),
             ]}
           >
-            {peran.map((r) => {
-              const [bg, warna] = WARNA_GRUP[r.grup] ?? ["var(--rona-abu)", "var(--muted)"];
-              return (
-                <tr key={r.id}>
-                  <td className="frz frzedge" style={{ left: 0, minWidth: 190, width: 190 }}>
-                    <span className="chip" style={{ background: bg, color: warna }}>
-                      {r.nama}
-                    </span>
-                    <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 3 }}>
-                      {r._count.users} pengguna
-                    </div>
-                  </td>
-                  {SECTIONS.map((s) => (
-                    <td key={s} style={{ textAlign: "center" }}>
-                      <SelIzin
-                        roleId={r.id}
-                        section={s}
-                        tingkat={tingkatIzin(r.permissions, s)}
-                        bolehUbah={bisaKelola}
-                      />
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
+            {grupPeranTampil.map((g) => (
+              <Fragment key={g.divisi}>
+                <BarisDivisi nama={g.divisi} kolom={kolomMatriks} />
+                {g.roles.map((r) => {
+                  const [bg, warna] = WARNA_GRUP[r.grup] ?? ["var(--rona-abu)", "var(--muted)"];
+                  return (
+                    <tr key={r.id}>
+                      <td className="frz frzedge" style={{ left: 0, minWidth: 190, width: 190 }}>
+                        <span className="chip" style={{ background: bg, color: warna }}>
+                          {r.nama}
+                        </span>
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 3 }}>
+                          {r._count.users} pengguna
+                        </div>
+                      </td>
+                      {SECTIONS.map((s) => (
+                        <td key={s} style={{ textAlign: "center" }}>
+                          <SelIzin
+                            roleId={r.id}
+                            section={s}
+                            tingkat={tingkatIzin(r.permissions, s)}
+                            bolehUbah={bisaKelola}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </Fragment>
+            ))}
           </Tabel>
         </>
       )}
@@ -191,63 +255,68 @@ export default async function Admin({
               bisaKelola && { lebar: 74 },
             ]}
           >
-            {users.map((u) => (
-              <tr key={u.id}>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span
-                      style={{
-                        width: 26, height: 26, borderRadius: 7, background: "var(--ink)",
-                        color: "#fff", display: "grid", placeItems: "center",
-                        fontSize: 10, fontWeight: 600, flexShrink: 0,
-                      }}
-                    >
-                      {u.inisial}
-                    </span>
-                    <span style={{ fontWeight: 600 }}>{u.nama}</span>
-                  </div>
-                </td>
-                <td style={{ color: "var(--muted)" }}>{u.email}</td>
-                <td>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {u.roles.map(({ role }) => {
-                      const [bg, warna] = WARNA_GRUP[role.grup] ?? ["var(--rona-abu)", "var(--muted)"];
-                      return (
-                        <span key={role.nama} className="chip" style={{ background: bg, color: warna }}>
-                          {role.nama}
+            {grupUserTampil.map((g) => (
+              <Fragment key={g.divisi}>
+                <BarisDivisi nama={g.divisi} kolom={kolomUser} />
+                {g.anggota.map((u) => (
+                  <tr key={u.id}>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span
+                          style={{
+                            width: 26, height: 26, borderRadius: 7, background: "var(--ink)",
+                            color: "#fff", display: "grid", placeItems: "center",
+                            fontSize: 10, fontWeight: 600, flexShrink: 0,
+                          }}
+                        >
+                          {u.inisial}
                         </span>
-                      );
-                    })}
-                  </div>
-                </td>
-                <td style={{ color: "var(--muted)", fontSize: 11.5 }}>
-                  {u.semuaProyek
-                    ? "Semua proyek"
-                    : u.aksesProyek.length
-                      ? u.aksesProyek.map((a) => a.project.kode).join(", ")
-                      : "— tidak ada —"}
-                </td>
-                <td>
-                  <TombolStatusUser userId={u.id} aktif={u.aktif} bolehUbah={bisaKelola} />
-                </td>
-                {bisaKelola && (
-                  <td>
-                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                      <UbahUser
-                        user={{
-                          id: u.id, nama: u.nama, email: u.email, inisial: u.inisial,
-                          semuaProyek: u.semuaProyek,
-                          peranIds: u.roles.map((r) => r.role.id),
-                          proyekIds: u.aksesProyek.map((a) => a.project.id),
-                        }}
-                        peran={peran.map((r) => ({ id: r.id, nama: r.nama }))}
-                        proyek={proyek.map((p) => ({ id: p.id, kode: p.kode, nama: p.nama }))}
-                      />
-                      <HapusUser id={u.id} nama={u.nama} />
-                    </div>
-                  </td>
-                )}
-              </tr>
+                        <span style={{ fontWeight: 600 }}>{u.nama}</span>
+                      </div>
+                    </td>
+                    <td style={{ color: "var(--muted)" }}>{u.email}</td>
+                    <td>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {u.roles.map(({ role }) => {
+                          const [bg, warna] = WARNA_GRUP[role.grup] ?? ["var(--rona-abu)", "var(--muted)"];
+                          return (
+                            <span key={role.nama} className="chip" style={{ background: bg, color: warna }}>
+                              {role.nama}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </td>
+                    <td style={{ color: "var(--muted)", fontSize: 11.5 }}>
+                      {u.semuaProyek
+                        ? "Semua proyek"
+                        : u.aksesProyek.length
+                          ? u.aksesProyek.map((a) => a.project.kode).join(", ")
+                          : "— tidak ada —"}
+                    </td>
+                    <td>
+                      <TombolStatusUser userId={u.id} aktif={u.aktif} bolehUbah={bisaKelola} />
+                    </td>
+                    {bisaKelola && (
+                      <td>
+                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                          <UbahUser
+                            user={{
+                              id: u.id, nama: u.nama, email: u.email, inisial: u.inisial,
+                              semuaProyek: u.semuaProyek,
+                              peranIds: u.roles.map((r) => r.role.id),
+                              proyekIds: u.aksesProyek.map((a) => a.project.id),
+                            }}
+                            peran={peran.map((r) => ({ id: r.id, nama: r.nama }))}
+                            proyek={proyek.map((p) => ({ id: p.id, kode: p.kode, nama: p.nama }))}
+                          />
+                          <HapusUser id={u.id} nama={u.nama} />
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </Fragment>
             ))}
           </Tabel>
         </div>

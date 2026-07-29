@@ -148,6 +148,7 @@ export const ROLES = [
   "Sales",
   "Head Content & Media",
   "Editor",
+  "Social Media",
 ] as const;
 
 /** Pengelompokan peran, dipakai untuk pewarnaan chip di UI. */
@@ -172,7 +173,43 @@ export const ROLE_GROUP: Record<Role, RoleGroup> = {
   Sales: "mkt",
   "Head Content & Media": "media",
   Editor: "media",
+  "Social Media": "media",
 };
+
+/**
+ * Struktur organisasi: divisi beserta peran anggotanya, berurut sesuai bagan.
+ *
+ * Dipakai untuk mengelompokkan baris pada Admin → Kelola Hak Akses dan Kelola
+ * User. Peran pertama tiap divisi adalah "kepala"-nya (mis. Head Operation
+ * Project); sisanya anggota di bawahnya. Sebagian nama divisi memang sama
+ * dengan nama peran kepalanya — kepala tetap punya baris hak aksesnya sendiri.
+ *
+ * "Social Media" dicantumkan sesuai bagan meski belum ada sebagai peran;
+ * barisnya muncul otomatis di posisi ini begitu peran tersebut dibuat.
+ */
+export const DIVISI: { nama: string; peran: string[] }[] = [
+  { nama: "Administrator Sistem", peran: ["Administrator Sistem"] },
+  { nama: "Komisaris / BOD", peran: ["Komisaris", "BOD"] },
+  { nama: "Project Manager", peran: ["Project Manager", "Supervisor"] },
+  {
+    nama: "Head Operation Project",
+    peran: [
+      "Head Operation Project", "Business Development", "Arsitek",
+      "Quantity Surveyor", "Procurement", "Customer Care",
+    ],
+  },
+  {
+    nama: "Head Operation Office",
+    peran: ["Head Operation Office", "Consultant Finance", "Finance", "Admin", "HRD"],
+  },
+  { nama: "Head Marketing & Sales", peran: ["Head Marketing & Sales", "Agent Coordinator", "Sales"] },
+  { nama: "Head Content & Media", peran: ["Head Content & Media", "Editor", "Social Media"] },
+];
+
+/** Indeks divisi yang memuat sebuah peran, atau -1 bila tak ada. */
+export function divisiPeran(nama: string): number {
+  return DIVISI.findIndex((d) => d.peran.includes(nama));
+}
 
 export type StatusProyek = (typeof STATUS_PROYEK)[number];
 export type StatusLahan = (typeof STATUS_LAHAN)[number];

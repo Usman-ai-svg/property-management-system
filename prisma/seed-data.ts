@@ -41,7 +41,7 @@ export const ROLE_GRUP: Record<string, string> = {
   "Consultant Finance": "fin", Finance: "fin", Admin: "fin",
   HRD: "hr",
   "Head Marketing & Sales": "mkt", "Agent Coordinator": "mkt", Sales: "mkt",
-  "Head Content & Media": "media", Editor: "media",
+  "Head Content & Media": "media", Editor: "media", "Social Media": "media",
 };
 
 export const SEMUA_PERAN = Object.keys(ROLE_GRUP);
@@ -105,6 +105,7 @@ export const USERS = [
   { nama: "Lina Marlina", inisial: "LM", peran: ["Agent Coordinator", "Sales"], semua: true, proyek: [] },
   { nama: "Doni Saputra", inisial: "DS", peran: ["Sales"], semua: true, proyek: [] },
   { nama: "Rani Puspita", inisial: "RP", peran: ["Head Content & Media", "Editor"], semua: true, proyek: [] },
+  { nama: "Tania Kirana", inisial: "TK", peran: ["Social Media"], semua: true, proyek: [] },
 ];
 
 // ---------------------------------------------------------------------------
