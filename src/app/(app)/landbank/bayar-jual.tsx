@@ -2,7 +2,7 @@
 
 import { BarisField, Field, FormModal, TombolHapus, TombolIkon } from "@/components/form";
 import { rp, tanggal as fmtTanggal } from "@/lib/format";
-import { hapusPembayaranJual, simpanPembayaranJual } from "./actions";
+import { hapusPembayaranJual, simpanPembayaranJual } from "./plan-real-actions";
 import { Petunjuk } from "@/components/ui";
 
 /**

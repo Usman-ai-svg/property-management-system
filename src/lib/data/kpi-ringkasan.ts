@@ -4,7 +4,6 @@ import { komposisi, keuanganPerProyek } from "@/lib/data/keuangan";
 import { luasTotal } from "@/lib/data/proyek";
 import { ringkasKontrak } from "@/lib/calc/keuangan";
 import { unitTerpakai } from "@/lib/calc/aset";
-import { PIMPINAN } from "@/lib/nav";
 import { m2, pct, rpRingkas } from "@/lib/format";
 import type { RingkasProyek } from "@/lib/data/ringkasan";
 
@@ -56,7 +55,7 @@ export async function kpiSeluruhFitur(u: Pengguna, proyek: RingkasProyek[]): Pro
     bolehLihat(u, "keuangan") ? grupKeuangan(u) : null,
     bolehLihat(u, "progress") ? grupVendor(u) : null,
     grupAset(u),
-    PIMPINAN.includes(u.peranAktif) ? grupLandbank(u) : null,
+    bolehLihat(u, "businessPlan") ? grupLandbank(u) : null,
   ]);
 
   const portofolio = bolehLihat(u, "deskripsi") ? grupPortofolio(u, proyek) : null;

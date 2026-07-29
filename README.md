@@ -283,8 +283,8 @@ Seluruh modul dari prototipe sudah diporting.
 | **Keuangan Proyek** | Tren pengeluaran, komposisi biaya, pengeluaran per unit dengan alokasi kontrak, dan pencatatan pengeluaran. |
 | **Vendor Management** | Daftar vendor, kontrak dengan Variation Order dan retensi, tender, progres pekerjaan, dan pembayaran. |
 | **Equipment & Asset** | Peralatan dengan kepemilikan, penempatan, pemakaian, dan jadwal servis. |
-| **Landbank** | Portofolio, perbandingan proyek, feasibility study, dan business plan. |
-| **Plan vs Realisasi** | HPP, penjualan, operasional, dan rencana laba — realisasi diturunkan dari data yang tercatat. |
+| **Landbank** | Portofolio, perbandingan proyek, feasibility study, business plan, dan **Plan vs Realisasi** (sebagai tab). |
+| &nbsp;&nbsp;↳ Plan vs Realisasi | Tab di Landbank: HPP, penjualan, operasional, dan rencana laba — realisasi diturunkan dari data yang tercatat. |
 | **Admin** | Pengelolaan proyek, matriks hak akses yang bisa disunting, kelola user, dan log perubahan. |
 
 ### Satu pembayaran untuk beberapa unit
@@ -343,6 +343,12 @@ labelnya bisa diganti menjadi "Nilai Jual" atau "Omzet Rencana" tanpa mengubah
 perhitungannya sama sekali.
 
 ### Catatan tentang Plan vs Realisasi
+
+Sejak penyatuan modul perencanaan, Plan vs Realisasi tidak lagi berupa laman
+tersendiri melainkan **tab ketiga pada indeks Landbank** (`/landbank?tab=pvr`) —
+karena angka *rencana*-nya memang bersumber dari Business Plan yang juga ada di
+Landbank. Rute lama `/plan-realisasi` dipertahankan sebagai pengalih. Aksesnya
+mengikuti izin `businessPlan` yang bisa diatur di Admin → Kelola Hak Akses.
 
 Prototipe menghitung realisasi sebagai `rencana × progres × faktor acak`.
 Di sini realisasi diturunkan dari data yang benar-benar tercatat: pengeluaran,

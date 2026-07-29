@@ -4,12 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  Building2, ChevronDown, GaugeCircle, LayoutGrid, LogOut, Map, ShieldCheck, Wallet,
+  Building2, ChevronDown, LayoutGrid, LogOut, Map, ShieldCheck, Wallet,
 } from "lucide-react";
 import type { ItemNav } from "@/lib/nav";
 import { gantiPeran, logout } from "@/app/login/actions";
 
-const IKON = { LayoutGrid, Building2, Wallet, Map, GaugeCircle, ShieldCheck };
+const IKON = { LayoutGrid, Building2, Wallet, Map, ShieldCheck };
 
 export function Sidebar({
   nav,

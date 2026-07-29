@@ -32,8 +32,8 @@ async function planProyek(businessPlanId: string) {
 
 function segarkan(kodeProyek: string) {
   revalidatePath(`/landbank/${kodeProyek}`);
+  // Mencakup pula tab Plan vs Realisasi yang kini hidup di dalam /landbank.
   revalidatePath("/landbank");
-  revalidatePath("/plan-realisasi");
 }
 
 // ===========================================================================

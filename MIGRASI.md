@@ -249,10 +249,11 @@ disunting lewat halaman Admin.
 
 `src/lib/data/kpi-ringkasan.ts` menyusun KPI seluruh modul untuk halaman
 depan. Penyaringnya sengaja disamakan persis dengan penyaring menu di
-`src/lib/nav.ts` — termasuk Landbank yang disaring per **peran** (`PIMPINAN`),
-bukan per sub-bagian. Halaman depan tidak boleh memamerkan angka dari modul
-yang menunya sendiri tidak muncul, dan grup yang tidak lolos tidak dihitung
-sama sekali: query-nya memang tidak dijalankan.
+`src/lib/nav.ts` — termasuk Landbank yang disaring per izin **`businessPlan`**
+(dulu per peran `PIMPINAN`, diseragamkan saat Plan vs Realisasi disatukan ke
+Landbank supaya aksesnya bisa dikonfigurasi). Halaman depan tidak boleh
+memamerkan angka dari modul yang menunya sendiri tidak muncul, dan grup yang
+tidak lolos tidak dihitung sama sekali: query-nya memang tidak dijalankan.
 
 Di dalam grup yang lolos, kolom rupiah masih bisa tertutup sendiri lewat
 `hargaRabRap`. Saat itu terjadi KPI-nya **berganti isi**, bukan berganti nilai

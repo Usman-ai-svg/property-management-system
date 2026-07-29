@@ -62,7 +62,7 @@ export async function catatBiayaOperasional(
       ke: `${uraian} — ${rpLog(nominal)}`,
     });
 
-    revalidatePath("/plan-realisasi");
+    revalidatePath("/landbank");
   });
 }
 
@@ -120,7 +120,7 @@ export async function simpanPembayaranJual(_s: HasilAksi | null, form: FormData)
         format: { nominal: (v) => rpLog(Number(v)) },
       });
 
-      revalidatePath("/plan-realisasi");
+      revalidatePath("/landbank");
       revalidatePath(`/keuangan/${unit.project.kode}`);
       return jml === 0 ? "Tidak ada yang berubah." : `${jml} perubahan tersimpan.`;
     }
@@ -143,7 +143,7 @@ export async function simpanPembayaranJual(_s: HasilAksi | null, form: FormData)
       ke: `${uraian} — ${rpLog(nominal)}`,
     });
 
-    revalidatePath("/plan-realisasi");
+    revalidatePath("/landbank");
     revalidatePath(`/keuangan/${unit.project.kode}`);
 
     if (lebih > 0) {
@@ -172,7 +172,7 @@ export async function hapusPembayaranJual(_s: HasilAksi | null, form: FormData):
       ke: "dihapus",
     });
 
-    revalidatePath("/plan-realisasi");
+    revalidatePath("/landbank");
     revalidatePath(`/keuangan/${unit.project.kode}`);
   });
 }

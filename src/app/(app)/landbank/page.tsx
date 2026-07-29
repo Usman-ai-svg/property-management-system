@@ -5,19 +5,21 @@ import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehLihat, filterProyek } from "@/lib/auth/rbac";
 import { luasTotal } from "@/lib/data/proyek";
 import { m2, pct, rp } from "@/lib/format";
-import { Badge, TabelHead, Track, WARNA_STATUS } from "@/components/ui";
+import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { Tabel } from "@/components/kartu-tabel";
+import { PlanRealisasiPanel } from "./plan-realisasi-panel";
 
 export default async function Landbank({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; proyek?: string; pv?: string }>;
 }) {
   const pengguna = await ambilPengguna();
   if (!pengguna) redirect("/login");
 
-  const { tab = "portofolio" } = await searchParams;
-  const tabAktif = tab === "banding" ? "banding" : "portofolio";
+  const { tab = "portofolio", proyek: proyekParam, pv } = await searchParams;
+  const tabAktif =
+    tab === "banding" ? "banding" : tab === "pvr" ? "pvr" : "portofolio";
 
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
   const bolehBp = bolehLihat(pengguna, "businessPlan");
@@ -120,6 +122,11 @@ export default async function Landbank({
         <Link href="?tab=banding" className={"tab" + (tabAktif === "banding" ? " active" : "")}>
           Perbandingan Proyek
         </Link>
+        {bolehBp && (
+          <Link href="?tab=pvr" className={"tab" + (tabAktif === "pvr" ? " active" : "")}>
+            Plan vs Realisasi
+          </Link>
+        )}
       </div>
 
       {tabAktif === "portofolio" && (
@@ -240,6 +247,13 @@ export default async function Landbank({
           </Tabel>
         </div>
       )}
+
+      {tabAktif === "pvr" &&
+        (bolehBp ? (
+          <PlanRealisasiPanel pengguna={pengguna} kodeParam={proyekParam} subParam={pv} />
+        ) : (
+          <Terbatas apa="Perbandingan rencana dan realisasi" />
+        ))}
     </div>
   );
 }

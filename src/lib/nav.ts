@@ -5,22 +5,13 @@ export interface ItemNav {
   label: string;
   href: string;
   /** Ikon lucide-react, dipetakan di komponen sidebar. */
-  ikon: "LayoutGrid" | "Building2" | "Wallet" | "Map" | "GaugeCircle" | "ShieldCheck";
+  ikon: "LayoutGrid" | "Building2" | "Wallet" | "Map" | "ShieldCheck";
   /** Bila diisi, menu hanya muncul untuk peran yang boleh melihat sub-bagian ini. */
   butuhSection?: Section;
   /** Bila diisi, menu hanya muncul untuk peran dalam daftar. */
   butuhPeran?: string[];
   anak?: Omit<ItemNav, "ikon" | "anak">[];
 }
-
-/**
- * Peran yang boleh membuka Landbank.
- *
- * "Administrator Sistem" ikut karena akun administrator harus bisa membuka
- * seluruh modul — dua menu di bawah disaring per PERAN, bukan per izin
- * sub-bagian, sehingga tidak otomatis terbuka hanya dengan memberi izin.
- */
-export const PIMPINAN = ["Administrator Sistem", "Komisaris", "BOD", "Business Development"];
 
 export const NAV: ItemNav[] = [
   { id: "ringkasan", label: "Ringkasan", href: "/", ikon: "LayoutGrid" },
@@ -37,8 +28,11 @@ export const NAV: ItemNav[] = [
       { id: "equipment", label: "Equipment & Asset", href: "/equipment" },
     ],
   },
-  { id: "landbank", label: "Landbank", href: "/landbank", ikon: "Map", butuhPeran: PIMPINAN },
-  { id: "planreal", label: "Plan vs Realisasi", href: "/plan-realisasi", ikon: "GaugeCircle", butuhSection: "businessPlan" },
+  // Landbank kini juga memuat tab Plan vs Realisasi. Gerbangnya izin
+  // `businessPlan` (bukan daftar peran) supaya bisa diatur dari Admin → Kelola
+  // Hak Akses; secara bawaan audiensnya tetap Administrator Sistem, Komisaris,
+  // BOD, dan Business Development — sama seperti sebelum penyatuan.
+  { id: "landbank", label: "Landbank", href: "/landbank", ikon: "Map", butuhSection: "businessPlan" },
   { id: "admin", label: "Admin", href: "/admin", ikon: "ShieldCheck", butuhPeran: ["Administrator Sistem", "BOD", "Business Development", "Head Operation Office", "Admin"] },
 ];
 

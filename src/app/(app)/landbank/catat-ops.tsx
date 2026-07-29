@@ -2,7 +2,7 @@
 
 import { BarisField, Field, FormModal, TombolTambah } from "@/components/form";
 import { STATUS_BAYAR } from "@/lib/domain/enums";
-import { catatBiayaOperasional } from "./actions";
+import { catatBiayaOperasional } from "./plan-real-actions";
 import { Petunjuk } from "@/components/ui";
 
 export function CatatBiayaOperasional({
