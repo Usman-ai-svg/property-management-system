@@ -284,11 +284,14 @@ export function FormModal({
       )}
 
       {terbuka && (
+        // Klik pada latar (di luar kartu) sengaja TIDAK menutup modal.
+        // Form ini kerap berisi banyak isian; satu klik tak sengaja di luar
+        // kotak tidak boleh membuang semua yang sudah diketik. Penutupan hanya
+        // lewat tombol Batal, ikon ×, atau tombol Escape — ketiganya disengaja.
         <div
           role="dialog"
           aria-modal="true"
           aria-label={judul}
-          onClick={(e) => e.target === e.currentTarget && setTerbuka(false)}
           style={{
             position: "fixed", inset: 0, background: "rgba(18,33,46,.55)",
             display: "grid", placeItems: "center", padding: 20, zIndex: 60,
