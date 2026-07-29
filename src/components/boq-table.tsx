@@ -186,7 +186,7 @@ export function BoqTable({
         </div>
       )}
 
-      <div className="card tablewrap">
+      <div className="card tablewrap" style={{ maxHeight: 520, overflowY: "auto" }}>
         <table>
           <thead>
             <tr>
@@ -209,7 +209,7 @@ export function BoqTable({
                 <tr style={{ background: "var(--rona-teal)" }}>
                   <td style={{ fontWeight: 700 }}>{ROMAWI[gi] ?? gi + 1}</td>
                   <td
-                    colSpan={sunting ? (bolehHarga ? 7 : 5) : (bolehHarga ? 6 : 4)}
+                    colSpan={sunting ? (bolehHarga ? 8 : 6) : (bolehHarga ? 7 : 5)}
                     style={{ fontWeight: 700, textTransform: sunting ? "none" : "uppercase", fontSize: 10.5, letterSpacing: ".04em" }}
                   >
                     {sunting ? (
@@ -292,7 +292,7 @@ export function BoqTable({
                 {sunting && (
                   <tr>
                     <td />
-                    <td colSpan={bolehHarga ? 7 : 5}>
+                    <td colSpan={bolehHarga ? 8 : 6}>
                       <button
                         type="button"
                         onClick={() =>
@@ -318,7 +318,7 @@ export function BoqTable({
             {sunting && (
               <tr>
                 <td />
-                <td colSpan={bolehHarga ? 7 : 5}>
+                <td colSpan={bolehHarga ? 8 : 6}>
                   <button
                     type="button"
                     onClick={() =>
@@ -338,9 +338,11 @@ export function BoqTable({
               </tr>
             )}
 
-            <tr style={{ fontWeight: 700, borderTop: "2px solid var(--line)" }}>
-              <td colSpan={bolehHarga ? 4 : 2}>TOTAL RAB</td>
-              {bolehHarga && <td className="num" style={{ textAlign: "right" }}>{rp(total)}</td>}
+            <tr style={{ fontWeight: 700, borderTop: "2px solid var(--line)", background: "var(--rona-baris)" }}>
+              <td colSpan={bolehHarga ? 5 : 4}>TOTAL RAB</td>
+              {bolehHarga && (
+                <td className="num" style={{ textAlign: "right", color: "var(--brass)" }}>{rp(total)}</td>
+              )}
               <td style={{ textAlign: "right" }}>100%</td>
               <td />
               {sunting && <td />}

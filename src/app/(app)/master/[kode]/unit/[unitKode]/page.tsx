@@ -414,8 +414,21 @@ export default async function RincianUnit({
               Gabungan RAB dan RAP dasar Tipe {unit.unitType.nama}
               {kts.length > 0 ? ` ditambah ${kts.length} kerja tambah di atas.` : " — unit ini masih Default, belum ada kerja tambah."}
             </div>
-            <InfoRow label="RAB Unit Ini" nilai={rp(nilai.rab)} />
-            <InfoRow label="RAP Unit Ini" nilai={rp(nilai.rap)} />
+
+            <div className="grid grid2" style={{ gap: 20 }}>
+              <div>
+                <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>RAB</div>
+                <InfoRow label={`Default · Tipe ${unit.unitType.nama}`} nilai={rp(nilai.rabStandar)} />
+                {kts.length > 0 && <InfoRow label={`Kerja Tambah (${kts.length})`} nilai={rp(nilai.kerjaTambah)} />}
+                <InfoRow label="RAB Unit Ini" nilai={rp(nilai.rab)} tebal />
+              </div>
+              <div>
+                <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>RAP</div>
+                <InfoRow label={`Default · Tipe ${unit.unitType.nama}`} nilai={rp(nilai.rapMaterial + nilai.rapUpah)} />
+                {kts.length > 0 && <InfoRow label={`Kerja Tambah (${kts.length})`} nilai={rp(nilai.rapKerjaTambah)} />}
+                <InfoRow label="RAP Unit Ini" nilai={rp(nilai.rap)} tebal />
+              </div>
+            </div>
           </Kartu>
         </>
       )}

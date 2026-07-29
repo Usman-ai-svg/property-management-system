@@ -88,8 +88,18 @@ export function Terbatas({ apa }: { apa: string }) {
   );
 }
 
-/** Baris label–nilai di dalam kartu. Mengikuti InfoRow pada artifact. */
-export function InfoRow({ label, nilai }: { label: string; nilai: React.ReactNode }) {
+/**
+ * Baris label–nilai di dalam kartu. Mengikuti InfoRow pada artifact.
+ *
+ * `tebal` menandai baris sebagai total penutup — dipakai saat InfoRow
+ * dipakai berjajar sebagai rincian (mis. Default + Kerja Tambah) yang
+ * ditutup satu baris total, supaya total itu menonjol dari rinciannya.
+ */
+export function InfoRow({
+  label, nilai, tebal,
+}: {
+  label: string; nilai: React.ReactNode; tebal?: boolean;
+}) {
   return (
     <div
       style={{
@@ -98,8 +108,12 @@ export function InfoRow({ label, nilai }: { label: string; nilai: React.ReactNod
         alignItems: "center",
       }}
     >
-      <span style={{ color: "var(--muted)" }}>{label}</span>
-      <span style={{ fontWeight: 600, textAlign: "right" }}>{nilai}</span>
+      <span style={{ color: tebal ? "var(--text)" : "var(--muted)", fontWeight: tebal ? 700 : 400 }}>
+        {label}
+      </span>
+      <span style={{ fontWeight: tebal ? 700 : 600, textAlign: "right", color: tebal ? "var(--brass)" : undefined }}>
+        {nilai}
+      </span>
     </div>
   );
 }
