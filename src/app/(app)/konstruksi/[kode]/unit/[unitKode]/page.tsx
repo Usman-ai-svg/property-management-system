@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
+import { unitKonstruksi } from "@/lib/data/konstruksi";
 import { duaTitikProgres } from "@/lib/data/konstruksi";
 import { susunOpname } from "@/lib/calc/opname";
 import { OpnameBoq } from "@/components/opname-boq";
@@ -21,23 +21,7 @@ export default async function OpnameUnit({
   const { kode, unitKode } = await params;
   const kodeProyek = kode.toUpperCase();
 
-  const unit = await prisma.unit.findUnique({
-    where: { kode: decodeURIComponent(unitKode).toUpperCase() },
-    select: {
-      id: true, kode: true, nomor: true, progress: true, statusPembangunan: true,
-      projectId: true,
-      phase: { select: { kode: true } },
-      project: { select: { kode: true, nama: true } },
-      unitType: { select: { nama: true } },
-      boqItems: {
-        orderBy: { urutan: "asc" },
-        select: {
-          id: true, grup: true, uraian: true, satuan: true,
-          volume: true, hargaSatuan: true, progress: true, progressLalu: true,
-        },
-      },
-    },
-  });
+  const unit = await unitKonstruksi(unitKode);
 
   if (!unit || unit.project.kode !== kodeProyek) notFound();
   if (!bolehAksesProyek(pengguna, unit.projectId)) notFound();

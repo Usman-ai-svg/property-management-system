@@ -22,10 +22,10 @@ daftar ini, semakin mudah dipindahkan.
 |---|---|---:|---|
 | Aturan hitung | `src/lib/calc/` | 908 | tidak ada — TypeScript murni |
 | Enum & template | `src/lib/domain/` | 358 | tidak ada — TypeScript murni |
-| Pengambilan data | `src/lib/data/` | 1.126 | Prisma |
+| Pengambilan data | `src/lib/data/` | 1.961 | Prisma |
 | Hak akses | `src/lib/auth/` | 300 | Prisma, `jose`, cookie Next.js |
 | Komponen tampilan | `src/components/` | 2.930 | React |
-| Halaman & aksi | `src/app/(app)/` | 14.255 | Next.js App Router |
+| Halaman & aksi | `src/app/(app)/` | 13.684 | Next.js App Router |
 
 Dua lapisan teratas — 1.266 baris — **tidak mengimpor apa pun dari framework
 maupun dari Prisma**. Keduanya bisa disalin ke ERP tanpa perubahan sebaris
@@ -35,9 +35,38 @@ berada. Sifat ini gampang rusak tanpa terasa, jadi lihat
 
 Lapisan paling bawah adalah yang paling banyak barisnya sekaligus paling
 tidak berharga untuk dipindahkan mentah-mentah. Isinya perakitan halaman:
-mengambil data, menyaring menurut hak akses, lalu menyusun kartu dan tabel.
+menyusun kartu dan tabel dari data yang sudah disiapkan lapisan di atasnya.
 Kalau ERP punya kerangka halaman sendiri, tulis ulang lapisan ini dan pakai
 lapisan di atasnya.
+
+### Aturan: halaman tidak boleh menyentuh Prisma
+
+Seluruh `page.tsx` dan `route.ts` **tidak mengimpor `@/lib/db`**. Setiap
+pengambilan data lewat fungsi bernama di `src/lib/data/`. Periksa dengan:
+
+```bash
+grep -rl 'from "@/lib/db"' src/app --include='page.tsx' --include='route.ts'
+```
+
+Keluaran kosong berarti aturannya masih utuh. Bila ada yang muncul, turunkan
+query-nya ke `src/lib/data/` sebelum melanjutkan.
+
+Gunanya untuk migrasi: saat modul ini diserap ERP, **hanya `src/lib/data/`
+yang berganti isi** — dari `prisma.*` menjadi pemanggilan RPC Supabase.
+Halaman tidak perlu tahu sumber datanya berubah. Tanpa aturan ini, 26 berkas
+halaman harus dibongkar satu per satu, dan penyaring hak aksesnya ikut
+berisiko tergeser.
+
+Yang **masih** memanggil Prisma dan memang disengaja: `*actions.ts` (lapisan
+perubahan data — nantinya menjadi RPC penulisan) dan `src/app/login/actions.ts`
+(titik sambung identitas).
+
+> **Yang paling mudah rusak saat menurunkan query:** blok
+> `...(bolehHarga ? { … } : {})` di dalam `select`. Itu bukan kerapian, itu
+> penegakan hak akses — kolom yang tidak boleh dilihat memang tidak ikut
+> di-SELECT. Kalau saat dipindah blok itu diratakan menjadi select biasa,
+> angka RAB/RAP akan sampai ke browser peran yang tidak berhak, dan **tidak
+> ada yang berubah di layar** sehingga tidak ada yang menyadarinya.
 
 ---
 

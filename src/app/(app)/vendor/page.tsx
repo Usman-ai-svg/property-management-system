@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { ambilPengguna, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
+import { ambilPengguna, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
+import { dataVendor } from "@/lib/data/vendor";
 import { ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Badge, BarisKpi, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
@@ -35,21 +35,7 @@ export default async function VendorManagement() {
 
   // Hanya kontrak pada proyek yang boleh diakses pengguna yang ikut dihitung —
   // vendor yang sama bisa mengerjakan proyek di luar jangkauannya.
-  const vendor = await prisma.vendor.findMany({
-    orderBy: { nama: "asc" },
-    select: {
-      id: true, nama: true, bidang: true, kontak: true, alamat: true, status: true, sejak: true,
-      contracts: {
-        where: { project: filterProyek(pengguna) },
-        select: {
-          id: true, nominal: true, retensiPct: true,
-          project: { select: { kode: true } },
-          expenses: { select: { total: true } },
-          variationOrders: { select: { nominal: true, status: true } },
-        },
-      },
-    },
-  });
+  const { vendor, tender, daftarProyek } = await dataVendor(pengguna, bolehKelola);
 
   const baris = vendor.map((v) => {
     const ringkas = v.contracts.map(ringkasKontrak);
@@ -62,25 +48,6 @@ export default async function VendorManagement() {
     };
   });
 
-  const tender = await prisma.tender.findMany({
-    where: { project: filterProyek(pengguna) },
-    orderBy: { tanggal: "desc" },
-    select: {
-      id: true, kode: true, pekerjaan: true, tanggal: true, hps: true, status: true,
-      pemenangVendorId: true,
-      project: { select: { kode: true } },
-      peserta: { select: { vendorId: true, nilai: true, vendor: { select: { nama: true } } } },
-    },
-  });
-
-  // Proyek dan vendor untuk formulir tender.
-  const daftarProyek = bolehKelola
-    ? await prisma.project.findMany({
-        where: filterProyek(pengguna),
-        orderBy: { kode: "asc" },
-        select: { kode: true, nama: true },
-      })
-    : [];
   const vendorAktif = vendor.filter((v) => v.status === "Aktif").map((v) => ({ id: v.id, nama: v.nama }));
 
   const totalNilai = baris.reduce((s, v) => s + v.nilai, 0);

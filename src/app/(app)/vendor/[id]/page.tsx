@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
+import { proyekUntukKontrak as ambilProyekUntukKontrak, vendorDetail } from "@/lib/data/vendor";
 import { ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Badge, Kartu, KartuKosong, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
@@ -41,80 +41,14 @@ export default async function DetailVendor({
   const bolehUbahKontrak = bolehUbah(pengguna, "progress");
   const bolehBayar = bolehUbah(pengguna, "keuangan");
 
-  const vendor = await prisma.vendor.findUnique({
-    where: { id },
-    select: {
-      id: true, nama: true, bidang: true, kontak: true, alamat: true, sejak: true, status: true,
-      contracts: {
-        where: { project: filterProyek(pengguna) },
-        orderBy: { mulai: "desc" },
-        select: {
-          id: true, kode: true, jenis: true, deskripsi: true, nominal: true,
-          retensiPct: true, jatuhTempoBln: true, mulai: true,
-          project: { select: { kode: true, nama: true } },
-          expenses: {
-            orderBy: { tanggal: "asc" },
-            select: { id: true, tanggal: true, uraian: true, total: true },
-          },
-          variationOrders: {
-            orderBy: { tanggal: "asc" },
-            select: { id: true, nomor: true, tanggal: true, uraian: true, nominal: true, status: true },
-          },
-          units: {
-            select: {
-              nilaiOverride: true,
-              unit: {
-                select: {
-                  id: true, nomor: true, progress: true, statusPembangunan: true,
-                  phase: { select: { kode: true } },
-                  unitType: { select: { nama: true } },
-                },
-              },
-            },
-          },
-          infrastructures: {
-            select: {
-              infrastructure: {
-                select: { id: true, nama: true, jenis: true, progress: true, status: true },
-              },
-            },
-          },
-        },
-      },
-      tenderPeserta: {
-        where: { tender: { project: filterProyek(pengguna) } },
-        select: {
-          id: true, nilai: true, dokumen: true,
-          tender: {
-            select: {
-              id: true, kode: true, pekerjaan: true, tanggal: true, hps: true, status: true,
-              pemenangVendorId: true,
-              project: { select: { kode: true } },
-              peserta: { select: { nilai: true } },
-            },
-          },
-        },
-      },
-    },
-  });
+  const vendor = await vendorDetail(pengguna, id);
 
   if (!vendor) notFound();
 
   // Proyek beserta unit dan sarprasnya, untuk memilih cakupan kontrak baru.
   const proyekUntukKontrak = bolehUbahKontrak
     ? (
-        await prisma.project.findMany({
-          where: filterProyek(pengguna),
-          orderBy: { kode: "asc" },
-          select: {
-            kode: true, nama: true,
-            units: {
-              orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
-              select: { id: true, nomor: true, phase: { select: { kode: true } }, unitType: { select: { nama: true } } },
-            },
-            infrastructures: { orderBy: { kode: "asc" }, select: { id: true, nama: true, jenis: true } },
-          },
-        })
+        await ambilProyekUntukKontrak(pengguna)
       ).map((p) => ({
         kode: p.kode,
         nama: p.nama,

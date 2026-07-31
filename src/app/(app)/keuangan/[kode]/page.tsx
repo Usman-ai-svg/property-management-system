@@ -1,8 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
-import { komposisi, totalRapDari, WARNA_JENIS } from "@/lib/data/keuangan";
+import {
+  komposisi, kontrakUntukAlokasi, proyekKeuangan, totalRapDari, WARNA_JENIS,
+} from "@/lib/data/keuangan";
 import { alokasiKontrak, ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Donut, LegendaDonut, RvsRAP } from "@/components/charts";
@@ -33,40 +34,7 @@ export default async function KeuanganProyek({
     );
   }
 
-  const proyek = await prisma.project.findUnique({
-    where: { kode: kodeProyek },
-    select: {
-      id: true, kode: true, nama: true, statusLahan: true,
-      units: {
-        orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
-        select: {
-          id: true, kode: true, nomor: true, hargaJual: true, rapUpah: true,
-          phase: { select: { kode: true } },
-          unitType: { select: { nama: true } },
-          rapItems: { select: { volume: true, hargaSatuan: true } },
-        },
-      },
-      infrastructures: {
-        orderBy: { kode: "asc" },
-        select: {
-          id: true, kode: true, nama: true, jenis: true, volume: true,
-          status: true, progress: true, rab: true, rapUpah: true,
-          rapItems: { select: { volume: true, hargaSatuan: true } },
-        },
-      },
-      expenses: {
-        orderBy: { tanggal: "desc" },
-        select: {
-          id: true, tanggal: true, jenis: true, peruntukan: true, metode: true,
-          uraian: true, total: true, status: true, pic: true, bukti: true,
-          alokasi: {
-            select: { id: true, unitId: true, infrastructureId: true, nominal: true },
-          },
-          contract: { select: { vendor: { select: { nama: true } } } },
-        },
-      },
-    },
-  });
+  const proyek = await proyekKeuangan(kodeProyek);
 
   if (!proyek) notFound();
   if (!bolehAksesProyek(pengguna, proyek.id)) notFound();
@@ -74,15 +42,7 @@ export default async function KeuanganProyek({
   // Alokasi kontrak ke unit: bagian unit dari kontrak borongan yang sudah
   // terbayar. Kontrak yang mencakup beberapa unit dibagi rata, kecuali unit
   // yang punya nilai override sendiri.
-  const kontrakUnit = await prisma.contract.findMany({
-    where: { projectId: proyek.id, jenis: "Unit" },
-    select: {
-      id: true, nominal: true, retensiPct: true,
-      expenses: { select: { total: true } },
-      variationOrders: { select: { nominal: true, status: true } },
-      units: { select: { unitId: true, nilaiOverride: true } },
-    },
-  });
+  const { kontrakUnit, kontrakSarpras } = await kontrakUntukAlokasi(proyek.id);
 
   const alokasiPerUnit = new Map<string, number>();
   for (const k of kontrakUnit) {
@@ -94,15 +54,6 @@ export default async function KeuanganProyek({
   }
 
   // Alokasi kontrak sarpras, dihitung dengan cara yang sama seperti unit.
-  const kontrakSarpras = await prisma.contract.findMany({
-    where: { projectId: proyek.id, jenis: "Sarpras" },
-    select: {
-      id: true, nominal: true, retensiPct: true,
-      expenses: { select: { total: true } },
-      variationOrders: { select: { nominal: true, status: true } },
-      infrastructures: { select: { infrastructureId: true, nilaiOverride: true } },
-    },
-  });
 
   const alokasiPerSarpras = new Map<string, number>();
   for (const k of kontrakSarpras) {

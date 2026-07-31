@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Check, FileText, X } from "lucide-react";
-import { prisma } from "@/lib/db";
-import { ambilPengguna, bolehLihat, filterProyek } from "@/lib/auth/rbac";
+import { ambilPengguna, bolehLihat } from "@/lib/auth/rbac";
+import { dataLandbank } from "@/lib/data/landbank";
 import { luasTotal } from "@/lib/data/proyek";
 import { m2, pct, rp } from "@/lib/format";
 import { Badge, TabelHead, Track, WARNA_STATUS } from "@/components/ui";
@@ -22,37 +22,7 @@ export default async function Landbank({
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
   const bolehBp = bolehLihat(pengguna, "businessPlan");
 
-  const proyek = await prisma.project.findMany({
-    where: filterProyek(pengguna),
-    orderBy: { kode: "asc" },
-    select: {
-      id: true, kode: true, nama: true, statusLahan: true,
-      kecamatan: true, kota: true,
-      luasKavlingEfektif: true, luasSarana: true, luasPrasarana: true, luasRth: true,
-      analisaDocId: true,
-      _count: { select: { units: true } },
-      ...(bolehHarga
-        ? {
-            hargaPerM2: true, biayaPembelian: true, biayaNotaris: true,
-            biayaBalikNama: true, biayaLegalLain: true,
-          }
-        : {}),
-    },
-  });
-
-  // Business plan diambil terpisah dan hanya bila peran berhak — sekaligus
-  // menghindari pelebaran tipe akibat relasi bersyarat di dalam select.
-  const rencana = bolehBp
-    ? await prisma.businessPlan.findMany({
-        where: { project: filterProyek(pengguna) },
-        select: {
-          projectId: true,
-          hpp: { select: { nilai: true } },
-          omzet: { select: { jumlah: true, harga: true } },
-          operasional: { select: { nilai: true } },
-        },
-      })
-    : [];
+  const { proyek, rencana } = await dataLandbank(pengguna);
 
   const rencanaPerProyek = new Map(rencana.map((r) => [r.projectId, r]));
 

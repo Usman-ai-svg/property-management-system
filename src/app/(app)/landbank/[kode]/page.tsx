@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Lock, MapPin } from "lucide-react";
-import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
+import { businessPlanProyek, detailLandbank } from "@/lib/data/landbank";
 import { luasTotal } from "@/lib/data/proyek";
 import { m2, pct, rp } from "@/lib/format";
 import { Badge, CardHead, InfoRow, Kartu, TabelHead, WARNA_STATUS } from "@/components/ui";
@@ -23,10 +23,6 @@ const BP_TAB = [
   ["cash", "Rencana Cashflow"],
 ] as const;
 
-const pilihVersi = {
-  select: { id: true, revisi: true, namaFile: true, ukuranByte: true, objectKey: true, diunggahPada: true },
-  orderBy: { diunggahPada: "desc" as const },
-};
 
 export default async function DetailLandbank({
   params,
@@ -50,46 +46,14 @@ export default async function DetailLandbank({
   const bolehUbahBp = bolehUbah(pengguna, "businessPlan");
   const ubahTeknis = bolehUbah(pengguna, "dokumenTeknis");
 
-  const proyek = await prisma.project.findUnique({
-    where: { kode: kodeProyek },
-    select: {
-      id: true, kode: true, nama: true, statusLahan: true,
-      kecamatan: true, kota: true,
-      luasKavlingEfektif: true, luasSarana: true, luasPrasarana: true, luasRth: true,
-      analisaDoc: { select: { id: true, kategori: true, versions: pilihVersi } },
-      marketComparables: {
-        orderBy: { jarak: "asc" },
-        select: {
-          id: true, nama: true, jarak: true,
-          tipe: { select: { id: true, tipe: true, jumlah: true, luasUnit: true, luasLahan: true, harga: true } },
-        },
-      },
-      ...(bolehHarga
-        ? {
-            hargaPerM2: true, biayaPembelian: true, biayaNotaris: true,
-            biayaBalikNama: true, biayaLegalLain: true,
-          }
-        : {}),
-    },
-  });
+  const proyek = await detailLandbank(kodeProyek, bolehHarga);
 
   if (!proyek) notFound();
   if (!bolehAksesProyek(pengguna, proyek.id)) notFound();
 
   // Business plan diambil terpisah, dan hanya bila peran berhak — menyisipkan
   // relasi lewat select bersyarat membuat Prisma kehilangan tipe pastinya.
-  const rencana = bolehBp
-    ? await prisma.businessPlan.findUnique({
-        where: { projectId: proyek.id },
-        select: {
-          id: true,
-          hpp: { orderBy: { urutan: "asc" }, select: { id: true, nama: true, nilai: true } },
-          omzet: { orderBy: { urutan: "asc" }, select: { id: true, tipe: true, jumlah: true, harga: true } },
-          operasional: { orderBy: { urutan: "asc" }, select: { id: true, nama: true, nilai: true } },
-          cashflow: { orderBy: { urutan: "asc" }, select: { id: true, periode: true, masuk: true, keluar: true } },
-        },
-      })
-    : null;
+  const rencana = bolehBp ? await businessPlanProyek(proyek.id) : null;
 
   const total = luasTotal(proyek);
   const b = proyek as Partial<{

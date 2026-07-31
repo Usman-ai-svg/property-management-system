@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
+import { kontrakDetail } from "@/lib/data/vendor";
 import { nilaiTerpasang, progresTertimbang } from "@/lib/calc/kontrak-boq";
 import { ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
@@ -45,54 +45,7 @@ export default async function DetailKontrak({
 
   const { id: vendorId, kode } = await params;
 
-  const kontrak = await prisma.contract.findUnique({
-    where: { kode: decodeURIComponent(kode).toUpperCase() },
-    select: {
-      id: true, kode: true, jenis: true, deskripsi: true, nominal: true,
-      retensiPct: true, jatuhTempoBln: true, mulai: true, projectId: true,
-      project: { select: { kode: true, nama: true } },
-      vendor: { select: { id: true, nama: true, bidang: true } },
-      docSpk: {
-        select: {
-          id: true, kategori: true,
-          versions: {
-            orderBy: { diunggahPada: "desc" },
-            select: {
-              id: true, revisi: true, namaFile: true, ukuranByte: true,
-              objectKey: true, diunggahPada: true,
-            },
-          },
-        },
-      },
-      expenses: { select: { total: true } },
-      variationOrders: { select: { nominal: true, status: true } },
-      units: {
-        select: {
-          unit: {
-            select: {
-              id: true, nomor: true, progress: true, statusPembangunan: true,
-              phase: { select: { kode: true } },
-              unitType: { select: { nama: true } },
-            },
-          },
-        },
-      },
-      infrastructures: {
-        select: {
-          infrastructure: {
-            select: { id: true, nama: true, jenis: true, progress: true, status: true },
-          },
-        },
-      },
-      boqItems: {
-        orderBy: [{ urutan: "asc" }],
-        select: {
-          id: true, unitId: true, infrastructureId: true, grup: true, uraian: true,
-          satuan: true, volume: true, hargaSatuan: true, progress: true,
-        },
-      },
-    },
-  });
+  const kontrak = await kontrakDetail(kode);
 
   if (!kontrak) notFound();
   if (!bolehAksesProyek(pengguna, kontrak.projectId)) notFound();
