@@ -21,18 +21,25 @@ daftar ini, semakin mudah dipindahkan.
 | Lapisan | Lokasi | Baris | Bergantung pada |
 |---|---|---:|---|
 | Aturan hitung | `src/lib/calc/` | 908 | tidak ada — TypeScript murni |
-| Enum & template | `src/lib/domain/` | 358 | tidak ada — TypeScript murni |
+| Enum & template | `src/lib/domain/` | 387 | tidak ada — TypeScript murni |
 | Penyusun angka halaman | `src/lib/tampilan/` | 493 | tidak ada — TypeScript murni |
+| Aturan adaptor | `src/lib/adaptor/` | 489 | tidak ada — TypeScript murni |
 | Pengambilan data | `src/lib/data/` | 1.958 | Prisma |
-| Hak akses | `src/lib/auth/` | 300 | Prisma, `jose`, cookie Next.js |
+| Hak akses | `src/lib/auth/` | 544 | Prisma, `jose`, cookie Next.js |
 | Komponen tampilan | `src/components/` | 2.930 | React |
 | Halaman & aksi | `src/app/(app)/` | 13.576 | Next.js App Router |
 
-Tiga lapisan teratas — 1.759 baris — **tidak mengimpor apa pun dari framework
-maupun dari Prisma**. Ketiganya bisa disalin ke ERP tanpa perubahan sebaris
-pun, dan itu memang disengaja sejak awal: di situlah seluruh rumus bisnis
-berada. Sifat ini gampang rusak tanpa terasa, jadi lihat
-[bagian 7](#7-cara-menjaga-lapisan-hitung-tetap-bersih).
+Empat lapisan teratas — 2.277 baris — **tidak mengimpor apa pun dari
+framework maupun dari Prisma**. Keempatnya bisa disalin ke ERP tanpa
+perubahan sebaris pun, dan itu memang disengaja sejak awal: di situlah
+seluruh rumus bisnis berada.
+
+Sifat ini gampang rusak tanpa terasa — satu `import` yang praktis hari ini
+membuat seluruh berkas tidak bisa dipindah tahun depan. Karena itu ada
+penjaganya: `src/lib/lapisan.test.ts` memeriksa baris impor setiap berkas di
+empat lapisan itu dan menolak React, Next, Prisma, ExcelJS, API Node, maupun
+lapisan di bawahnya. Penjaganya sendiri ikut diuji, supaya tidak lolos hanya
+karena penelusuran foldernya rusak.
 
 Lapisan paling bawah adalah yang paling banyak barisnya sekaligus paling
 tidak berharga untuk dipindahkan mentah-mentah. Isinya perakitan halaman:
@@ -156,6 +163,99 @@ tes gagal dan menunjuk tepat ke risikonya.
 > ini — keenam peran yang boleh mengubah aset semuanya berhak atas harga —
 > tapi ini satu penyuntingan matriks dari menjadi kebocoran. Tercatat sebagai
 > `PENGECUALIAN` di `kolom-terbatas.test.ts`.
+
+### Tiga adaptor: identitas, berkas, Excel
+
+`src/lib/adaptor/` memisahkan **aturan** dari **mesinnya**. Aturannya murni
+dan ikut pindah; mesinnya diganti.
+
+| Aturan (ikut pindah) | Mesin sekarang | Mesin di ERP |
+|---|---|---|
+| `identitas.ts` — bentuk `Pengguna` | `jose` JWT di cookie | Supabase Auth + `profiles` |
+| `berkas-aturan.ts` — jenis, ukuran, nama, kunci objek | `storage.ts` (disk) | Supabase Storage |
+| `tabel-aturan.ts` — baris judul, sinonim kolom, angka, validasi | `impor-excel.ts` (ExcelJS) | SheetJS di browser |
+
+**Identitas.** Seluruh aplikasi membaca pengguna lewat satu fungsi,
+`ambilPengguna()`. `identitas.ts` menyatakan kontraknya, dan
+`periksaPengguna()` menolak adaptor baru yang lupa mengisi `izin` atau
+mengisi `peranAktif` dengan daftar — ketahuan di sana, bukan nanti sebagai
+halaman kosong tanpa penjelasan.
+
+**Berkas.** Yang diamankan bukan kerapian melainkan daftar putih jenis
+berkas, batas ukuran, dan pembersihan nama. `bersihkanNamaFile()` sekarang
+juga mengenali pemisah gaya Windows — berkas diunggah dari dua jenis mesin,
+sementara `path.basename` di server hanya mengenali salah satu.
+
+**Excel.** ERP sudah memuat SheetJS 0.18. Yang perlu ditulis ulang hanya
+`kisiDariExcel()`: `XLSX.utils.sheet_to_json(sheet, { header: 1 })`
+menghasilkan bentuk `Tabel` yang sama, dan seluruh aturan pembacaannya —
+termasuk prinsip "impor tidak boleh separuh jadi" — dipakai ulang apa adanya.
+
+---
+
+## RBAC ganda: ERP di depan, model sendiri di belakang
+
+`src/lib/auth/peran-erp.ts`. Saklarnya variabel lingkungan `RBAC_MODE`;
+bawaannya `internal`, dan `erp` menyalakan mode ERP.
+
+Peta peran, dikonfirmasi pemilik sistem:
+
+| Peran ERP | Setara | hargaRabRap | businessPlan | keuangan | progress | aset |
+|---|---|---|---|---|---|---|
+| `director` | BOD | ubah | ubah | ubah | ubah | ubah |
+| `accountant` | Finance / Consultant Finance | lihat | — | ubah | lihat | lihat |
+| `manager` | Project Manager / Head Ops Project | lihat | — | lihat | ubah | ubah |
+| `admin` | Admin (Staff Administration) | lihat | — | ubah | — | lihat |
+| `staff` | Supervisor dan setingkat | — | — | — | ubah | lihat |
+
+`sales`, `viewer`, dan `hrd` tidak ada di peta — ketiganya memang tidak
+berhak membuka modul proyek di ERP. Daftar putih, bukan daftar hitam: peran
+baru di ERP tidak otomatis mendapat akses.
+
+Batas yang dijaga tes, bukan sekadar dicatat:
+
+- `staff` tidak boleh memegang `hargaRabRap`, `businessPlan`, maupun
+  `keuangan`. Kalau suatu saat dibuka karena dianggap praktis, tes yang gagal
+  menjelaskan kenapa itu bukan ide bagus.
+- Setiap peran yang boleh mengubah `keuangan` juga harus berhak atas
+  `hargaRabRap` — jalur data Keuangan mengambil kolom RAP tanpa syarat.
+- Hanya `director` yang memegang `businessPlan`.
+
+> **Pelonggaran yang disengaja:** ERP tidak punya pembatasan per proyek.
+> Selama `RBAC_MODE=erp`, setiap pengguna melihat SELURUH proyek —
+> `semuaProyek` selalu `true`. Di sistem ini Hendra Kurnia hanya boleh
+> melihat NT4 dan GN2; di mode ERP ia melihat semuanya. Memalsukannya jadi
+> daftar kosong akan membuat setiap halaman tampak kosong tanpa penjelasan,
+> jadi dipilih melonggarkan — dengan catatan tertulis.
+
+---
+
+## Skema Postgres yang sudah disiapkan
+
+`npm run skema:postgres` menghasilkan dua berkas dari `prisma/schema.prisma`:
+
+| Berkas | Isi |
+|---|---|
+| `prisma/schema.postgres.prisma` | 43 tabel berawalan `pm_`, 34 kolom uang jadi `Decimal(18,2)` |
+| `prisma/enum-postgres.sql` | 19 `CREATE TYPE` dari `src/lib/domain/enums.ts` |
+
+Sudah lolos `prisma validate`. Aplikasi ini tidak memakainya — gunanya bahan
+siap pakai saat penyerapan.
+
+Awalan `pm_` dipakai karena ERP sudah punya 40-an tabel; tanpa awalan,
+`projects` kita akan bertabrakan dengan milik mereka.
+
+> **Yang paling mudah salah di sini:** menaikkan SEMUA `Float` jadi
+> `Decimal(18,2)`. Volume pekerjaan punya pecahan halus — 12,375 m³ beton
+> akan dibulatkan jadi 12,38 dan menggeser seluruh RAB yang dihitung darinya.
+> Koordinat peta lebih parah: dua desimal menggeser titik sampai sekitar satu
+> kilometer. 22 kolom sengaja tetap `Float`, didaftar sebagai `BUKAN_UANG` di
+> `scripts/skema-postgres.mjs` dan dijaga tes.
+
+Yang masih menunggu keputusan manusia: enum masih bertipe `String` (SQL-nya
+sudah siap, tapi menaikkannya perlu migrasi data), Row Level Security belum
+ada sama sekali, dan apakah tabel `User`/`Role` kita dipakai atau digantikan
+`profiles` ERP.
 
 ---
 

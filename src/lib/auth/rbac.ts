@@ -2,6 +2,7 @@ import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { ambilSession } from "./session";
 import type { Section } from "@/lib/domain/enums";
+import type { Pengguna } from "@/lib/adaptor/identitas";
 
 /**
  * PENEGAKAN HAK AKSES DI SISI SERVER.
@@ -19,17 +20,12 @@ import type { Section } from "@/lib/domain/enums";
  *   3. Komponen UI hanya menerima apa yang sudah lolos saringan ini.
  */
 
-export interface Pengguna {
-  id: string;
-  nama: string;
-  peranAktif: string;
-  peran: string[];
-  semuaProyek: boolean;
-  /** ID proyek yang boleh diakses. Kosong bila semuaProyek = true. */
-  proyekIds: string[];
-  /** section → boleh ubah. Section yang tidak ada di peta berarti tidak boleh dilihat. */
-  izin: Map<Section, boolean>;
-}
+/**
+ * Bentuk `Pengguna` didefinisikan di `src/lib/adaptor/identitas.ts` — di
+ * sanalah kontrak titik sambung login dinyatakan. Diekspor ulang di sini
+ * supaya pemanggil lama tidak perlu berubah.
+ */
+export type { Pengguna };
 
 /**
  * Muat pengguna aktif beserta peran dan izinnya.
