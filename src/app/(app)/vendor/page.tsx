@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { dataVendor } from "@/lib/data/vendor";
-import { ringkasKontrak } from "@/lib/calc/keuangan";
+import { kpiVendor, susunBarisVendor } from "@/lib/tampilan/vendor";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Badge, BarisKpi, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import {
@@ -37,32 +37,15 @@ export default async function VendorManagement() {
   // vendor yang sama bisa mengerjakan proyek di luar jangkauannya.
   const { vendor, tender, daftarProyek } = await dataVendor(pengguna, bolehKelola);
 
-  const baris = vendor.map((v) => {
-    const ringkas = v.contracts.map(ringkasKontrak);
-    return {
-      ...v,
-      proyek: [...new Set(v.contracts.map((k) => k.project.kode))],
-      jumlahKontrak: v.contracts.length,
-      nilai: ringkas.reduce((s, r) => s + r.nilaiEfektif, 0),
-      terbayar: ringkas.reduce((s, r) => s + r.terbayar, 0),
-    };
-  });
-
+  const baris = susunBarisVendor(vendor);
+  const angka = kpiVendor(vendor);
   const vendorAktif = vendor.filter((v) => v.status === "Aktif").map((v) => ({ id: v.id, nama: v.nama }));
 
-  const totalNilai = baris.reduce((s, v) => s + v.nilai, 0);
-  const totalTerbayar = baris.reduce((s, v) => s + v.terbayar, 0);
-  const semuaKontrak = vendor.flatMap((v) => v.contracts);
-  const kontrakAktif = semuaKontrak.filter((k) => {
-    const r = ringkasKontrak(k);
-    return r.terbayar < r.nilaiEfektif;
-  }).length;
-
   const kpi: [string, string][] = [
-    ["Vendor Terdaftar", String(vendor.length)],
-    ["Kontrak Berjalan", `${kontrakAktif} / ${semuaKontrak.length}`],
-    ["Nilai Kontrak", bolehHarga ? rp(totalNilai) : "—"],
-    ["Belum Terbayar", bolehHarga ? rp(totalNilai - totalTerbayar) : "—"],
+    ["Vendor Terdaftar", String(angka.jumlahVendor)],
+    ["Kontrak Berjalan", `${angka.kontrakBerjalan} / ${angka.jumlahKontrak}`],
+    ["Nilai Kontrak", bolehHarga ? rp(angka.totalNilai) : "—"],
+    ["Belum Terbayar", bolehHarga ? rp(angka.belumTerbayar) : "—"],
   ];
 
   return (

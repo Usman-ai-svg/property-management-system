@@ -22,13 +22,14 @@ daftar ini, semakin mudah dipindahkan.
 |---|---|---:|---|
 | Aturan hitung | `src/lib/calc/` | 908 | tidak ada — TypeScript murni |
 | Enum & template | `src/lib/domain/` | 358 | tidak ada — TypeScript murni |
-| Pengambilan data | `src/lib/data/` | 1.961 | Prisma |
+| Penyusun angka halaman | `src/lib/tampilan/` | 493 | tidak ada — TypeScript murni |
+| Pengambilan data | `src/lib/data/` | 1.958 | Prisma |
 | Hak akses | `src/lib/auth/` | 300 | Prisma, `jose`, cookie Next.js |
 | Komponen tampilan | `src/components/` | 2.930 | React |
-| Halaman & aksi | `src/app/(app)/` | 13.684 | Next.js App Router |
+| Halaman & aksi | `src/app/(app)/` | 13.576 | Next.js App Router |
 
-Dua lapisan teratas — 1.266 baris — **tidak mengimpor apa pun dari framework
-maupun dari Prisma**. Keduanya bisa disalin ke ERP tanpa perubahan sebaris
+Tiga lapisan teratas — 1.759 baris — **tidak mengimpor apa pun dari framework
+maupun dari Prisma**. Ketiganya bisa disalin ke ERP tanpa perubahan sebaris
 pun, dan itu memang disengaja sejak awal: di situlah seluruh rumus bisnis
 berada. Sifat ini gampang rusak tanpa terasa, jadi lihat
 [bagian 7](#7-cara-menjaga-lapisan-hitung-tetap-bersih).
@@ -67,6 +68,43 @@ perubahan data — nantinya menjadi RPC penulisan) dan `src/app/login/actions.ts
 > di-SELECT. Kalau saat dipindah blok itu diratakan menjadi select biasa,
 > angka RAB/RAP akan sampai ke browser peran yang tidak berhak, dan **tidak
 > ada yang berubah di layar** sehingga tidak ada yang menyadarinya.
+
+### Aturan: halaman tidak boleh menghitung
+
+`src/lib/tampilan/` berisi penyusun angka tiap halaman — masuk data mentah,
+keluar angka siap gambar. Halaman hanya menggambar hasilnya.
+
+Bedanya dengan `src/lib/calc/`: `calc` berisi rumus yang berlaku di mana pun
+(serapan anggaran, progres tertimbang, pembagian kontrak), sedangkan
+`tampilan` menjawab "angka apa saja yang dibutuhkan layar ini". Keduanya
+sama-sama TypeScript murni dan sama-sama bertes.
+
+Isinya sekarang:
+
+| Berkas | Isi |
+|---|---|
+| `keuangan-proyek.ts` | pembagian biaya kontrak & pengeluaran ke unit/sarpras |
+| `landbank.ts` | luas lahan, biaya perolehan, ringkasan business plan |
+| `vendor.ts` | posisi kontrak per vendor, KPI vendor |
+| `konstruksi.ts` | rata-rata progres tertimbang |
+| `aset.ts` | KPI peralatan, ambang servis |
+| `plan-realisasi.ts` | target vs realisasi, ambang toleransi serapan |
+
+Periksa kemurniannya dengan:
+
+```bash
+grep -rl 'from "react"\|from "next\|@/lib/db' src/lib/tampilan
+```
+
+Keluaran kosong berarti lapisan ini masih bisa dipindahkan apa adanya.
+
+> **Kenapa ini yang menentukan saat penulisan ulang ke ERP:** yang ditulis
+> ulang nanti adalah cara menggambar, dan itu pekerjaan mekanis. Yang TIDAK
+> boleh ikut ditulis ulang adalah aturannya — bahwa realisasi penjualan hanya
+> dihitung dari yang sudah akad, bahwa rata-rata progres ditimbang jumlah
+> unit, bahwa biaya per unit dijumlahkan dari baris alokasi dan bukan dari
+> total transaksi. Selama aturan itu berada di `tampilan/` dan dijaga tes,
+> penulis ulang tinggal memanggilnya.
 
 ---
 

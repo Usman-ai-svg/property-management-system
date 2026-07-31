@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna } from "@/lib/auth/rbac";
-import { daftarProyek, kpiMaster, luasTotal } from "@/lib/data/proyek";
+import { daftarProyek, kpiMaster } from "@/lib/data/proyek";
+import { luasTotal } from "@/lib/tampilan/landbank";
 import { m2 } from "@/lib/format";
 import { Badge, TabelHead, WARNA_STATUS } from "@/components/ui";
 import { Tabel } from "@/components/kartu-tabel";

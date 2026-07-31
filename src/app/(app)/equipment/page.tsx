@@ -4,6 +4,7 @@ import { dataAset } from "@/lib/data/aset";
 import { rp, tanggal } from "@/lib/format";
 import { Badge, BarisKpi, TabelHead } from "@/components/ui";
 import { unitTerpakai } from "@/lib/calc/aset";
+import { kpiAset } from "@/lib/tampilan/aset";
 import { HapusAset, PenyesuaianAset, TambahAset, UbahAset } from "./editors";
 import { Tabel } from "@/components/kartu-tabel";
 
@@ -34,19 +35,16 @@ export default async function EquipmentAsset() {
 
   const { aset, penyesuaian, daftarVendor, daftarProyek } = await dataAset(pengguna);
 
-  const milikSendiri = aset.filter((a) => a.kepemilikan === "Milik Sendiri");
-  const perluPerhatian = aset.filter((a) => a.status === "Rusak" || a.status === "Pemeliharaan").length;
-  const nilaiAset = milikSendiri.reduce((s, a) => s + a.nilai, 0);
-
-  // Servis yang jatuh tempo dalam 30 hari ke depan, atau sudah terlewat.
-  const ambang = new Date(Date.now() + 30 * 864e5);
-  const servisDekat = aset.filter((a) => a.servisBerikut && a.servisBerikut <= ambang).length;
+  const angka = kpiAset(aset);
 
   const kpi: [string, string][] = [
-    ["Total Aset", `${aset.length} jenis`],
-    ["Milik Sendiri / Sewa", `${milikSendiri.length} / ${aset.length - milikSendiri.length}`],
-    ["Perlu Perhatian", String(perluPerhatian)],
-    [bolehHarga ? "Nilai Aset Sendiri" : "Servis ≤ 30 Hari", bolehHarga ? rp(nilaiAset) : String(servisDekat)],
+    ["Total Aset", `${angka.jumlahJenis} jenis`],
+    ["Milik Sendiri / Sewa", `${angka.milikSendiri} / ${angka.sewa}`],
+    ["Perlu Perhatian", String(angka.perluPerhatian)],
+    [
+      bolehHarga ? "Nilai Aset Sendiri" : "Servis ≤ 30 Hari",
+      bolehHarga ? rp(angka.nilaiMilikSendiri) : String(angka.servisDekat),
+    ],
   ];
 
   return (

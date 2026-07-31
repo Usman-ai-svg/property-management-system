@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
 import { dataAdmin } from "@/lib/data/admin";
 import { SECTION_LABELS, SECTIONS, type Section } from "@/lib/domain/enums";
-import { luasTotal } from "@/lib/data/proyek";
+import { luasTotal } from "@/lib/tampilan/landbank";
 import { m2, tanggalJam } from "@/lib/format";
 import { Badge, TabelHead, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { SelIzin, TombolStatusUser } from "./matriks";

@@ -3,9 +3,6 @@ import { prisma } from "@/lib/db";
 import { bolehAksesProyek, bolehLihat, filterProyek, type Pengguna } from "@/lib/auth/rbac";
 
 /** Luas total = kavling efektif + sarana + prasarana + RTH. */
-export const luasTotal = (l: {
-  luasKavlingEfektif: number; luasSarana: number; luasPrasarana: number; luasRth: number;
-}): number => l.luasKavlingEfektif + l.luasSarana + l.luasPrasarana + l.luasRth;
 
 /**
  * Daftar proyek untuk Level 1, beserta angka yang ditampilkan di tabelnya:

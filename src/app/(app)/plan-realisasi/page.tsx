@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { ambilPengguna, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { daftarProyekPlanReal, planVsRealisasi } from "@/lib/data/plan-real";
+import { kpiPlanRealisasi, warnaSerapan } from "@/lib/tampilan/plan-realisasi";
 import { pct, rp } from "@/lib/format";
 import { Badge, Kartu, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { CatatBiayaOperasional } from "./catat-ops";
@@ -35,8 +36,7 @@ function Meter({
   progres: number;
 }) {
   const terpakai = plan ? real / plan : 0;
-  const warna =
-    terpakai > progres + 0.03 ? "var(--red)" : terpakai > progres - 0.03 ? "var(--amber)" : "var(--green)";
+  const warna = warnaSerapan(terpakai, progres);
   const selisih = real - plan;
 
   return (
@@ -143,10 +143,9 @@ export default async function PlanRealisasi({
   const bolehCatatOps = bolehUbah(pengguna, "businessPlan");
   const bolehCatatCair = bolehUbah(pengguna, "keuangan");
 
-  const targetJual = d.sales.reduce((s, x) => s + x.target, 0);
-  const realJual = d.sales.filter((x) => x.akad).reduce((s, x) => s + x.real, 0);
-  const terjual = d.sales.filter((x) => x.akad).length;
-  const melampaui = d.biaya.filter((c) => c.plan && c.real / c.plan > d.progres + 0.03).length;
+  const { targetJual, realJual, terjual, melampaui } = kpiPlanRealisasi(
+    d.sales, d.biaya, d.progres,
+  );
 
   return (
     <div style={{ padding: 24 }}>

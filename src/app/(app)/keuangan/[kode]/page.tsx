@@ -4,6 +4,10 @@ import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/au
 import {
   komposisi, kontrakUntukAlokasi, proyekKeuangan, totalRapDari, WARNA_JENIS,
 } from "@/lib/data/keuangan";
+import {
+  alokasiKontrakSarprasTerbayar, alokasiKontrakTerbayar, biayaLangsung,
+  komposisiObjek, totalDibebankan, transaksiUntukObjek,
+} from "@/lib/tampilan/keuangan-proyek";
 import { alokasiKontrak, ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Donut, LegendaDonut, RvsRAP } from "@/components/charts";
@@ -44,28 +48,8 @@ export default async function KeuanganProyek({
   // yang punya nilai override sendiri.
   const { kontrakUnit, kontrakSarpras } = await kontrakUntukAlokasi(proyek.id);
 
-  const alokasiPerUnit = new Map<string, number>();
-  for (const k of kontrakUnit) {
-    const r = ringkasKontrak(k);
-    const porsiTerbayar = r.nilaiEfektif ? r.terbayar / r.nilaiEfektif : 0;
-    for (const a of alokasiKontrak(r.nilaiEfektif, k.units)) {
-      alokasiPerUnit.set(a.unitId, (alokasiPerUnit.get(a.unitId) ?? 0) + a.alokasi * porsiTerbayar);
-    }
-  }
-
-  // Alokasi kontrak sarpras, dihitung dengan cara yang sama seperti unit.
-
-  const alokasiPerSarpras = new Map<string, number>();
-  for (const k of kontrakSarpras) {
-    const r = ringkasKontrak(k);
-    const porsiTerbayar = r.nilaiEfektif ? r.terbayar / r.nilaiEfektif : 0;
-    for (const a of alokasiKontrak(r.nilaiEfektif, k.infrastructures)) {
-      alokasiPerSarpras.set(
-        a.infrastructureId,
-        (alokasiPerSarpras.get(a.infrastructureId) ?? 0) + a.alokasi * porsiTerbayar,
-      );
-    }
-  }
+  const alokasiPerUnit = alokasiKontrakTerbayar(kontrakUnit);
+  const alokasiPerSarpras = alokasiKontrakSarprasTerbayar(kontrakSarpras);
 
   const totalRap = proyek.units.reduce((s, u) => s + totalRapDari(u), 0);
   const totalRealisasi = proyek.expenses.reduce((s, e) => s + e.total, 0);
@@ -74,38 +58,14 @@ export default async function KeuanganProyek({
 
   // Satu pembayaran boleh menanggung beberapa unit, jadi angka per unit
   // dijumlahkan dari baris alokasinya — bukan dari totalnya.
-  const langsungPerUnit = new Map<string, number>();
-  const langsungPerSarpras = new Map<string, number>();
-  let levelProyek = 0;
+  const {
+    perUnit: langsungPerUnit,
+    perSarpras: langsungPerSarpras,
+    levelProyek,
+  } = biayaLangsung(proyek.expenses);
 
-  for (const e of proyek.expenses) {
-    for (const a of e.alokasi) {
-      if (a.unitId) {
-        langsungPerUnit.set(a.unitId, (langsungPerUnit.get(a.unitId) ?? 0) + a.nominal);
-      } else if (a.infrastructureId) {
-        langsungPerSarpras.set(
-          a.infrastructureId,
-          (langsungPerSarpras.get(a.infrastructureId) ?? 0) + a.nominal,
-        );
-      } else {
-        // Biaya level proyek: perijinan dan pengolahan lahan.
-        levelProyek += a.nominal;
-      }
-    }
-  }
-
-  /** Transaksi yang punya alokasi ke sebuah unit atau item sarpras. */
   const transaksiUntuk = (kunci: { unitId?: string; sarprasId?: string }) =>
-    proyek.expenses
-      .map((e) => {
-        const a = e.alokasi.find((x) =>
-          kunci.unitId ? x.unitId === kunci.unitId : x.infrastructureId === kunci.sarprasId,
-        );
-        return a
-          ? { ...e, nominalDibebankan: a.nominal, jumlahTujuan: e.alokasi.length }
-          : null;
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null);
+    transaksiUntukObjek(proyek.expenses, kunci);
 
   // Unit yang sedang dibuka rinciannya. Dipegang di URL, bukan di state
   // komponen, supaya rincian sebuah unit bisa ditautkan langsung dan tetap
@@ -276,18 +236,12 @@ export default async function KeuanganProyek({
         (() => {
           const tx = transaksiUntuk({ unitId: unitRinci.id });
           const rap = totalRapDari(unitRinci);
-          const terpakai = tx.reduce((s, e) => s + e.nominalDibebankan, 0);
+          const terpakai = totalDibebankan(tx);
           // Pembagi dijaga agar tidak nol supaya bar tetap tergambar walau unit
           // ini belum punya transaksi sama sekali.
           const pembagi = terpakai || 1;
 
-          const perJenis = Object.keys(WARNA_JENIS)
-            .map((j) => ({
-              jenis: j,
-              nilai: tx.filter((e) => e.jenis === j).reduce((s, e) => s + e.nominalDibebankan, 0),
-            }))
-            .filter((x) => x.nilai > 0)
-            .sort((a, b) => b.nilai - a.nilai);
+          const perJenis = komposisiObjek(tx, Object.keys(WARNA_JENIS));
 
           return (
             <div
@@ -519,16 +473,10 @@ export default async function KeuanganProyek({
         (() => {
           const tx = transaksiUntuk({ sarprasId: sarprasRinci.id });
           const rap = totalRapDari(sarprasRinci);
-          const terpakai = tx.reduce((s, e) => s + e.nominalDibebankan, 0);
+          const terpakai = totalDibebankan(tx);
           const pembagi = terpakai || 1;
 
-          const perJenis = Object.keys(WARNA_JENIS)
-            .map((j) => ({
-              jenis: j,
-              nilai: tx.filter((e) => e.jenis === j).reduce((s, e) => s + e.nominalDibebankan, 0),
-            }))
-            .filter((x) => x.nilai > 0)
-            .sort((a, b) => b.nilai - a.nilai);
+          const perJenis = komposisiObjek(tx, Object.keys(WARNA_JENIS));
 
           return (
             <div

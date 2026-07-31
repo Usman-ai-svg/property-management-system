@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Lock, MapPin } from "lucide-react";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { businessPlanProyek, detailLandbank } from "@/lib/data/landbank";
-import { luasTotal } from "@/lib/data/proyek";
+import { luasTotal, ringkasRencana } from "@/lib/tampilan/landbank";
 import { m2, pct, rp } from "@/lib/format";
 import { Badge, CardHead, InfoRow, Kartu, TabelHead, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
@@ -64,9 +64,9 @@ export default async function DetailLandbank({
     ? (b.biayaPembelian ?? 0) + (b.biayaNotaris ?? 0) + (b.biayaBalikNama ?? 0) + (b.biayaLegalLain ?? 0)
     : 0;
 
-  const totalHpp = rencana ? rencana.hpp.reduce((s, h) => s + h.nilai, 0) : 0;
-  const totalOmzet = rencana ? rencana.omzet.reduce((s, o) => s + o.jumlah * o.harga, 0) : 0;
-  const totalOps = rencana ? rencana.operasional.reduce((s, o) => s + o.nilai, 0) : 0;
+  const {
+    hpp: totalHpp, omzet: totalOmzet, ops: totalOps,
+  } = ringkasRencana(rencana ?? undefined);
   const labaKotor = totalOmzet - totalHpp;
   const labaBersih = labaKotor - totalOps;
 
