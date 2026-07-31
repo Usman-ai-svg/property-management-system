@@ -813,34 +813,6 @@ export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promis
   });
 }
 
-/**
- * Impor tabel dari Excel.
- *
- * PERAGAAN: berkas belum dibaca. Percobaan impor dicatat ke jejak audit
- * supaya alurnya bisa dinilai lebih dulu sebelum pembacaan berkas dibangun.
- */
-export async function imporPeragaan(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
-  return jalankan(async () => {
-    const jenis = teks(form, "jenis", true);
-    const konteks = teks(form, "konteks", true);
-
-    const pengguna = await ambilPengguna();
-    if (!pengguna) throw new GagalIzin("Sesi Anda sudah berakhir. Silakan masuk kembali.");
-
-    await catat({
-      pengguna, objek: `${konteks} · ${jenis}`,
-      aksi: "Impor dari Excel",
-      ke: "percobaan impor — berkas belum diproses",
-    });
-
-    return "Alur impor tercatat. Pembacaan berkas Excel belum aktif pada demo ini.";
-  });
-}
-
-// ===========================================================================
-// SARANA & PRASARANA
-// ===========================================================================
-
 export async function simpanSarpras(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
   return jalankan(async () => {
     const kodeProyek = teks(form, "kode", true);

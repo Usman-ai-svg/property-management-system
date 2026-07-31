@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, wajibUbah, type Pengguna } from "@/lib/auth/rbac";
 import type { Section } from "@/lib/domain/enums";
+import {
+  bacaAngka, bacaPilihan, bacaTeks, bacaTeksOpsional, GagalIsian, type OpsiAngka,
+} from "@/lib/adaptor/formulir";
 
 /**
  * Penjagaan untuk Server Action.
@@ -41,7 +44,12 @@ export async function jalankan(fn: () => Promise<string | void>): Promise<HasilA
     const pesan = await fn();
     return { ok: true, pesan: pesan ?? undefined };
   } catch (e) {
-    if (e instanceof GagalIzin) return { ok: false, error: e.message };
+    // GagalIzin dan GagalIsian sama-sama membawa pesan yang memang untuk
+    // dibaca pengguna. Melewatkan salah satunya membuat pesan "Kolom harga
+    // wajib diisi" berubah jadi "Terjadi kesalahan tak terduga".
+    if (e instanceof GagalIzin || e instanceof GagalIsian) {
+      return { ok: false, error: e.message };
+    }
     // redirect() dan notFound() melempar error khusus yang harus diteruskan.
     if (e instanceof Error && /NEXT_(REDIRECT|NOT_FOUND)/.test(e.message)) throw e;
     console.error("Aksi gagal:", e);
@@ -58,53 +66,28 @@ export async function idProyekDariKode(kode: string): Promise<string> {
 
 // ---------------------------------------------------------------------------
 // Pembacaan FormData
+//
+// Aturannya ada di `src/lib/adaptor/formulir.ts` — murni dan bertes. Di sini
+// hanya jembatan dari `FormData` ke fungsi pembaca yang dipakainya, supaya
+// aturan yang sama bisa dipakai lagi saat isian datang sebagai parameter RPC.
 // ---------------------------------------------------------------------------
 
-export function teks(form: FormData, nama: string, wajib = false): string {
-  const v = String(form.get(nama) ?? "").trim();
-  if (wajib && !v) throw new GagalIzin(`Kolom "${nama}" wajib diisi.`);
-  return v;
-}
+/** `GagalIsian` diperlakukan sama seperti `GagalIzin` oleh `jalankan()`. */
+export { GagalIsian };
 
-export function teksOpsional(form: FormData, nama: string): string | null {
-  const v = String(form.get(nama) ?? "").trim();
-  return v === "" ? null : v;
-}
+const dari = (form: FormData) => (nama: string) => {
+  const v = form.get(nama);
+  return v === null ? null : String(v);
+};
 
-/**
- * Baca angka dari form.
- *
- * Menerima format Indonesia ("1.250.000" dan "12,5") maupun format polos,
- * karena pengguna terbiasa mengetik pemisah ribuan.
- */
-export function angka(form: FormData, nama: string, opts: { min?: number; max?: number; wajib?: boolean } = {}): number {
-  const mentah = String(form.get(nama) ?? "").trim();
+export const teks = (form: FormData, nama: string, wajib = false): string =>
+  bacaTeks(dari(form), nama, wajib);
 
-  if (mentah === "") {
-    if (opts.wajib) throw new GagalIzin(`Kolom "${nama}" wajib diisi.`);
-    return 0;
-  }
+export const teksOpsional = (form: FormData, nama: string): string | null =>
+  bacaTeksOpsional(dari(form), nama);
 
-  // Bila ada koma, titik dianggap pemisah ribuan dan koma pemisah desimal.
-  // Bila tidak ada koma, titik yang diikuti tepat 3 digit juga dianggap
-  // pemisah ribuan — "1.250" berarti seribu dua ratus lima puluh.
-  const bersih = mentah.includes(",")
-    ? mentah.replace(/\./g, "").replace(",", ".")
-    : /^\d{1,3}(\.\d{3})+$/.test(mentah)
-      ? mentah.replace(/\./g, "")
-      : mentah;
+export const angka = (form: FormData, nama: string, opts: OpsiAngka = {}): number =>
+  bacaAngka(dari(form), nama, opts);
 
-  const n = Number(bersih);
-  if (!Number.isFinite(n)) throw new GagalIzin(`Nilai "${mentah}" pada kolom "${nama}" bukan angka yang sah.`);
-  if (opts.min != null && n < opts.min) throw new GagalIzin(`Kolom "${nama}" tidak boleh kurang dari ${opts.min}.`);
-  if (opts.max != null && n > opts.max) throw new GagalIzin(`Kolom "${nama}" tidak boleh lebih dari ${opts.max}.`);
-
-  return n;
-}
-
-/** Baca pilihan yang harus termasuk daftar nilai sah. */
-export function pilihan<T extends string>(form: FormData, nama: string, sah: readonly T[]): T {
-  const v = String(form.get(nama) ?? "").trim() as T;
-  if (!sah.includes(v)) throw new GagalIzin(`Nilai "${v}" tidak sah untuk kolom "${nama}".`);
-  return v;
-}
+export const pilihan = <T extends string>(form: FormData, nama: string, sah: readonly T[]): T =>
+  bacaPilihan(dari(form), nama, sah);

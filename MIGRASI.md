@@ -230,6 +230,38 @@ Batas yang dijaga tes, bukan sekadar dicatat:
 
 ---
 
+## Lapisan perubahan data
+
+79 Server Action, 4.658 baris. Ini permukaan tulis modul — di ERP semuanya
+menjadi RPC Postgres. Inventaris lengkapnya, beserta izin penjaga dan usulan
+nama RPC tiap aksi, ada di **`KONTRAK-RPC.md`**.
+
+Yang penting dipahami sebelum menyentuhnya: berkas `"use server"` mengekspor
+SELURUH fungsinya sebagai endpoint yang bisa dipanggil langsung dari browser.
+Tombol yang tidak digambar tidak menahan apa pun.
+
+`src/lib/actions/penjaga-aksi.test.ts` menelusuri tiap aksi yang diekspor dan
+menolak yang tidak sampai ke pemeriksaan izin — langsung, lewat fungsi
+pembantu di berkas yang sama, atau lewat aksi lain yang sudah terjaga.
+
+> **Dua endpoint tanpa penjaga ditemukan saat tes itu ditulis**, keduanya juga
+> tanpa satu pun pemanggil: `nilaiTerpasangSpk` di `vendor/boq-actions.ts`
+> (mengembalikan nilai terpasang sebuah SPK ke siapa pun) dan `imporPeragaan`
+> di `master/actions.ts` (menulis teks bebas dari pengguna ke jejak audit).
+> Keduanya peninggalan yang sudah tergantikan, dan sudah dihapus.
+
+Validasi isiannya ada di `src/lib/adaptor/formulir.ts` — murni, bekerja di
+atas fungsi pembaca `(nama) => string | null`, jadi bisa dipakai apa adanya
+ketika isian datang sebagai parameter RPC alih-alih `FormData`.
+
+> **Yang paling mudah salah pada pembacaan angka:** `"1.250"` berarti seribu
+> dua ratus lima puluh, sedangkan `"12.5"` berarti dua belas setengah.
+> Keduanya satu titik. Aturannya dulu ada dua salinan — satu untuk formulir,
+> satu untuk impor Excel — dan sekarang satu, dipakai bersama. Satu-satunya
+> perbedaan yang disengaja: impor Excel menerima awalan "Rp", formulir tidak.
+
+---
+
 ## Skema Postgres yang sudah disiapkan
 
 `npm run skema:postgres` menghasilkan dua berkas dari `prisma/schema.prisma`:

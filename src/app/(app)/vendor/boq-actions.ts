@@ -380,11 +380,3 @@ export async function salinBoqKeSemua(
   });
 }
 
-/** Nilai pekerjaan terpasang sebuah SPK — dasar opname untuk penagihan. */
-export async function nilaiTerpasangSpk(contractId: string): Promise<number> {
-  const baris = await prisma.contractBoqItem.findMany({
-    where: { contractId },
-    select: { volume: true, hargaSatuan: true, progress: true },
-  });
-  return nilaiTerpasang(baris);
-}

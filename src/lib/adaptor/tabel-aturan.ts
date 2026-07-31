@@ -1,3 +1,5 @@
+import { angkaIndonesia } from "./formulir";
+
 /**
  * ATURAN PEMBACAAN TABEL BOQ & RAP — bagian yang tidak boleh berubah saat
  * pustaka Excel-nya diganti.
@@ -64,16 +66,9 @@ const BARIS_JUMLAH = /^(total|jumlah|sub\s*total|grand\s*total)/i;
 export function angkaDari(nilai: Sel): number | null {
   if (nilai === null || nilai === undefined || nilai === "") return null;
   if (typeof nilai === "number") return Number.isFinite(nilai) ? nilai : null;
-
-  const teks = String(nilai).trim().replace(/^Rp\s*/i, "");
-  const bersih = teks.includes(",")
-    ? teks.replace(/\./g, "").replace(",", ".")
-    : /^\d{1,3}(\.\d{3})+$/.test(teks)
-      ? teks.replace(/\./g, "")
-      : teks;
-
-  const n = Number(bersih);
-  return Number.isFinite(n) ? n : null;
+  // Aturannya satu, dipakai bersama isian formulir. Berkas Excel nyata memuat
+  // awalan "Rp", jadi di jalur ini awalan itu diterima.
+  return angkaIndonesia(String(nilai), { terimaRp: true });
 }
 
 /** Teks sebuah sel, sudah dipangkas. */
