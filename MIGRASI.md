@@ -106,6 +106,57 @@ Keluaran kosong berarti lapisan ini masih bisa dipindahkan apa adanya.
 > total transaksi. Selama aturan itu berada di `tampilan/` dan dijaga tes,
 > penulis ulang tinggal memanggilnya.
 
+### Aturan: hak akses per kolom dinyatakan sekali
+
+`src/lib/auth/kolom-terbatas.ts` menyatakan kolom mana milik sub-bagian mana:
+
+```ts
+KOLOM_TERBATAS = {
+  unit:           { hargaRabRap: ["hargaJual", "rapUpah", "boqItems", "rapItems"] },
+  infrastructure: { hargaRabRap: ["rab", "rapUpah", "boqItems", "rapItems"] },
+  project:        { hargaRabRap: ["hargaPerM2", "biayaPembelian", …] },
+  equipment:      { hargaRabRap: ["nilai"] },
+  customWork:     { hargaRabRap: ["rapUpah", "boqItems", "rapItems"] },
+}
+```
+
+Penegakannya tetap lewat blok `...(bolehHarga ? { … } : {})` di dalam
+`select`, karena bentuk itulah yang membuat Prisma menghasilkan tipe yang
+tepat — halaman mengandalkan penyempitan tipe itu (`"boqItems" in unit`).
+Deklarasi di atas adalah **kontraknya**, dan sebuah tes menjaga keduanya tetap
+sejalan: `kolom-terbatas.test.ts` membaca kode sumber `src/lib/data/` dan
+menolak kolom uang yang di-SELECT di luar blok bersyarat.
+
+Untuk ERP, deklarasi yang sama bisa dibaca untuk membangun fungsi RPC atau
+policy RLS — `saringSelect()` sudah tersedia untuk membentuk select secara
+dinamis, yang di sana justru lebih cocok karena tipe Prisma tidak lagi
+berlaku.
+
+#### Dua penjagaan yang berbeda, dan yang kedua lebih rapuh
+
+| Cara | Contoh | Sifat |
+|---|---|---|
+| Per kolom | `detailUnit()` | aman sendiri |
+| Per halaman | `keuanganPerProyek()` | aman **hanya bila matriks mendukung** |
+
+Beberapa jalur — `keuangan.ts`, `ringkasan.ts`, `plan-real.ts` — mengambil
+kolom RAP tanpa syarat, karena satu-satunya halaman yang memanggilnya sudah
+menolak peran tak berhak lebih dulu. Itu aman **hanya selama** setiap
+pemegang izin penjaga juga berhak atas `hargaRabRap`.
+
+Hari ini benar, tapi itu bentuk matriks saat ini — bukan sifat kodenya.
+`WAJIB_IKUT_HARGA` mencatat implikasinya dan tesnya memeriksanya terhadap
+matriks awal. Bila suatu saat ada peran diberi `keuangan` tanpa `hargaRabRap`,
+tes gagal dan menunjuk tepat ke risikonya.
+
+> **Satu celah yang diketahui:** `src/lib/data/aset.ts` mengambil
+> `Equipment.nilai` tanpa syarat karena formulir Ubah Aset memerlukannya.
+> Peran yang boleh mengubah aset tapi tidak berhak atas `hargaRabRap` akan
+> menerima nilai perolehan alat di muatan komponen klien. Tidak terjadi hari
+> ini — keenam peran yang boleh mengubah aset semuanya berhak atas harga —
+> tapi ini satu penyuntingan matriks dari menjadi kebocoran. Tercatat sebagai
+> `PENGECUALIAN` di `kolom-terbatas.test.ts`.
+
 ---
 
 ## 2. Model data
