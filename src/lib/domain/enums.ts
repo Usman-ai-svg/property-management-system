@@ -242,3 +242,33 @@ export type RoleGroup =
   | "hr"
   | "mkt"
   | "media";
+
+/**
+ * Seluruh enum domain dalam satu peta.
+ *
+ * Dipakai `scripts/skema-postgres.mjs` untuk menghasilkan `CREATE TYPE`
+ * Postgres. Menambah enum baru di atas tanpa mendaftarkannya di sini berarti
+ * enum itu tidak ikut terbawa saat modul dipindah — ada tes yang menjaganya.
+ */
+export const SEMUA_ENUM = {
+  StatusProyek: STATUS_PROYEK,
+  StatusLahan: STATUS_LAHAN,
+  StatusPembangunan: STATUS_PEMBANGUNAN,
+  StatusJual: STATUS_JUAL,
+  StatusSarpras: STATUS_SARPRAS,
+  JenisSarpras: JENIS_SARPRAS,
+  JenisKontrak: JENIS_KONTRAK,
+  StatusVo: STATUS_VO,
+  StatusVendor: STATUS_VENDOR,
+  DokumenTender: DOKUMEN_TENDER,
+  StatusTender: STATUS_TENDER,
+  PeruntukanBiaya: PERUNTUKAN_BIAYA,
+  JenisBiaya: JENIS_BIAYA,
+  MetodeBayar: METODE_BAYAR,
+  StatusBayar: STATUS_BAYAR,
+  StatusAset: STATUS_ASET,
+  KepemilikanAset: KEPEMILIKAN_ASET,
+  SatuanPakai: SATUAN_PAKAI,
+  JenisPenyesuaianAset: JENIS_PENYESUAIAN_ASET,
+  JenisHakAtasTanah: JENIS_HAK_ATAS_TANAH,
+} as const satisfies Record<string, readonly string[]>;

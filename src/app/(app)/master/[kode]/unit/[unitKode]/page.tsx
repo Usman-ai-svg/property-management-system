@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
+import { detailUnit, kontrakUnit } from "@/lib/data/proyek";
 import { Badge, CardHead, InfoRow, Kartu, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
 import { KATEGORI_EKSTENSI } from "@/lib/storage";
@@ -14,11 +14,6 @@ import {
   TabelRapKt, TabelRapUnit, TambahKerjaTambah, UbahJudulKerjaTambah,
 } from "./editors";
 
-const pilihVersi = {
-  select: { id: true, revisi: true, namaFile: true, ukuranByte: true, objectKey: true, diunggahPada: true },
-  orderBy: { diunggahPada: "desc" as const },
-};
-const pilihDokumen = { select: { id: true, kategori: true, versions: pilihVersi } };
 
 export default async function RincianUnit({
   params,
@@ -39,84 +34,7 @@ export default async function RincianUnit({
   const ubahTeknis = bolehUbah(pengguna, "dokumenTeknis");
   const bolehDokumen = bolehLihat(pengguna, "dokumenTeknis");
 
-  const unit = await prisma.unit.findUnique({
-    where: { kode: decodeURIComponent(unitKode).toUpperCase() },
-    select: {
-      id: true, kode: true, nomor: true, luasTanah: true, projectId: true,
-      phaseId: true, unitTypeId: true,
-      statusPembangunan: true, statusJual: true, progress: true,
-      // Jumlah baris BOQ Master menentukan apakah progres unit ini turunan
-      // dari opname per baris atau masih diisi satu angka manual.
-      _count: { select: { boqItems: true } },
-      phase: { select: { kode: true } },
-      project: {
-        select: {
-          kode: true, nama: true,
-          fases: { select: { id: true, kode: true }, orderBy: { urutan: "asc" } },
-          unitTypes: {
-            select: { id: true, nama: true, luasBangunan: true },
-            orderBy: { luasBangunan: "asc" },
-          },
-        },
-      },
-      unitType: {
-        select: {
-          kode: true, nama: true, luasBangunan: true,
-          docModel3d: pilihDokumen,
-          docGambarKerjaPdf: pilihDokumen,
-          docGambarKerjaDwg: pilihDokumen,
-          docRender: pilihDokumen,
-          docSpek: pilihDokumen,
-        },
-      },
-      ...(bolehHarga
-        ? {
-            hargaJual: true,
-            rapUpahVolume: true,
-            rapUpahHarga: true,
-            boqItems: {
-              orderBy: { urutan: "asc" as const },
-              select: {
-                id: true, grup: true, uraian: true, satuan: true,
-                volume: true, hargaSatuan: true, spesifikasi: true,
-              },
-            },
-            rapItems: {
-              orderBy: { urutan: "asc" as const },
-              select: {
-                id: true, grup: true, nama: true, satuan: true,
-                volume: true, hargaSatuan: true, keterangan: true,
-              },
-            },
-          }
-        : {}),
-      customWorks: {
-        orderBy: { judul: "asc" as const },
-        select: {
-          id: true, judul: true, rapUpahVolume: true, rapUpahHarga: true,
-          docDesain: pilihDokumen,
-          docModel3d: pilihDokumen,
-          docGambarKerjaPdf: pilihDokumen,
-          docGambarKerjaDwg: pilihDokumen,
-          docRab: pilihDokumen,
-          boqItems: {
-            orderBy: { urutan: "asc" as const },
-            select: {
-              id: true, grup: true, uraian: true, satuan: true, volume: true,
-              hargaSatuan: true, spesifikasi: true,
-            },
-          },
-          rapItems: {
-            orderBy: { urutan: "asc" as const },
-            select: {
-              id: true, grup: true, nama: true, satuan: true,
-              volume: true, hargaSatuan: true, keterangan: true,
-            },
-          },
-        },
-      },
-    },
-  });
+  const unit = await detailUnit(unitKode, bolehHarga);
 
   if (!unit || unit.project.kode !== kodeProyek) notFound();
   if (!bolehAksesProyek(pengguna, unit.projectId)) notFound();
@@ -126,15 +44,7 @@ export default async function RincianUnit({
   // angka di sini ditiadakan — sama seperti di halaman Konstruksi.
   const dariBoq = unit._count.boqItems > 0;
 
-  const kontrak = await prisma.contract.findMany({
-    where: { units: { some: { unitId: unit.id } } },
-    select: {
-      id: true, nominal: true, retensiPct: true, deskripsi: true,
-      vendor: { select: { nama: true } },
-      expenses: { select: { total: true } },
-      variationOrders: { select: { nominal: true, status: true } },
-    },
-  });
+  const kontrak = await kontrakUnit(unit.id);
 
   const label = `${unit.phase.kode}-${unit.nomor}`;
   const kts = unit.customWorks;

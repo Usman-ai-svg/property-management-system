@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
+import { isiKonstruksiProyek, proyekKonstruksi } from "@/lib/data/konstruksi";
 import { keteranganPekerjaan } from "@/lib/calc/opname";
 import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { FilterKonstruksi } from "./filter";
@@ -21,33 +21,16 @@ export default async function ProgresProyek({
   const { fase = "Semua", cari = "" } = await searchParams;
   const kodeProyek = kode.toUpperCase();
 
-  const proyek = await prisma.project.findUnique({
-    where: { kode: kodeProyek },
-    select: {
-      id: true, kode: true, nama: true, statusLahan: true,
-      fases: { select: { kode: true }, orderBy: { urutan: "asc" } },
-    },
-  });
+  const proyek = await proyekKonstruksi(kodeProyek);
   if (!proyek) notFound();
   if (!bolehAksesProyek(pengguna, proyek.id)) notFound();
 
   const bolehUnit = bolehLihat(pengguna, "daftarUnit");
   const bolehSarpras = bolehLihat(pengguna, "daftarSarpras");
 
-  const unit = bolehUnit
-    ? await prisma.unit.findMany({
-        where: {
-          projectId: proyek.id,
-          ...(fase !== "Semua" ? { phase: { kode: fase } } : {}),
-        },
-        orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
-        select: {
-          id: true, kode: true, nomor: true, progress: true, statusPembangunan: true,
-          phase: { select: { kode: true } },
-          unitType: { select: { nama: true } },
-        },
-      })
-    : [];
+  const { unit, sarpras } = await isiKonstruksiProyek(proyek.id, {
+    fase, bolehUnit, bolehSarpras,
+  });
 
   // Pencarian dilakukan di sini, bukan di database, karena yang dicari adalah
   // gabungan "F2-3 Galileo" yang tidak tersimpan sebagai satu kolom.
@@ -58,16 +41,6 @@ export default async function ProgresProyek({
       )
     : unit;
 
-  const sarpras = bolehSarpras
-    ? await prisma.infrastructure.findMany({
-        where: { projectId: proyek.id },
-        orderBy: { kode: "asc" },
-        select: {
-          id: true, kode: true, nama: true, jenis: true, volume: true,
-          status: true, progress: true,
-        },
-      })
-    : [];
 
   return (
     <div style={{ padding: 24 }}>

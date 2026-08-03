@@ -64,3 +64,103 @@ export async function duaTitikProgres(
   if (catatan.length === 1) return { lalu: 0, kini: progresSekarang };
   return { lalu: catatan[1].progress, kini: progresSekarang };
 }
+
+// ---------------------------------------------------------------------------
+// Pengambilan data per halaman
+//
+// Halaman tidak lagi memanggil Prisma sendiri. Bentuk datanya ditetapkan di
+// sini, sehingga saat modul ini diserap ERP cukup berkas ini yang berganti isi
+// menjadi pemanggilan RPC — halamannya tidak perlu disentuh.
+// ---------------------------------------------------------------------------
+
+/** Kepala halaman Konstruksi per proyek: identitas proyek dan daftar fasenya. */
+export async function proyekKonstruksi(kodeProyek: string) {
+  return prisma.project.findUnique({
+    where: { kode: kodeProyek },
+    select: {
+      id: true, kode: true, nama: true, statusLahan: true,
+      fases: { select: { kode: true }, orderBy: { urutan: "asc" } },
+    },
+  });
+}
+
+/**
+ * Isi halaman Konstruksi per proyek: unit dan sarpras.
+ *
+ * Keduanya hanya di-query bila peran berhak melihatnya — bukan diambil lalu
+ * disembunyikan. Penyaring fase dikerjakan di database; pencarian teks
+ * dikerjakan pemanggil, karena yang dicari gabungan "F2-3 Galileo" yang tidak
+ * tersimpan sebagai satu kolom.
+ */
+export async function isiKonstruksiProyek(
+  projectId: string,
+  opsi: { fase: string; bolehUnit: boolean; bolehSarpras: boolean },
+) {
+  const unit = opsi.bolehUnit
+    ? await prisma.unit.findMany({
+        where: {
+          projectId,
+          ...(opsi.fase !== "Semua" ? { phase: { kode: opsi.fase } } : {}),
+        },
+        orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
+        select: {
+          id: true, kode: true, nomor: true, progress: true, statusPembangunan: true,
+          phase: { select: { kode: true } },
+          unitType: { select: { nama: true } },
+        },
+      })
+    : [];
+
+  const sarpras = opsi.bolehSarpras
+    ? await prisma.infrastructure.findMany({
+        where: { projectId },
+        orderBy: { kode: "asc" },
+        select: {
+          id: true, kode: true, nama: true, jenis: true, volume: true,
+          status: true, progress: true,
+        },
+      })
+    : [];
+
+  return { unit, sarpras };
+}
+
+/** Satu unit beserta BOQ Master-nya, untuk halaman opname konstruksi. */
+export async function unitKonstruksi(unitKode: string) {
+  return prisma.unit.findUnique({
+    where: { kode: decodeURIComponent(unitKode).toUpperCase() },
+    select: {
+      id: true, kode: true, nomor: true, progress: true, statusPembangunan: true,
+      projectId: true,
+      phase: { select: { kode: true } },
+      project: { select: { kode: true, nama: true } },
+      unitType: { select: { nama: true } },
+      boqItems: {
+        orderBy: { urutan: "asc" },
+        select: {
+          id: true, grup: true, uraian: true, satuan: true,
+          volume: true, hargaSatuan: true, progress: true, progressLalu: true,
+        },
+      },
+    },
+  });
+}
+
+/** Satu item sarpras beserta BOQ Master-nya. */
+export async function sarprasKonstruksi(kodeSarpras: string) {
+  return prisma.infrastructure.findUnique({
+    where: { kode: decodeURIComponent(kodeSarpras).toUpperCase() },
+    select: {
+      id: true, kode: true, nama: true, jenis: true, volume: true,
+      status: true, progress: true, projectId: true,
+      project: { select: { kode: true, nama: true } },
+      boqItems: {
+        orderBy: { urutan: "asc" },
+        select: {
+          id: true, grup: true, uraian: true, satuan: true,
+          volume: true, hargaSatuan: true, progress: true, progressLalu: true,
+        },
+      },
+    },
+  });
+}

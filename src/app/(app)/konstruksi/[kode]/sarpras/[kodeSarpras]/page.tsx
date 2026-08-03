@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
+import { sarprasKonstruksi } from "@/lib/data/konstruksi";
 import { duaTitikProgres } from "@/lib/data/konstruksi";
 import { susunOpname } from "@/lib/calc/opname";
 import { OpnameBoq } from "@/components/opname-boq";
@@ -21,21 +21,7 @@ export default async function OpnameSarpras({
   const { kode, kodeSarpras } = await params;
   const kodeProyek = kode.toUpperCase();
 
-  const item = await prisma.infrastructure.findUnique({
-    where: { kode: decodeURIComponent(kodeSarpras).toUpperCase() },
-    select: {
-      id: true, kode: true, nama: true, jenis: true, volume: true,
-      status: true, progress: true, projectId: true,
-      project: { select: { kode: true, nama: true } },
-      boqItems: {
-        orderBy: { urutan: "asc" },
-        select: {
-          id: true, grup: true, uraian: true, satuan: true,
-          volume: true, hargaSatuan: true, progress: true, progressLalu: true,
-        },
-      },
-    },
-  });
+  const item = await sarprasKonstruksi(kodeSarpras);
 
   if (!item || item.project.kode !== kodeProyek) notFound();
   if (!bolehAksesProyek(pengguna, item.projectId)) notFound();

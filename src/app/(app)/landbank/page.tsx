@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Check, FileText, X } from "lucide-react";
-import { prisma } from "@/lib/db";
-import { ambilPengguna, bolehLihat, filterProyek } from "@/lib/auth/rbac";
-import { luasTotal } from "@/lib/data/proyek";
+import { ambilPengguna, bolehLihat } from "@/lib/auth/rbac";
+import { dataLandbank } from "@/lib/data/landbank";
+import { rataRasioEfektif, susunBarisLandbank } from "@/lib/tampilan/landbank";
 import { m2, pct, rp } from "@/lib/format";
 import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { Tabel } from "@/components/kartu-tabel";
@@ -24,67 +24,9 @@ export default async function Landbank({
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
   const bolehBp = bolehLihat(pengguna, "businessPlan");
 
-  const proyek = await prisma.project.findMany({
-    where: filterProyek(pengguna),
-    orderBy: { kode: "asc" },
-    select: {
-      id: true, kode: true, nama: true, statusLahan: true,
-      kecamatan: true, kota: true,
-      luasKavlingEfektif: true, luasSarana: true, luasPrasarana: true, luasRth: true,
-      analisaDocId: true,
-      _count: { select: { units: true } },
-      ...(bolehHarga
-        ? {
-            hargaPerM2: true, biayaPembelian: true, biayaNotaris: true,
-            biayaBalikNama: true, biayaLegalLain: true,
-          }
-        : {}),
-    },
-  });
+  const { proyek, rencana } = await dataLandbank(pengguna);
 
-  // Business plan diambil terpisah dan hanya bila peran berhak — sekaligus
-  // menghindari pelebaran tipe akibat relasi bersyarat di dalam select.
-  const rencana = bolehBp
-    ? await prisma.businessPlan.findMany({
-        where: { project: filterProyek(pengguna) },
-        select: {
-          projectId: true,
-          hpp: { select: { nilai: true } },
-          omzet: { select: { jumlah: true, harga: true } },
-          operasional: { select: { nilai: true } },
-        },
-      })
-    : [];
-
-  const rencanaPerProyek = new Map(rencana.map((r) => [r.projectId, r]));
-
-  const baris = proyek.map((p) => {
-    const total = luasTotal(p);
-    const b = p as Partial<{
-      hargaPerM2: number; biayaPembelian: number; biayaNotaris: number;
-      biayaBalikNama: number; biayaLegalLain: number;
-    }>;
-    const perolehan = bolehHarga
-      ? (b.biayaPembelian ?? 0) + (b.biayaNotaris ?? 0) + (b.biayaBalikNama ?? 0) + (b.biayaLegalLain ?? 0)
-      : 0;
-
-    const bp = rencanaPerProyek.get(p.id);
-    const omzet = bp ? bp.omzet.reduce((s, o) => s + o.jumlah * o.harga, 0) : 0;
-    const hpp = bp ? bp.hpp.reduce((s, h) => s + h.nilai, 0) : 0;
-    const ops = bp ? bp.operasional.reduce((s, o) => s + o.nilai, 0) : 0;
-    const laba = omzet - hpp - ops;
-
-    return {
-      ...p,
-      luasTotal: total,
-      rasioEfektif: total ? p.luasKavlingEfektif / total : 0,
-      hargaPerM2: b.hargaPerM2 ?? 0,
-      perolehan,
-      punyaBp: !!bp,
-      omzet, hpp, ops, laba,
-      margin: omzet ? laba / omzet : 0,
-    };
-  });
+  const baris = susunBarisLandbank(proyek, rencana);
 
   const kpi: [string, string][] = [
     ["Total Proyek", String(baris.length)],
@@ -92,7 +34,7 @@ export default async function Landbank({
     ["Total Biaya Perolehan", bolehHarga ? rp(baris.reduce((s, p) => s + p.perolehan, 0)) : "—"],
     [
       "Rata Kavling Efektif",
-      baris.length ? pct(baris.reduce((s, p) => s + p.rasioEfektif, 0) / baris.length, 1) : "—",
+      baris.length ? pct(rataRasioEfektif(baris), 1) : "—",
     ],
   ];
 

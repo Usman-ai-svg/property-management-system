@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
+import { detailSarpras, kontrakSarpras, riwayatObjek } from "@/lib/data/proyek";
 import { Badge, CardHead, InfoRow, Kartu, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
 import { KATEGORI_EKSTENSI } from "@/lib/storage";
@@ -10,11 +10,6 @@ import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
 import { rp, tanggalJam } from "@/lib/format";
 import { EditDeskripsiSarpras, TabelBoqSarpras, TabelRapSarpras } from "./editors";
 
-const pilihVersi = {
-  select: { id: true, revisi: true, namaFile: true, ukuranByte: true, objectKey: true, diunggahPada: true },
-  orderBy: { diunggahPada: "desc" as const },
-};
-const pilihDokumen = { select: { id: true, kategori: true, versions: pilihVersi } };
 
 export default async function RincianSarpras({
   params,
@@ -46,72 +41,16 @@ export default async function RincianSarpras({
   const ubahTeknis = bolehUbah(pengguna, "dokumenTeknis");
   const bolehDokumen = bolehLihat(pengguna, "dokumenTeknis");
 
-  const item = await prisma.infrastructure.findUnique({
-    where: { kode: decodeURIComponent(kodeSarpras).toUpperCase() },
-    select: {
-      id: true, kode: true, nama: true, jenis: true, volume: true,
-      status: true, progress: true, projectId: true,
-      // Jumlah baris BOQ menentukan apakah progres item ini turunan dari
-      // opname per baris (halaman Konstruksi) atau masih diisi satu angka
-      // manual — sama seperti pada unit.
-      _count: { select: { boqItems: true } },
-      project: { select: { kode: true, nama: true } },
-      docModel3d: pilihDokumen,
-      docGambarKerjaPdf: pilihDokumen,
-      docGambarKerjaDwg: pilihDokumen,
-      ...(bolehHarga
-        ? {
-            rab: true,
-            rapUpahVolume: true,
-            rapUpahHarga: true,
-            boqItems: {
-              orderBy: { urutan: "asc" as const },
-              select: {
-                id: true, grup: true, uraian: true, satuan: true,
-                volume: true, hargaSatuan: true, spesifikasi: true,
-              },
-            },
-            rapItems: {
-              orderBy: { urutan: "asc" as const },
-              select: {
-                id: true, grup: true, nama: true, satuan: true,
-                volume: true, hargaSatuan: true, keterangan: true,
-              },
-            },
-          }
-        : {}),
-    },
-  });
+  const item = await detailSarpras(kodeSarpras, bolehHarga);
 
   if (!item || item.project.kode !== kodeProyek) notFound();
   if (!bolehAksesProyek(pengguna, item.projectId)) notFound();
 
-  const kontrak = await prisma.contract.findMany({
-    where: { infrastructures: { some: { infrastructureId: item.id } } },
-    select: {
-      id: true, nominal: true, retensiPct: true, deskripsi: true,
-      vendor: { select: { nama: true } },
-      expenses: { select: { total: true } },
-      variationOrders: { select: { nominal: true, status: true } },
-    },
-  });
+  const kontrak = await kontrakSarpras(item.id);
 
   // Riwayat perubahan item ini. Dibatasi ke proyek yang boleh diakses pengguna,
   // supaya log tidak menjadi celah untuk mengintip proyek lain.
-  const riwayat = await prisma.auditLog.findMany({
-    where: {
-      project: filterProyek(pengguna),
-      projectId: item.projectId,
-      objek: { contains: item.nama },
-    },
-    orderBy: { waktu: "desc" },
-    take: 8,
-    select: {
-      id: true, waktu: true, aksi: true, objek: true,
-      nilaiDari: true, nilaiKe: true, peran: true,
-      user: { select: { nama: true } },
-    },
-  });
+  const riwayat = await riwayatObjek(pengguna, item.projectId, item.nama);
 
   const boqItems = "boqItems" in item ? item.boqItems : [];
   const rapItems = "rapItems" in item ? item.rapItems : [];

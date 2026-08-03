@@ -122,3 +122,113 @@ export const totalRapDari = (x: {
 }) =>
   x.rapUpahVolume * x.rapUpahHarga +
   x.rapItems.reduce((a, r) => a + r.volume * r.hargaSatuan, 0);
+
+// ---------------------------------------------------------------------------
+// Pengambilan data per halaman
+//
+// Halaman tidak lagi memanggil Prisma sendiri. Bentuk datanya ditetapkan di
+// sini, sehingga saat modul ini diserap ERP cukup berkas ini yang berganti isi
+// menjadi pemanggilan RPC — halamannya tidak perlu disentuh.
+// ---------------------------------------------------------------------------
+
+/** Data halaman daftar Keuangan Proyek. */
+export async function dataKeuangan(u: Pengguna, bolehCatat: boolean) {
+  const [proyek, tren, expenses] = await Promise.all([
+    keuanganPerProyek(u),
+    trenBulanan(u),
+    prisma.expense.findMany({
+      where: { project: filterProyek(u) },
+      orderBy: { tanggal: "desc" },
+      select: {
+        id: true, tanggal: true, jenis: true, peruntukan: true, total: true,
+        uraian: true, pic: true,
+        project: { select: { nama: true } },
+      },
+    }),
+  ]);
+
+  // Pilihan unit dan sarpras untuk formulir pencatatan, hanya bila boleh mencatat.
+  const proyekUntukForm = bolehCatat
+    ? await prisma.project.findMany({
+        where: filterProyek(u),
+        orderBy: { kode: "asc" },
+        select: {
+          id: true, nama: true,
+          units: {
+            orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
+            select: { id: true, nomor: true, phase: { select: { kode: true } } },
+          },
+          infrastructures: {
+            orderBy: { kode: "asc" },
+            select: { id: true, nama: true, jenis: true },
+          },
+        },
+      })
+    : [];
+
+  return { proyek, tren, expenses, proyekUntukForm };
+}
+
+/** Satu proyek beserta unit, sarpras, dan seluruh pengeluarannya. */
+export async function proyekKeuangan(kodeProyek: string) {
+  return prisma.project.findUnique({
+    where: { kode: kodeProyek },
+    select: {
+      id: true, kode: true, nama: true, statusLahan: true,
+      units: {
+        orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
+        select: {
+          id: true, kode: true, nomor: true, hargaJual: true, rapUpahVolume: true, rapUpahHarga: true,
+          phase: { select: { kode: true } },
+          unitType: { select: { nama: true } },
+          rapItems: { select: { volume: true, hargaSatuan: true } },
+        },
+      },
+      infrastructures: {
+        orderBy: { kode: "asc" },
+        select: {
+          id: true, kode: true, nama: true, jenis: true, volume: true,
+          status: true, progress: true, rab: true,
+          rapUpahVolume: true, rapUpahHarga: true,
+          rapItems: { select: { volume: true, hargaSatuan: true } },
+        },
+      },
+      expenses: {
+        orderBy: { tanggal: "desc" },
+        select: {
+          id: true, tanggal: true, jenis: true, peruntukan: true, metode: true,
+          uraian: true, total: true, status: true, pic: true, bukti: true,
+          alokasi: {
+            select: { id: true, unitId: true, infrastructureId: true, nominal: true },
+          },
+          contract: { select: { vendor: { select: { nama: true } } } },
+        },
+      },
+    },
+  });
+}
+
+/** Kontrak sebuah proyek, dipakai membagi realisasi ke unit dan sarpras. */
+export async function kontrakUntukAlokasi(projectId: string) {
+  const [kontrakUnit, kontrakSarpras] = await Promise.all([
+    prisma.contract.findMany({
+      where: { projectId, jenis: "Unit" },
+      select: {
+        id: true, nominal: true, retensiPct: true,
+        expenses: { select: { total: true } },
+        variationOrders: { select: { nominal: true, status: true } },
+        units: { select: { unitId: true, nilaiOverride: true } },
+      },
+    }),
+    prisma.contract.findMany({
+      where: { projectId, jenis: "Sarpras" },
+      select: {
+        id: true, nominal: true, retensiPct: true,
+        expenses: { select: { total: true } },
+        variationOrders: { select: { nominal: true, status: true } },
+        infrastructures: { select: { infrastructureId: true, nilaiOverride: true } },
+      },
+    }),
+  ]);
+  return { kontrakUnit, kontrakSarpras };
+}

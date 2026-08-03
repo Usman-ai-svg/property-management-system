@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna } from "@/lib/auth/rbac";
 import { dashboardKonstruksi } from "@/lib/data/konstruksi";
+import { kpiKonstruksi } from "@/lib/tampilan/konstruksi";
 import { Badge, TabelHead, Track, WARNA_STATUS } from "@/components/ui";
 import { Tabel } from "@/components/kartu-tabel";
 
@@ -11,24 +12,13 @@ export default async function DashboardKonstruksi() {
 
   const proyek = await dashboardKonstruksi(pengguna);
 
-  const totalUnit = proyek.reduce((s, p) => s + p.jumlahUnit, 0);
-  const dikerjakan = proyek.reduce((s, p) => s + p.dikerjakan, 0);
-
-  // Rata-rata ditimbang jumlah unit, bukan rata-rata dari rata-rata —
-  // proyek dengan 51 unit tidak boleh sama bobotnya dengan yang 12 unit.
-  const rataUnit = totalUnit
-    ? Math.round(proyek.reduce((s, p) => s + p.rataUnit * p.jumlahUnit, 0) / totalUnit)
-    : 0;
-  const totalSarpras = proyek.reduce((s, p) => s + p.jumlahSarpras, 0);
-  const rataSarpras = totalSarpras
-    ? Math.round(proyek.reduce((s, p) => s + p.rataSarpras * p.jumlahSarpras, 0) / totalSarpras)
-    : 0;
+  const angka = kpiKonstruksi(proyek);
 
   const kpi: [string, string | number][] = [
-    ["Total Proyek", proyek.length],
-    ["Unit Sedang Dikerjakan", dikerjakan],
-    ["Rata Progress Unit", `${rataUnit}%`],
-    ["Rata Progress Sarpras", `${rataSarpras}%`],
+    ["Total Proyek", angka.jumlahProyek],
+    ["Unit Sedang Dikerjakan", angka.dikerjakan],
+    ["Rata Progress Unit", `${angka.rataUnit}%`],
+    ["Rata Progress Sarpras", `${angka.rataSarpras}%`],
   ];
 
   return (

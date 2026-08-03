@@ -1,13 +1,23 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import {
+  bersihkanNamaFile, ekstensiDari, GagalUnggah, JENIS_DITERIMA, kunciAman,
+  kunciObjek, MAKS_UKURAN, periksaBerkas, tipeDari,
+} from "@/lib/adaptor/berkas-aturan";
 
 /**
- * Penyimpanan berkas.
+ * MESIN PENYIMPANAN BERKAS — disk lokal.
  *
- * Untuk demo, berkas disimpan di disk lokal pada folder `storage/`. Bentuk
- * antarmukanya sengaja dibuat seperti object storage — kunci objek, simpan,
- * baca, hapus — supaya penggantian ke S3/R2 nanti hanya menyentuh berkas ini.
+ * Aturannya (jenis yang diterima, batas ukuran, pembersihan nama, bentuk
+ * kunci objek) ada di `src/lib/adaptor/berkas-aturan.ts` dan tidak boleh ikut
+ * berubah saat mesinnya diganti. Berkas ini hanya berisi cara menulis dan
+ * membacanya.
+ *
+ * Untuk ERP: ganti isi `simpanBerkas`, `bacaBerkas`, dan `hapusBerkas` dengan
+ * pemanggilan Supabase Storage. Tanda tangan ketiganya sudah berbentuk object
+ * storage — kunci objek masuk, isi keluar — jadi pemanggilnya tidak perlu
+ * disentuh.
  *
  * Berkas TIDAK disimpan di dalam database: berkas .skp pada proyek ini
  * berukuran 24–38 MB, dan menyimpan biner sebesar itu di baris tabel membuat
@@ -16,71 +26,17 @@ import path from "node:path";
 
 const AKAR = path.join(process.cwd(), "storage");
 
-/** Batas ukuran unggahan. Berkas 3D terbesar pada data demo 38 MB. */
-export const MAKS_UKURAN = 64 * 1024 * 1024;
-
-/**
- * Jenis berkas yang diterima.
- *
- * Daftar putih, bukan daftar hitam: apa pun yang tidak disebutkan ditolak.
- * Membalik urutannya berarti setiap jenis berkas baru yang berbahaya harus
- * ditemukan lebih dulu sebelum bisa dicegah.
- */
-export const JENIS_DITERIMA: Record<string, string[]> = {
-  "application/pdf": [".pdf"],
-  "image/jpeg": [".jpg", ".jpeg"],
-  "image/png": [".png"],
-  "image/webp": [".webp"],
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-  "application/vnd.ms-excel": [".xls"],
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
-  "application/octet-stream": [".skp", ".dwg", ".rvt"],
-  "": [".skp", ".dwg", ".rvt"],
+export {
+  bersihkanNamaFile, GagalUnggah, JENIS_DITERIMA, MAKS_UKURAN, periksaBerkas, tipeDari,
 };
 
-export class GagalUnggah extends Error {}
-
-/** Nama berkas yang aman: tanpa path, tanpa karakter aneh. */
-export function bersihkanNamaFile(nama: string): string {
-  const dasar = path.basename(nama).replace(/[^\w.\-() ]/g, "_").trim();
-  if (!dasar || dasar === "." || dasar === "..") throw new GagalUnggah("Nama berkas tidak sah.");
-  return dasar.slice(0, 180);
-}
-
-/** Periksa jenis dan ukuran sebelum apa pun ditulis ke disk. */
-export function periksaBerkas(nama: string, tipe: string, ukuran: number): void {
-  if (ukuran === 0) throw new GagalUnggah("Berkas kosong.");
-  if (ukuran > MAKS_UKURAN) {
-    throw new GagalUnggah(
-      `Berkas ${(ukuran / 1024 / 1024).toFixed(1)} MB melebihi batas ${MAKS_UKURAN / 1024 / 1024} MB.`,
-    );
-  }
-
-  const ext = path.extname(nama).toLowerCase();
-  const diizinkan = JENIS_DITERIMA[tipe];
-
-  if (!diizinkan || !diizinkan.includes(ext)) {
-    throw new GagalUnggah(
-      `Jenis berkas "${ext || "tanpa ekstensi"}" tidak diterima. ` +
-        "Yang diterima: PDF, JPG, PNG, WEBP, XLSX, DOCX, SKP, DWG, RVT.",
-    );
-  }
-}
-
-/**
- * Simpan berkas dan kembalikan kunci objeknya.
- *
- * Kunci memuat UUID, bukan nama asli, supaya dua unggahan bernama sama tidak
- * saling menimpa dan nama berkas tidak bisa dipakai menebak isi folder.
- */
+/** Simpan berkas dan kembalikan kunci objeknya. */
 export async function simpanBerkas(
   data: ArrayBuffer,
   namaAsli: string,
 ): Promise<{ objectKey: string; ukuranByte: number; sha256: string }> {
   const buf = Buffer.from(data);
-  const ext = path.extname(namaAsli).toLowerCase();
-  const tahun = new Date().getUTCFullYear();
-  const objectKey = `${tahun}/${randomUUID()}${ext}`;
+  const objectKey = kunciObjek(namaAsli, randomUUID(), new Date().getUTCFullYear());
   const tujuan = path.join(AKAR, objectKey);
 
   await mkdir(path.dirname(tujuan), { recursive: true });
@@ -96,10 +52,13 @@ export async function simpanBerkas(
 /**
  * Baca berkas berdasarkan kunci objeknya.
  *
- * Kunci divalidasi terhadap akar penyimpanan supaya `../` pada nilai yang
- * tersimpan tidak bisa dipakai membaca berkas di luar folder storage.
+ * Kunci diperiksa dua kali: lewat `kunciAman()` yang menolak `..` dan jalur
+ * absolut, lalu lewat perbandingan jalur hasil resolve terhadap akar
+ * penyimpanan. Yang kedua menangkap kasus yang lolos dari yang pertama pada
+ * sistem berkas tertentu.
  */
 export async function bacaBerkas(objectKey: string): Promise<Buffer> {
+  if (!kunciAman(objectKey)) throw new GagalUnggah("Kunci objek tidak sah.");
   const tujuan = path.resolve(AKAR, objectKey);
   if (!tujuan.startsWith(AKAR + path.sep)) {
     throw new GagalUnggah("Kunci objek tidak sah.");
@@ -108,6 +67,7 @@ export async function bacaBerkas(objectKey: string): Promise<Buffer> {
 }
 
 export async function hapusBerkas(objectKey: string): Promise<void> {
+  if (!kunciAman(objectKey)) return;
   const tujuan = path.resolve(AKAR, objectKey);
   if (!tujuan.startsWith(AKAR + path.sep)) return;
   await unlink(tujuan).catch(() => {});
@@ -140,7 +100,7 @@ export function periksaBerkasKategori(nama: string, kategori: string): void {
   const diizinkan = KATEGORI_EKSTENSI[kategori];
   if (!diizinkan) return;
 
-  const ext = path.extname(nama).toLowerCase();
+  const ext = ekstensiDari(nama);
   if (!diizinkan.includes(ext)) {
     throw new GagalUnggah(
       `Dokumen ini hanya menerima berkas ${diizinkan.join(" atau ")}, bukan "${ext || "tanpa ekstensi"}".`,
@@ -148,11 +108,6 @@ export function periksaBerkasKategori(nama: string, kategori: string): void {
   }
 }
 
-/** Tipe MIME untuk dikirim saat mengunduh. */
-export function tipeDari(nama: string): string {
-  const ext = path.extname(nama).toLowerCase();
-  for (const [mime, daftar] of Object.entries(JENIS_DITERIMA)) {
-    if (mime && daftar.includes(ext)) return mime;
-  }
-  return "application/octet-stream";
-}
+
+/** Dipakai hanya oleh tes; diekspor supaya aturan ekstensi punya satu rumah. */
+export { ekstensiDari };

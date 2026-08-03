@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { bolehLihat, filterProyek, type Pengguna } from "@/lib/auth/rbac";
 import { komposisi, keuanganPerProyek } from "@/lib/data/keuangan";
-import { luasTotal } from "@/lib/data/proyek";
+import { luasTotal } from "@/lib/tampilan/landbank";
 import { ringkasKontrak } from "@/lib/calc/keuangan";
 import { unitTerpakai } from "@/lib/calc/aset";
 import { m2, pct, rpRingkas } from "@/lib/format";

@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { ambilPengguna, bolehUbah, filterProyek } from "@/lib/auth/rbac";
-import { keuanganPerProyek, komposisi, trenBulanan, WARNA_JENIS } from "@/lib/data/keuangan";
+import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
+import { dataKeuangan, komposisi, WARNA_JENIS } from "@/lib/data/keuangan";
 import { rp, rpRingkas, tanggal } from "@/lib/format";
 import { Donut, LegendaDonut, RvsRAP } from "@/components/charts";
 import { TrenChart } from "@/components/tren-chart";
@@ -21,39 +20,8 @@ export default async function DashboardKeuangan({
   const { donat = "jenis" } = await searchParams;
   const mode = donat === "peruntukan" ? "peruntukan" : "jenis";
 
-  const [proyek, tren, expenses] = await Promise.all([
-    keuanganPerProyek(pengguna),
-    trenBulanan(pengguna),
-    prisma.expense.findMany({
-      where: { project: filterProyek(pengguna) },
-      orderBy: { tanggal: "desc" },
-      select: {
-        id: true, tanggal: true, jenis: true, peruntukan: true, total: true,
-        uraian: true, pic: true,
-        project: { select: { nama: true } },
-      },
-    }),
-  ]);
-
   const bolehCatat = bolehUbah(pengguna, "keuangan");
-
-  const proyekUntukForm = bolehCatat
-    ? await prisma.project.findMany({
-        where: filterProyek(pengguna),
-        orderBy: { kode: "asc" },
-        select: {
-          id: true, nama: true,
-          units: {
-            orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
-            select: { id: true, nomor: true, phase: { select: { kode: true } } },
-          },
-          infrastructures: {
-            orderBy: { kode: "asc" },
-            select: { id: true, nama: true, jenis: true },
-          },
-        },
-      })
-    : [];
+  const { proyek, tren, expenses, proyekUntukForm } = await dataKeuangan(pengguna, bolehCatat);
 
   const batas = new Date(Date.now() - 30 * 864e5);
   const total30 = expenses.filter((e) => e.tanggal >= batas).reduce((s, e) => s + e.total, 0);

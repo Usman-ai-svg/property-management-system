@@ -1,0 +1,1123 @@
+// =============================================================================
+// DIHASILKAN OTOMATIS oleh scripts/skema-postgres.mjs — JANGAN DISUNTING TANGAN.
+//
+// Versi PostgreSQL dari prisma/schema.prisma, disiapkan untuk penyerapan ke
+// ERP Nanoland (Supabase). Aplikasi ini TIDAK memakainya.
+//
+// Yang sudah dikerjakan:
+//   - provider postgresql
+//   - 41 kolom uang jadi Decimal(18, 2)
+//   - 24 kolom Float BUKAN uang dibiarkan (volume, luas, persentase)
+//   - 45 tabel diberi awalan "pm_" pada @@map yang sudah ada
+//
+// Yang masih harus dikerjakan manusia:
+//   - Enum masih bertipe String. Daftar nilai sahnya ada di bawah sebagai
+//     CREATE TYPE siap pakai; menaikkannya perlu migrasi data.
+//   - Row Level Security. Skema ini tidak memuat policy apa pun.
+//   - Keputusan apakah tabel User/Role kita dipakai, atau diganti profiles ERP.
+// =============================================================================
+
+//
+// CATATAN PORTABILITAS (dibaca dulu sebelum porting ke ERP)
+//
+// 1. NILAI UANG memakai `Float`, bukan `Int`.
+//    Prisma `Int` adalah 32-bit (maks ~2,1 miliar) — tidak cukup, karena nilai
+//    seperti cashflow NT4 mencapai Rp 32.010.000.000. `Float` (double) menyimpan
+//    bilangan bulat secara eksak sampai 2^53 (~9 kuadriliun), jadi aman untuk
+//    rupiah penuh tanpa sen.
+//    → Di ERP/Postgres, petakan ke BIGINT atau NUMERIC(18,2).
+//
+// 2. ENUM ditulis sebagai `String`.
+//    SQLite tidak mendukung enum di Prisma. Nilai yang sah didokumentasikan di
+//    komentar tiap field dan divalidasi di `src/lib/domain/enums.ts`.
+//    → Di Postgres, ini bisa dinaikkan jadi enum asli.
+//
+// 3. HARGA DI-SNAPSHOT, bukan dihitung ulang.
+//    `UnitBoqItem` / `UnitRapItem` menyimpan harga satuan pada saat unit dibuat.
+//    RAB unit = SUM(UnitBoqItem.volume * hargaSatuan) — BUKAN fungsi dari luas
+//    bangunan. Ini disengaja: mengubah harga template tidak boleh menggeser RAB
+//    unit yang sudah berjalan atau sudah selesai.
+//
+// Ganti `provider` di bawah ke "postgresql" saat pindah dari demo.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Sejak Prisma 7, URL koneksi tidak lagi ditulis di sini — lihat prisma.config.ts.
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================================
+// IDENTITAS, PERAN & HAK AKSES
+// =============================================================================
+
+model User {
+  id           String   @id @default(cuid())
+  nama         String
+  inisial      String
+  email        String   @unique
+  passwordHash String
+  aktif        Boolean  @default(true)
+  /// true = boleh mengakses semua proyek; false = dibatasi lewat UserProjectAccess
+  semuaProyek  Boolean  @default(false)
+  dibuatPada   DateTime @default(now())
+  diubahPada   DateTime @updatedAt
+
+  roles         UserRole[]
+  aksesProyek   UserProjectAccess[]
+  auditLogs     AuditLog[]
+  dokumenDiuploadOleh DocumentVersion[]
+
+  @@map("pm_users")
+}
+
+model Role {
+  id        String  @id @default(cuid())
+  nama      String  @unique
+  /// Pengelompokan untuk pewarnaan UI: lead|ops|biz|tech|cc|fin|hr|mkt|media
+  grup      String
+  keterangan String?
+
+  users       UserRole[]
+  permissions RoleSectionPermission[]
+
+  @@map("pm_roles")
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("pm_user_roles")
+}
+
+/// Pembatasan akses per proyek. Hanya berlaku bila User.semuaProyek = false.
+model UserProjectAccess {
+  userId    String
+  projectId String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+  @@map("pm_user_project_access")
+}
+
+/// Matriks hak akses per sub-bagian — dikelola dari Admin → Kelola Hak Akses.
+/// Sengaja disimpan sebagai data, bukan hardcode, supaya bisa diubah tanpa deploy.
+model RoleSectionPermission {
+  id      String @id @default(cuid())
+  roleId  String
+  /// deskripsi | daftarUnit | daftarSarpras | dokumenTeknis
+  /// hargaRabRap | businessPlan | keuangan | progress
+  section String
+  /// false = boleh lihat saja, true = boleh ubah
+  bolehUbah Boolean @default(false)
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, section])
+  @@map("pm_role_section_permissions")
+}
+
+// =============================================================================
+// DOKUMEN
+// =============================================================================
+
+/// Metadata dokumen. Isi file sesungguhnya ada di object storage (atau, pada
+/// demo ini, belum ada — hanya metadata). Jangan simpan biner di database:
+/// berkas .skp di proyek ini berukuran 24–38 MB.
+model Document {
+  id         String   @id @default(cuid())
+  /// model3d | gambarKerjaPdf | gambarKerjaDwg | render | spek | desain | rab
+  /// | legalitas | analisa | lain
+  kategori   String
+  judul      String
+  dibuatPada DateTime @default(now())
+
+  versions DocumentVersion[]
+
+  unitTypeModel3d        UnitType? @relation("UnitTypeModel3d")
+  unitTypeGambarKerjaPdf UnitType? @relation("UnitTypeGambarKerjaPdf")
+  unitTypeGambarKerjaDwg UnitType? @relation("UnitTypeGambarKerjaDwg")
+  unitTypeRender         UnitType? @relation("UnitTypeRender")
+  unitTypeSpek           UnitType? @relation("UnitTypeSpek")
+  legality               Legality?
+  projectAnalisa         Project?  @relation("ProjectAnalisa")
+  infraModel3d           Infrastructure[] @relation("InfraModel3d")
+  infraGambarKerjaPdf    Infrastructure[] @relation("InfraGambarKerjaPdf")
+  infraGambarKerjaDwg    Infrastructure[] @relation("InfraGambarKerjaDwg")
+  ktDesain               CustomWork[]     @relation("KtDesain")
+  ktModel3d              CustomWork[]     @relation("KtModel3d")
+  ktGambarKerjaPdf       CustomWork[]     @relation("KtGambarKerjaPdf")
+  ktGambarKerjaDwg       CustomWork[]     @relation("KtGambarKerjaDwg")
+  ktRab                  CustomWork[]     @relation("KtRab")
+  contractSpk            Contract?        @relation("ContractSpk")
+
+  @@map("pm_documents")
+}
+
+/// Revisi dokumen (R1, R2, R3...). Append-only: unggahan baru = baris baru,
+/// tidak pernah menimpa. Ini yang membuat riwayat gambar kerja bisa ditelusuri.
+model DocumentVersion {
+  id           String   @id @default(cuid())
+  documentId   String
+  /// R1, R2, R3, ...
+  revisi       String
+  namaFile     String
+  /// Ukuran dalam byte. Ditampilkan sebagai "24,5 MB" di UI.
+  ukuranByte   Int
+  /// Kunci objek di storage (S3/R2). Null pada demo yang belum punya storage.
+  objectKey    String?
+  diunggahPada DateTime @default(now())
+  diunggahOlehId String?
+
+  document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  diunggahOleh User?    @relation(fields: [diunggahOlehId], references: [id])
+
+  @@unique([documentId, revisi])
+  @@map("pm_document_versions")
+}
+
+// =============================================================================
+// PROYEK & LAHAN
+// =============================================================================
+
+model Project {
+  id   String @id @default(cuid())
+  kode String @unique
+  nama String
+  /// Perencanaan | Proses Legal & Perizinan | Dalam Pembangunan | Selesai
+  status String
+  /// Status lahan: Perencanaan | Proses Legal & Perizinan | Pembangunan | Selesai Terbangun
+  statusLahan String
+
+  // --- lokasi ---
+  alamat    String
+  kelurahan String
+  kecamatan String
+  kota      String
+  provinsi  String
+  pinLat    Float?
+  pinLng    Float?
+
+  // --- luas (m²) ---
+  luasKavlingEfektif Float
+  luasSarana         Float @default(0)
+  luasPrasarana      Float @default(0)
+  luasRth            Float @default(0)
+
+  // --- biaya perolehan lahan (Rp) ---
+  // Bawaan nol karena proyek yang baru dibuat belum tahu angkanya; diisi
+  // kemudian dari halaman Landbank.
+  hargaPerM2     Decimal @db.Decimal(18, 2) @default(0)
+  biayaPembelian Decimal @db.Decimal(18, 2) @default(0)
+  biayaNotaris   Decimal @db.Decimal(18, 2) @default(0)
+  biayaBalikNama Decimal @db.Decimal(18, 2) @default(0)
+  biayaLegalLain Decimal @db.Decimal(18, 2) @default(0)
+
+  analisaDocId String?   @unique
+  analisaDoc   Document? @relation("ProjectAnalisa", fields: [analisaDocId], references: [id])
+
+  dibuatPada DateTime @default(now())
+  diubahPada DateTime @updatedAt
+
+  legalitas       Legality[]
+  fases           Phase[]
+  unitTypes       UnitType[]
+  units           Unit[]
+  infrastructures Infrastructure[]
+  marketComparables MarketComparable[]
+  businessPlan    BusinessPlan?
+  contracts       Contract[]
+  expenses        Expense[]
+  biayaOperasional OperationalCost[]
+  tenders         Tender[]
+  equipments      Equipment[]
+  aksesUser       UserProjectAccess[]
+  auditLogs       AuditLog[]
+
+  @@map("pm_projects")
+}
+
+model Legality {
+  id          String  @id @default(cuid())
+  projectId   String
+  nib         String
+  /// Hak Milik (HM) | Hak Guna Usaha (HGU) | Hak Guna Bangunan (HGB) |
+  /// Hak Pakai | Hak Pengelolaan (HPL) | Hak Tanggungan
+  jenisHak    String  @default("Hak Milik (HM)")
+  /// Nomor hak atas tanah, mis. "412"
+  nomorHak    String  @default("")
+  /// Catatan tambahan bebas tentang sertifikat, mis. "Induk, pemecahan selesai 8 unit"
+  sertifikat  String
+  luas        Float
+  dokumenId   String? @unique
+
+  project Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  dokumen Document? @relation(fields: [dokumenId], references: [id])
+
+  @@map("pm_legalities")
+}
+
+model Phase {
+  id        String @id @default(cuid())
+  projectId String
+  /// F1, F2, F3, F4
+  kode      String
+  nama      String?
+  urutan    Int    @default(0)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  units   Unit[]
+
+  @@unique([projectId, kode])
+  @@map("pm_phases")
+}
+
+// =============================================================================
+// TIPE UNIT & UNIT
+// =============================================================================
+
+/// Tipe unit bersifat per proyek — desain NT4 berbeda dari GN2, jadi tipe
+/// tidak dibagikan lintas proyek.
+model UnitType {
+  id            String @id @default(cuid())
+  projectId     String
+  kode          String
+  nama          String
+  luasBangunan  Float
+  luasTanah     Float
+
+  /// Upah tenaga kerja acuan RAP tipe ini (material ada di UnitTypeRapItem).
+  /// Volume disatuankan OH (orang-hari); jumlah = rapUpahVolume * rapUpahHarga.
+  /// Ini yang disalin ke Unit baru bertipe ini saat pertama dibuat.
+  rapUpahVolume Decimal @db.Decimal(18, 2) @default(1)
+  rapUpahHarga  Decimal @db.Decimal(18, 2) @default(0)
+
+  docModel3dId        String? @unique
+  docGambarKerjaPdfId String? @unique
+  docGambarKerjaDwgId String? @unique
+  docRenderId         String? @unique
+  docSpekId           String? @unique
+
+  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  docModel3d        Document? @relation("UnitTypeModel3d", fields: [docModel3dId], references: [id])
+  docGambarKerjaPdf Document? @relation("UnitTypeGambarKerjaPdf", fields: [docGambarKerjaPdfId], references: [id])
+  docGambarKerjaDwg Document? @relation("UnitTypeGambarKerjaDwg", fields: [docGambarKerjaDwgId], references: [id])
+  docRender         Document? @relation("UnitTypeRender", fields: [docRenderId], references: [id])
+  docSpek           Document? @relation("UnitTypeSpek", fields: [docSpekId], references: [id])
+
+  units    Unit[]
+  /// RAB master tipe ini — dasar yang disalin ke Unit baru bertipe ini.
+  boqItems UnitTypeBoqItem[]
+  /// RAP master tipe ini — dasar yang disalin ke Unit baru bertipe ini.
+  rapItems UnitTypeRapItem[]
+
+  @@unique([projectId, kode])
+  @@map("pm_unit_types")
+}
+
+/// RAB master milik sebuah TIPE unit — bukan snapshot unit. Ini yang disalin
+/// ke `UnitBoqItem` saat unit baru dibuat dari tipe ini (lihat catatan pada
+/// `buatBoqDariTemplate` di lib/calc/boq.ts, yang dipakai hanya sebagai
+/// fallback bila tipe belum punya rincian sendiri).
+model UnitTypeBoqItem {
+  id          String @id @default(cuid())
+  unitTypeId  String
+  grup        String
+  uraian      String
+  satuan      String
+  volume      Float
+  hargaSatuan Decimal @db.Decimal(18, 2)
+  spesifikasi String?
+  urutan      Int    @default(0)
+
+  unitType UnitType @relation(fields: [unitTypeId], references: [id], onDelete: Cascade)
+
+  @@index([unitTypeId])
+  @@map("pm_unit_type_boq_items")
+}
+
+/// RAP master milik sebuah TIPE unit — pasangan `UnitTypeBoqItem`.
+model UnitTypeRapItem {
+  id          String  @id @default(cuid())
+  unitTypeId  String
+  grup        String
+  nama        String
+  satuan      String
+  volume      Float
+  hargaSatuan Decimal @db.Decimal(18, 2)
+  keterangan  String?
+  urutan      Int     @default(0)
+
+  unitType UnitType @relation(fields: [unitTypeId], references: [id], onDelete: Cascade)
+
+  @@index([unitTypeId])
+  @@map("pm_unit_type_rap_items")
+}
+
+model Unit {
+  id         String @id @default(cuid())
+  /// Kode lengkap, mis. "NT4-F2-3"
+  kode       String @unique
+  projectId  String
+  phaseId    String
+  unitTypeId String
+  nomor      Int
+
+  /// Luas tanah unit ini — bisa berbeda dari tipe standar (kavling sudut, dll)
+  luasTanah  Float
+
+  /// Belum terbangun | Progress | Selesai | Serah Terima | Habis Masa Garansi
+  statusPembangunan String @default("Belum terbangun")
+  /// Tersedia | Booking | Akad | Serah Terima
+  statusJual        String @default("Tersedia")
+  /// 0–100
+  progress          Int    @default(0)
+
+  hargaJual Decimal @db.Decimal(18, 2) @default(0)
+  /// Upah tenaga kerja pada RAP (material ada di UnitRapItem). Volume
+  /// disatuankan OH (orang-hari); jumlah = rapUpahVolume * rapUpahHarga.
+  rapUpahVolume Decimal @db.Decimal(18, 2) @default(1)
+  rapUpahHarga  Decimal @db.Decimal(18, 2) @default(0)
+
+  dibuatPada DateTime @default(now())
+  diubahPada DateTime @updatedAt
+
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase    Phase    @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  unitType UnitType @relation(fields: [unitTypeId], references: [id])
+
+  boqItems       UnitBoqItem[]
+  rapItems       UnitRapItem[]
+  customWorks    CustomWork[]
+  progressRecords ProgressRecord[]
+  contractUnits  ContractUnit[]
+  boqSpk         ContractBoqItem[]
+  alokasiBiaya   ExpenseAllocation[]
+  penerimaan     SalesPayment[]
+
+  @@index([projectId, phaseId])
+  @@unique([projectId, nomor])
+  @@map("pm_units")
+}
+
+/// SNAPSHOT baris BOQ milik satu unit. Disalin dari template saat unit dibuat.
+/// RAB unit = SUM(volume * hargaSatuan) atas baris-baris ini.
+model UnitBoqItem {
+  id          String @id @default(cuid())
+  unitId      String
+  grup        String
+  uraian      String
+  satuan      String
+  volume      Float
+  hargaSatuan Decimal @db.Decimal(18, 2)
+  spesifikasi String?
+  urutan      Int    @default(0)
+
+  /// Persentase penyelesaian baris ini, 0–100. Diisi QS saat opname konstruksi.
+  ///
+  /// INILAH sumber Progress Konstruksi — lingkup penuh satu unit: struktur,
+  /// arsitektur, MEP, hingga subkon. Jangan dikacaukan dengan progres pada
+  /// `ContractBoqItem`, yang hanya mencakup lingkup satu SPK.
+  progress Int @default(0)
+
+  /// Nilai `progress` pada opname sebelumnya, disimpan saat opname baru
+  /// tersimpan. Dipakai tabel opname mingguan untuk menampilkan penambahan
+  /// minggu ini tanpa perlu tabel riwayat per baris tersendiri.
+  progressLalu Int @default(0)
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@map("pm_unit_boq_items")
+}
+
+/// SNAPSHOT rincian material RAP milik satu unit.
+model UnitRapItem {
+  id          String  @id @default(cuid())
+  unitId      String
+  grup        String
+  nama        String
+  satuan      String
+  volume      Float
+  hargaSatuan Decimal @db.Decimal(18, 2)
+  keterangan  String?
+  urutan      Int     @default(0)
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@map("pm_unit_rap_items")
+}
+
+/// Kerja tambah / unit custom di luar tipe standar.
+model CustomWork {
+  id       String  @id @default(cuid())
+  unitId   String
+  judul    String
+  /// Upah tenaga kerja untuk kerja tambah ini. Volume disatuankan OH
+  /// (orang-hari); jumlah = rapUpahVolume * rapUpahHarga.
+  rapUpahVolume Decimal @db.Decimal(18, 2) @default(1)
+  rapUpahHarga  Decimal @db.Decimal(18, 2) @default(0)
+
+  docDesainId         String?
+  docModel3dId        String?
+  docGambarKerjaPdfId String?
+  docGambarKerjaDwgId String?
+  /// RAB (disetujui) — harus ditandatangani konsumen yang meminta kerja
+  /// tambah ini sebelum dikerjakan.
+  docRabId            String?
+
+  unit              Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  docDesain         Document? @relation("KtDesain", fields: [docDesainId], references: [id])
+  docModel3d        Document? @relation("KtModel3d", fields: [docModel3dId], references: [id])
+  docGambarKerjaPdf Document? @relation("KtGambarKerjaPdf", fields: [docGambarKerjaPdfId], references: [id])
+  docGambarKerjaDwg Document? @relation("KtGambarKerjaDwg", fields: [docGambarKerjaDwgId], references: [id])
+  docRab            Document? @relation("KtRab", fields: [docRabId], references: [id])
+
+  boqItems CustomWorkBoqItem[]
+  rapItems CustomWorkRapItem[]
+
+  @@map("pm_custom_works")
+}
+
+model CustomWorkBoqItem {
+  id           String  @id @default(cuid())
+  customWorkId String
+  grup         String  @default("Tambahan")
+  uraian       String
+  satuan       String
+  volume       Float
+  hargaSatuan  Decimal @db.Decimal(18, 2)
+  spesifikasi  String?
+  urutan       Int     @default(0)
+
+  customWork CustomWork @relation(fields: [customWorkId], references: [id], onDelete: Cascade)
+
+  @@index([customWorkId])
+  @@map("pm_custom_work_boq_items")
+}
+
+model CustomWorkRapItem {
+  id           String  @id @default(cuid())
+  customWorkId String
+  grup         String
+  nama         String
+  satuan       String
+  volume       Float
+  hargaSatuan  Decimal @db.Decimal(18, 2)
+  keterangan   String?
+  urutan       Int     @default(0)
+
+  customWork CustomWork @relation(fields: [customWorkId], references: [id], onDelete: Cascade)
+
+  @@index([customWorkId])
+  @@map("pm_custom_work_rap_items")
+}
+
+/// Catatan progres berkala. Opname mingguan dihitung dari selisih antar catatan,
+/// bukan dari tebakan `progress - 7` seperti pada prototipe.
+model ProgressRecord {
+  id               String   @id @default(cuid())
+  unitId           String?
+  infrastructureId String?
+  tanggal          DateTime
+  progress         Int
+  catatan          String?
+  dicatatOleh      String?
+
+  unit           Unit?           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  infrastructure Infrastructure? @relation(fields: [infrastructureId], references: [id], onDelete: Cascade)
+
+  @@index([unitId, tanggal])
+  @@index([infrastructureId, tanggal])
+  @@map("pm_progress_records")
+}
+
+// =============================================================================
+// SARANA & PRASARANA
+// =============================================================================
+
+model Infrastructure {
+  id        String @id @default(cuid())
+  kode      String @unique
+  projectId String
+  nama      String
+  /// Sarana | Prasarana
+  jenis     String
+  /// Volume beserta satuannya, mis. "3.400 m²" atau "51 sambungan"
+  volume    String
+  /// Belum terbangun | Progress | Selesai
+  status    String @default("Belum terbangun")
+  progress  Int    @default(0)
+  rab       Decimal @db.Decimal(18, 2)
+  /// Upah tenaga kerja pada RAP (material ada di InfrastructureRapItem).
+  /// Volume disatuankan OH (orang-hari); jumlah = rapUpahVolume * rapUpahHarga.
+  rapUpahVolume Decimal @db.Decimal(18, 2) @default(1)
+  rapUpahHarga  Decimal @db.Decimal(18, 2) @default(0)
+
+  docModel3dId        String?
+  docGambarKerjaPdfId String?
+  docGambarKerjaDwgId String?
+
+  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  docModel3d        Document? @relation("InfraModel3d", fields: [docModel3dId], references: [id])
+  docGambarKerjaPdf Document? @relation("InfraGambarKerjaPdf", fields: [docGambarKerjaPdfId], references: [id])
+  docGambarKerjaDwg Document? @relation("InfraGambarKerjaDwg", fields: [docGambarKerjaDwgId], references: [id])
+
+  boqItems        InfrastructureBoqItem[]
+  rapItems        InfrastructureRapItem[]
+  progressRecords ProgressRecord[]
+  contractItems   ContractInfrastructure[]
+  boqSpk          ContractBoqItem[]
+  alokasiBiaya    ExpenseAllocation[]
+
+  @@map("pm_infrastructures")
+}
+
+/// SNAPSHOT rincian material RAP milik satu item sarana/prasarana.
+model InfrastructureRapItem {
+  id               String  @id @default(cuid())
+  infrastructureId String
+  grup             String
+  nama             String
+  satuan           String
+  volume           Float
+  hargaSatuan      Decimal @db.Decimal(18, 2)
+  keterangan       String?
+  urutan           Int     @default(0)
+
+  infrastructure Infrastructure @relation(fields: [infrastructureId], references: [id], onDelete: Cascade)
+
+  @@index([infrastructureId])
+  @@map("pm_infrastructure_rap_items")
+}
+
+model InfrastructureBoqItem {
+  id               String  @id @default(cuid())
+  infrastructureId String
+  grup             String
+  uraian           String
+  satuan           String
+  volume           Float
+  hargaSatuan      Decimal @db.Decimal(18, 2)
+  spesifikasi      String?
+  urutan           Int     @default(0)
+
+  /// Sama peranannya dengan `UnitBoqItem.progress`: sumber Progress Konstruksi
+  /// untuk item sarana & prasarana, mencakup seluruh lingkup pekerjaannya.
+  progress     Int @default(0)
+  progressLalu Int @default(0)
+
+  infrastructure Infrastructure @relation(fields: [infrastructureId], references: [id], onDelete: Cascade)
+
+  @@index([infrastructureId])
+  @@map("pm_infrastructure_boq_items")
+}
+
+// =============================================================================
+// VENDOR, KONTRAK & TENDER
+// =============================================================================
+
+model Vendor {
+  id      String  @id @default(cuid())
+  nama    String  @unique
+  bidang  String
+  kontak  String
+  alamat  String
+  sejak   Int
+  /// Aktif | Nonaktif
+  status  String  @default("Aktif")
+
+  contracts       Contract[]
+  tenderPeserta   TenderParticipant[]
+  equipmentSewa   Equipment[]
+
+  @@map("pm_vendors")
+}
+
+model Contract {
+  id        String @id @default(cuid())
+  kode      String @unique
+  projectId String
+  vendorId  String
+  /// Unit | Sarpras
+  jenis     String
+  deskripsi String
+  /// Nilai kontrak awal, belum termasuk VO
+  nominal   Decimal @db.Decimal(18, 2)
+  /// Persentase retensi yang ditahan sampai masa pemeliharaan selesai
+  retensiPct     Float @default(0)
+  /// Lama masa pemeliharaan (bulan)
+  jatuhTempoBln  Int   @default(0)
+  mulai          DateTime
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  vendor  Vendor  @relation(fields: [vendorId], references: [id])
+
+  /// Dokumen SPK (Surat Perintah Kerja) yang mendasari kontrak ini.
+  ///
+  /// Kontrak tidak sah tanpa SPK, jadi berkasnya diunggah bersamaan saat
+  /// kontrak dibuat. Memakai `Document` + `DocumentVersion` seperti dokumen
+  /// lain supaya revisinya ikut terlacak — SPK kerap direvisi setelah
+  /// negosiasi, dan versi mana yang berlaku harus bisa ditelusuri.
+  docSpkId String?   @unique
+  docSpk   Document? @relation("ContractSpk", fields: [docSpkId], references: [id])
+
+  units           ContractUnit[]
+  infrastructures ContractInfrastructure[]
+  variationOrders VariationOrder[]
+  /// Pembayaran ke vendor atas kontrak ini.
+  ///
+  /// Tidak ada tabel pembayaran kontrak tersendiri: satu pembayaran vendor
+  /// adalah satu `Expense` yang menunjuk kontrak ini. Sebelumnya keduanya
+  /// terpisah, dan uang yang sama bisa tercatat dua kali — sekali di tab
+  /// Pembayaran vendor, sekali di Catat Pengeluaran — lalu terhitung ganda
+  /// di halaman Keuangan.
+  ///
+  /// Dengan satu tabel, pembayaran vendor otomatis ikut aturan induk–rincian
+  /// `Expense`: satu baris mutasi bank, dibebankan ke beberapa unit lewat
+  /// `ExpenseAllocation`.
+  expenses        Expense[]
+  boqItems        ContractBoqItem[]
+
+  @@index([projectId])
+  @@map("pm_contracts")
+}
+
+/// Rincian pekerjaan yang diperintahkan sebuah SPK, sekaligus tempat QS
+/// mencatat progres.
+///
+/// BOQ SPK sengaja BERDIRI SENDIRI, tidak menunjuk ke `UnitBoqItem`. Rincian
+/// pekerjaan pada SPK borongan kerap tidak sama persis dengan RAB unit —
+/// beberapa pekerjaan digabung, sebagian lain di luar lingkup vendor — jadi
+/// memaksanya mengikuti BOQ unit akan membuat SPK tidak bisa ditulis apa
+/// adanya.
+///
+/// Konsekuensinya satu pekerjaan bisa tercatat di dua tempat. Yang
+/// menyambungkan keduanya adalah `unitId` / `infrastructureId`: dari situlah
+/// progres tiap baris dijumlahkan tertimbang nilai menjadi progres unit.
+/// Karena itu salah satu dari keduanya WAJIB terisi dan tidak boleh
+/// dua-duanya — ditegakkan `periksaBarisBoqSpk()` di lib/calc/kontrak-boq.ts.
+model ContractBoqItem {
+  id         String @id @default(cuid())
+  contractId String
+
+  /// Objek yang dikerjakan baris ini. Tepat satu yang terisi.
+  unitId           String?
+  infrastructureId String?
+
+  grup        String
+  uraian      String
+  satuan      String
+  volume      Float
+  hargaSatuan Decimal @db.Decimal(18, 2)
+
+  /// Persentase penyelesaian baris ini, 0–100. Diisi QS saat opname.
+  progress Int @default(0)
+  urutan   Int @default(0)
+
+  contract       Contract        @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  unit           Unit?           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  infrastructure Infrastructure? @relation(fields: [infrastructureId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@index([unitId])
+  @@index([infrastructureId])
+  @@map("pm_contract_boq_items")
+}
+
+/// Unit yang tercakup dalam sebuah kontrak. `nilaiOverride` dipakai bila unit
+/// tertentu dihargai berbeda (mis. unit sudut); bila null, nilai kontrak dibagi
+/// rata ke seluruh unit.
+model ContractUnit {
+  contractId    String
+  unitId        String
+  nilaiOverride Decimal? @db.Decimal(18, 2)
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  unit     Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@id([contractId, unitId])
+  @@map("pm_contract_units")
+}
+
+model ContractInfrastructure {
+  contractId       String
+  infrastructureId String
+  nilaiOverride    Decimal? @db.Decimal(18, 2)
+
+  contract       Contract       @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  infrastructure Infrastructure @relation(fields: [infrastructureId], references: [id], onDelete: Cascade)
+
+  @@id([contractId, infrastructureId])
+  @@map("pm_contract_infrastructures")
+}
+
+/// Variation Order — pekerjaan tambah/kurang. Nominal boleh negatif.
+model VariationOrder {
+  id         String   @id @default(cuid())
+  contractId String
+  nomor      String
+  tanggal    DateTime
+  uraian     String
+  nominal    Decimal @db.Decimal(18, 2)
+  /// Diajukan | Disetujui | Ditolak
+  status     String   @default("Diajukan")
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@map("pm_variation_orders")
+}
+
+model Tender {
+  id        String   @id @default(cuid())
+  kode      String   @unique
+  projectId String
+  pekerjaan String
+  tanggal   DateTime
+  /// Harga Perkiraan Sendiri
+  hps       Decimal @db.Decimal(18, 2)
+  /// Dibuka | Evaluasi | Ditetapkan | Batal
+  status    String   @default("Dibuka")
+  pemenangVendorId String?
+
+  project Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  peserta TenderParticipant[]
+
+  @@map("pm_tenders")
+}
+
+model TenderParticipant {
+  id       String @id @default(cuid())
+  tenderId String
+  vendorId String
+  nilai    Decimal @db.Decimal(18, 2)
+  /// Lengkap | Kurang dokumen
+  dokumen  String @default("Lengkap")
+
+  tender Tender @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+
+  @@unique([tenderId, vendorId])
+  @@map("pm_tender_participants")
+}
+
+// =============================================================================
+// KEUANGAN
+// =============================================================================
+
+/// Satu baris = satu pembayaran = satu baris mutasi bank.
+///
+/// Pembebanan ke unit atau sarpras TIDAK disimpan di sini melainkan di
+/// `ExpenseAllocation`, karena satu pembayaran lazimnya menanggung beberapa
+/// unit sekaligus — upah borongan untuk lima rumah dibayar sekali. Kalau
+/// pembebanan ikut di baris ini, satu pembayaran harus dipecah jadi lima baris
+/// dan nominal tiap barisnya tidak pernah muncul di rekening koran, sehingga
+/// rekonsiliasi bank jadi penjumlahan tebak-tebakan.
+///
+/// Jumlah seluruh alokasi wajib sama persis dengan `total`. Itu yang menjaga
+/// angka per unit selalu bisa dijumlahkan balik ke angka yang keluar dari bank.
+model Expense {
+  id        String   @id @default(cuid())
+  projectId String
+  tanggal   DateTime
+  /// Unit (rumah dijual) | Prasarana & Sarana | Perijinan & Ormas | Pengolahan Lahan
+  peruntukan String
+  /// Upah Borongan | Material | Subkon | Upah Harian | Lain-lain proyek
+  jenis      String
+  /// Transfer | Petty Cash | Tunai langsung
+  metode     String
+  uraian     String
+  total      Decimal @db.Decimal(18, 2)
+  /// Lunas | DP | Belum
+  status     String @default("Belum")
+  pic        String?
+  /// Pos HPP business plan yang dibebani, mis. "E — Konstruksi"
+  posHpp     String?
+  /// Nama berkas bukti (nota, berita acara, kwitansi). Berkasnya sendiri
+  /// belum disimpan — lihat catatan pada model Document.
+  bukti      String?
+  /// Kontrak vendor yang membiayai pengeluaran ini, bila ada.
+  contractId String?
+
+  project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contract  Contract?           @relation(fields: [contractId], references: [id])
+  alokasi   ExpenseAllocation[]
+
+  @@index([projectId, tanggal])
+  @@map("pm_expenses")
+}
+
+/// Pembebanan satu pembayaran ke unit atau item sarana & prasarana.
+///
+/// `unitId` dan `infrastructureId` saling meniadakan: satu baris alokasi
+/// membebani unit ATAU sarpras, tidak pernah keduanya, karena itu akan
+/// terhitung dua kali pada laporan realisasi. Bila keduanya kosong, alokasi itu
+/// biaya level proyek — perijinan dan pengolahan lahan.
+///
+/// Nominalnya tidak harus rata. Bagi rata hanyalah pengisian awal di formulir;
+/// upah borongan untuk unit yang tipenya berbeda memang tidak sama besar.
+model ExpenseAllocation {
+  id        String @id @default(cuid())
+  expenseId String
+  unitId           String?
+  infrastructureId String?
+  nominal   Decimal @db.Decimal(18, 2)
+
+  expense        Expense         @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  unit           Unit?           @relation(fields: [unitId], references: [id])
+  infrastructure Infrastructure? @relation(fields: [infrastructureId], references: [id])
+
+  @@index([expenseId])
+  @@index([unitId])
+  @@index([infrastructureId])
+  @@map("pm_expense_allocations")
+}
+
+/// Biaya operasional perusahaan yang dibebankan ke sebuah proyek.
+///
+/// Terpisah dari `Expense` karena kedudukannya memang berbeda: Expense adalah
+/// harga pokok penjualan (masuk HPP), sedangkan ini biaya di luar HPP —
+/// pemasaran, umum & administrasi, bunga & pajak. Keduanya bertemu kembali
+/// pada perhitungan laba bersih di Plan vs Realisasi.
+model OperationalCost {
+  id        String   @id @default(cuid())
+  projectId String
+  tanggal   DateTime
+  /// Harus cocok dengan nama pos pada BpOperasionalItem agar bisa
+  /// dibandingkan rencana lawan realisasinya.
+  kategori  String
+  uraian    String
+  nominal   Decimal @db.Decimal(18, 2)
+  /// Lunas | DP | Belum
+  status    String   @default("Lunas")
+  pic       String?
+  bukti     String?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, tanggal])
+  @@map("pm_operational_costs")
+}
+
+/// Penerimaan dari pembeli (DP, cair KPR, pelunasan) — dasar angka realisasi
+/// penjualan pada Plan vs Realisasi.
+model SalesPayment {
+  id      String   @id @default(cuid())
+  unitId  String
+  tanggal DateTime
+  uraian  String
+  nominal Decimal @db.Decimal(18, 2)
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@map("pm_sales_payments")
+}
+
+// =============================================================================
+// BUSINESS PLAN (rencana, pembanding realisasi)
+// =============================================================================
+
+model BusinessPlan {
+  id        String @id @default(cuid())
+  projectId String @unique
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  hpp         BpHppItem[]
+  omzet       BpOmzetItem[]
+  operasional BpOperasionalItem[]
+  cashflow    BpCashflowItem[]
+
+  @@map("pm_business_plans")
+}
+
+model BpHppItem {
+  id             String @id @default(cuid())
+  businessPlanId String
+  nama           String
+  nilai          Decimal @db.Decimal(18, 2)
+  urutan         Int    @default(0)
+
+  businessPlan BusinessPlan @relation(fields: [businessPlanId], references: [id], onDelete: Cascade)
+
+  @@map("pm_bp_hpp_items")
+}
+
+model BpOmzetItem {
+  id             String @id @default(cuid())
+  businessPlanId String
+  tipe           String
+  jumlah         Int
+  harga          Decimal @db.Decimal(18, 2)
+  urutan         Int    @default(0)
+
+  businessPlan BusinessPlan @relation(fields: [businessPlanId], references: [id], onDelete: Cascade)
+
+  @@map("pm_bp_omzet_items")
+}
+
+model BpOperasionalItem {
+  id             String @id @default(cuid())
+  businessPlanId String
+  nama           String
+  nilai          Decimal @db.Decimal(18, 2)
+  urutan         Int    @default(0)
+
+  businessPlan BusinessPlan @relation(fields: [businessPlanId], references: [id], onDelete: Cascade)
+
+  @@map("pm_bp_operasional_items")
+}
+
+model BpCashflowItem {
+  id             String @id @default(cuid())
+  businessPlanId String
+  /// mis. "2025 Q1"
+  periode        String
+  masuk          Decimal @db.Decimal(18, 2)
+  keluar         Decimal @db.Decimal(18, 2)
+  urutan         Int    @default(0)
+
+  businessPlan BusinessPlan @relation(fields: [businessPlanId], references: [id], onDelete: Cascade)
+
+  @@map("pm_bp_cashflow_items")
+}
+
+/// Pembanding pasar untuk analisa kelayakan lahan.
+model MarketComparable {
+  id        String @id @default(cuid())
+  projectId String
+  nama      String
+  /// Jarak dari lokasi proyek (km)
+  jarak     Float
+
+  project Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tipe    MarketComparableType[]
+
+  @@map("pm_market_comparables")
+}
+
+model MarketComparableType {
+  id                 String @id @default(cuid())
+  marketComparableId String
+  tipe               String
+  jumlah             Int
+  luasUnit           Float
+  luasLahan          Float
+  harga              Decimal @db.Decimal(18, 2)
+
+  marketComparable MarketComparable @relation(fields: [marketComparableId], references: [id], onDelete: Cascade)
+
+  @@map("pm_market_comparable_types")
+}
+
+// =============================================================================
+// EQUIPMENT & ASET
+// =============================================================================
+
+model Equipment {
+  id        String  @id @default(cuid())
+  kode      String  @unique
+  nama      String
+  kategori  String
+  merk      String?
+  jumlah    Int     @default(1)
+  /// Bagian dari `jumlah` yang sedang rusak dan tidak bisa dipakai.
+  ///
+  /// Dipisah dari `status` karena status melekat pada seluruh baris: 5 helm
+  /// yang 2 di antaranya rusak tidak bisa dinyatakan lewat satu status saja.
+  /// Selalu <= jumlah; ditegakkan `terapkanPenyesuaian()` di lib/calc/aset.ts.
+  jumlahRusak Int   @default(0)
+  satuan    String  @default("unit")
+  /// Milik Sendiri | Sewa
+  kepemilikan String @default("Milik Sendiri")
+  vendorId  String?
+  projectId String?
+  penanggungJawab String?
+  /// Tersedia | Digunakan | Pemeliharaan | Rusak
+  status    String  @default("Tersedia")
+  /// jam | hari
+  satuanPakai String @default("jam")
+  pemakaian   Float  @default(0)
+  servisTerakhir DateTime?
+  servisBerikut  DateTime?
+  /// Nilai aset, atau tarif sewa bila kepemilikan = "Sewa"
+  nilai     Decimal @db.Decimal(18, 2)   @default(0)
+
+  vendor  Vendor?  @relation(fields: [vendorId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+  penyesuaian EquipmentAdjustment[]
+
+  @@map("pm_equipments")
+}
+
+/// Riwayat penyesuaian stok aset: kehilangan, kerusakan, dan koreksi opname.
+///
+/// BERSIFAT HANYA-TAMBAH, seperti jejak audit. Jumlah aset berubah HANYA lewat
+/// baris di sini, tidak pernah diketik langsung — dengan begitu setiap
+/// pergerakan stok punya alasan, tanggal, dan penanggung jawab. Pencatatan
+/// yang telanjur salah diperbaiki dengan baris "Koreksi Stok" baru, bukan
+/// dengan menghapus atau menyunting baris lama.
+///
+/// `jumlahSebelum` dan `jumlahSesudah` disimpan apa adanya, bukan dihitung
+/// ulang dari rantai riwayat: itu membuat tiap baris bisa dibaca sendirian
+/// saat audit, tanpa perlu menyusuri seluruh riwayat sejak awal.
+model EquipmentAdjustment {
+  id          String   @id @default(cuid())
+  equipmentId String
+  tanggal     DateTime @default(now())
+  /// Hilang | Rusak | Perbaikan Selesai | Koreksi Stok
+  jenis       String
+  /// Banyaknya unit yang disesuaikan. Selalu positif; arahnya ditentukan jenis.
+  banyak      Int
+  jumlahSebelum     Int
+  jumlahSesudah     Int
+  rusakSebelum      Int
+  rusakSesudah      Int
+  keterangan        String
+  penanggungJawab   String?
+  dicatatOleh       String
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@index([equipmentId, tanggal])
+  @@map("pm_equipment_adjustments")
+}
+
+// =============================================================================
+// JEJAK AUDIT
+// =============================================================================
+
+/// Append-only. Tidak pernah di-UPDATE atau DELETE — inilah yang membuat
+/// perubahan harga BOQ oleh QS bisa dipertanggungjawabkan.
+model AuditLog {
+  id        String   @id @default(cuid())
+  waktu     DateTime @default(now())
+  userId    String?
+  /// Peran yang dipakai saat aksi dilakukan (user bisa punya lebih dari satu)
+  peran     String
+  projectId String?
+  /// Objek yang diubah, mis. "Unit F2-3 · RAB"
+  objek     String
+  aksi      String
+  nilaiDari String?
+  nilaiKe   String?
+
+  user    User?    @relation(fields: [userId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([waktu])
+  @@index([projectId, waktu])
+  @@map("pm_audit_logs")
+}

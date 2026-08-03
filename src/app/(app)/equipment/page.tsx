@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { ambilPengguna, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
+import { ambilPengguna, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
+import { dataAset } from "@/lib/data/aset";
 import { rp, tanggal } from "@/lib/format";
 import { Badge, BarisKpi, TabelHead } from "@/components/ui";
 import { unitTerpakai } from "@/lib/calc/aset";
+import { kpiAset } from "@/lib/tampilan/aset";
 import { HapusAset, PenyesuaianAset, TambahAset, UbahAset } from "./editors";
 import { Tabel } from "@/components/kartu-tabel";
 
@@ -32,60 +33,18 @@ export default async function EquipmentAsset() {
   const bolehKelola = bolehUbah(pengguna, "aset");
   const bolehSesuaikan = bolehUbah(pengguna, "penyesuaianAset");
 
-  const aset = await prisma.equipment.findMany({
-    orderBy: { kode: "asc" },
-    select: {
-      id: true, kode: true, nama: true, kategori: true, merk: true,
-      jumlah: true, jumlahRusak: true, satuan: true, kepemilikan: true, status: true,
-      satuanPakai: true, pemakaian: true, nilai: true,
-      servisTerakhir: true, servisBerikut: true, penanggungJawab: true,
-      vendorId: true, projectId: true,
-      vendor: { select: { nama: true } },
-      project: { select: { kode: true } },
-    },
-  });
+  const { aset, penyesuaian, daftarVendor, daftarProyek } = await dataAset(pengguna);
 
-  // Riwayat penyesuaian terbaru — kehilangan, kerusakan, dan koreksi opname.
-  // Ditampilkan sebagai tabel tersendiri karena inilah jawaban atas "kenapa
-  // stoknya berkurang", yang tidak terbaca dari daftar aset saja.
-  const penyesuaian = await prisma.equipmentAdjustment.findMany({
-    orderBy: { tanggal: "desc" },
-    take: 50,
-    select: {
-      id: true, tanggal: true, jenis: true, banyak: true,
-      jumlahSebelum: true, jumlahSesudah: true,
-      rusakSebelum: true, rusakSesudah: true,
-      keterangan: true, penanggungJawab: true, dicatatOleh: true,
-      equipment: { select: { kode: true, nama: true, satuan: true } },
-    },
-  });
-
-  // Pilihan untuk formulir. Vendor tidak dibatasi proyek karena satu vendor
-  // bisa menyewakan alat ke proyek mana pun.
-  const [daftarVendor, daftarProyek] = bolehKelola
-    ? await Promise.all([
-        prisma.vendor.findMany({ orderBy: { nama: "asc" }, select: { id: true, nama: true } }),
-        prisma.project.findMany({
-          where: filterProyek(pengguna),
-          orderBy: { kode: "asc" },
-          select: { id: true, nama: true },
-        }),
-      ])
-    : [[], []];
-
-  const milikSendiri = aset.filter((a) => a.kepemilikan === "Milik Sendiri");
-  const perluPerhatian = aset.filter((a) => a.status === "Rusak" || a.status === "Pemeliharaan").length;
-  const nilaiAset = milikSendiri.reduce((s, a) => s + a.nilai, 0);
-
-  // Servis yang jatuh tempo dalam 30 hari ke depan, atau sudah terlewat.
-  const ambang = new Date(Date.now() + 30 * 864e5);
-  const servisDekat = aset.filter((a) => a.servisBerikut && a.servisBerikut <= ambang).length;
+  const angka = kpiAset(aset);
 
   const kpi: [string, string][] = [
-    ["Total Aset", `${aset.length} jenis`],
-    ["Milik Sendiri / Sewa", `${milikSendiri.length} / ${aset.length - milikSendiri.length}`],
-    ["Perlu Perhatian", String(perluPerhatian)],
-    [bolehHarga ? "Nilai Aset Sendiri" : "Servis ≤ 30 Hari", bolehHarga ? rp(nilaiAset) : String(servisDekat)],
+    ["Total Aset", `${angka.jumlahJenis} jenis`],
+    ["Milik Sendiri / Sewa", `${angka.milikSendiri} / ${angka.sewa}`],
+    ["Perlu Perhatian", String(angka.perluPerhatian)],
+    [
+      bolehHarga ? "Nilai Aset Sendiri" : "Servis ≤ 30 Hari",
+      bolehHarga ? rp(angka.nilaiMilikSendiri) : String(angka.servisDekat),
+    ],
   ];
 
   return (

@@ -3,9 +3,6 @@ import { prisma } from "@/lib/db";
 import { bolehAksesProyek, bolehLihat, filterProyek, type Pengguna } from "@/lib/auth/rbac";
 
 /** Luas total = kavling efektif + sarana + prasarana + RTH. */
-export const luasTotal = (l: {
-  luasKavlingEfektif: number; luasSarana: number; luasPrasarana: number; luasRth: number;
-}): number => l.luasKavlingEfektif + l.luasSarana + l.luasPrasarana + l.luasRth;
 
 /**
  * Daftar proyek untuk Level 1, beserta angka yang ditampilkan di tabelnya:
@@ -53,6 +50,8 @@ const pilihVersi = {
  *      supaya keberadaan proyek itu sendiri tidak bocor.
  *   2. Field harga hanya di-SELECT bila peran berhak.
  */
+const pilihDokumen = { select: { id: true, kategori: true, versions: pilihVersi } };
+
 export async function detailProyek(u: Pengguna, kode: string) {
   const bolehHarga = bolehLihat(u, "hargaRabRap");
   const bolehSarpras = bolehLihat(u, "daftarSarpras");
@@ -219,4 +218,182 @@ export function nilaiSarpras(s: {
   const dariBoq = (s.boqItems ?? []).reduce((a, r) => a + r.volume * r.hargaSatuan, 0);
   const rab = dariBoq || s.rab || 0;
   return { rab, rap: Math.round(rab * 0.9) };
+}
+
+// ---------------------------------------------------------------------------
+// Halaman rincian (Level 3 & 4) Master Proyek
+//
+// Dipindahkan dari halaman supaya lapisan tampilan tidak lagi tahu Prisma.
+// Perhatikan blok `...(bolehHarga ? ... : {})`: kolom harga dan seluruh
+// relasi BOQ/RAP hanya ikut di-SELECT bila peran berhak. Itulah aturan yang
+// wajib ikut pindah saat modul ini diserap ERP.
+// ---------------------------------------------------------------------------
+
+/** Satu unit beserta tipe, dokumen teknis, kerja tambah, dan BOQ/RAP-nya. */
+export async function detailUnit(unitKode: string, bolehHarga: boolean) {
+  return prisma.unit.findUnique({
+    where: { kode: decodeURIComponent(unitKode).toUpperCase() },
+    select: {
+      id: true, kode: true, nomor: true, luasTanah: true, projectId: true,
+      phaseId: true, unitTypeId: true,
+      statusPembangunan: true, statusJual: true, progress: true,
+      // Jumlah baris BOQ Master menentukan apakah progres unit ini turunan
+      // dari opname per baris atau masih diisi satu angka manual.
+      _count: { select: { boqItems: true } },
+      phase: { select: { kode: true } },
+      project: {
+        select: {
+          kode: true, nama: true,
+          fases: { select: { id: true, kode: true }, orderBy: { urutan: "asc" } },
+          unitTypes: {
+            select: { id: true, nama: true, luasBangunan: true },
+            orderBy: { luasBangunan: "asc" },
+          },
+        },
+      },
+      unitType: {
+        select: {
+          kode: true, nama: true, luasBangunan: true,
+          docModel3d: pilihDokumen,
+          docGambarKerjaPdf: pilihDokumen,
+          docGambarKerjaDwg: pilihDokumen,
+          docRender: pilihDokumen,
+          docSpek: pilihDokumen,
+        },
+      },
+      ...(bolehHarga
+        ? {
+            hargaJual: true,
+            rapUpahVolume: true,
+            rapUpahHarga: true,
+            boqItems: {
+              orderBy: { urutan: "asc" as const },
+              select: {
+                id: true, grup: true, uraian: true, satuan: true,
+                volume: true, hargaSatuan: true, spesifikasi: true,
+              },
+            },
+            rapItems: {
+              orderBy: { urutan: "asc" as const },
+              select: {
+                id: true, grup: true, nama: true, satuan: true,
+                volume: true, hargaSatuan: true, keterangan: true,
+              },
+            },
+          }
+        : {}),
+      customWorks: {
+        orderBy: { judul: "asc" as const },
+        select: {
+          id: true, judul: true, rapUpahVolume: true, rapUpahHarga: true,
+          docDesain: pilihDokumen,
+          docModel3d: pilihDokumen,
+          docGambarKerjaPdf: pilihDokumen,
+          docGambarKerjaDwg: pilihDokumen,
+          docRab: pilihDokumen,
+          boqItems: {
+            orderBy: { urutan: "asc" as const },
+            select: {
+              id: true, grup: true, uraian: true, satuan: true, volume: true,
+              hargaSatuan: true, spesifikasi: true,
+            },
+          },
+          rapItems: {
+            orderBy: { urutan: "asc" as const },
+            select: {
+              id: true, grup: true, nama: true, satuan: true,
+              volume: true, hargaSatuan: true, keterangan: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+/** Satu item sarpras beserta dokumen teknis dan BOQ/RAP-nya. */
+export async function detailSarpras(kodeSarpras: string, bolehHarga: boolean) {
+  return prisma.infrastructure.findUnique({
+    where: { kode: decodeURIComponent(kodeSarpras).toUpperCase() },
+    select: {
+      id: true, kode: true, nama: true, jenis: true, volume: true,
+      status: true, progress: true, projectId: true,
+      // Jumlah baris BOQ menentukan apakah progres item ini turunan dari
+      // opname per baris (halaman Konstruksi) atau masih diisi satu angka
+      // manual — sama seperti pada unit.
+      _count: { select: { boqItems: true } },
+      project: { select: { kode: true, nama: true } },
+      docModel3d: pilihDokumen,
+      docGambarKerjaPdf: pilihDokumen,
+      docGambarKerjaDwg: pilihDokumen,
+      ...(bolehHarga
+        ? {
+            rab: true,
+            rapUpahVolume: true,
+            rapUpahHarga: true,
+            boqItems: {
+              orderBy: { urutan: "asc" as const },
+              select: {
+                id: true, grup: true, uraian: true, satuan: true,
+                volume: true, hargaSatuan: true, spesifikasi: true,
+              },
+            },
+            rapItems: {
+              orderBy: { urutan: "asc" as const },
+              select: {
+                id: true, grup: true, nama: true, satuan: true,
+                volume: true, hargaSatuan: true, keterangan: true,
+              },
+            },
+          }
+        : {}),
+    },
+  });
+}
+
+/** Kontrak vendor yang mencakup sebuah unit. */
+export async function kontrakUnit(unitId: string) {
+  return prisma.contract.findMany({
+    where: { units: { some: { unitId } } },
+    select: {
+      id: true, nominal: true, retensiPct: true, deskripsi: true,
+      vendor: { select: { nama: true } },
+      expenses: { select: { total: true } },
+      variationOrders: { select: { nominal: true, status: true } },
+    },
+  });
+}
+
+/** Kontrak vendor yang mencakup sebuah item sarpras. */
+export async function kontrakSarpras(infrastructureId: string) {
+  return prisma.contract.findMany({
+    where: { infrastructures: { some: { infrastructureId } } },
+    select: {
+      id: true, nominal: true, retensiPct: true, deskripsi: true,
+      vendor: { select: { nama: true } },
+      expenses: { select: { total: true } },
+      variationOrders: { select: { nominal: true, status: true } },
+    },
+  });
+}
+
+/**
+ * Riwayat perubahan sebuah objek, dibatasi ke proyek yang boleh diakses
+ * pengguna — supaya log tidak menjadi celah untuk mengintip proyek lain.
+ */
+export async function riwayatObjek(u: Pengguna, projectId: string, namaObjek: string) {
+  return prisma.auditLog.findMany({
+    where: {
+      project: filterProyek(u),
+      projectId,
+      objek: { contains: namaObjek },
+    },
+    orderBy: { waktu: "desc" },
+    take: 8,
+    select: {
+      id: true, waktu: true, aksi: true, objek: true,
+      nilaiDari: true, nilaiKe: true, peran: true,
+      user: { select: { nama: true } },
+    },
+  });
 }

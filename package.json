@@ -2,7 +2,7 @@
   "name": "nanoland-management-system",
   "version": "0.1.0",
   "private": true,
-  "description": "Sistem manajemen pengembang properti Nanoland — demo internal",
+  "description": "Sistem manajemen pengembang properti Nanoland \u2014 demo internal",
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "next dev",
@@ -15,7 +15,8 @@
     "db:push": "prisma db push && prisma generate",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "node scripts/hapus-db.mjs && prisma db push && prisma generate && prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "skema:postgres": "tsx scripts/skema-postgres.mjs"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.0",

@@ -1,8 +1,8 @@
 import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { ambilPengguna, bolehUbah, filterProjectIdOpsional, filterProyek } from "@/lib/auth/rbac";
+import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
+import { dataAdmin } from "@/lib/data/admin";
 import { DIVISI, divisiPeran, SECTION_LABELS, SECTIONS, type Section } from "@/lib/domain/enums";
 import { tanggalJam } from "@/lib/format";
 import { TabelHead, Terbatas } from "@/components/ui";
@@ -69,43 +69,7 @@ export default async function Admin({
   // tetapi hanya yang boleh MENGUBAHNYA yang bisa menyunting matriks.
   const bisaKelola = bolehUbah(pengguna, "deskripsi");
 
-  // Daftar proyek di sini hanya dipakai untuk menyusun akses proyek pengguna
-  // di tab Kelola User — pembuatan/penyuntingan proyek sendiri sudah pindah
-  // ke Master Proyek.
-  const [proyek, peran, users, log] = await Promise.all([
-    prisma.project.findMany({
-      where: filterProyek(pengguna),
-      orderBy: { kode: "asc" },
-      select: { id: true, kode: true, nama: true },
-    }),
-    prisma.role.findMany({
-      orderBy: { nama: "asc" },
-      select: {
-        id: true, nama: true, grup: true,
-        permissions: { select: { section: true, bolehUbah: true } },
-        _count: { select: { users: true } },
-      },
-    }),
-    prisma.user.findMany({
-      orderBy: { nama: "asc" },
-      select: {
-        id: true, nama: true, inisial: true, email: true, aktif: true, semuaProyek: true,
-        roles: { select: { role: { select: { id: true, nama: true, grup: true } } } },
-        aksesProyek: { select: { project: { select: { id: true, kode: true } } } },
-      },
-    }),
-    prisma.auditLog.findMany({
-      where: filterProjectIdOpsional(pengguna),
-      orderBy: { waktu: "desc" },
-      take: 60,
-      select: {
-        id: true, waktu: true, peran: true, objek: true, aksi: true,
-        nilaiDari: true, nilaiKe: true,
-        user: { select: { nama: true } },
-        project: { select: { kode: true } },
-      },
-    }),
-  ]);
+  const { proyek, peran, users, log } = await dataAdmin(pengguna);
 
   const tingkatIzin = (
     p: { section: string; bolehUbah: boolean }[],

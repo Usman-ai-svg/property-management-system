@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
+import { proyekPemilikDokumen, versiDokumen } from "@/lib/data/dokumen";
 import { bacaBerkas, tipeDari } from "@/lib/storage";
 
 /**
@@ -26,31 +26,7 @@ export async function GET(
 
   const { versiId } = await params;
 
-  const versi = await prisma.documentVersion.findUnique({
-    where: { id: versiId },
-    select: {
-      namaFile: true, objectKey: true, ukuranByte: true,
-      document: {
-        select: {
-          legality: { select: { projectId: true } },
-          projectAnalisa: { select: { id: true } },
-          unitTypeModel3d: { select: { projectId: true } },
-          unitTypeGambarKerjaPdf: { select: { projectId: true } },
-          unitTypeGambarKerjaDwg: { select: { projectId: true } },
-          unitTypeRender: { select: { projectId: true } },
-          unitTypeSpek: { select: { projectId: true } },
-          infraModel3d: { select: { projectId: true } },
-          infraGambarKerjaPdf: { select: { projectId: true } },
-          infraGambarKerjaDwg: { select: { projectId: true } },
-          ktDesain: { select: { unit: { select: { projectId: true } } } },
-          ktModel3d: { select: { unit: { select: { projectId: true } } } },
-          ktGambarKerjaPdf: { select: { unit: { select: { projectId: true } } } },
-          ktGambarKerjaDwg: { select: { unit: { select: { projectId: true } } } },
-          ktRab: { select: { unit: { select: { projectId: true } } } },
-        },
-      },
-    },
-  });
+  const versi = await versiDokumen(versiId);
 
   if (!versi) return new NextResponse("Dokumen tidak ditemukan.", { status: 404 });
 
@@ -61,25 +37,7 @@ export async function GET(
     );
   }
 
-  // Kumpulkan proyek pemilik dokumen dari relasi mana pun yang terisi.
-  const d = versi.document;
-  const proyekTerkait = [
-    d.legality?.projectId,
-    d.projectAnalisa?.id,
-    d.unitTypeModel3d?.projectId,
-    d.unitTypeGambarKerjaPdf?.projectId,
-    d.unitTypeGambarKerjaDwg?.projectId,
-    d.unitTypeRender?.projectId,
-    d.unitTypeSpek?.projectId,
-    ...d.infraModel3d.map((x) => x.projectId),
-    ...d.infraGambarKerjaPdf.map((x) => x.projectId),
-    ...d.infraGambarKerjaDwg.map((x) => x.projectId),
-    ...d.ktDesain.map((x) => x.unit.projectId),
-    ...d.ktModel3d.map((x) => x.unit.projectId),
-    ...d.ktGambarKerjaPdf.map((x) => x.unit.projectId),
-    ...d.ktGambarKerjaDwg.map((x) => x.unit.projectId),
-    ...d.ktRab.map((x) => x.unit.projectId),
-  ].filter((x): x is string => !!x);
+  const proyekTerkait = proyekPemilikDokumen(versi.document);
 
   // Dokumen yang tidak tertaut ke proyek mana pun ditolak, bukan diloloskan —
   // yatim piatu tidak boleh jadi celah untuk melewati pembatasan proyek.
