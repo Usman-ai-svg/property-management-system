@@ -17,7 +17,7 @@ import {
   UbahBarisBoq,
   type PilihanObjek,
 } from "./editors-boq";
-import { RingkasOpname, TabelOpnameSpk, type ObjekOpname } from "./opname";
+import { RingkasOpname } from "@/components/opname-spk";
 
 /**
  * Detail satu SPK: rincian pekerjaan yang diperintahkan, dan opname progresnya.
@@ -81,16 +81,6 @@ export default async function DetailKontrak({
   const pilihanObjek: PilihanObjek[] = semuaObjek.map((o) => ({
     kunci: o.kunci,
     label: `${o.label} · ${o.keterangan}`,
-  }));
-
-  const untukOpname: ObjekOpname[] = semuaObjek.map((o) => ({
-    kunci: o.kunci,
-    label: o.label,
-    keterangan: o.keterangan,
-    baris: o.baris.map((b) => ({
-      id: b.id, grup: b.grup, uraian: b.uraian, satuan: b.satuan,
-      volume: b.volume, hargaSatuan: b.hargaSatuan, progress: b.progress,
-    })),
   }));
 
   const adaBoq = kontrak.boqItems.length > 0;
@@ -201,7 +191,7 @@ export default async function DetailKontrak({
         </Tabel>
       </div>
 
-      {/* ---------- rincian & opname ---------- */}
+      {/* ---------- rincian pekerjaan (BOQ) ---------- */}
       <div
         style={{
           display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -210,12 +200,12 @@ export default async function DetailKontrak({
       >
         <div>
           <div className="sectitle" style={{ margin: 0 }}>
-            Rincian Pekerjaan &amp; Opname
+            Rincian Pekerjaan (BOQ)
           </div>
           <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>
             {adaBoq
-              ? "Isi persentase tiap pekerjaan, lalu simpan sekali untuk seluruh SPK."
-              : "Rinci dulu pekerjaan SPK ini sebelum progres bisa diopname per baris."}
+              ? "Definisi lingkup pekerjaan SPK — dasar RAB. Opname progres diisi di modul Konstruksi."
+              : "Rinci dulu pekerjaan SPK ini; opname progres diisi di modul Konstruksi."}
           </div>
         </div>
 
@@ -234,14 +224,21 @@ export default async function DetailKontrak({
         )}
       </div>
 
-      {adaBoq ? (
-        <TabelOpnameSpk
-          contractId={kontrak.id}
-          objek={untukOpname}
-          bolehUbah={bolehUbahProgres}
-          bolehHarga={bolehHarga}
-        />
-      ) : (
+      <div
+        className="card"
+        style={{ padding: "12px 16px", marginBottom: 12, background: "var(--rona-panel)", fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}
+      >
+        Opname progres vendor kini diisi di{" "}
+        <Link
+          href={`/konstruksi/${kontrak.project.kode}/vendor/${encodeURIComponent(kontrak.kode)}`}
+          style={{ color: "var(--teal)", fontWeight: 600 }}
+        >
+          Konstruksi › Progress Vendor › {kontrak.kode}
+        </Link>
+        . Di halaman ini BOQ berfungsi sebagai dasar RAB-nya.
+      </div>
+
+      {!adaBoq && (
         <div
           className="card"
           style={{ padding: 22, textAlign: "center", color: "var(--muted)", fontSize: 12.5 }}

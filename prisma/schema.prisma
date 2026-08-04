@@ -418,6 +418,13 @@ model UnitBoqItem {
   /// minggu ini tanpa perlu tabel riwayat per baris tersendiri.
   progressLalu Int @default(0)
 
+  /// Kapan `progressLalu` terakhir DIGESER (awal "minggu berjalan" baris ini).
+  /// Dipakai aturan opname mingguan: opname dalam <5 hari kerja sejak tanggal
+  /// ini dianggap KOREKSI dan tidak menggeser `progressLalu`, sehingga rekap
+  /// minggu lalu tidak rusak saat QS memperbaiki salah input. Null = belum
+  /// pernah diopname.
+  progressLaluPada DateTime?
+
   unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
   @@index([unitId])
@@ -601,6 +608,9 @@ model InfrastructureBoqItem {
   progress     Int @default(0)
   progressLalu Int @default(0)
 
+  /// Awal "minggu berjalan" baris ini — lihat `UnitBoqItem.progressLaluPada`.
+  progressLaluPada DateTime?
+
   infrastructure Infrastructure @relation(fields: [infrastructureId], references: [id], onDelete: Cascade)
 
   @@index([infrastructureId])
@@ -705,8 +715,16 @@ model ContractBoqItem {
   volume      Float
   hargaSatuan Float
 
-  /// Persentase penyelesaian baris ini, 0–100. Diisi QS saat opname.
+  /// Persentase penyelesaian baris ini, 0–100. Diisi QS saat opname (Progress
+  /// Vendor). Terpisah dari Progress Konstruksi pada BOQ Master.
   progress Int @default(0)
+
+  /// Nilai `progress` pada opname sebelumnya + kapan minggu berjalan dimulai —
+  /// sama peran & aturannya dengan `UnitBoqItem.progressLalu`/`progressLaluPada`.
+  /// Dipakai tabel Laporan Opname Mingguan pada Progress Vendor.
+  progressLalu     Int       @default(0)
+  progressLaluPada DateTime?
+
   urutan   Int @default(0)
 
   contract       Contract        @relation(fields: [contractId], references: [id], onDelete: Cascade)

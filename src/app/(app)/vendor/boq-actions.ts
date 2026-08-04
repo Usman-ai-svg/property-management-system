@@ -6,6 +6,7 @@ import { catat } from "@/lib/audit";
 import { angka, GagalIzin, HasilAksi, izinkan, jalankan, teks } from "@/lib/actions/guard";
 import { nilaiTerpasang, periksaBarisBoqSpk } from "@/lib/calc/kontrak-boq";
 import { bacaBoqDariExcel } from "@/lib/impor-excel";
+import { mingguBaru } from "@/lib/calc/hari-kerja";
 
 /**
  * BOQ SPK: rincian pekerjaan yang diperintahkan sebuah kontrak, dan progres
@@ -193,11 +194,16 @@ export async function simpanProgresBoqSpk(
 
     const sebelum = await prisma.contractBoqItem.findMany({
       where: { id: { in: ids }, contractId },
-      select: { id: true, uraian: true, progress: true },
+      select: { id: true, uraian: true, progress: true, progressLalu: true, progressLaluPada: true },
     });
     const petaLama = new Map(sebelum.map((b) => [b.id, b]));
 
-    const ubah: { id: string; progress: number }[] = [];
+    // Aturan minggu berjalan yang sama dengan opname konstruksi: koreksi dalam
+    // minggu yang sama (<5 hari kerja) tidak menggeser `progressLalu`, supaya
+    // rekap opname mingguan vendor tidak rusak saat salah input diperbaiki.
+    const sekarang = new Date();
+
+    const ubah: { id: string; progress: number; progressLalu: number; progressLaluPada: Date }[] = [];
     for (let i = 0; i < ids.length; i++) {
       const lama = petaLama.get(ids[i]);
       // Baris yang bukan milik kontrak ini diabaikan, bukan menggagalkan
@@ -209,14 +215,25 @@ export async function simpanProgresBoqSpk(
         throw new GagalIzin(`Progres "${lama.uraian}" harus di antara 0 dan 100 persen.`);
       }
       const bulat = Math.round(p);
-      if (bulat !== lama.progress) ubah.push({ id: ids[i], progress: bulat });
+      if (bulat === lama.progress) continue;
+
+      const baru = mingguBaru(lama.progressLaluPada, sekarang);
+      ubah.push({
+        id: ids[i],
+        progress: bulat,
+        progressLalu: baru ? lama.progress : lama.progressLalu,
+        progressLaluPada: baru ? sekarang : (lama.progressLaluPada ?? sekarang),
+      });
     }
 
     if (ubah.length === 0) return "Tidak ada progres yang berubah.";
 
     await prisma.$transaction(
       ubah.map((u) =>
-        prisma.contractBoqItem.update({ where: { id: u.id }, data: { progress: u.progress } }),
+        prisma.contractBoqItem.update({
+          where: { id: u.id },
+          data: { progress: u.progress, progressLalu: u.progressLalu, progressLaluPada: u.progressLaluPada },
+        }),
       ),
     );
 

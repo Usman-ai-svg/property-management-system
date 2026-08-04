@@ -104,8 +104,13 @@ export function OpnameBoq({
           const nilaiBaris = b.volume * b.hargaSatuan;
           const p = angka(b.id);
           const diubah = semula.get(b.id) !== p;
+          // Baris yang sedang disunting tetap kuning (perubahan belum tersimpan);
+          // di luar itu, pekerjaan yang sudah 100% ditandai hijau.
           return (
-            <tr key={b.id} style={{ background: diubah ? "var(--rona-amber)" : undefined }}>
+            <tr
+              key={b.id}
+              style={{ background: diubah ? "var(--rona-amber)" : p === 100 ? "var(--rona-hijau)" : undefined }}
+            >
               <td style={{ color: "var(--muted)", fontSize: 11 }}>{b.grup}</td>
               <td>{b.uraian}</td>
               <td style={{ textAlign: "right" }}>{b.volume.toLocaleString("id-ID")}</td>

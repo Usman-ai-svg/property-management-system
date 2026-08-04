@@ -8,6 +8,7 @@ import {
   hitungUlangProgresSarpras,
   hitungUlangProgresUnit,
 } from "@/lib/data/progres-konstruksi";
+import { mingguBaru } from "@/lib/calc/hari-kerja";
 
 /**
  * Pembaruan progres dari modul Konstruksi.
@@ -240,15 +241,21 @@ async function simpanBarisOpname(
     jenis === "unit"
       ? await prisma.unitBoqItem.findMany({
           where: { id: { in: ids }, unitId: objekId },
-          select: { id: true, uraian: true, progress: true },
+          select: { id: true, uraian: true, progress: true, progressLalu: true, progressLaluPada: true },
         })
       : await prisma.infrastructureBoqItem.findMany({
           where: { id: { in: ids }, infrastructureId: objekId },
-          select: { id: true, uraian: true, progress: true },
+          select: { id: true, uraian: true, progress: true, progressLalu: true, progressLaluPada: true },
         });
   const petaLama = new Map(sebelum.map((b) => [b.id, b]));
 
-  const ubah: { id: string; progress: number; progressLalu: number }[] = [];
+  // Aturan minggu berjalan: `progressLalu` hanya digeser bila opname ini masuk
+  // minggu baru (≥5 hari kerja sejak awal minggu berjalan baris itu). Koreksi
+  // dalam minggu yang sama hanya memperbarui `progress` tanpa merusak rekap
+  // minggu lalu.
+  const sekarang = new Date();
+
+  const ubah: { id: string; progress: number; progressLalu: number; progressLaluPada: Date }[] = [];
   for (let i = 0; i < ids.length; i++) {
     const lama = petaLama.get(ids[i]);
     if (!lama) continue;
@@ -258,9 +265,15 @@ async function simpanBarisOpname(
       throw new GagalIzin(`Progres "${lama.uraian}" harus di antara 0 dan 100 persen.`);
     }
     const bulat = Math.round(p);
-    if (bulat !== lama.progress) {
-      ubah.push({ id: ids[i], progress: bulat, progressLalu: lama.progress });
-    }
+    if (bulat === lama.progress) continue;
+
+    const baru = mingguBaru(lama.progressLaluPada, sekarang);
+    ubah.push({
+      id: ids[i],
+      progress: bulat,
+      progressLalu: baru ? lama.progress : lama.progressLalu,
+      progressLaluPada: baru ? sekarang : (lama.progressLaluPada ?? sekarang),
+    });
   }
 
   if (ubah.length === 0) return 0;
@@ -270,11 +283,11 @@ async function simpanBarisOpname(
       jenis === "unit"
         ? prisma.unitBoqItem.update({
             where: { id: u.id },
-            data: { progress: u.progress, progressLalu: u.progressLalu },
+            data: { progress: u.progress, progressLalu: u.progressLalu, progressLaluPada: u.progressLaluPada },
           })
         : prisma.infrastructureBoqItem.update({
             where: { id: u.id },
-            data: { progress: u.progress, progressLalu: u.progressLalu },
+            data: { progress: u.progress, progressLalu: u.progressLalu, progressLaluPada: u.progressLaluPada },
           }),
     ),
   );

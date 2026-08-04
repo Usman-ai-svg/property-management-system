@@ -1,13 +1,14 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
-import { unitKonstruksi } from "@/lib/data/konstruksi";
-import { duaTitikProgres } from "@/lib/data/konstruksi";
+import { unitKonstruksi, daftarUnitKonstruksi } from "@/lib/data/konstruksi";
 import { susunOpname } from "@/lib/calc/opname";
+import { tanggal } from "@/lib/format";
 import { OpnameBoq } from "@/components/opname-boq";
 import { Badge, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { TabelMingguan } from "@/components/tabel-mingguan";
 import { UbahProgres } from "@/components/ubah-progres";
+import { NavObjek } from "@/components/nav-objek";
 import { ubahProgresUnit, simpanOpnameUnit } from "../../../actions";
 
 export default async function OpnameUnit({
@@ -48,7 +49,16 @@ export default async function OpnameUnit({
     );
   }
 
-    const baris = susunOpname(unit.boqItems);
+  const baris = susunOpname(unit.boqItems);
+
+  // Navigasi antar unit + catatan opname terakhir (untuk melacak kapan unit
+  // terakhir diperbarui, mis. saat pembangunannya sempat dihentikan).
+  const daftarUnit = await daftarUnitKonstruksi(unit.projectId);
+  const opsiUnit = daftarUnit.map((d) => ({
+    kode: d.kode,
+    label: `${d.phase.kode}-${d.nomor} · ${d.unitType.nama}`,
+  }));
+  const rekamTerakhir = unit.progressRecords[0] ?? null;
 
   return (
     <div style={{ padding: 24 }}>
@@ -65,6 +75,15 @@ export default async function OpnameUnit({
         <b style={{ color: "var(--text)" }}>Unit {unit.nomor}</b>
       </div>
 
+      <div style={{ marginBottom: 12 }}>
+        <NavObjek
+          basis={`/konstruksi/${kodeProyek}/unit`}
+          sekarang={unit.kode}
+          daftar={opsiUnit}
+          ariaLabel="Pilih unit"
+        />
+      </div>
+
       <div
         style={{
           display: "flex", justifyContent: "space-between", alignItems: "flex-end",
@@ -76,6 +95,11 @@ export default async function OpnameUnit({
             Fase {unit.phase.kode} · {unit.unitType.nama}
           </div>
           <h3 className="disp" style={{ margin: "4px 0 0", fontSize: 19 }}>Unit {unit.nomor}</h3>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+            {rekamTerakhir
+              ? `Update terakhir: ${tanggal(rekamTerakhir.tanggal)}${rekamTerakhir.dicatatOleh ? ` · oleh ${rekamTerakhir.dicatatOleh}` : ""}`
+              : "Belum ada catatan progres"}
+          </div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <Badge nilai={unit.statusPembangunan} peta={WARNA_STATUS.bangun} />
@@ -116,8 +140,10 @@ export default async function OpnameUnit({
 
       <div className="sectitle">Laporan opname mingguan</div>
       <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 10, lineHeight: 1.6 }}>
-        Kolom &ldquo;minggu lalu&rdquo; adalah capaian tiap baris pada opname sebelumnya,
-        disimpan otomatis setiap kali opname di atas tersimpan.
+        Kolom &ldquo;minggu lalu&rdquo; adalah capaian tiap baris pada opname minggu
+        sebelumnya. Ia hanya bergeser bila opname berikutnya berjarak minimal satu
+        minggu kerja (5 hari kerja, Senin&ndash;Sabtu) — koreksi dalam minggu yang
+        sama tidak mengubahnya.
       </div>
 
       <TabelMingguan baris={baris} bolehHarga={bolehHarga} />

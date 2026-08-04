@@ -107,6 +107,11 @@ export async function isiKonstruksiProyek(
           id: true, kode: true, nomor: true, progress: true, statusPembangunan: true,
           phase: { select: { kode: true } },
           unitType: { select: { nama: true } },
+          // Untuk "Keterangan Pekerjaan": grup BOQ yang sedang berjalan diturunkan
+          // dari progres tertimbang per grup, bukan lagi ditebak dari angka persen.
+          boqItems: { select: { grup: true, volume: true, hargaSatuan: true, progress: true } },
+          // Untuk laporan meeting: kapan unit ini terakhir diopname.
+          progressRecords: { orderBy: { tanggal: "desc" }, take: 1, select: { tanggal: true } },
         },
       })
     : [];
@@ -135,6 +140,13 @@ export async function unitKonstruksi(unitKode: string) {
       phase: { select: { kode: true } },
       project: { select: { kode: true, nama: true } },
       unitType: { select: { nama: true } },
+      // Catatan progres terakhir → "update terakhir" di kepala halaman, supaya
+      // penghentian sementara pembangunan bisa terlacak dari kapan terakhir diisi.
+      progressRecords: {
+        orderBy: { tanggal: "desc" },
+        take: 1,
+        select: { tanggal: true, dicatatOleh: true },
+      },
       boqItems: {
         orderBy: { urutan: "asc" },
         select: {
@@ -142,6 +154,51 @@ export async function unitKonstruksi(unitKode: string) {
           volume: true, hargaSatuan: true, progress: true, progressLalu: true,
         },
       },
+    },
+  });
+}
+
+/**
+ * Daftar ringkas seluruh unit sebuah proyek, untuk penyeleksi navigasi antar
+ * unit di halaman Detail Progress Unit. Urutannya sama dengan tabel proyek.
+ */
+export async function daftarUnitKonstruksi(projectId: string) {
+  return prisma.unit.findMany({
+    where: { projectId },
+    orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
+    select: {
+      kode: true, nomor: true,
+      phase: { select: { kode: true } },
+      unitType: { select: { nama: true } },
+    },
+  });
+}
+
+/** Daftar ringkas sarpras sebuah proyek, untuk penyeleksi navigasi antar item. */
+export async function daftarSarprasKonstruksi(projectId: string) {
+  return prisma.infrastructure.findMany({
+    where: { projectId },
+    orderBy: { kode: "asc" },
+    select: { kode: true, nama: true, jenis: true },
+  });
+}
+
+/**
+ * Progress Vendor per proyek: daftar SPK proyek ini beserta baris BOQ
+ * kontraknya (untuk menghitung capaian tertimbang) dan jumlah objek tercakup.
+ *
+ * Progress Vendor SENGAJA terpisah dari Progress Konstruksi — lihat
+ * `lib/data/progres-konstruksi.ts`. Yang dihitung di sini hanya lingkup SPK.
+ */
+export async function vendorKonstruksiProyek(projectId: string) {
+  return prisma.contract.findMany({
+    where: { projectId },
+    orderBy: { kode: "asc" },
+    select: {
+      id: true, kode: true, jenis: true, deskripsi: true, nominal: true,
+      vendor: { select: { id: true, nama: true } },
+      boqItems: { select: { volume: true, hargaSatuan: true, progress: true } },
+      _count: { select: { units: true, infrastructures: true } },
     },
   });
 }

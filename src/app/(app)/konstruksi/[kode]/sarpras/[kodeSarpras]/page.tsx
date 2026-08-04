@@ -1,13 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
-import { sarprasKonstruksi } from "@/lib/data/konstruksi";
-import { duaTitikProgres } from "@/lib/data/konstruksi";
+import { sarprasKonstruksi, daftarSarprasKonstruksi } from "@/lib/data/konstruksi";
 import { susunOpname } from "@/lib/calc/opname";
 import { OpnameBoq } from "@/components/opname-boq";
 import { Badge, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { TabelMingguan } from "@/components/tabel-mingguan";
 import { UbahProgres } from "@/components/ubah-progres";
+import { NavObjek } from "@/components/nav-objek";
 import { ubahProgresSarpras, simpanOpnameSarpras } from "../../../actions";
 
 export default async function OpnameSarpras({
@@ -47,7 +47,13 @@ export default async function OpnameSarpras({
     );
   }
 
-    const baris = susunOpname(item.boqItems);
+  const baris = susunOpname(item.boqItems);
+
+  const daftarSarpras = await daftarSarprasKonstruksi(item.projectId);
+  const opsiSarpras = daftarSarpras.map((s) => ({
+    kode: s.kode,
+    label: `${s.nama} · ${s.jenis}`,
+  }));
 
   return (
     <div style={{ padding: 24 }}>
@@ -64,6 +70,15 @@ export default async function OpnameSarpras({
         </Link>
         {" / "}
         <b style={{ color: "var(--text)" }}>{item.nama}</b>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <NavObjek
+          basis={`/konstruksi/${kodeProyek}/sarpras`}
+          sekarang={item.kode}
+          daftar={opsiSarpras}
+          ariaLabel="Pilih sarana & prasarana"
+        />
       </div>
 
       <div
@@ -112,8 +127,10 @@ export default async function OpnameSarpras({
 
       <div className="sectitle">Laporan opname mingguan</div>
       <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 10, lineHeight: 1.6 }}>
-        Kolom &ldquo;minggu lalu&rdquo; adalah capaian tiap baris pada opname sebelumnya,
-        disimpan otomatis setiap kali opname di atas tersimpan.
+        Kolom &ldquo;minggu lalu&rdquo; adalah capaian tiap baris pada opname minggu
+        sebelumnya. Ia hanya bergeser bila opname berikutnya berjarak minimal satu
+        minggu kerja (5 hari kerja, Senin&ndash;Sabtu) — koreksi dalam minggu yang
+        sama tidak mengubahnya.
       </div>
 
       <TabelMingguan baris={baris} bolehHarga={bolehHarga} />

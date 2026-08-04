@@ -127,16 +127,29 @@ export function ringkasOpname(rows: BarisOpname[]) {
 }
 
 /**
- * Keterangan pekerjaan yang sedang berjalan pada suatu tingkat progres.
- * Dipakai sebagai label ringkas di daftar unit.
+ * Grup pekerjaan yang SEDANG berjalan, diturunkan dari progres per baris BOQ
+ * Master — bukan lagi ditebak dari satu angka persen unit.
+ *
+ * Syaratnya per grup: progres tertimbang grup itu 0 < x < 100. Bisa mengembalikan
+ * LEBIH DARI SATU grup — mis. Struktur dan Arsitektur berjalan bersamaan asal
+ * masing-masing progresnya di antara 0 dan 100. Grup yang seluruhnya 0% (belum
+ * mulai) atau 100% (selesai) tidak ikut. Unit tanpa baris BOQ → daftar kosong.
  */
-export function keteranganPekerjaan(progres: number): string[] {
-  if (progres <= 0) return ["Belum mulai"];
-  if (progres >= 100) return ["Selesai"];
-  if (progres < 25) return ["Pek. Struktur"];
-  if (progres < 40) return ["Pek. Struktur", "Pek. Arsitektur"];
-  if (progres < 55) return ["Pek. Arsitektur"];
-  if (progres < 70) return ["Pek. Kusen & Pintu", "Pek. Kanopi"];
-  if (progres < 85) return ["Pek. Kanopi", "Pek. Taman"];
-  return ["Pek. Taman"];
+export function grupBerjalan(
+  rows: { grup: string; volume: number; hargaSatuan: number; progress: number }[],
+): string[] {
+  const peta = new Map<string, { nilai: number; terpasang: number }>();
+  for (const r of rows) {
+    const nilai = r.volume * r.hargaSatuan;
+    const g = peta.get(r.grup) ?? { nilai: 0, terpasang: 0 };
+    g.nilai += nilai;
+    g.terpasang += nilai * (r.progress / 100);
+    peta.set(r.grup, g);
+  }
+  return [...peta.entries()]
+    .filter(([, v]) => {
+      const p = v.nilai > 0 ? (v.terpasang / v.nilai) * 100 : 0;
+      return p > 0 && p < 100;
+    })
+    .map(([grup]) => grup);
 }

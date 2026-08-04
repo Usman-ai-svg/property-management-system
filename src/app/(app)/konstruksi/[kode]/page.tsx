@@ -1,11 +1,16 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
-import { isiKonstruksiProyek, proyekKonstruksi } from "@/lib/data/konstruksi";
-import { keteranganPekerjaan } from "@/lib/calc/opname";
+import { isiKonstruksiProyek, proyekKonstruksi, vendorKonstruksiProyek } from "@/lib/data/konstruksi";
+import { grupBerjalan } from "@/lib/calc/opname";
+import { progresTertimbang } from "@/lib/calc/kontrak-boq";
+import { rp, tanggal } from "@/lib/format";
 import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
-import { FilterKonstruksi } from "./filter";
 import { Tabel } from "@/components/kartu-tabel";
+import { RingkasProgress } from "@/components/ringkas-progress";
+import { TombolLaporan } from "@/components/laporan-tombol";
+import { IsiLaporan, type DataLaporanKonstruksi } from "@/components/laporan-konstruksi";
+import { FilterKonstruksi } from "./filter";
 
 export default async function ProgresProyek({
   params,
@@ -27,10 +32,13 @@ export default async function ProgresProyek({
 
   const bolehUnit = bolehLihat(pengguna, "daftarUnit");
   const bolehSarpras = bolehLihat(pengguna, "daftarSarpras");
+  const bolehVendor = bolehLihat(pengguna, "progress");
+  const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
 
   const { unit, sarpras } = await isiKonstruksiProyek(proyek.id, {
     fase, bolehUnit, bolehSarpras,
   });
+  const kontrak = bolehVendor ? await vendorKonstruksiProyek(proyek.id) : [];
 
   // Pencarian dilakukan di sini, bukan di database, karena yang dicari adalah
   // gabungan "F2-3 Galileo" yang tidak tersimpan sebagai satu kolom.
@@ -41,11 +49,39 @@ export default async function ProgresProyek({
       )
     : unit;
 
+  // Data laporan meeting — memuat SELURUH unit (bukan hasil saringan), supaya
+  // laporan tetap utuh apa pun filter yang sedang aktif di layar.
+  const dataLaporan: DataLaporanKonstruksi = {
+    proyek: { kode: kodeProyek, nama: proyek.nama },
+    dicetak: tanggal(new Date()),
+    unit: unit.map((u) => ({
+      nomor: u.nomor, fase: u.phase.kode, tipe: u.unitType.nama,
+      progress: u.progress, grup: grupBerjalan(u.boqItems), status: u.statusPembangunan,
+      updateTerakhir: u.progressRecords[0] ? tanggal(u.progressRecords[0].tanggal) : null,
+    })),
+    sarpras: sarpras.map((s) => ({
+      nama: s.nama, jenis: s.jenis, volume: s.volume, progress: s.progress, status: s.status,
+    })),
+  };
 
   return (
     <div style={{ padding: 24 }}>
-      <div className="eyebrow">Manajemen Proyek · Konstruksi</div>
-      <h2 className="disp" style={{ margin: "4px 0 14px", fontSize: 20 }}>{proyek.nama}</h2>
+      <div
+        style={{
+          display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+          gap: 12, flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <div className="eyebrow">Manajemen Proyek · Konstruksi</div>
+          <h2 className="disp" style={{ margin: "4px 0 14px", fontSize: 20 }}>{proyek.nama}</h2>
+        </div>
+        {(bolehUnit || bolehSarpras) && (
+          <TombolLaporan kodeProyek={kodeProyek}>
+            <IsiLaporan data={dataLaporan} />
+          </TombolLaporan>
+        )}
+      </div>
 
       <Link
         href="/konstruksi"
@@ -58,6 +94,26 @@ export default async function ProgresProyek({
         <Badge nilai={proyek.statusLahan} peta={WARNA_STATUS.lahan} />
       </div>
 
+      {/* ---------- ringkasan progress ---------- */}
+      {(bolehUnit || bolehSarpras) && (
+        <div className="grid grid2" style={{ gap: 12, marginBottom: 16 }}>
+          {bolehUnit && (
+            <RingkasProgress
+              judul="Ringkasan Progress Unit"
+              nilai={unit.map((u) => u.progress)}
+              satuan="unit"
+            />
+          )}
+          {bolehSarpras && (
+            <RingkasProgress
+              judul="Ringkasan Progress Sarana & Prasarana"
+              nilai={sarpras.map((s) => s.progress)}
+              satuan="item"
+            />
+          )}
+        </div>
+      )}
+
       <FilterKonstruksi
         fases={proyek.fases.map((f) => f.kode)}
         faseAktif={fase}
@@ -67,7 +123,7 @@ export default async function ProgresProyek({
       {/* ---------- unit ---------- */}
       <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>
         <TabelHead
-          judul={`Tabel Progress Unit · ${unitTampil.length} unit`}
+          judul={`Progress Unit · ${unitTampil.length} unit`}
           keterangan="Klik nomor unit untuk membuka rincian mingguan."
         />
         {!bolehUnit ? (
@@ -87,50 +143,57 @@ export default async function ProgresProyek({
             ]}
             kosong="Tidak ada unit yang cocok dengan saringan ini."
           >
-            {unitTampil.map((u) => (
-              <tr key={u.id}>
-                <td>
-                  <Link
-                    href={`/konstruksi/${kodeProyek}/unit/${encodeURIComponent(u.kode)}`}
-                    style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
-                  >
-                    {u.nomor}
-                  </Link>
-                </td>
-                <td>{u.phase.kode}</td>
-                <td>{u.unitType.nama}</td>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Track
-                      nilai={u.progress}
-                      tinggi={9}
-                      warna={u.progress === 100 ? "var(--green)" : "var(--teal)"}
-                    />
-                    <span style={{ fontSize: 11, color: "var(--muted)", width: 30 }}>{u.progress}%</span>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {keteranganPekerjaan(u.progress).map((k) => (
-                      <span key={k} className="chip" style={{ background: "var(--rona-teal)", color: "var(--teal)" }}>
-                        {k}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td>
-                  <Badge nilai={u.statusPembangunan} peta={WARNA_STATUS.bangun} />
-                </td>
-              </tr>
-            ))}
+            {unitTampil.map((u) => {
+              const grup = grupBerjalan(u.boqItems);
+              return (
+                <tr key={u.id}>
+                  <td>
+                    <Link
+                      href={`/konstruksi/${kodeProyek}/unit/${encodeURIComponent(u.kode)}`}
+                      style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
+                    >
+                      {u.nomor}
+                    </Link>
+                  </td>
+                  <td>{u.phase.kode}</td>
+                  <td>{u.unitType.nama}</td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <Track
+                        nilai={u.progress}
+                        tinggi={9}
+                        warna={u.progress === 100 ? "var(--green)" : "var(--teal)"}
+                      />
+                      <span style={{ fontSize: 11, color: "var(--muted)", width: 30 }}>{u.progress}%</span>
+                    </div>
+                  </td>
+                  <td>
+                    {grup.length === 0 ? (
+                      <span style={{ color: "var(--muted)" }}>—</span>
+                    ) : (
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {grup.map((k) => (
+                          <span key={k} className="chip" style={{ background: "var(--rona-teal)", color: "var(--teal)" }}>
+                            {k}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    <Badge nilai={u.statusPembangunan} peta={WARNA_STATUS.bangun} />
+                  </td>
+                </tr>
+              );
+            })}
           </Tabel>
         )}
       </div>
 
       {/* ---------- sarpras ---------- */}
-      <div className="card" style={{ overflow: "hidden" }}>
+      <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>
         <TabelHead
-          judul={`Tabel Progress Sarana & Prasarana · ${sarpras.length} item`}
+          judul={`Sarana & Prasarana · ${sarpras.length} item`}
           keterangan="Klik nama item untuk membuka rincian mingguan."
         />
         {!bolehSarpras ? (
@@ -178,6 +241,60 @@ export default async function ProgresProyek({
           </Tabel>
         )}
       </div>
+
+      {/* ---------- Progress Vendor ---------- */}
+      {bolehVendor && (
+        <div className="card" style={{ overflow: "hidden" }}>
+          <TabelHead
+            judul={`Progress Vendor · ${kontrak.length} SPK`}
+            keterangan="Capaian per SPK dari BOQ kontrak (lingkup vendor, terpisah dari Progress Konstruksi). Klik untuk membuka objek & opname-nya."
+          />
+          <Tabel
+            kolom={[
+              { label: "SPK" },
+              { label: "Vendor" },
+              { label: "Pekerjaan" },
+              bolehHarga && { label: "Nilai", rata: "kanan" },
+              { label: "Objek", rata: "kanan" },
+              { label: "Progress Vendor", minLebar: 190 },
+            ]}
+            kosong="Belum ada SPK vendor pada proyek ini."
+          >
+            {kontrak.map((c) => {
+              const progres = c.boqItems.length ? progresTertimbang(c.boqItems) : 0;
+              const jumlahObjek = c._count.units + c._count.infrastructures;
+              return (
+                <tr key={c.id}>
+                  <td>
+                    <Link
+                      href={`/konstruksi/${kodeProyek}/vendor/${encodeURIComponent(c.kode)}`}
+                      style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
+                    >
+                      {c.kode}
+                    </Link>
+                  </td>
+                  <td>{c.vendor.nama}</td>
+                  <td style={{ color: "var(--muted)" }}>{c.deskripsi}</td>
+                  {bolehHarga && (
+                    <td className="num" style={{ textAlign: "right" }}>{rp(c.nominal)}</td>
+                  )}
+                  <td style={{ textAlign: "right" }}>{jumlahObjek}</td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <Track
+                        nilai={progres}
+                        tinggi={9}
+                        warna={progres === 100 ? "var(--green)" : "var(--brass)"}
+                      />
+                      <span style={{ fontSize: 11, color: "var(--muted)", width: 30 }}>{progres}%</span>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </Tabel>
+        </div>
+      )}
     </div>
   );
 }

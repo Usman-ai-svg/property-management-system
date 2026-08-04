@@ -177,7 +177,7 @@ export async function kontrakDetail(kode: string) {
         orderBy: [{ urutan: "asc" }],
         select: {
           id: true, unitId: true, infrastructureId: true, grup: true, uraian: true,
-          satuan: true, volume: true, hargaSatuan: true, progress: true,
+          satuan: true, volume: true, hargaSatuan: true, progress: true, progressLalu: true,
         },
       },
     },

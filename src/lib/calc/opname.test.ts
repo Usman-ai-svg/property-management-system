@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   fraksiBaris,
-  keteranganPekerjaan,
+  grupBerjalan,
   ringkasOpname,
   susunOpname,
   susunOpnameDariPersen,
@@ -83,17 +83,33 @@ describe("susunOpname", () => {
   });
 });
 
-describe("keteranganPekerjaan", () => {
-  it("menyebut belum mulai pada nol persen", () => {
-    assert.deepEqual(keteranganPekerjaan(0), ["Belum mulai"]);
+describe("grupBerjalan", () => {
+  const b = (grup: string, progress: number) => ({ grup, volume: 1, hargaSatuan: 1_000_000, progress });
+
+  it("hanya menyebut grup yang progres tertimbangnya 0<x<100", () => {
+    const rows = [
+      b("Struktur", 100), b("Struktur", 100),   // selesai → 100%
+      b("Arsitektur", 40), b("Arsitektur", 0),  // berjalan → 20%
+      b("MEP", 0),                               // belum → 0%
+    ];
+    assert.deepEqual(grupBerjalan(rows), ["Arsitektur"]);
   });
 
-  it("menyebut selesai pada seratus persen", () => {
-    assert.deepEqual(keteranganPekerjaan(100), ["Selesai"]);
+  it("bisa menyebut LEBIH DARI SATU grup yang berjalan bersamaan", () => {
+    const rows = [b("Struktur", 60), b("Arsitektur", 30), b("MEP", 0), b("Atap", 100)];
+    assert.deepEqual(grupBerjalan(rows), ["Struktur", "Arsitektur"]);
   });
 
-  it("selalu mengembalikan minimal satu keterangan", () => {
-    for (let p = 0; p <= 100; p++) assert.ok(keteranganPekerjaan(p).length >= 1);
+  it("mengembalikan daftar kosong bila tak ada baris", () => {
+    assert.deepEqual(grupBerjalan([]), []);
+  });
+
+  it("tidak menyebut grup yang seluruhnya sudah 100%", () => {
+    assert.deepEqual(grupBerjalan([b("Atap", 100)]), []);
+  });
+
+  it("menyebut grup dengan satu baris yang sedang dikerjakan", () => {
+    assert.deepEqual(grupBerjalan([b("Taman", 50)]), ["Taman"]);
   });
 });
 
