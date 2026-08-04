@@ -5,7 +5,8 @@ import { detailUnit, kontrakUnit } from "@/lib/data/proyek";
 import { Badge, CardHead, InfoRow, Kartu, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
 import { KATEGORI_EKSTENSI } from "@/lib/storage";
-import { unggahRevisi } from "../../../actions";
+import { hapusUnitPaksa, unggahRevisi } from "../../../actions";
+import { HapusPaksa } from "@/components/hapus-paksa";
 import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
 import { rp } from "@/lib/format";
 import { nilaiUnit } from "@/lib/data/proyek";
@@ -59,6 +60,17 @@ export default async function RincianUnit({
   // disatukan jadi satu angka. Sama untuk unit default (kts kosong, jadi
   // sama dengan RAB/RAP tipe) maupun unit custom.
   const nilai = nilaiUnit({ boqItems, rapItems, rapUpahVolume, rapUpahHarga, customWorks: kts });
+
+  // Rincian RAB & RAP per Kerja Tambah — dipisah agar ringkasan tidak lagi
+  // menggabung seluruh kerja tambah menjadi satu baris. Jumlah baris-baris ini
+  // tepat sama dengan nilai.kerjaTambah / nilai.rapKerjaTambah.
+  const jumlahBaris = (rows?: { volume: number; hargaSatuan: number }[]) =>
+    (rows ?? []).reduce((s, r) => s + r.volume * r.hargaSatuan, 0);
+  const ktNilai = kts.map((kt) => ({
+    judul: kt.judul,
+    rab: jumlahBaris(kt.boqItems),
+    rap: jumlahBaris(kt.rapItems) + (kt.rapUpahVolume || 0) * (kt.rapUpahHarga || 0),
+  }));
 
   return (
     <div style={{ padding: 24 }}>
@@ -144,7 +156,10 @@ export default async function RincianUnit({
           {!bolehDokumen ? (
             <Terbatas apa="Dokumen teknis" />
           ) : (
-            <>
+            // Daftar dokumen dibatasi tingginya dan bisa di-scroll sendiri:
+            // saat unit punya banyak Kerja Tambah, dokumennya tidak lagi
+            // memanjangkan seluruh halaman ke bawah.
+            <div style={{ maxHeight: 460, overflowY: "auto", marginRight: -8, paddingRight: 8 }}>
               <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 6 }}>
                 Diturunkan dari Tipe Unit {unit.unitType.nama} · unggah revisi menyimpan versi lama.
               </div>
@@ -195,7 +210,7 @@ export default async function RincianUnit({
                   ))}
                 </div>
               ))}
-            </>
+            </div>
           )}
         </Kartu>
       </div>
@@ -329,18 +344,32 @@ export default async function RincianUnit({
               <div>
                 <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>RAB</div>
                 <InfoRow label={`Default · Tipe ${unit.unitType.nama}`} nilai={rp(nilai.rabStandar)} />
-                {kts.length > 0 && <InfoRow label={`Kerja Tambah (${kts.length})`} nilai={rp(nilai.kerjaTambah)} />}
+                {ktNilai.map((k, i) => (
+                  <InfoRow key={i} label={`Kerja Tambah · ${k.judul}`} nilai={rp(k.rab)} />
+                ))}
                 <InfoRow label="RAB Unit Ini" nilai={rp(nilai.rab)} tebal />
               </div>
               <div>
                 <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>RAP</div>
                 <InfoRow label={`Default · Tipe ${unit.unitType.nama}`} nilai={rp(nilai.rapMaterial + nilai.rapUpah)} />
-                {kts.length > 0 && <InfoRow label={`Kerja Tambah (${kts.length})`} nilai={rp(nilai.rapKerjaTambah)} />}
+                {ktNilai.map((k, i) => (
+                  <InfoRow key={i} label={`Kerja Tambah · ${k.judul}`} nilai={rp(k.rap)} />
+                ))}
                 <InfoRow label="RAP Unit Ini" nilai={rp(nilai.rap)} tebal />
               </div>
             </div>
           </Kartu>
         </>
+      )}
+
+      {pengguna.peranAktif === "Administrator Sistem" && (
+        <HapusPaksa
+          aksi={hapusUnitPaksa}
+          id={unit.id}
+          kodeProyek={kodeProyek}
+          label={`Unit ${unit.nomor}`}
+          keterangan="Hapus unit ini secara permanen walau progress-nya sudah berjalan — untuk mengganti data lama dengan data baru."
+        />
       )}
     </div>
   );

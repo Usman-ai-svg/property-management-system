@@ -14,7 +14,7 @@ export async function daftarProyek(u: Pengguna) {
     orderBy: { kode: "asc" },
     select: {
       id: true, kode: true, nama: true, status: true, statusLahan: true,
-      kecamatan: true, kota: true,
+      kelurahan: true, kecamatan: true, kota: true,
       luasKavlingEfektif: true, luasSarana: true, luasPrasarana: true, luasRth: true,
       fases: { select: { kode: true }, orderBy: { urutan: "asc" } },
       _count: { select: { units: true, infrastructures: true, unitTypes: true } },

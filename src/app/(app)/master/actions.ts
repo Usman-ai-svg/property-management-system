@@ -1,12 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
 } from "@/lib/actions/guard";
-import { ambilPengguna } from "@/lib/auth/rbac";
+
+/**
+ * Hanya Administrator Sistem yang boleh menghapus paksa. Diperiksa lewat PERAN
+ * AKTIF — konsisten dengan model "Lihat sebagai" aplikasi: seseorang yang
+ * merangkap peran ini harus benar-benar sedang berperan Administrator Sistem
+ * untuk memakainya, bukan sekadar memilikinya.
+ */
+const PERAN_HAPUS_PAKSA = "Administrator Sistem";
 import { bersihkanNamaFile, periksaBerkas, periksaBerkasKategori, simpanBerkas } from "@/lib/storage";
 import {
   JENIS_HAK_ATAS_TANAH, JENIS_SARPRAS, STATUS_JUAL, STATUS_LAHAN, STATUS_PEMBANGUNAN,
@@ -864,6 +872,63 @@ export async function hapusUnit(_s: HasilAksi | null, form: FormData): Promise<H
   });
 }
 
+/**
+ * Hapus paksa unit — melewati kunci "progres harus 0".
+ *
+ * Untuk perubahan besar: mengganti data lama yang sudah terlanjur berjalan.
+ * Dikunci ke peran Administrator Sistem dan meminta pengetikan kode proyek,
+ * karena penghapusan ini permanen dan ikut menghapus seluruh riwayat
+ * progress/opname, baris BOQ/RAP, serta kerja tambah unit (onDelete: Cascade).
+ * Pagar kontrak tetap berlaku: unit yang tercakup kontrak tidak boleh lenyap
+ * diam-diam dari kontraknya.
+ */
+export async function hapusUnitPaksa(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = teks(form, "id", true);
+    const konfirmasi = teks(form, "konfirmasi", true);
+
+    const unit = await prisma.unit.findUnique({
+      where: { id },
+      select: {
+        id: true, kode: true, nomor: true, projectId: true, progress: true,
+        phase: { select: { kode: true } }, project: { select: { kode: true } },
+        _count: { select: { contractUnits: true } },
+      },
+    });
+    if (!unit) throw new GagalIzin("Unit tidak ditemukan.");
+
+    // Izin ubah daftar unit + akses proyek diperiksa sekaligus di sini.
+    const pengguna = await izinkan("daftarUnit", unit.projectId);
+
+    // Di atas izin operasional itu, hapus paksa masih dikunci ke satu peran.
+    if (pengguna.peranAktif !== PERAN_HAPUS_PAKSA) {
+      throw new GagalIzin(`Hanya peran ${PERAN_HAPUS_PAKSA} yang boleh menghapus paksa.`);
+    }
+
+    if (unit._count.contractUnits > 0) {
+      throw new GagalIzin(
+        `Unit ${unit.kode} masih tercakup ${unit._count.contractUnits} kontrak. Lepaskan dari kontrak lebih dulu.`,
+      );
+    }
+    if (konfirmasi.trim().toUpperCase() !== unit.project.kode.toUpperCase()) {
+      throw new GagalIzin(`Ketik kode proyek "${unit.project.kode}" persis untuk mengonfirmasi.`);
+    }
+
+    await prisma.unit.delete({ where: { id } });
+
+    await catat({
+      pengguna, projectId: unit.projectId,
+      objek: `Unit ${unit.phase.kode}-${unit.nomor}`,
+      aksi: "Hapus paksa unit",
+      dari: `${unit.kode} · progres ${unit.progress}%`, ke: "dihapus permanen",
+    });
+
+    revalidatePath(`/master/${unit.project.kode}`);
+    revalidatePath("/");
+    redirect(`/master/${unit.project.kode}`);
+  });
+}
+
 // ===========================================================================
 // BARIS BOQ — inti penyesuaian harga
 // ===========================================================================
@@ -1214,5 +1279,56 @@ export async function hapusSarpras(_s: HasilAksi | null, form: FormData): Promis
     });
 
     segarkan(lama.project.kode);
+  });
+}
+
+/**
+ * Hapus paksa item sarpras — pasangan dari `hapusUnitPaksa`, dengan penjagaan
+ * yang sama: peran Administrator Sistem, konfirmasi kode proyek, dan pagar
+ * kontrak yang tetap berlaku.
+ */
+export async function hapusSarprasPaksa(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = teks(form, "id", true);
+    const konfirmasi = teks(form, "konfirmasi", true);
+
+    const s = await prisma.infrastructure.findUnique({
+      where: { id },
+      select: {
+        id: true, kode: true, nama: true, projectId: true, progress: true,
+        project: { select: { kode: true } },
+        _count: { select: { contractItems: true } },
+      },
+    });
+    if (!s) throw new GagalIzin("Item sarpras tidak ditemukan.");
+
+    // Izin ubah daftar sarpras + akses proyek diperiksa sekaligus di sini.
+    const pengguna = await izinkan("daftarSarpras", s.projectId);
+
+    // Di atas izin operasional itu, hapus paksa masih dikunci ke satu peran.
+    if (pengguna.peranAktif !== PERAN_HAPUS_PAKSA) {
+      throw new GagalIzin(`Hanya peran ${PERAN_HAPUS_PAKSA} yang boleh menghapus paksa.`);
+    }
+
+    if (s._count.contractItems > 0) {
+      throw new GagalIzin(
+        `"${s.nama}" masih tercakup ${s._count.contractItems} kontrak. Lepaskan dari kontrak lebih dulu.`,
+      );
+    }
+    if (konfirmasi.trim().toUpperCase() !== s.project.kode.toUpperCase()) {
+      throw new GagalIzin(`Ketik kode proyek "${s.project.kode}" persis untuk mengonfirmasi.`);
+    }
+
+    await prisma.infrastructure.delete({ where: { id } });
+
+    await catat({
+      pengguna, projectId: s.projectId, objek: `Sarpras · ${s.nama}`,
+      aksi: "Hapus paksa sarpras",
+      dari: `${s.kode} · progres ${s.progress}%`, ke: "dihapus permanen",
+    });
+
+    revalidatePath(`/master/${s.project.kode}`);
+    revalidatePath("/");
+    redirect(`/master/${s.project.kode}`);
   });
 }

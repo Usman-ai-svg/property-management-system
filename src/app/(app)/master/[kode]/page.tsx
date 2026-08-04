@@ -15,6 +15,27 @@ import {
 import { HapusFase, HapusProyek, KelolaFase, UbahFase, UbahProyek } from "../editors-proyek";
 import { Tabel } from "@/components/kartu-tabel";
 
+/** Baris total di kaki tabel: pasangan label–nilai, rata kanan. */
+function BarisTotal({ items }: { items: [string, string][] }) {
+  return (
+    <div
+      style={{
+        display: "flex", justifyContent: "flex-end", gap: 28, flexWrap: "wrap",
+        padding: "11px 16px", borderTop: "1px solid var(--line)", background: "var(--rona-baris)",
+      }}
+    >
+      {items.map(([label, nilai]) => (
+        <div key={label} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em" }}>
+            {label}
+          </span>
+          <span className="num" style={{ fontSize: 14, fontWeight: 700, color: "var(--brass)" }}>{nilai}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default async function DetailProyek({ params }: { params: Promise<{ kode: string }> }) {
   const pengguna = await ambilPengguna();
   if (!pengguna) redirect("/login");
@@ -42,6 +63,14 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
 
   const totalBersertifikat = proyek.legalitas.reduce((a, l) => a + (l.luas || 0), 0);
   const nomorBerikutnya = unit.length + 1;
+
+  // Total RAB & RAP se-proyek — dijumlahkan dari nilai tiap unit dan tiap item
+  // sarpras (nilai per baris memakai rumus yang sama dengan yang ditampilkan di
+  // tabelnya). Hanya bermakna bila peran berhak atas angka harga.
+  const totalRabUnit = bolehHarga ? unit.reduce((s, u) => s + nilaiUnit(u).rab, 0) : 0;
+  const totalRapUnit = bolehHarga ? unit.reduce((s, u) => s + nilaiUnit(u).rap, 0) : 0;
+  const totalRabSarpras = bolehHarga ? sarpras.reduce((s, x) => s + nilaiSarpras(x).rab, 0) : 0;
+  const totalRapSarpras = bolehHarga ? sarpras.reduce((s, x) => s + nilaiSarpras(x).rap, 0) : 0;
 
   return (
     <div style={{ padding: 24 }}>
@@ -310,7 +339,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
               <tr key={t.id}>
                 <td>
                   <Link
-                    href={`/master/${kodeProyek}/tipe/${t.kode}`}
+                    href={`/master/${kodeProyek}/tipe/${encodeURIComponent(t.kode)}`}
                     style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
                   >
                     {t.nama}
@@ -380,7 +409,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                   <tr key={u.id}>
                     <td>
                       <Link
-                        href={`/master/${kodeProyek}/unit/${u.kode}`}
+                        href={`/master/${kodeProyek}/unit/${encodeURIComponent(u.kode)}`}
                         style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
                       >
                         {u.nomor}
@@ -431,6 +460,15 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
               })}
             </Tabel>
           )}
+
+          {bolehUnit && bolehHarga && (
+            <BarisTotal
+              items={[
+                ["Total RAB Unit", rp(totalRabUnit)],
+                ["Total RAP Unit", rp(totalRapUnit)],
+              ]}
+            />
+          )}
         </div>
 
         {bolehUnit && !bolehHarga && (
@@ -470,7 +508,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                   <tr key={s.id}>
                     <td>
                       <Link
-                        href={`/master/${kodeProyek}/sarpras/${s.kode}`}
+                        href={`/master/${kodeProyek}/sarpras/${encodeURIComponent(s.kode)}`}
                         style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
                       >
                         {s.nama}
@@ -503,7 +541,42 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
               })}
             </Tabel>
           )}
+
+          {bolehSarpras && bolehHarga && (
+            <BarisTotal
+              items={[
+                ["Total RAB Sarpras", rp(totalRabSarpras)],
+                ["Total RAP Sarpras", rp(totalRapSarpras)],
+              ]}
+            />
+          )}
         </div>
+
+        {/* ---------- Grand Total RAB & RAP Proyek ---------- */}
+        {bolehHarga && (bolehUnit || bolehSarpras) && (
+          <Kartu atas={16}>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>
+              Grand Total RAB &amp; RAP Proyek
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 12, lineHeight: 1.6 }}>
+              Gabungan seluruh unit dan item sarana &amp; prasarana pada proyek ini.
+            </div>
+            <div className="grid grid2" style={{ gap: 20 }}>
+              <div>
+                <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>RAB</div>
+                {bolehUnit && <InfoRow label="Unit" nilai={rp(totalRabUnit)} />}
+                {bolehSarpras && <InfoRow label="Sarana & Prasarana" nilai={rp(totalRabSarpras)} />}
+                <InfoRow label="Total RAB Proyek" nilai={rp(totalRabUnit + totalRabSarpras)} tebal />
+              </div>
+              <div>
+                <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>RAP</div>
+                {bolehUnit && <InfoRow label="Unit" nilai={rp(totalRapUnit)} />}
+                {bolehSarpras && <InfoRow label="Sarana & Prasarana" nilai={rp(totalRapSarpras)} />}
+                <InfoRow label="Total RAP Proyek" nilai={rp(totalRapUnit + totalRapSarpras)} tebal />
+              </div>
+            </div>
+          </Kartu>
+        )}
       </div>
     </div>
   );

@@ -50,7 +50,7 @@ export default async function MasterProyek() {
         <Tabel
           kolom={[
             { label: "Proyek" },
-            { label: "Kecamatan / Kota" },
+            { label: "Lokasi (Kelurahan, Kecamatan, Kota)" },
             { label: "Luas Total", rata: "kanan" },
             { label: "Unit", rata: "kanan" },
             { label: "Fase" },
@@ -71,7 +71,7 @@ export default async function MasterProyek() {
                 <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{p.kode}</div>
               </td>
               <td style={{ color: "var(--muted)" }}>
-                {p.kecamatan}, {p.kota}
+                {p.kelurahan}, {p.kecamatan}, {p.kota}
               </td>
               <td style={{ textAlign: "right" }}>{m2(luasTotal(p))}</td>
               <td style={{ textAlign: "right" }}>{p._count.units}</td>

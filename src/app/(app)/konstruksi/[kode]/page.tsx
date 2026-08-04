@@ -91,7 +91,7 @@ export default async function ProgresProyek({
               <tr key={u.id}>
                 <td>
                   <Link
-                    href={`/konstruksi/${kodeProyek}/unit/${u.kode}`}
+                    href={`/konstruksi/${kodeProyek}/unit/${encodeURIComponent(u.kode)}`}
                     style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
                   >
                     {u.nomor}
@@ -152,7 +152,7 @@ export default async function ProgresProyek({
               <tr key={s.id}>
                 <td>
                   <Link
-                    href={`/konstruksi/${kodeProyek}/sarpras/${s.kode}`}
+                    href={`/konstruksi/${kodeProyek}/sarpras/${encodeURIComponent(s.kode)}`}
                     style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
                   >
                     {s.nama}

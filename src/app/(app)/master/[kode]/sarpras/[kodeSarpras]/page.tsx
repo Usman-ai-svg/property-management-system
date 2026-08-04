@@ -5,7 +5,8 @@ import { detailSarpras, kontrakSarpras, riwayatObjek } from "@/lib/data/proyek";
 import { Badge, CardHead, InfoRow, Kartu, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
 import { KATEGORI_EKSTENSI } from "@/lib/storage";
-import { unggahRevisi } from "../../../actions";
+import { hapusSarprasPaksa, unggahRevisi } from "../../../actions";
+import { HapusPaksa } from "@/components/hapus-paksa";
 import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
 import { rp, tanggalJam } from "@/lib/format";
 import { EditDeskripsiSarpras, TabelBoqSarpras, TabelRapSarpras } from "./editors";
@@ -229,6 +230,16 @@ export default async function RincianSarpras({
           ))
         )}
       </div>
+
+      {pengguna.peranAktif === "Administrator Sistem" && (
+        <HapusPaksa
+          aksi={hapusSarprasPaksa}
+          id={item.id}
+          kodeProyek={kodeProyek}
+          label={item.nama}
+          keterangan="Hapus item ini secara permanen walau progress-nya sudah berjalan — untuk mengganti data lama dengan data baru."
+        />
+      )}
     </div>
   );
 }

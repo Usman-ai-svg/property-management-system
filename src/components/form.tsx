@@ -4,6 +4,7 @@ import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { AlertTriangle, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { HasilAksi } from "@/lib/actions/guard";
+import { useToast } from "@/components/toast";
 
 // ---------------------------------------------------------------------------
 // Kolom isian
@@ -199,9 +200,9 @@ export function FormModal({
   lebar?: number;
 }) {
   const [terbuka, setTerbuka] = useState(false);
-  const [catatan, setCatatan] = useState<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const dataTerakhir = useRef<FormData | null>(null);
+  const { tampil } = useToast();
 
   const [hasil, kirim] = useActionState(
     async (sebelumnya: HasilAksi | null, form: FormData) => {
@@ -211,11 +212,14 @@ export function FormModal({
     null,
   );
 
+  // Sukses → modal ditutup dan konfirmasinya muncul sebagai toast di kanan atas,
+  // lepas dari halaman. Galat validasi tetap ditampilkan inline di dalam modal
+  // (lihat blok role="alert" di bawah) supaya rincian per-baris impor tak hilang.
   useEffect(() => {
     if (!hasil?.ok) return;
     setTerbuka(false);
-    setCatatan(hasil.pesan ?? null);
-  }, [hasil]);
+    tampil(hasil.pesan ?? "Perubahan tersimpan.");
+  }, [hasil, tampil]);
 
   // Kembalikan isian yang dikosongkan React setelah aksi yang ditolak.
   //
@@ -257,31 +261,7 @@ export function FormModal({
 
   return (
     <>
-      {pemicu(() => {
-        setCatatan(null);
-        setTerbuka(true);
-      })}
-
-      {catatan && (
-        <div
-          role="status"
-          style={{
-            display: "flex", alignItems: "flex-start", gap: 8, marginTop: 8,
-            padding: "9px 12px", borderRadius: 9, background: "var(--rona-hijau)",
-            color: "var(--teal)", fontSize: 12.5, lineHeight: 1.5, whiteSpace: "pre-line",
-          }}
-        >
-          <span style={{ flex: 1 }}>{catatan}</span>
-          <button
-            type="button"
-            onClick={() => setCatatan(null)}
-            aria-label="Tutup pesan"
-            style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", padding: 0 }}
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
+      {pemicu(() => setTerbuka(true))}
 
       {terbuka && (
         // Klik pada latar (di luar kartu) sengaja TIDAK menutup modal.

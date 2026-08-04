@@ -98,7 +98,11 @@ function terjaga(
 }
 
 describe("penjaga Server Action", () => {
-  const berkas = berkasAksi(AKAR).filter((f) => !BUKAN_AKSI_TERJAGA.has(f));
+  // Jalur dinormalkan ke garis miring depan supaya pengecualian tetap cocok di
+  // Windows, tempat penelusuran berkas menghasilkan pemisah "\".
+  const berkas = berkasAksi(AKAR).filter(
+    (f) => !BUKAN_AKSI_TERJAGA.has(f.replaceAll("\\", "/")),
+  );
 
   it("menemukan berkas aksi yang masuk akal", () => {
     // Kalau penelusuran rusak, seluruh tes di bawah lolos tanpa memeriksa apa pun.

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { ambilPengguna, bolehLihat } from "@/lib/auth/rbac";
 import { navUntuk } from "@/lib/nav";
 import { Sidebar } from "./sidebar";
+import { ToastProvider } from "@/components/toast";
 
 export default async function LayoutAplikasi({ children }: { children: React.ReactNode }) {
   const pengguna = await ambilPengguna();
@@ -20,7 +21,9 @@ export default async function LayoutAplikasi({ children }: { children: React.Rea
         peranAktif={pengguna.peranAktif}
         peran={pengguna.peran}
       />
-      <main className="main">{children}</main>
+      <main className="main">
+        <ToastProvider>{children}</ToastProvider>
+      </main>
     </div>
   );
 }

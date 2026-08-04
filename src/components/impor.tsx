@@ -49,6 +49,25 @@ export function ModalImpor({
       <input type="hidden" name="jenis" value={jenisTabel} />
       <input type="hidden" name="id" value={id} />
 
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+        <a
+          className="btn-garis"
+          href={`/api/template/${jenisTabel}`}
+          download
+          style={{ textDecoration: "none" }}
+        >
+          Unduh Template Kosong
+        </a>
+        <a
+          className="btn-garis"
+          href={`/api/ekspor/${jenisTabel}?sasaran=${sasaran}&id=${encodeURIComponent(id)}`}
+          download
+          style={{ textDecoration: "none" }}
+        >
+          Ekspor Isi Saat Ini
+        </a>
+      </div>
+
       <BarisField kolom={1}>
         <div>
           <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
