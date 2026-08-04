@@ -62,6 +62,9 @@ export default async function DetailKontrak({
   const objekUnit = kontrak.units.map(({ unit }) => ({
     kunci: `unit:${unit.id}`,
     label: `Unit ${unit.phase.kode}-${unit.nomor}`,
+    // Kolom Unit + Fase terpisah pada tabel, mengikuti tabel Daftar Unit.
+    unit: String(unit.nomor),
+    fase: unit.phase.kode,
     keterangan: unit.unitType.nama,
     progresTersimpan: unit.progress,
     status: unit.statusPembangunan,
@@ -71,6 +74,8 @@ export default async function DetailKontrak({
   const objekSarpras = kontrak.infrastructures.map(({ infrastructure: s }) => ({
     kunci: `sarpras:${s.id}`,
     label: s.nama,
+    unit: s.nama,
+    fase: "—",
     keterangan: s.jenis,
     progresTersimpan: s.progress,
     status: s.status,
@@ -141,7 +146,8 @@ export default async function DetailKontrak({
         />
         <Tabel
           kolom={[
-            { label: "Objek" },
+            { label: "Unit" },
+            { label: "Fase" },
             { label: "Jenis" },
             { label: "Baris BOQ", rata: "kanan" },
             bolehHarga && { label: "Nilai BOQ", rata: "kanan" },
@@ -155,7 +161,8 @@ export default async function DetailKontrak({
             const progres = o.baris.length ? progresTertimbang(o.baris) : o.progresTersimpan;
             return (
               <tr key={o.kunci}>
-                <td style={{ fontWeight: 600 }}>{o.label}</td>
+                <td style={{ fontWeight: 600 }}>{o.unit}</td>
+                <td>{o.fase}</td>
                 <td style={{ color: "var(--muted)" }}>{o.keterangan}</td>
                 <td style={{ textAlign: "right" }}>
                   {o.baris.length || <span style={{ color: "var(--muted)" }}>—</span>}

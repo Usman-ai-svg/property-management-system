@@ -55,7 +55,9 @@ export default async function ObjekVendorKonstruksi({
   const objekUnit = kontrak.units.map(({ unit }) => ({
     jenis: "unit" as const,
     id: unit.id,
-    label: `Unit ${unit.phase.kode}-${unit.nomor}`,
+    // Dipecah menjadi kolom Unit + Fase, mengikuti tabel Daftar Unit.
+    unit: String(unit.nomor),
+    fase: unit.phase.kode,
     keterangan: unit.unitType.nama,
     progresTersimpan: unit.progress,
     status: unit.statusPembangunan,
@@ -64,7 +66,8 @@ export default async function ObjekVendorKonstruksi({
   const objekSarpras = kontrak.infrastructures.map(({ infrastructure: s }) => ({
     jenis: "sarpras" as const,
     id: s.id,
-    label: s.nama,
+    unit: s.nama,
+    fase: "—",
     keterangan: s.jenis,
     progresTersimpan: s.progress,
     status: s.status,
@@ -104,7 +107,8 @@ export default async function ObjekVendorKonstruksi({
         />
         <Tabel
           kolom={[
-            { label: "Objek" },
+            { label: "Unit" },
+            { label: "Fase" },
             { label: "Jenis" },
             { label: "Baris BOQ", rata: "kanan" },
             bolehHarga && { label: "Nilai BOQ", rata: "kanan" },
@@ -123,9 +127,10 @@ export default async function ObjekVendorKonstruksi({
                     href={`/konstruksi/${kodeProyek}/vendor/${encodeURIComponent(kontrak.kode)}/${o.jenis}_${o.id}`}
                     style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
                   >
-                    {o.label}
+                    {o.unit}
                   </Link>
                 </td>
+                <td>{o.fase}</td>
                 <td style={{ color: "var(--muted)" }}>{o.keterangan}</td>
                 <td style={{ textAlign: "right" }}>
                   {o.baris.length || <span style={{ color: "var(--muted)" }}>—</span>}
