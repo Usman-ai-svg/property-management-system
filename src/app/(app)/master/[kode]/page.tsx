@@ -1,3 +1,4 @@
+import { kodeProyekDari, segmen } from "@/lib/adaptor/rute";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ExternalLink, MapPin } from "lucide-react";
@@ -41,7 +42,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
   if (!pengguna) redirect("/login");
 
   const { kode } = await params;
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
   const { proyek, unit, sarpras, bolehHarga, bolehUnit, bolehSarpras, bolehDokumen } =
     await detailProyek(pengguna, kodeProyek);
 
@@ -276,7 +277,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
           </div>
           <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 8 }}>
             Biaya perolehan lahan dikelola di{" "}
-            <Link href={`/landbank/${kodeProyek}`} style={{ color: "var(--teal)", fontWeight: 600 }}>
+            <Link href={`/landbank/${segmen(kodeProyek)}`} style={{ color: "var(--teal)", fontWeight: 600 }}>
               halaman Landbank
             </Link>
             .
@@ -339,7 +340,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
               <tr key={t.id}>
                 <td>
                   <Link
-                    href={`/master/${kodeProyek}/tipe/${encodeURIComponent(t.kode)}`}
+                    href={`/master/${segmen(kodeProyek)}/tipe/${segmen(t.kode)}`}
                     style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
                   >
                     {t.nama}
@@ -409,7 +410,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                   <tr key={u.id}>
                     <td>
                       <Link
-                        href={`/master/${kodeProyek}/unit/${encodeURIComponent(u.kode)}`}
+                        href={`/master/${segmen(kodeProyek)}/unit/${segmen(u.kode)}`}
                         style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
                       >
                         {u.nomor}
@@ -508,7 +509,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
                   <tr key={s.id}>
                     <td>
                       <Link
-                        href={`/master/${kodeProyek}/sarpras/${encodeURIComponent(s.kode)}`}
+                        href={`/master/${segmen(kodeProyek)}/sarpras/${segmen(s.kode)}`}
                         style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
                       >
                         {s.nama}

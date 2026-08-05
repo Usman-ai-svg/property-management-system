@@ -1,4 +1,5 @@
 "use server";
+import { segmen } from "@/lib/adaptor/rute";
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
@@ -63,9 +64,9 @@ function pastikanDalamLingkup(
 /** Segarkan seluruh halaman yang menampilkan progres objek ini. */
 function segarkan(kodeProyek: string, vendorId: string) {
   revalidatePath(`/vendor/${vendorId}`);
-  revalidatePath(`/konstruksi/${kodeProyek}`);
-  revalidatePath(`/master/${kodeProyek}`);
-  revalidatePath(`/keuangan/${kodeProyek}`);
+  revalidatePath(`/konstruksi/${segmen(kodeProyek)}`);
+  revalidatePath(`/master/${segmen(kodeProyek)}`);
+  revalidatePath(`/keuangan/${segmen(kodeProyek)}`);
   revalidatePath("/");
 }
 

@@ -1,3 +1,4 @@
+import { kodeProyekDari, segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
@@ -24,7 +25,7 @@ export default async function ProgresProyek({
 
   const { kode } = await params;
   const { fase = "Semua", cari = "" } = await searchParams;
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
 
   const proyek = await proyekKonstruksi(kodeProyek);
   if (!proyek) notFound();
@@ -149,7 +150,7 @@ export default async function ProgresProyek({
                 <tr key={u.id}>
                   <td>
                     <Link
-                      href={`/konstruksi/${kodeProyek}/unit/${encodeURIComponent(u.kode)}`}
+                      href={`/konstruksi/${segmen(kodeProyek)}/unit/${segmen(u.kode)}`}
                       style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
                     >
                       {u.nomor}
@@ -215,7 +216,7 @@ export default async function ProgresProyek({
               <tr key={s.id}>
                 <td>
                   <Link
-                    href={`/konstruksi/${kodeProyek}/sarpras/${encodeURIComponent(s.kode)}`}
+                    href={`/konstruksi/${segmen(kodeProyek)}/sarpras/${segmen(s.kode)}`}
                     style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
                   >
                     {s.nama}
@@ -267,7 +268,7 @@ export default async function ProgresProyek({
                 <tr key={c.id}>
                   <td>
                     <Link
-                      href={`/konstruksi/${kodeProyek}/vendor/${encodeURIComponent(c.kode)}`}
+                      href={`/konstruksi/${segmen(kodeProyek)}/vendor/${segmen(c.kode)}`}
                       style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
                     >
                       {c.kode}

@@ -1,3 +1,4 @@
+import { kodeProyekDari, segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
@@ -28,7 +29,7 @@ export default async function KeuanganProyek({
   const { kode } = await params;
   const { donat = "jenis", unit: unitDipilih, sarpras: sarprasDipilih } = await searchParams;
   const mode = donat === "peruntukan" ? "peruntukan" : "jenis";
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
 
   if (!bolehLihat(pengguna, "keuangan")) {
     return (
@@ -76,7 +77,7 @@ export default async function KeuanganProyek({
   const sarprasRinci = sarprasDipilih
     ? proyek.infrastructures.find((s) => s.kode === sarprasDipilih.toUpperCase())
     : undefined;
-  const alamatDasar = `/keuangan/${proyek.kode}?donat=${mode}`;
+  const alamatDasar = `/keuangan/${segmen(proyek.kode)}?donat=${mode}`;
 
   const bolehUbahKeuangan = bolehUbah(pengguna, "keuangan");
   const pilihanUnit = proyek.units.map((u) => ({
@@ -183,7 +184,7 @@ export default async function KeuanganProyek({
                     href={
                       unitRinci?.id === u.id
                         ? alamatDasar
-                        : `${alamatDasar}&unit=${u.kode}#rincian-unit`
+                        : `${alamatDasar}&unit=${segmen(u.kode)}#rincian-unit`
                     }
                     scroll={false}
                     style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
@@ -424,7 +425,7 @@ export default async function KeuanganProyek({
                     href={
                       sarprasRinci?.id === s.id
                         ? alamatDasar
-                        : `${alamatDasar}&sarpras=${s.kode}#rincian-sarpras`
+                        : `${alamatDasar}&sarpras=${segmen(s.kode)}#rincian-sarpras`
                     }
                     scroll={false}
                     style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}

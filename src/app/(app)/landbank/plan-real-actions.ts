@@ -1,4 +1,5 @@
 "use server";
+import { segmen } from "@/lib/adaptor/rute";
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
@@ -121,7 +122,7 @@ export async function simpanPembayaranJual(_s: HasilAksi | null, form: FormData)
       });
 
       revalidatePath("/landbank");
-      revalidatePath(`/keuangan/${unit.project.kode}`);
+      revalidatePath(`/keuangan/${segmen(unit.project.kode)}`);
       return jml === 0 ? "Tidak ada yang berubah." : `${jml} perubahan tersimpan.`;
     }
 
@@ -144,7 +145,7 @@ export async function simpanPembayaranJual(_s: HasilAksi | null, form: FormData)
     });
 
     revalidatePath("/landbank");
-    revalidatePath(`/keuangan/${unit.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(unit.project.kode)}`);
 
     if (lebih > 0) {
       return `Tersimpan. Total penerimaan unit ini kini ${rpLog(lebih)} melebihi harga jualnya — periksa bila itu tidak disengaja.`;
@@ -173,6 +174,6 @@ export async function hapusPembayaranJual(_s: HasilAksi | null, form: FormData):
     });
 
     revalidatePath("/landbank");
-    revalidatePath(`/keuangan/${unit.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(unit.project.kode)}`);
   });
 }

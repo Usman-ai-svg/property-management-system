@@ -1,3 +1,4 @@
+import { bacaSegmen, kodeProyekDari, segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
@@ -24,7 +25,7 @@ export default async function RincianTipeUnit({
   if (!pengguna) redirect("/login");
 
   const { kode, tipeKode } = await params;
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
 
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
   const ubahHarga = bolehUbah(pengguna, "hargaRabRap");
@@ -32,7 +33,7 @@ export default async function RincianTipeUnit({
   const bolehDokumen = bolehLihat(pengguna, "dokumenTeknis");
 
   const tipe = await prisma.unitType.findFirst({
-    where: { kode: decodeURIComponent(tipeKode).toUpperCase(), project: { kode: kodeProyek } },
+    where: { kode: bacaSegmen(tipeKode).toUpperCase(), project: { kode: kodeProyek } },
     select: {
       id: true, kode: true, nama: true, luasBangunan: true, luasTanah: true,
       rapUpahVolume: true, rapUpahHarga: true, projectId: true,
@@ -75,7 +76,7 @@ export default async function RincianTipeUnit({
       <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10 }}>
         <Link href="/master" style={{ color: "inherit", textDecoration: "none" }}>Master Proyek</Link>
         {" / "}
-        <Link href={`/master/${kodeProyek}`} style={{ color: "inherit", textDecoration: "none" }}>
+        <Link href={`/master/${segmen(kodeProyek)}`} style={{ color: "inherit", textDecoration: "none" }}>
           {tipe.project.nama}
         </Link>
         {" / "}

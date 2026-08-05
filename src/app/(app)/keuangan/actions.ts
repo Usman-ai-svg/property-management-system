@@ -1,4 +1,5 @@
 "use server";
+import { segmen } from "@/lib/adaptor/rute";
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
@@ -124,7 +125,7 @@ export async function catatPengeluaran(_s: HasilAksi | null, form: FormData): Pr
     });
 
     revalidatePath("/keuangan");
-    revalidatePath(`/keuangan/${proyek.kode}`);
+    revalidatePath(`/keuangan/${segmen(proyek.kode)}`);
     revalidatePath("/");
 
     if (alokasi.length > 1) {
@@ -217,7 +218,7 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
     });
 
     revalidatePath("/keuangan");
-    revalidatePath(`/keuangan/${lama.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(lama.project.kode)}`);
     revalidatePath("/");
 
     if (jml === 0) return "Tidak ada yang berubah.";
@@ -319,7 +320,7 @@ export async function hapusPengeluaran(_s: HasilAksi | null, form: FormData): Pr
     });
 
     revalidatePath("/keuangan");
-    revalidatePath(`/keuangan/${lama.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(lama.project.kode)}`);
     revalidatePath("/");
   });
 }

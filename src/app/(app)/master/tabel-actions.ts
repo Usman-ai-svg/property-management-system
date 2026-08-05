@@ -1,4 +1,5 @@
 "use server";
+import { segmen } from "@/lib/adaptor/rute";
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
@@ -168,7 +169,7 @@ export async function simpanBoqUnit(unitId: string, dataJson: string): Promise<H
       dari: rpLog(sebelum), ke: rpLog(jumlah(baris)),
     });
 
-    revalidatePath(`/master/${unit.project.kode}`);
+    revalidatePath(`/master/${segmen(unit.project.kode)}`);
     revalidatePath("/");
   });
 }
@@ -212,7 +213,7 @@ export async function simpanBoqKerjaTambah(customWorkId: string, dataJson: strin
       dari: rpLog(sebelum), ke: rpLog(jumlah(baris)),
     });
 
-    revalidatePath(`/master/${kt.unit.project.kode}`);
+    revalidatePath(`/master/${segmen(kt.unit.project.kode)}`);
     revalidatePath("/");
   });
 }
@@ -254,7 +255,7 @@ export async function simpanBoqSarpras(infrastructureId: string, dataJson: strin
       dari: rpLog(sebelum), ke: rpLog(sesudah),
     });
 
-    revalidatePath(`/master/${s.project.kode}`);
+    revalidatePath(`/master/${segmen(s.project.kode)}`);
     revalidatePath("/");
   });
 }
@@ -289,8 +290,8 @@ export async function simpanBoqTipe(unitTypeId: string, dataJson: string): Promi
       dari: rpLog(sebelum), ke: rpLog(jumlah(baris)),
     });
 
-    revalidatePath(`/master/${tipe.project.kode}`);
-    revalidatePath(`/master/${tipe.project.kode}/tipe/${tipe.kode}`);
+    revalidatePath(`/master/${segmen(tipe.project.kode)}`);
+    revalidatePath(`/master/${segmen(tipe.project.kode)}/tipe/${segmen(tipe.kode)}`);
   });
 }
 
@@ -329,7 +330,7 @@ export async function simpanRapUnit(unitId: string, dataJson: string): Promise<H
       dari: rpLog(sebelum), ke: rpLog(totalRap(ratakan(kelompok), upahVolume, upahHarga)),
     });
 
-    revalidatePath(`/master/${unit.project.kode}`);
+    revalidatePath(`/master/${segmen(unit.project.kode)}`);
     revalidatePath("/");
   });
 }
@@ -370,7 +371,7 @@ export async function simpanRapKerjaTambah(customWorkId: string, dataJson: strin
       dari: rpLog(sebelum), ke: rpLog(totalRap(ratakan(kelompok), upahVolume, upahHarga)),
     });
 
-    revalidatePath(`/master/${kt.unit.project.kode}`);
+    revalidatePath(`/master/${segmen(kt.unit.project.kode)}`);
     revalidatePath("/");
   });
 }
@@ -406,7 +407,7 @@ export async function simpanRapSarpras(infrastructureId: string, dataJson: strin
       dari: rpLog(sebelum), ke: rpLog(totalRap(ratakan(kelompok), upahVolume, upahHarga)),
     });
 
-    revalidatePath(`/master/${s.project.kode}`);
+    revalidatePath(`/master/${segmen(s.project.kode)}`);
     revalidatePath("/");
   });
 }
@@ -442,8 +443,8 @@ export async function simpanRapTipe(unitTypeId: string, dataJson: string): Promi
       dari: rpLog(sebelum), ke: rpLog(totalRap(ratakan(kelompok), upahVolume, upahHarga)),
     });
 
-    revalidatePath(`/master/${tipe.project.kode}`);
-    revalidatePath(`/master/${tipe.project.kode}/tipe/${tipe.kode}`);
+    revalidatePath(`/master/${segmen(tipe.project.kode)}`);
+    revalidatePath(`/master/${segmen(tipe.project.kode)}/tipe/${segmen(tipe.kode)}`);
   });
 }
 
@@ -610,7 +611,7 @@ export async function tambahKerjaTambah(_s: HasilAksi | null, form: FormData): P
       aksi: "Tambah kerja tambah", ke: judul,
     });
 
-    revalidatePath(`/master/${unit.project.kode}`);
+    revalidatePath(`/master/${segmen(unit.project.kode)}`);
   });
 }
 
@@ -645,7 +646,7 @@ export async function ubahJudulKerjaTambah(_s: HasilAksi | null, form: FormData)
       dari: kt.judul, ke: judul,
     });
 
-    revalidatePath(`/master/${kt.unit.project.kode}`);
+    revalidatePath(`/master/${segmen(kt.unit.project.kode)}`);
   });
 }
 
@@ -675,6 +676,6 @@ export async function hapusKerjaTambah(_s: HasilAksi | null, form: FormData): Pr
       aksi: "Hapus kerja tambah", dari: kt.judul, ke: "dihapus",
     });
 
-    revalidatePath(`/master/${kt.unit.project.kode}`);
+    revalidatePath(`/master/${segmen(kt.unit.project.kode)}`);
   });
 }

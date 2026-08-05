@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { bacaSegmen } from "@/lib/adaptor/rute";
 import { filterProyek, type Pengguna } from "@/lib/auth/rbac";
 
 /**
@@ -135,7 +136,7 @@ export async function proyekUntukKontrak(u: Pengguna) {
 /** Satu kontrak (SPK) beserta dokumen, cakupan, dan seluruh baris BOQ-nya. */
 export async function kontrakDetail(kode: string) {
   return prisma.contract.findUnique({
-    where: { kode: decodeURIComponent(kode).toUpperCase() },
+    where: { kode: bacaSegmen(kode).toUpperCase() },
     select: {
       id: true, kode: true, jenis: true, deskripsi: true, nominal: true,
       retensiPct: true, jatuhTempoBln: true, mulai: true, projectId: true,

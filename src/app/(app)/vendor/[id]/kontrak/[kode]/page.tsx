@@ -1,3 +1,4 @@
+import { segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
@@ -237,7 +238,7 @@ export default async function DetailKontrak({
       >
         Opname progres vendor kini diisi di{" "}
         <Link
-          href={`/konstruksi/${kontrak.project.kode}/vendor/${encodeURIComponent(kontrak.kode)}`}
+          href={`/konstruksi/${segmen(kontrak.project.kode)}/vendor/${segmen(kontrak.kode)}`}
           style={{ color: "var(--teal)", fontWeight: 600 }}
         >
           Konstruksi › Progress Vendor › {kontrak.kode}

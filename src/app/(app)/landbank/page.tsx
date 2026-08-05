@@ -1,3 +1,4 @@
+import { segmen } from "@/lib/adaptor/rute";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Check, FileText, X } from "lucide-react";
@@ -104,7 +105,7 @@ export default async function Landbank({
                 <tr key={p.id}>
                   <td>
                     <Link
-                      href={`/landbank/${p.kode}`}
+                      href={`/landbank/${segmen(p.kode)}`}
                       style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
                     >
                       {p.nama}

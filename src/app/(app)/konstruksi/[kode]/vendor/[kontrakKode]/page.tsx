@@ -1,3 +1,4 @@
+import { kodeProyekDari, segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
@@ -26,12 +27,12 @@ export default async function ObjekVendorKonstruksi({
   if (!pengguna) redirect("/login");
 
   const { kode, kontrakKode } = await params;
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
 
   if (!bolehLihat(pengguna, "progress")) {
     return (
       <div style={{ padding: 24 }}>
-        <Link href={`/konstruksi/${kodeProyek}`} style={{ fontSize: 12.5, color: "var(--muted)", textDecoration: "none" }}>
+        <Link href={`/konstruksi/${segmen(kodeProyek)}`} style={{ fontSize: 12.5, color: "var(--muted)", textDecoration: "none" }}>
           ← Konstruksi
         </Link>
         <div style={{ marginTop: 16 }}>
@@ -86,7 +87,7 @@ export default async function ObjekVendorKonstruksi({
       <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
         <Link href="/konstruksi" style={{ color: "inherit", textDecoration: "none" }}>Konstruksi</Link>
         {" / "}
-        <Link href={`/konstruksi/${kodeProyek}`} style={{ color: "inherit", textDecoration: "none" }}>
+        <Link href={`/konstruksi/${segmen(kodeProyek)}`} style={{ color: "inherit", textDecoration: "none" }}>
           {kontrak.project.nama}
         </Link>
         {" / "}
@@ -124,7 +125,7 @@ export default async function ObjekVendorKonstruksi({
               <tr key={`${o.jenis}_${o.id}`}>
                 <td>
                   <Link
-                    href={`/konstruksi/${kodeProyek}/vendor/${encodeURIComponent(kontrak.kode)}/${o.jenis}_${o.id}`}
+                    href={`/konstruksi/${segmen(kodeProyek)}/vendor/${segmen(kontrak.kode)}/${o.jenis}_${o.id}`}
                     style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
                   >
                     {o.unit}

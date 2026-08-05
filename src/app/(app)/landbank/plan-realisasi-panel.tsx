@@ -1,3 +1,4 @@
+import { segmen } from "@/lib/adaptor/rute";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
@@ -163,7 +164,7 @@ export async function PlanRealisasiPanel({
           {daftar.map((p) => (
             <Link
               key={p.kode}
-              href={`?tab=pvr&proyek=${p.kode}&pv=${subAktif}`}
+              href={`?tab=pvr&proyek=${segmen(p.kode)}&pv=${subAktif}`}
               className={"pill" + (kode === p.kode ? " active" : "")}
             >
               {p.nama}
@@ -184,7 +185,7 @@ export async function PlanRealisasiPanel({
         {PVR_TAB.map(([id, label]) => (
           <Link
             key={id}
-            href={`?tab=pvr&proyek=${kode}&pv=${id}`}
+            href={`?tab=pvr&proyek=${segmen(kode)}&pv=${id}`}
             className={"pill" + (subAktif === id ? " active" : "")}
           >
             {label}

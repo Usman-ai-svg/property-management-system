@@ -1,3 +1,4 @@
+import { segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
@@ -169,7 +170,7 @@ export default async function DetailVendor({
                       >
                         <div>
                           <Link
-                            href={`/vendor/${vendor.id}/kontrak/${k.kode}`}
+                            href={`/vendor/${vendor.id}/kontrak/${segmen(k.kode)}`}
                             className="disp"
                             style={{
                               fontWeight: 600, fontSize: 15,

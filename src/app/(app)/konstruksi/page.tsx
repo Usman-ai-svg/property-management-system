@@ -1,3 +1,4 @@
+import { segmen } from "@/lib/adaptor/rute";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna } from "@/lib/auth/rbac";
@@ -59,7 +60,7 @@ export default async function DashboardKonstruksi() {
             <tr key={p.id}>
               <td>
                 <Link
-                  href={`/konstruksi/${p.kode}`}
+                  href={`/konstruksi/${segmen(p.kode)}`}
                   style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
                 >
                   {p.nama}

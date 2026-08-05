@@ -1,3 +1,4 @@
+import { segmen } from "@/lib/adaptor/rute";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowUpRight, Lightbulb } from "lucide-react";
@@ -139,7 +140,7 @@ export default async function Ringkasan() {
               )}
               <td>
                 <Link
-                  href={`/master/${p.kode}`}
+                  href={`/master/${segmen(p.kode)}`}
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 4,
                     color: "var(--teal)", fontSize: 12, fontWeight: 600, textDecoration: "none",

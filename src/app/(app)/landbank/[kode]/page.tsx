@@ -1,3 +1,4 @@
+import { kodeProyekDari } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Lock, MapPin } from "lucide-react";
@@ -36,7 +37,7 @@ export default async function DetailLandbank({
 
   const { kode } = await params;
   const { tab = "fs", bp = "hpp" } = await searchParams;
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
   const tabAktif = tab === "bp" ? "bp" : "fs";
   const bpAktif = BP_TAB.some(([t]) => t === bp) ? bp : "hpp";
 
