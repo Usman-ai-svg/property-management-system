@@ -4,13 +4,11 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
-  angka, GagalIzin, HasilAksi, idProyekDariKode, izinkan, jalankan, pilihan, teks, teksOpsional,
+  angka, GagalIzin, HasilAksi, idProyekDariKode, izinkan, jalankan, pilihan, teks,
 } from "@/lib/actions/guard";
 import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
 import { alokasiPembayaran, periksaAlokasi } from "@/lib/calc/keuangan";
-import {
-  DOKUMEN_TENDER, JENIS_KONTRAK, STATUS_TENDER, STATUS_VENDOR, STATUS_VO,
-} from "@/lib/domain/enums";
+import { JENIS_KONTRAK, STATUS_VENDOR, STATUS_VO } from "@/lib/domain/enums";
 
 /**
  * Tambah Variation Order pada sebuah kontrak.
@@ -240,17 +238,17 @@ export async function hapusVendor(_s: HasilAksi | null, form: FormData): Promise
       where: { id },
       select: {
         id: true, nama: true,
-        _count: { select: { contracts: true, tenderPeserta: true, equipmentSewa: true } },
+        _count: { select: { contracts: true, rabPembanding: true, equipmentSewa: true } },
       },
     });
     if (!lama) return;
 
     const pengguna = await izinkan("progress");
 
-    const { contracts, tenderPeserta, equipmentSewa } = lama._count;
-    if (contracts + tenderPeserta + equipmentSewa > 0) {
+    const { contracts, rabPembanding, equipmentSewa } = lama._count;
+    if (contracts + rabPembanding + equipmentSewa > 0) {
       throw new GagalIzin(
-        `Vendor "${lama.nama}" masih terkait ${contracts} kontrak, ${tenderPeserta} tender, ` +
+        `Vendor "${lama.nama}" masih terkait ${contracts} kontrak, ${rabPembanding} perbandingan RAB, ` +
           `dan ${equipmentSewa} alat sewa. Ubah statusnya menjadi Nonaktif alih-alih menghapusnya.`,
       );
     }
@@ -488,169 +486,5 @@ export async function hapusKontrak(_s: HasilAksi | null, form: FormData): Promis
     revalidatePath("/vendor");
     revalidatePath(`/vendor/${lama.vendorId}`);
     revalidatePath(`/keuangan/${lama.project.kode}`);
-  });
-}
-
-// ===========================================================================
-// TENDER
-// ===========================================================================
-
-export async function tambahTender(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
-  return jalankan(async () => {
-    const kodeProyek = teks(form, "kodeProyek", true);
-    const projectId = await idProyekDariKode(kodeProyek);
-    const pengguna = await izinkan("progress", projectId);
-
-    const kode = teks(form, "kode", true).toUpperCase();
-    const bentrok = await prisma.tender.count({ where: { kode } });
-    if (bentrok) throw new GagalIzin(`Kode tender "${kode}" sudah dipakai.`);
-
-    const isiTanggal = String(form.get("tanggal") ?? "").trim();
-    const tanggal = isiTanggal ? new Date(isiTanggal) : new Date();
-    if (Number.isNaN(tanggal.getTime())) throw new GagalIzin("Tanggal tender tidak sah.");
-
-    const pekerjaan = teks(form, "pekerjaan", true);
-    const hps = angka(form, "hps", { min: 1, wajib: true });
-
-    await prisma.tender.create({
-      data: { kode, projectId, pekerjaan, tanggal, hps, status: "Dibuka" },
-    });
-
-    await catat({
-      pengguna, projectId,
-      objek: `Tender ${kode}`,
-      aksi: "Buat tender",
-      ke: `${pekerjaan} — HPS ${rpLog(hps)}`,
-    });
-
-    revalidatePath("/vendor");
-  });
-}
-
-export async function tambahPesertaTender(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
-  return jalankan(async () => {
-    const tenderId = teks(form, "tenderId", true);
-    const vendorId = teks(form, "vendorId", true);
-
-    const tender = await prisma.tender.findUnique({
-      where: { id: tenderId },
-      select: { id: true, kode: true, projectId: true, status: true },
-    });
-    if (!tender) throw new GagalIzin("Tender tidak ditemukan.");
-
-    const pengguna = await izinkan("progress", tender.projectId);
-
-    if (tender.status === "Ditetapkan" || tender.status === "Batal") {
-      throw new GagalIzin(`Tender ${tender.kode} sudah ${tender.status.toLowerCase()} — peserta tidak bisa ditambah lagi.`);
-    }
-
-    const vendor = await prisma.vendor.findUnique({
-      where: { id: vendorId },
-      select: { nama: true, status: true },
-    });
-    if (!vendor) throw new GagalIzin("Vendor tidak ditemukan.");
-    if (vendor.status !== "Aktif") throw new GagalIzin(`Vendor "${vendor.nama}" berstatus Nonaktif.`);
-
-    const sudahIkut = await prisma.tenderParticipant.count({ where: { tenderId, vendorId } });
-    if (sudahIkut) throw new GagalIzin(`${vendor.nama} sudah terdaftar sebagai peserta tender ini.`);
-
-    const nilai = angka(form, "nilai", { min: 1, wajib: true });
-    const dokumen = pilihan(form, "dokumen", DOKUMEN_TENDER);
-
-    await prisma.tenderParticipant.create({ data: { tenderId, vendorId, nilai, dokumen } });
-
-    await catat({
-      pengguna, projectId: tender.projectId,
-      objek: `Tender ${tender.kode}`,
-      aksi: "Tambah peserta tender",
-      ke: `${vendor.nama} — ${rpLog(nilai)} (${dokumen})`,
-    });
-
-    revalidatePath("/vendor");
-  });
-}
-
-/**
- * Ubah status tender, sekalian menetapkan pemenangnya.
- *
- * Pemenang wajib diisi saat status "Ditetapkan" dan wajib salah satu peserta —
- * tender yang ditetapkan tanpa pemenang yang jelas tidak bisa
- * dipertanggungjawabkan.
- */
-export async function ubahStatusTender(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
-  return jalankan(async () => {
-    const id = teks(form, "id", true);
-
-    const tender = await prisma.tender.findUnique({
-      where: { id },
-      select: {
-        id: true, kode: true, projectId: true, status: true, pemenangVendorId: true,
-        peserta: { select: { vendorId: true, nilai: true, vendor: { select: { nama: true } } } },
-      },
-    });
-    if (!tender) throw new GagalIzin("Tender tidak ditemukan.");
-
-    const pengguna = await izinkan("progress", tender.projectId);
-
-    const status = pilihan(form, "status", STATUS_TENDER);
-    const pemenangVendorId = teksOpsional(form, "pemenangVendorId");
-
-    if (status === "Ditetapkan") {
-      if (!pemenangVendorId) throw new GagalIzin("Pilih pemenangnya sebelum menetapkan tender.");
-      if (!tender.peserta.some((p) => p.vendorId === pemenangVendorId)) {
-        throw new GagalIzin("Pemenang harus salah satu peserta tender ini.");
-      }
-    }
-
-    const pemenangBaru = status === "Ditetapkan" ? pemenangVendorId : null;
-    await prisma.tender.update({
-      where: { id },
-      data: { status, pemenangVendorId: pemenangBaru },
-    });
-
-    const namaDari = tender.peserta.find((p) => p.vendorId === tender.pemenangVendorId)?.vendor.nama;
-    const namaKe = tender.peserta.find((p) => p.vendorId === pemenangBaru)?.vendor.nama;
-
-    await catat({
-      pengguna, projectId: tender.projectId,
-      objek: `Tender ${tender.kode}`,
-      aksi: "Ubah status tender",
-      dari: `${tender.status}${namaDari ? ` · ${namaDari}` : ""}`,
-      ke: `${status}${namaKe ? ` · ${namaKe}` : ""}`,
-    });
-
-    revalidatePath("/vendor");
-  });
-}
-
-export async function hapusTender(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
-  return jalankan(async () => {
-    const id = String(form.get("id") ?? "");
-
-    const lama = await prisma.tender.findUnique({
-      where: { id },
-      select: { id: true, kode: true, projectId: true, pekerjaan: true, status: true },
-    });
-    if (!lama) return;
-
-    const pengguna = await izinkan("progress", lama.projectId);
-
-    if (lama.status === "Ditetapkan") {
-      throw new GagalIzin(
-        `Tender ${lama.kode} sudah ditetapkan pemenangnya. Ubah statusnya menjadi Batal alih-alih menghapusnya.`,
-      );
-    }
-
-    await prisma.tender.delete({ where: { id } });
-
-    await catat({
-      pengguna, projectId: lama.projectId,
-      objek: `Tender ${lama.kode}`,
-      aksi: "Hapus tender",
-      dari: lama.pekerjaan,
-      ke: "dihapus",
-    });
-
-    revalidatePath("/vendor");
   });
 }

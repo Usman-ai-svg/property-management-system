@@ -53,6 +53,7 @@ export const ACL_AWAL: Record<string, string[]> = {
   daftarSarpras: SEMUA_PERAN,
   dokumenTeknis: SEMUA_PERAN,
   hargaRabRap: ["Administrator Sistem", "Komisaris", "BOD", "Business Development", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor", "Procurement", "Admin", "Finance", "Consultant Finance"],
+  setujuiRab: ["Administrator Sistem", "Komisaris", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor"],
   businessPlan: ["Administrator Sistem", "Komisaris", "BOD", "Business Development"],
   keuangan: ["Administrator Sistem", "BOD", "Business Development", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor", "Admin", "Finance", "Consultant Finance"],
   progress: ["Administrator Sistem", "BOD", "Head Operation Project", "Project Manager", "Supervisor", "Quantity Surveyor", "Arsitek", "Procurement"],
@@ -73,6 +74,9 @@ export const ACL_UBAH: Record<string, string[]> = {
   daftarSarpras: ["Administrator Sistem", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager"],
   dokumenTeknis: ["Administrator Sistem", "BOD", "Arsitek", "Head Operation Project", "Project Manager"],
   hargaRabRap: ["Administrator Sistem", "BOD", "Quantity Surveyor", "Head Operation Office"],
+  // Penyetuju RAB (bolehUbah = boleh menyetujui/menolak). QS TIDAK termasuk —
+  // ia menyusun & mengajukan, tak menyetujui buatannya sendiri.
+  setujuiRab: ["Administrator Sistem", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager"],
   businessPlan: ["Administrator Sistem", "BOD", "Business Development"],
   keuangan: ["Administrator Sistem", "BOD", "Finance", "Admin", "Head Operation Office"],
   // Quantity Surveyor ikut boleh mengubah karena memantau progres vendor
@@ -392,15 +396,6 @@ export const KONTRAK = [
     riwayat: [{ tgl: "02 Apr 2025", uraian: "DP 50% jaringan listrik", nominal: 297500000 }] },
   { kode: "S6", jenis: "Sarpras", proyek: "GN2", vendor: "CV Karya Aspal", deskripsi: "Jalan lingkungan & drainase", sarpras: ["GN2-S1", "GN2-S2"], nominal: 690000000, vo: [], retensiPct: 5, jatuhTempoBln: 3, mulai: "20 Okt 2024",
     riwayat: [{ tgl: "20 Okt 2024", uraian: "DP 40% jalan & drainase", nominal: 276000000 }, { tgl: "14 Jan 2025", uraian: "Termin 2", nominal: 207000000 }] },
-];
-
-export const TENDER = [
-  { kode: "TD-2026-01", proyek: "NT4", pekerjaan: "Borongan finishing tipe Newton — 8 unit", tgl: "12 Jun 2026", hps: 640000000, status: "Evaluasi", pemenang: null as string | null,
-    peserta: [{ vendor: "CV Cipta Bangun", nilai: 612000000, dok: "Lengkap" }, { vendor: "Pemborong Hj. Hasim", nilai: 598000000, dok: "Lengkap" }, { vendor: "CV Baja Jaya Mandiri", nilai: 655000000, dok: "Kurang dokumen" }] },
-  { kode: "TD-2026-02", proyek: "GN2", pekerjaan: "Pagar keliling & gerbang samping", tgl: "02 Jul 2026", hps: 185000000, status: "Dibuka", pemenang: null,
-    peserta: [{ vendor: "CV Cipta Bangun", nilai: 178000000, dok: "Lengkap" }, { vendor: "CV Tanah Makmur", nilai: 182500000, dok: "Lengkap" }] },
-  { kode: "TD-2026-03", proyek: "NT4", pekerjaan: "Jaringan air bersih 51 sambungan", tgl: "20 Mei 2026", hps: 428000000, status: "Ditetapkan", pemenang: "CV Elektrindo Jaya",
-    peserta: [{ vendor: "CV Elektrindo Jaya", nilai: 415000000, dok: "Lengkap" }, { vendor: "PT Bina Marga Sejahtera", nilai: 447000000, dok: "Lengkap" }] },
 ];
 
 // ---------------------------------------------------------------------------

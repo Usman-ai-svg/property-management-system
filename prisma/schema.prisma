@@ -222,8 +222,9 @@ model Project {
   contracts       Contract[]
   expenses        Expense[]
   biayaOperasional OperationalCost[]
-  tenders         Tender[]
   equipments      Equipment[]
+  rabEstimasi     RabEstimasi[]
+  pembelian       Pembelian[]
   aksesUser       UserProjectAccess[]
   auditLogs       AuditLog[]
 
@@ -618,7 +619,7 @@ model InfrastructureBoqItem {
 }
 
 // =============================================================================
-// VENDOR, KONTRAK & TENDER
+// VENDOR & KONTRAK
 // =============================================================================
 
 model Vendor {
@@ -632,7 +633,9 @@ model Vendor {
   status  String  @default("Aktif")
 
   contracts       Contract[]
-  tenderPeserta   TenderParticipant[]
+  rabPembanding   RabPembanding[]
+  rabMenang       RabEstimasiItem[]   @relation("RabItemPemenang")
+  rabPenawaran    RabPenawaran[]
   equipmentSewa   Equipment[]
 
   @@map("vendors")
@@ -781,39 +784,6 @@ model VariationOrder {
   @@map("variation_orders")
 }
 
-model Tender {
-  id        String   @id @default(cuid())
-  kode      String   @unique
-  projectId String
-  pekerjaan String
-  tanggal   DateTime
-  /// Harga Perkiraan Sendiri
-  hps       Float
-  /// Dibuka | Evaluasi | Ditetapkan | Batal
-  status    String   @default("Dibuka")
-  pemenangVendorId String?
-
-  project Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  peserta TenderParticipant[]
-
-  @@map("tenders")
-}
-
-model TenderParticipant {
-  id       String @id @default(cuid())
-  tenderId String
-  vendorId String
-  nilai    Float
-  /// Lengkap | Kurang dokumen
-  dokumen  String @default("Lengkap")
-
-  tender Tender @relation(fields: [tenderId], references: [id], onDelete: Cascade)
-  vendor Vendor @relation(fields: [vendorId], references: [id])
-
-  @@unique([tenderId, vendorId])
-  @@map("tender_participants")
-}
-
 // =============================================================================
 // KEUANGAN
 // =============================================================================
@@ -851,10 +821,15 @@ model Expense {
   bukti      String?
   /// Kontrak vendor yang membiayai pengeluaran ini, bila ada.
   contractId String?
+  /// Pembelian material yang dibayar pengeluaran ini, bila ada. Tiap termin
+  /// pembayaran ke pemasok = satu Expense yang menunjuk pembelian ini —
+  /// pola yang sama dengan `contractId` untuk pembayaran vendor.
+  pembelianId String?
 
-  project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  contract  Contract?           @relation(fields: [contractId], references: [id])
-  alokasi   ExpenseAllocation[]
+  project    Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contract   Contract?           @relation(fields: [contractId], references: [id])
+  pembelian  Pembelian?          @relation(fields: [pembelianId], references: [id])
+  alokasi    ExpenseAllocation[]
 
   @@index([projectId, tanggal])
   @@map("expenses")
@@ -1095,6 +1070,283 @@ model EquipmentAdjustment {
 
   @@index([equipmentId, tanggal])
   @@map("equipment_adjustments")
+}
+
+// =============================================================================
+// PEMASOK, PUSTAKA AHSP & RAB ESTIMASI
+// =============================================================================
+//
+// Modul perencanaan biaya untuk proyek/tender baru. Alurnya:
+//
+//   Pemasok → PenawaranPemasok ─┐
+//                               ├─► HargaDasar.hargaAcuan ─► KomponenAnalisa
+//   (upah diisi manual) ────────┘                              │
+//                                                              ▼
+//                                                        AnalisaHarga
+//                                                              │  harga satuan
+//                                                              ▼  (dihitung)
+//                                    RabEstimasiItem  ◄── di-SNAPSHOT saat ditarik
+//
+// Harga satuan tiap analisa dihitung di src/lib/calc/ahsp.ts — BUKAN disimpan.
+// Yang disimpan hanyalah snapshot-nya di RabEstimasiItem, supaya perubahan
+// pustaka AHSP tidak menggeser RAB yang sudah berjalan. Prinsip snapshot yang
+// sama persis dengan UnitBoqItem.
+
+/// Pemasok material, tenaga kerja, atau alat. SENGAJA terpisah dari `Vendor`:
+/// Vendor kini berkarakter kontraktor/SPK (borongan), sedangkan Pemasok adalah
+/// sumber harga dasar yang masuk perhitungan AHSP.
+model Pemasok {
+  id       String @id @default(cuid())
+  nama     String
+  /// Material | Tenaga Kerja | Alat
+  kategori String
+  kontak   String @default("")
+  alamat   String @default("")
+  /// Aktif | Nonaktif
+  status   String @default("Aktif")
+
+  penawaran PenawaranPemasok[]
+  pembelian Pembelian[]
+
+  @@map("pemasok")
+}
+
+/// Harga satuan dasar — upah, bahan, atau alat — yang menjadi masukan AHSP.
+/// Ini price book TERPUSAT perusahaan; nilai yang dipakai perhitungan adalah
+/// `hargaAcuan`. Penawaran tiap pemasok tercatat terpisah sebagai pembanding,
+/// dan salah satunya (untuk bahan/alat) biasanya diangkat menjadi `hargaAcuan`.
+model HargaDasar {
+  id         String @id @default(cuid())
+  kode       String @unique
+  /// UPAH | BAHAN | ALAT — menentukan pengelompokan komponen di analisa.
+  kategori   String
+  uraian     String
+  satuan     String
+  /// Harga yang dipakai perhitungan AHSP. Untuk BAHAN/ALAT lazimnya diambil
+  /// dari salah satu PenawaranPemasok; untuk UPAH diisi manual.
+  hargaAcuan Float  @default(0)
+
+  penawaran      PenawaranPemasok[]
+  komponen       KomponenAnalisa[]
+  pembelianItems PembelianItem[]
+
+  @@map("harga_dasar")
+}
+
+/// Penawaran harga dari seorang pemasok atas sebuah harga dasar. Banyak
+/// penawaran boleh menempel pada satu harga dasar; satu di antaranya (atau
+/// angka manual) menjadi `HargaDasar.hargaAcuan`.
+model PenawaranPemasok {
+  id           String   @id @default(cuid())
+  hargaDasarId String
+  pemasokId    String
+  harga        Float
+  tanggal      DateTime @default(now())
+  keterangan   String?
+
+  hargaDasar HargaDasar @relation(fields: [hargaDasarId], references: [id], onDelete: Cascade)
+  pemasok    Pemasok    @relation(fields: [pemasokId], references: [id], onDelete: Cascade)
+
+  @@index([hargaDasarId])
+  @@index([pemasokId])
+  @@map("penawaran_pemasok")
+}
+
+/// Analisa Harga Satuan Pekerjaan (AHSP). Satu pekerjaan (mis. "Pasangan
+/// pondasi batu kali 1:4") diurai menjadi komponen upah, bahan, dan alat.
+///
+/// Harga satuannya TIDAK disimpan — dihitung dari komponennya:
+///   SUM(koefisien × hargaAcuan) × (1 + overheadPct%)
+/// Rumusnya di `hargaSatuanAnalisa()`, src/lib/calc/ahsp.ts.
+model AnalisaHarga {
+  id          String @id @default(cuid())
+  kode        String @unique
+  uraian      String
+  satuan      String
+  /// Pengelompokan pekerjaan untuk RAB, mis. "Persiapan", "Tanah", "Struktur".
+  kelompok    String
+  /// Overhead & keuntungan dalam persen; 13 berarti 13%. Per-analisa — tiap
+  /// pekerjaan boleh berbeda (sama pola dengan `Contract.retensiPct`, yang juga
+  /// disimpan sebagai bilangan persen lalu dibagi 100 saat dihitung).
+  overheadPct Float  @default(13)
+
+  komponen KomponenAnalisa[]
+  rabItems RabEstimasiItem[]
+
+  @@map("analisa_harga")
+}
+
+/// Satu baris komponen di dalam sebuah analisa: sebuah harga dasar dengan
+/// koefisien pemakaiannya. `koefisien` punya pecahan halus (mis. 0,00252 kg
+/// besi per satuan pekerjaan), jadi TETAP Float — bukan uang, jangan dinaikkan
+/// jadi Decimal(18,2) saat porting.
+model KomponenAnalisa {
+  id           String @id @default(cuid())
+  analisaId    String
+  hargaDasarId String
+  koefisien    Float
+  urutan       Int    @default(0)
+
+  analisa    AnalisaHarga @relation(fields: [analisaId], references: [id], onDelete: Cascade)
+  hargaDasar HargaDasar   @relation(fields: [hargaDasarId], references: [id])
+
+  @@index([analisaId])
+  @@index([hargaDasarId])
+  @@map("komponen_analisa")
+}
+
+/// RAB Estimasi sebuah proyek/tender — ENTITAS TERSENDIRI, bukan menimpa
+/// `UnitTypeBoqItem`. Dipakai QS untuk menyusun anggaran biaya proyek baru:
+/// pilih pekerjaan dari pustaka AHSP, isi volume, jumlah dihitung otomatis.
+model RabEstimasi {
+  id         String   @id @default(cuid())
+  projectId  String
+  nomor      String
+  nama       String
+  tanggal    DateTime @default(now())
+  /// Draft | Diajukan | Ditolak | Final (alur persetujuan)
+  status     String   @default("Draft")
+  /// Jejak persetujuan. Nama penyetuju/pengaju disimpan sebagai string snapshot
+  /// agar tidak menyeret relasi User ke model ini.
+  diajukanPada DateTime?
+  diajukanOleh String?
+  diputusPada  DateTime?
+  diputusOleh  String?
+  catatanTolak String?
+  dibuatPada DateTime @default(now())
+  diubahPada DateTime @updatedAt
+
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items      RabEstimasiItem[]
+  /// Vendor yang penawarannya dibandingkan atas RAB ini (hanya saat Final).
+  pembanding RabPembanding[]
+
+  @@unique([projectId, nomor])
+  @@index([projectId])
+  @@map("rab_estimasi")
+}
+
+/// SNAPSHOT satu baris RAB Estimasi. `analisaId` hanya PENELUSURAN (boleh null
+/// untuk baris manual atau bila analisanya kelak dihapus); uraian, satuan, dan
+/// hargaSatuan disalin apa adanya saat baris dibuat. Nilai baris =
+/// volume × hargaSatuan. Prinsip snapshot-nya sama dengan `UnitBoqItem`:
+/// mengubah pustaka AHSP tidak boleh menggeser RAB yang sudah tersusun.
+model RabEstimasiItem {
+  id            String  @id @default(cuid())
+  rabEstimasiId String
+  analisaId     String?
+  grup          String
+  uraian        String
+  satuan        String
+  /// Spesifikasi teknis bebas (mis. "K-225", "Kayu meranti"). Opsional, ikut snapshot.
+  spesifikasi   String?
+  volume        Float
+  hargaSatuan   Float
+  /// Vendor pemenang baris ini pada perbandingan penawaran (null = belum
+  /// ditetapkan). Penetapan dilakukan per grup, disimpan per baris — satu RAB
+  /// bisa dimenangkan beberapa vendor. `hargaSatuan` di atas berperan sebagai
+  /// HPS (rahasia dari vendor) saat membandingkan.
+  pemenangVendorId String?
+  urutan        Int     @default(0)
+
+  rabEstimasi RabEstimasi   @relation(fields: [rabEstimasiId], references: [id], onDelete: Cascade)
+  analisa     AnalisaHarga? @relation(fields: [analisaId], references: [id])
+  pemenang    Vendor?       @relation("RabItemPemenang", fields: [pemenangVendorId], references: [id])
+  penawaran   RabPenawaran[]
+
+  @@index([rabEstimasiId])
+  @@map("rab_estimasi_items")
+}
+
+/// Seorang vendor yang penawarannya dibandingkan atas sebuah RAB Estimasi —
+/// satu kolom pada tabel perbandingan. Menggantikan `TenderParticipant`:
+/// perbandingan penawaran kini melebur ke detail RAB (aktif hanya saat Final).
+/// Vendor bukan pengguna sistem — QS memasukkan harganya dari template Excel.
+model RabPembanding {
+  id            String @id @default(cuid())
+  rabEstimasiId String
+  vendorId      String
+
+  rabEstimasi RabEstimasi @relation(fields: [rabEstimasiId], references: [id], onDelete: Cascade)
+  vendor      Vendor      @relation(fields: [vendorId], references: [id])
+
+  @@unique([rabEstimasiId, vendorId])
+  @@index([rabEstimasiId])
+  @@map("rab_pembanding")
+}
+
+/// Penawaran satu vendor atas satu baris RAB (`RabEstimasiItem`). Menggantikan
+/// `TenderBid`. Nilai baris tawaran = volume (dari baris RAB) × hargaSatuan;
+/// tidak disimpan.
+model RabPenawaran {
+  id                String @id @default(cuid())
+  rabEstimasiItemId String
+  vendorId          String
+  hargaSatuan       Float
+
+  item   RabEstimasiItem @relation(fields: [rabEstimasiItemId], references: [id], onDelete: Cascade)
+  vendor Vendor          @relation(fields: [vendorId], references: [id])
+
+  @@unique([rabEstimasiItemId, vendorId])
+  @@index([rabEstimasiItemId])
+  @@map("rab_penawaran")
+}
+
+/// Pembelian material dari seorang pemasok untuk sebuah proyek — nota/PO.
+///
+/// Nilainya = Σ item (qty × harga). Pembayarannya dilakukan bertermin: tiap
+/// termin adalah satu `Expense` yang menunjuk pembelian ini (lihat
+/// `Expense.pembelianId`), sama pola dengan pembayaran vendor lewat `Contract`.
+/// Hutang berjalan = total − Σ Expense terbayar. Expense-nya berada di tingkat
+/// proyek (peruntukan "Material"), tanpa alokasi ke unit.
+model Pembelian {
+  id         String   @id @default(cuid())
+  pemasokId  String
+  projectId  String
+  nomor      String
+  /// Alur PO: Draft (diterbitkan) | Diterima (barang fisik datang). Pembayaran
+  /// LEPAS dari status ini (DP boleh sebelum Diterima). "Lunas" tak disimpan —
+  /// turunan Σ pembayaran ≥ total.
+  status     String   @default("Draft")
+  tanggal    DateTime @default(now())
+  keterangan String?
+  /// Diisi saat barang ditandai Diterima: kapan (tanggal + jam) barang datang
+  /// dan siapa yang menerima. Null selama masih Draft.
+  tanggalTerima DateTime?
+  penerima      String?
+  dibuatPada DateTime @default(now())
+
+  pemasok    Pemasok   @relation(fields: [pemasokId], references: [id], onDelete: Cascade)
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items      PembelianItem[]
+  /// Termin pembayaran = Expense. Hutang = total − Σ terbayar.
+  pembayaran Expense[]
+
+  @@index([pemasokId])
+  @@index([projectId])
+  @@map("pembelian")
+}
+
+/// Satu baris barang dalam sebuah pembelian. `hargaDasarId` opsional menaut ke
+/// price book (penelusuran harga), boleh null untuk barang lepas. Nilai baris =
+/// qty × harga; tidak disimpan. `qty` BUKAN uang (pecahan halus) — jangan
+/// dinaikkan jadi Decimal saat porting.
+model PembelianItem {
+  id           String  @id @default(cuid())
+  pembelianId  String
+  uraian       String
+  satuan       String
+  qty          Float
+  harga        Float
+  hargaDasarId String?
+  urutan       Int     @default(0)
+
+  pembelian  Pembelian   @relation(fields: [pembelianId], references: [id], onDelete: Cascade)
+  hargaDasar HargaDasar? @relation(fields: [hargaDasarId], references: [id])
+
+  @@index([pembelianId])
+  @@index([hargaDasarId])
+  @@map("pembelian_items")
 }
 
 // =============================================================================

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { BarisField, Field, FormModal, TombolTambah } from "@/components/form";
 import { AlokasiBiaya } from "@/components/alokasi-biaya";
-import { JENIS_BIAYA, METODE_BAYAR, PERUNTUKAN_BIAYA, STATUS_BAYAR } from "@/lib/domain/enums";
+import { JENIS_BIAYA, METODE_BAYAR, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN, STATUS_BAYAR } from "@/lib/domain/enums";
 import { catatPengeluaran } from "./actions";
 
 /**
@@ -26,11 +26,18 @@ export function CatatPengeluaran({
   }[];
 }) {
   const [projectId, setProjectId] = useState(proyek[0]?.id ?? "");
+  const [peruntukan, setPeruntukan] = useState<string>(PERUNTUKAN_BIAYA[0]);
   const [total, setTotal] = useState("");
   // Kunci memaksa AlokasiBiaya dipasang ulang saat proyek berganti: unit dan
   // sarpras dari proyek lama tidak sah untuk proyek yang baru.
   const aktif = proyek.find((p) => p.id === projectId);
   const nominal = Number(total) || 0;
+
+  // Peruntukan menentukan sasaran yang boleh dibebani: unit-saja, sarpras-saja,
+  // atau tidak keduanya (murni level proyek → tanpa panel pembebanan).
+  const sasaran = SASARAN_PERUNTUKAN[peruntukan as keyof typeof SASARAN_PERUNTUKAN]
+    ?? { unit: false, sarpras: false };
+  const adaObjek = sasaran.unit || sasaran.sarpras;
 
   if (proyek.length === 0) return null;
 
@@ -60,7 +67,21 @@ export function CatatPengeluaran({
             ))}
           </select>
         </div>
-        <Field label="Peruntukan" nama="peruntukan" nilai={PERUNTUKAN_BIAYA[0]} pilihan={PERUNTUKAN_BIAYA} />
+        <div>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+            Peruntukan
+          </label>
+          <select
+            name="peruntukan"
+            className="inp"
+            value={peruntukan}
+            onChange={(e) => setPeruntukan(e.target.value)}
+          >
+            {PERUNTUKAN_BIAYA.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
       </BarisField>
 
       <BarisField>
@@ -106,16 +127,31 @@ export function CatatPengeluaran({
           <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
             Dibebankan ke
           </label>
-          <AlokasiBiaya
-            key={projectId}
-            total={nominal}
-            pilihan={{ units: aktif?.units ?? [], sarpras: aktif?.sarpras ?? [] }}
-          />
-          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8, lineHeight: 1.6 }}>
-            Satu pembayaran tetap tersimpan sebagai <b>satu baris transaksi</b> — cocok
-            satu-lawan-satu dengan satu baris mutasi bank. Yang dipecah hanya
-            pembebanannya, dan jumlahnya harus pas dengan total di atas.
-          </div>
+          {adaObjek ? (
+            <>
+              <AlokasiBiaya
+                // Di-remount saat proyek ATAU peruntukan berubah supaya sasaran
+                // lama (mis. unit) tidak tertinggal saat peruntukan diganti.
+                key={`${projectId}_${peruntukan}`}
+                total={nominal}
+                pilihan={{
+                  units: sasaran.unit ? (aktif?.units ?? []) : [],
+                  sarpras: sasaran.sarpras ? (aktif?.sarpras ?? []) : [],
+                }}
+              />
+              <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8, lineHeight: 1.6 }}>
+                Satu pembayaran tetap tersimpan sebagai <b>satu baris transaksi</b> — cocok
+                satu-lawan-satu dengan satu baris mutasi bank. Yang dipecah hanya
+                pembebanannya, dan jumlahnya harus pas dengan total di atas.
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6 }}>
+              Peruntukan <b>{peruntukan}</b> adalah <b>biaya level proyek</b> — tidak
+              menempel pada unit maupun sarana &amp; prasarana, jadi tak perlu dibebankan
+              ke objek tertentu.
+            </div>
+          )}
         </div>
       </BarisField>
 

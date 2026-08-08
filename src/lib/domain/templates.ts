@@ -155,6 +155,28 @@ export const TEMPLATE_RAP: BaseTemplateRapGroup[] = [
   },
 ];
 
+/**
+ * Kelompok pekerjaan RAB — mengikuti struktur REKAP/RAB pada berkas AHSP
+ * perusahaan (NL_DRAF_RAB_RAP.xlsx). Dipakai untuk:
+ *   - mengelompokkan baris pada tabel Analisa AHSP dan rincian RAB Estimasi,
+ *   - urutan tampilnya (bukan alfabetis, tapi urut pelaksanaan),
+ *   - pilihan `kelompok` saat menyusun analisa.
+ *
+ * Bukan enum ketat di database (kolom `kelompok` tetap String bebas) supaya
+ * proyek dengan lingkup khusus masih bisa menambah kelompok sendiri; daftar ini
+ * hanya kanon standar + urutannya.
+ */
+export const KELOMPOK_AHSP = [
+  "Pekerjaan Persiapan",
+  "Pekerjaan Tanah",
+  "Pekerjaan Struktur",
+  "Pekerjaan Arsitektur",
+  "Pekerjaan MEP",
+  "Pekerjaan Lain-lain",
+] as const;
+
+export type KelompokAhsp = (typeof KELOMPOK_AHSP)[number];
+
 /** RAP ditargetkan 88% dari RAB. */
 export const RASIO_RAP_TERHADAP_RAB = 0.88;
 

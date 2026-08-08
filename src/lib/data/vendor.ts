@@ -4,14 +4,13 @@ import { filterProyek, type Pengguna } from "@/lib/auth/rbac";
 /**
  * Pengambilan data untuk modul Vendor Management.
  *
- * Satu aturan berulang di seluruh berkas ini: relasi `contracts` dan
- * `tenderPeserta` selalu disaring `filterProyek` — vendor yang sama bisa
- * mengerjakan proyek di luar jangkauan pengguna, dan kontrak itu tidak boleh
- * ikut terhitung. Penyaring inilah yang harus ikut pindah saat modul ini
- * diserap ERP.
+ * Satu aturan berulang di seluruh berkas ini: relasi `contracts` selalu
+ * disaring `filterProyek` — vendor yang sama bisa mengerjakan proyek di luar
+ * jangkauan pengguna, dan kontrak itu tidak boleh ikut terhitung. Penyaring
+ * inilah yang harus ikut pindah saat modul ini diserap ERP.
  */
 
-/** Daftar vendor beserta ringkasan kontraknya, plus tender. */
+/** Daftar vendor beserta ringkasan kontraknya. */
 export async function dataVendor(u: Pengguna, bolehKelola: boolean) {
   const vendor = await prisma.vendor.findMany({
     orderBy: { nama: "asc" },
@@ -29,18 +28,7 @@ export async function dataVendor(u: Pengguna, bolehKelola: boolean) {
     },
   });
 
-  const tender = await prisma.tender.findMany({
-    where: { project: filterProyek(u) },
-    orderBy: { tanggal: "desc" },
-    select: {
-      id: true, kode: true, pekerjaan: true, tanggal: true, hps: true, status: true,
-      pemenangVendorId: true,
-      project: { select: { kode: true } },
-      peserta: { select: { vendorId: true, nilai: true, vendor: { select: { nama: true } } } },
-    },
-  });
-
-  // Proyek untuk formulir tender, hanya bila boleh mengelola.
+  // Proyek untuk formulir kontrak, hanya bila boleh mengelola.
   const daftarProyek = bolehKelola
     ? await prisma.project.findMany({
         where: filterProyek(u),
@@ -49,7 +37,7 @@ export async function dataVendor(u: Pengguna, bolehKelola: boolean) {
       })
     : [];
 
-  return { vendor, tender, daftarProyek };
+  return { vendor, daftarProyek };
 }
 
 /** Satu vendor beserta seluruh kontrak dan keikutsertaan tendernya. */
@@ -90,20 +78,6 @@ export async function vendorDetail(u: Pengguna, id: string) {
               infrastructure: {
                 select: { id: true, nama: true, jenis: true, progress: true, status: true },
               },
-            },
-          },
-        },
-      },
-      tenderPeserta: {
-        where: { tender: { project: filterProyek(u) } },
-        select: {
-          id: true, nilai: true, dokumen: true,
-          tender: {
-            select: {
-              id: true, kode: true, pekerjaan: true, tanggal: true, hps: true, status: true,
-              pemenangVendorId: true,
-              project: { select: { kode: true } },
-              peserta: { select: { nilai: true } },
             },
           },
         },

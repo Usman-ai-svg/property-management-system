@@ -2,7 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import {
-  komposisi, kontrakUntukAlokasi, proyekKeuangan, totalRapDari, WARNA_JENIS,
+  hargaDasarUntukPembelian, komposisi, kontrakUntukAlokasi, pemasokUntukPembelian,
+  pembelianProyek, proyekKeuangan, totalRapDari, WARNA_JENIS,
 } from "@/lib/data/keuangan";
 import {
   alokasiKontrakSarprasTerbayar, alokasiKontrakTerbayar, biayaLangsung,
@@ -13,6 +14,7 @@ import { pct, rp, tanggal } from "@/lib/format";
 import { Donut, LegendaDonut, RvsRAP } from "@/components/charts";
 import { Badge, Kartu, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { HapusTransaksi, UbahTransaksi } from "./ubah-transaksi";
+import { BuatPO, PanelPembelian } from "../pembelian";
 import { Tabel } from "@/components/kartu-tabel";
 
 export default async function KeuanganProyek({
@@ -87,6 +89,13 @@ export default async function KeuanganProyek({
     id: s.id,
     label: `${s.nama} · ${s.jenis}`,
   }));
+
+  // Pembelian material (PO) proyek — satu-satunya pintu masuk belanja material.
+  // Daftar pemasok & price book hanya dimuat bila boleh mencatat (untuk form).
+  const pembelian = await pembelianProyek(proyek.id);
+  const [pemasokPO, hargaDasarPO] = bolehUbahKeuangan
+    ? await Promise.all([pemasokUntukPembelian(), hargaDasarUntukPembelian()])
+    : [[], []];
 
   return (
     <div style={{ padding: 24 }}>
@@ -634,11 +643,34 @@ export default async function KeuanganProyek({
           );
         })()}
 
+      {/* ---------- pembelian material (PO) ---------- */}
+      <div className="card" style={{ marginTop: 16, padding: "16px 20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          <div>
+            <div className="eyebrow">Pembelian Material · PO</div>
+            <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2, maxWidth: 560, lineHeight: 1.5 }}>
+              Satu-satunya tempat belanja material dicatat. Buat PO (Draft), tandai
+              barang <b>Diterima</b> saat datang, lalu bayar bertermin — tiap termin jadi satu pengeluaran proyek.
+            </div>
+          </div>
+          {bolehUbahKeuangan && (
+            <BuatPO projectId={proyek.id} proyekNama={proyek.nama} pemasok={pemasokPO} hargaDasar={hargaDasarPO} />
+          )}
+        </div>
+        <PanelPembelian
+          bolehKelola={bolehUbahKeuangan}
+          pembelian={pembelian}
+          units={pilihanUnit}
+          sarpras={pilihanSarpras}
+          namaPengguna={pengguna.nama}
+        />
+      </div>
+
       {/* ---------- transaksi ---------- */}
       <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
         <TabelHead
           judul={`Transaksi · ${proyek.expenses.length} entri`}
-          keterangan="Kontrak vendor dikelola di modul Vendor Management."
+          keterangan="Kontrak vendor dikelola di modul Vendor Management. Belanja material dicatat lewat PO di atas."
         />
         <Tabel
           tinggiMaks={360}

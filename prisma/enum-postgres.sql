@@ -56,23 +56,41 @@ CREATE TYPE pm_status_vendor AS ENUM (
   'Nonaktif'
 );
 
-CREATE TYPE pm_dokumen_tender AS ENUM (
-  'Lengkap',
-  'Kurang dokumen'
+CREATE TYPE pm_kategori_pemasok AS ENUM (
+  'Material',
+  'Tenaga Kerja',
+  'Alat'
 );
 
-CREATE TYPE pm_status_tender AS ENUM (
-  'Dibuka',
-  'Evaluasi',
-  'Ditetapkan',
-  'Batal'
+CREATE TYPE pm_status_pemasok AS ENUM (
+  'Aktif',
+  'Nonaktif'
+);
+
+CREATE TYPE pm_status_pembelian AS ENUM (
+  'Draft',
+  'Diterima'
+);
+
+CREATE TYPE pm_kategori_harga_dasar AS ENUM (
+  'UPAH',
+  'BAHAN',
+  'ALAT'
+);
+
+CREATE TYPE pm_status_rab_estimasi AS ENUM (
+  'Draft',
+  'Diajukan',
+  'Ditolak',
+  'Final'
 );
 
 CREATE TYPE pm_peruntukan_biaya AS ENUM (
   'Unit (rumah dijual)',
   'Prasarana & Sarana',
   'Perijinan & Ormas',
-  'Pengolahan Lahan'
+  'Pengolahan Lahan',
+  'Material'
 );
 
 CREATE TYPE pm_jenis_biaya AS ENUM (

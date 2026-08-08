@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
-import { ambilSession } from "@/lib/auth/session";
+import { ambilPengguna } from "@/lib/auth/rbac";
 import { FormLogin } from "./form";
 
 export default async function HalamanLogin() {
-  if (await ambilSession()) redirect("/");
+  // Periksa PENGGUNA sungguhan, bukan sekadar ada token: cookie yang masih
+  // tertanda sah tapi menunjuk user yang tak ada lagi (mis. setelah reset DB)
+  // jangan sampai memantulkan balik ke "/" dan menciptakan loop redirect.
+  if (await ambilPengguna()) redirect("/");
 
   return (
     <div

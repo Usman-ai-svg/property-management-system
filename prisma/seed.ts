@@ -17,10 +17,11 @@ import { buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap, rabAcuan, rapA
 import { parseUkuran } from "../src/lib/format";
 import { alokasiPembayaran } from "../src/lib/calc/keuangan";
 import { terapkanPenyesuaian } from "../src/lib/calc/aset";
+import { seedAhsp } from "./seed-ahsp";
 import {
   ACL_AWAL, ACL_UBAH, ASET, BIAYA_OPERASIONAL, BIAYA_UMUM, KERJA_TAMBAH, KONTRAK, LOG_AWAL,
   PORSI_BIAYA_SARPRAS, PORSI_BIAYA_UNIT, POS_HPP, PROYEK, ROLE_GRUP, SARPRAS, SEMUA_PERAN,
-  TENDER, TIPE_UNIT, USERS, VENDOR, type Dok, tgl,
+  TIPE_UNIT, USERS, VENDOR, type Dok, tgl,
 } from "./seed-data";
 
 const prisma = new PrismaClient({
@@ -292,13 +293,18 @@ async function main() {
   console.log("Menyemai data demo…\n");
 
   // --- bersihkan (urutan penting karena foreign key) ---
+  await prisma.rabEstimasiItem.deleteMany();
+  await prisma.rabEstimasi.deleteMany();
+  await prisma.komponenAnalisa.deleteMany();
+  await prisma.penawaranPemasok.deleteMany();
+  await prisma.analisaHarga.deleteMany();
+  await prisma.hargaDasar.deleteMany();
+  await prisma.pemasok.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.salesPayment.deleteMany();
   await prisma.expenseAllocation.deleteMany();
   await prisma.expense.deleteMany();
   await prisma.operationalCost.deleteMany();
-  await prisma.tenderParticipant.deleteMany();
-  await prisma.tender.deleteMany();
   await prisma.variationOrder.deleteMany();
   await prisma.contractBoqItem.deleteMany();
   await prisma.contractUnit.deleteMany();
@@ -410,6 +416,10 @@ async function main() {
     });
   }
   console.log(`  ${PROYEK.length} proyek beserta legalitas, pembanding pasar & business plan`);
+
+  // Pustaka AHSP, pemasok & satu RAB Estimasi — modul perencanaan biaya.
+  // Hanya butuh proyek sebagai wadah, jadi disemai tepat setelah proyek dibuat.
+  await seedAhsp(prisma, projectId);
 
   // ---------------------------------------------------------------------
   // 3. FASE & TIPE UNIT
@@ -610,7 +620,7 @@ async function main() {
   console.log(`  ${infraId.size} item sarana & prasarana`);
 
   // ---------------------------------------------------------------------
-  // 6. VENDOR, KONTRAK, TENDER
+  // 6. VENDOR & KONTRAK
   // ---------------------------------------------------------------------
   const vendorId = new Map<string, string>();
   for (const V of VENDOR) {
@@ -670,7 +680,7 @@ async function main() {
           projectId: projectId.get(K.proyek)!,
           contractId: c.id,
           tanggal: tgl(r.tgl)!,
-          peruntukan: K.jenis === "Unit" ? "Unit (rumah dijual)" : "Sarana & Prasarana",
+          peruntukan: K.jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana",
           jenis: "Upah Borongan",
           metode: "Transfer",
           uraian: `${r.uraian} — ${K.kode} ${K.vendor}`,
@@ -685,17 +695,7 @@ async function main() {
     await isiBoqSpk(c.id, K);
   }
 
-  for (const T of TENDER) {
-    await prisma.tender.create({
-      data: {
-        kode: T.kode, projectId: projectId.get(T.proyek)!, pekerjaan: T.pekerjaan,
-        tanggal: tgl(T.tgl)!, hps: T.hps, status: T.status,
-        pemenangVendorId: T.pemenang ? vendorId.get(T.pemenang) ?? null : null,
-        peserta: { create: T.peserta.map((p) => ({ vendorId: vendorId.get(p.vendor)!, nilai: p.nilai, dokumen: p.dok })) },
-      },
-    });
-  }
-  console.log(`  ${VENDOR.length} vendor, ${KONTRAK.length} kontrak, ${TENDER.length} tender`);
+  console.log(`  ${VENDOR.length} vendor, ${KONTRAK.length} kontrak`);
 
   // ---------------------------------------------------------------------
   // 7. EQUIPMENT

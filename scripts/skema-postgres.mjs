@@ -42,10 +42,19 @@ const BUKAN_UANG = new Set([
   // titik lokasi sampai sekitar satu kilometer.
   "pinLat", "pinLng",
   // Persentase dan jarak.
-  "retensiPct", "jarak", "pemakaian",
+  "retensiPct", "overheadPct", "jarak", "pemakaian",
+  // Koefisien AHSP — pecahan halus (0,00252 kg besi per m³). Dibulatkan jadi
+  // dua desimal akan menggeser seluruh harga satuan analisa yang dihitung darinya.
+  "koefisien",
+  // Kuantitas baris pembelian — bisa berpecahan (mis. 2,5 m³ pasir); ikut
+  // aturan yang sama dengan volume, jangan dinaikkan jadi Decimal(18,2).
+  "qty",
 ]);
 
-const kode = readFileSync(SUMBER, "utf8");
+// Normalkan akhir baris ke LF. Di checkout Windows (autocrlf) berkas bisa
+// ber-CRLF; tanpa normalisasi, `\r` di ujung baris membuat regex Float `(.*)$`
+// gagal cocok dan tak ada satu pun kolom uang yang dinaikkan jadi Decimal.
+const kode = readFileSync(SUMBER, "utf8").replace(/\r\n/g, "\n");
 
 // --- 1. provider ---
 let hasil = kode.replace('provider = "sqlite"', 'provider = "postgresql"');

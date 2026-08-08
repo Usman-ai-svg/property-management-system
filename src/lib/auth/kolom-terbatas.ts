@@ -104,6 +104,9 @@ export const DIJAGA_DI_HALAMAN: Record<string, Section> = {
   "ringkasan.ts": "keuangan",
   "plan-real.ts": "businessPlan",
   "proyek.ts": "hargaRabRap",
+  // Seluruh modul Estimasi RAB (harga satuan AHSP, harga dasar, penawaran
+  // pemasok) berada di bawah "hargaRabRap" dan dijaga di tiap halamannya.
+  "estimasi.ts": "hargaRabRap",
 };
 
 /**

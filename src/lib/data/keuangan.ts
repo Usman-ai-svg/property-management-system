@@ -208,6 +208,48 @@ export async function proyekKeuangan(kodeProyek: string) {
   });
 }
 
+/**
+ * Seluruh PO / pembelian material sebuah proyek beserta barang dan termin
+ * pembayarannya. Nilai/terbayar/hutang dihitung di tampilan dari data mentah
+ * di sini (Σ item qty×harga vs Σ Expense pembayaran).
+ */
+export async function pembelianProyek(projectId: string) {
+  return prisma.pembelian.findMany({
+    where: { projectId },
+    orderBy: [{ status: "asc" }, { tanggal: "desc" }],
+    select: {
+      id: true, nomor: true, status: true, tanggal: true, keterangan: true,
+      tanggalTerima: true, penerima: true,
+      pemasok: { select: { id: true, nama: true, kategori: true } },
+      items: {
+        orderBy: { urutan: "asc" },
+        select: { id: true, uraian: true, satuan: true, qty: true, harga: true },
+      },
+      pembayaran: {
+        orderBy: { tanggal: "asc" },
+        select: { id: true, tanggal: true, uraian: true, total: true, metode: true, status: true },
+      },
+    },
+  });
+}
+
+/** Pemasok aktif — pilihan saat membuat PO di Keuangan Proyek. */
+export async function pemasokUntukPembelian() {
+  return prisma.pemasok.findMany({
+    where: { status: "Aktif" },
+    orderBy: { nama: "asc" },
+    select: { id: true, nama: true, kategori: true },
+  });
+}
+
+/** Harga dasar ringkas untuk menaut baris PO ke price book (opsional). */
+export async function hargaDasarUntukPembelian() {
+  return prisma.hargaDasar.findMany({
+    orderBy: { kode: "asc" },
+    select: { id: true, kode: true, uraian: true, satuan: true, hargaAcuan: true },
+  });
+}
+
 /** Kontrak sebuah proyek, dipakai membagi realisasi ke unit dan sarpras. */
 export async function kontrakUntukAlokasi(projectId: string) {
   const [kontrakUnit, kontrakSarpras] = await Promise.all([

@@ -11,7 +11,6 @@ import { Tabel } from "@/components/kartu-tabel";
 
 const TAB = [
   ["kontrak", "Kontrak"],
-  ["tender", "Penawaran"],
   ["bayar", "Pembayaran"],
 ] as const;
 
@@ -341,75 +340,6 @@ export default async function DetailVendor({
             );
           })
         ))}
-
-      {/* ================= PENAWARAN ================= */}
-      {tabAktif === "tender" &&
-        (vendor.tenderPeserta.length === 0 ? (
-          <KartuKosong>
-            Vendor ini belum pernah ikut tender.
-          </KartuKosong>
-        ) : (
-          vendor.tenderPeserta.map((p) => {
-            const t = p.tender;
-            const terendah = Math.min(...t.peserta.map((x) => x.nilai));
-            const menang = t.pemenangVendorId === vendor.id;
-
-            return (
-              <div key={p.id} className="card" style={{ padding: "16px 20px", marginBottom: 14 }}>
-                <div
-                  style={{
-                    display: "flex", justifyContent: "space-between",
-                    alignItems: "flex-start", flexWrap: "wrap", gap: 8,
-                  }}
-                >
-                  <div>
-                    <div className="disp" style={{ fontWeight: 600, fontSize: 15 }}>{t.pekerjaan}</div>
-                    <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                      {t.kode} · {t.project.kode} · dibuka {tanggal(t.tanggal)}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {menang && (
-                      <span className="chip" style={{ background: "var(--rona-hijau2)", color: "var(--green)" }}>
-                        Pemenang
-                      </span>
-                    )}
-                    <span className="chip" style={{ background: "var(--rona-teal)", color: "var(--teal)" }}>
-                      {t.status}
-                    </span>
-                  </div>
-                </div>
-
-                {bolehHarga && (
-                  <div className="grid grid4" style={{ marginTop: 14, gap: 12 }}>
-                    {(
-                      [
-                        ["HPS", rp(t.hps)],
-                        ["PENAWARAN VENDOR", rp(p.nilai)],
-                        ["PENAWARAN TERENDAH", rp(terendah)],
-                        ["SELISIH THD HPS", `${p.nilai <= t.hps ? "−" : "+"}${rp(Math.abs(t.hps - p.nilai))}`],
-                      ] as [string, string][]
-                    ).map(([label, nilai]) => (
-                      <div key={label}>
-                        <div style={{ fontSize: 10, color: "var(--muted)", letterSpacing: 1 }}>{label}</div>
-                        <div className="num">{nilai}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
-                  Kelengkapan dokumen:{" "}
-                  <b style={{ color: p.dokumen === "Lengkap" ? "var(--green)" : "var(--amber)" }}>
-                    {p.dokumen}
-                  </b>{" "}
-                  · {t.peserta.length} peserta
-                </div>
-              </div>
-            );
-          })
-        ))}
-
 
       {/* ================= PEMBAYARAN ================= */}
       {tabAktif === "bayar" &&

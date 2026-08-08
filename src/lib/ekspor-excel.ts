@@ -98,3 +98,57 @@ const CONTOH_RAP: BarisRapEks[] = [
 
 export const excelTemplateBoq = () => excelBoq("Template RAB", CONTOH_BOQ);
 export const excelTemplateRap = () => excelRap("Template RAP", CONTOH_RAP, 5000000);
+
+// ---------------------------------------------------------------------------
+// Template BOQ penawaran — dikirim ke vendor untuk diisi harga
+// ---------------------------------------------------------------------------
+
+export interface BarisTemplatePenawaran {
+  grup: string;
+  uraian: string;
+  satuan: string;
+  volume: number;
+}
+
+/**
+ * Template penawaran vendor: daftar pekerjaan dengan kolom Harga Satuan KOSONG
+ * untuk diisi vendor, dan kolom Jumlah sebagai formula Volume×Harga.
+ *
+ * HPS (harga acuan dari RAB) SENGAJA TIDAK disertakan — angka itu rahasia
+ * internal dan tak boleh bocor ke vendor. Yang bocor lewat berkas ini hanyalah
+ * lingkup pekerjaan dan volumenya.
+ */
+export async function excelTemplatePenawaran(
+  info: { kode: string; pekerjaan: string; proyek: string },
+  baris: BarisTemplatePenawaran[],
+): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(`Penawaran ${info.kode}`.slice(0, 31));
+
+  ws.addRow([`FORMULIR PENAWARAN — ${info.kode}`]);
+  ws.addRow([`Pekerjaan: ${info.pekerjaan}`]);
+  ws.addRow([`Proyek: ${info.proyek}`]);
+  ws.addRow(["Isi kolom Harga Satuan. Kolom Jumlah terisi otomatis."]);
+  ws.addRow([]);
+
+  const headIdx = ws.rowCount + 1;
+  ws.addRow(["Grup", "Uraian Pekerjaan", "Satuan", "Volume", "Harga Satuan", "Jumlah"]);
+  for (const b of baris) {
+    const r = ws.addRow([b.grup, b.uraian, b.satuan, b.volume, null, null]);
+    r.getCell(6).value = { formula: `D${r.number}*E${r.number}` };
+  }
+
+  const kepala = ws.getRow(headIdx);
+  kepala.font = { bold: true };
+  kepala.eachCell((c) => {
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFF3F2" } };
+    c.border = { bottom: { style: "thin", color: { argb: "FFCBD5D2" } } };
+  });
+  ws.getRow(1).font = { bold: true, size: 13 };
+  [22, 40, 8, 12, 16, 16].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+  ws.getColumn(4).numFmt = "#,##0.##";
+  ws.getColumn(5).numFmt = "#,##0";
+  ws.getColumn(6).numFmt = "#,##0";
+
+  return keBuffer(wb);
+}

@@ -3,20 +3,10 @@ import Link from "next/link";
 import { ambilPengguna, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { dataVendor } from "@/lib/data/vendor";
 import { kpiVendor, susunBarisVendor } from "@/lib/tampilan/vendor";
-import { pct, rp, tanggal } from "@/lib/format";
-import { Badge, BarisKpi, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
-import {
-  HapusTender, HapusVendor, TambahPeserta, TambahTender, TambahVendor,
-  UbahStatusTender, UbahVendor,
-} from "./editors-vendor";
+import { pct, rp } from "@/lib/format";
+import { BarisKpi, TabelHead, Terbatas, Track } from "@/components/ui";
+import { HapusVendor, TambahVendor, UbahVendor } from "./editors-vendor";
 import { Tabel } from "@/components/kartu-tabel";
-
-const WARNA_TENDER: Record<string, [string, string]> = {
-  Dibuka: ["var(--rona-teal2)", "var(--teal)"],
-  Evaluasi: ["var(--rona-amber)", "var(--amber)"],
-  Ditetapkan: ["var(--rona-hijau2)", "var(--green)"],
-  Batal: ["var(--rona-merah)", "var(--red)"],
-};
 
 export default async function VendorManagement() {
   const pengguna = await ambilPengguna();
@@ -35,11 +25,10 @@ export default async function VendorManagement() {
 
   // Hanya kontrak pada proyek yang boleh diakses pengguna yang ikut dihitung —
   // vendor yang sama bisa mengerjakan proyek di luar jangkauannya.
-  const { vendor, tender, daftarProyek } = await dataVendor(pengguna, bolehKelola);
+  const { vendor } = await dataVendor(pengguna, bolehKelola);
 
   const baris = susunBarisVendor(vendor);
   const angka = kpiVendor(vendor);
-  const vendorAktif = vendor.filter((v) => v.status === "Aktif").map((v) => ({ id: v.id, nama: v.nama }));
 
   const kpi: [string, string][] = [
     ["Vendor Terdaftar", String(angka.jumlahVendor)],
@@ -136,66 +125,6 @@ export default async function VendorManagement() {
               )}
             </tr>
           ))}
-        </Tabel>
-      </div>
-
-      <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
-        <TabelHead
-          judul="Tender / Penawaran Berjalan"
-          aksi={bolehKelola && <TambahTender proyek={daftarProyek} />}
-        />
-        <Tabel
-          kolom={[
-            { label: "Kode" },
-            { label: "Proyek" },
-            { label: "Pekerjaan" },
-            { label: "Tanggal" },
-            bolehHarga && { label: "HPS", rata: "kanan" },
-            { label: "Peserta", rata: "kanan" },
-            bolehHarga && { label: "Penawaran Terendah", rata: "kanan" },
-            { label: "Status" },
-            bolehKelola && { lebar: 120 },
-          ]}
-          kosong="Belum ada tender berjalan."
-        >
-          {tender.map((t) => {
-            const terendah = t.peserta.length ? Math.min(...t.peserta.map((p) => p.nilai)) : 0;
-            return (
-              <tr key={t.id}>
-                <td style={{ fontWeight: 600 }}>{t.kode}</td>
-                <td style={{ color: "var(--muted)" }}>{t.project.kode}</td>
-                <td style={{ whiteSpace: "normal" }}>{t.pekerjaan}</td>
-                <td style={{ color: "var(--muted)" }}>{tanggal(t.tanggal)}</td>
-                {bolehHarga && <td className="num" style={{ textAlign: "right" }}>{rp(t.hps)}</td>}
-                <td style={{ textAlign: "right" }}>{t.peserta.length}</td>
-                {bolehHarga && (
-                  <td className="num" style={{ textAlign: "right" }}>
-                    {terendah ? rp(terendah) : "—"}
-                  </td>
-                )}
-                <td>
-                  <Badge nilai={t.status} peta={WARNA_TENDER} />
-                </td>
-                {bolehKelola && (
-                  <td>
-                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                      <TambahPeserta tenderId={t.id} kodeTender={t.kode} vendor={vendorAktif} />
-                      <UbahStatusTender
-                        tender={{
-                          id: t.id, kode: t.kode, status: t.status,
-                          pemenangVendorId: t.pemenangVendorId,
-                          peserta: t.peserta.map((p) => ({
-                            vendorId: p.vendorId, nama: p.vendor.nama, nilai: p.nilai,
-                          })),
-                        }}
-                      />
-                      <HapusTender id={t.id} kode={t.kode} />
-                    </div>
-                  </td>
-                )}
-              </tr>
-            );
-          })}
         </Tabel>
       </div>
     </div>

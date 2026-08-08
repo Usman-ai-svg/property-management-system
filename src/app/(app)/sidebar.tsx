@@ -4,12 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  Building2, ChevronDown, LayoutGrid, LogOut, Map, ShieldCheck, Wallet,
+  Building2, Calculator, ChevronDown, LayoutGrid, LogOut, Map, ShieldCheck, Wallet,
 } from "lucide-react";
 import type { ItemNav } from "@/lib/nav";
 import { gantiPeran, logout } from "@/app/login/actions";
 
-const IKON = { LayoutGrid, Building2, Wallet, Map, ShieldCheck };
+const IKON = { LayoutGrid, Building2, Wallet, Map, ShieldCheck, Calculator };
 
 export function Sidebar({
   nav,
@@ -25,7 +25,14 @@ export function Sidebar({
   const path = usePathname();
   const [terbuka, setTerbuka] = useState<string[]>(["manpro"]);
 
-  const aktif = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  // Highlight menu dengan aturan "paling spesifik menang": di antara semua href
+  // yang cocok dengan path saat ini, hanya yang TERPANJANG yang aktif. Tanpa ini,
+  // href pendek seperti "/estimasi" ikut menyala di "/estimasi/pemasok".
+  const cocok = (href: string) =>
+    href === "/" ? path === "/" : path === href || path.startsWith(href + "/");
+  const semuaHref = nav.flatMap((n) => [n.href, ...(n.anak?.map((a) => a.href) ?? [])]);
+  const terbaik = semuaHref.filter(cocok).sort((a, b) => b.length - a.length)[0] ?? "";
+  const aktif = (href: string) => href === terbaik;
 
   return (
     <aside className="side">

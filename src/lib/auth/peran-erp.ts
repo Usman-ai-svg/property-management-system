@@ -60,7 +60,7 @@ export type Tingkat = "tidak" | "lihat" | "ubah";
 export const PETA_PERAN_ERP: Record<string, Partial<Record<Section, Tingkat>>> = {
   director: {
     deskripsi: "ubah", daftarUnit: "ubah", daftarSarpras: "ubah", dokumenTeknis: "ubah",
-    hargaRabRap: "ubah", businessPlan: "ubah", keuangan: "ubah", progress: "ubah",
+    hargaRabRap: "ubah", setujuiRab: "ubah", businessPlan: "ubah", keuangan: "ubah", progress: "ubah",
     aset: "ubah", penyesuaianAset: "ubah",
   },
   accountant: {
@@ -69,7 +69,7 @@ export const PETA_PERAN_ERP: Record<string, Partial<Record<Section, Tingkat>>> =
   },
   manager: {
     deskripsi: "lihat", daftarUnit: "ubah", daftarSarpras: "ubah", dokumenTeknis: "ubah",
-    hargaRabRap: "lihat", keuangan: "lihat", progress: "ubah",
+    hargaRabRap: "lihat", setujuiRab: "ubah", keuangan: "lihat", progress: "ubah",
     aset: "ubah", penyesuaianAset: "ubah",
   },
   admin: {

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { BarisField, Field, FormModal, TombolHapus, TombolIkon } from "@/components/form";
 import { AlokasiBiaya } from "@/components/alokasi-biaya";
-import { JENIS_BIAYA, METODE_BAYAR, PERUNTUKAN_BIAYA, STATUS_BAYAR } from "@/lib/domain/enums";
+import { JENIS_BIAYA, METODE_BAYAR, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN, STATUS_BAYAR } from "@/lib/domain/enums";
 import { hapusPengeluaran, ubahPengeluaran } from "../actions";
 import { Petunjuk } from "@/components/ui";
 
@@ -34,12 +34,26 @@ export function UbahTransaksi({
   sarpras: { id: string; label: string }[];
 }) {
   const [total, setTotal] = useState(String(transaksi.total));
+  const [peruntukan, setPeruntukan] = useState<string>(transaksi.peruntukan);
   const nominal = Number(total) || 0;
+
+  // Nilai lama bisa saja di luar daftar baku (mis. data pra-perubahan). Ditambah
+  // sebagai opsi supaya menyunting field lain tak diam-diam mengubah peruntukan.
+  const daftarPeruntukan = (PERUNTUKAN_BIAYA as readonly string[]).includes(transaksi.peruntukan)
+    ? PERUNTUKAN_BIAYA
+    : [transaksi.peruntukan, ...PERUNTUKAN_BIAYA];
+
+  const sasaran = SASARAN_PERUNTUKAN[peruntukan as keyof typeof SASARAN_PERUNTUKAN]
+    ?? { unit: false, sarpras: false };
+  const adaObjek = sasaran.unit || sasaran.sarpras;
 
   const awal = transaksi.alokasi.map((a) => ({
     tujuan: a.unitId ? `unit:${a.unitId}` : a.infrastructureId ? `sarpras:${a.infrastructureId}` : "",
     nominal: a.nominal,
   }));
+  // Alokasi awal hanya dipakai selama peruntukan belum diubah. Begitu diganti,
+  // sasaran lama bisa tak sah untuk peruntukan baru, jadi dimulai kosong.
+  const awalDipakai = peruntukan === transaksi.peruntukan ? awal : undefined;
 
   return (
     <FormModal
@@ -52,7 +66,21 @@ export function UbahTransaksi({
       <input type="hidden" name="id" value={transaksi.id} />
 
       <BarisField>
-        <Field label="Peruntukan" nama="peruntukan" nilai={transaksi.peruntukan} pilihan={PERUNTUKAN_BIAYA} />
+        <div>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+            Peruntukan
+          </label>
+          <select
+            name="peruntukan"
+            className="inp"
+            value={peruntukan}
+            onChange={(e) => setPeruntukan(e.target.value)}
+          >
+            {daftarPeruntukan.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
         <Field label="Jenis Biaya" nama="jenis" nilai={transaksi.jenis} pilihan={JENIS_BIAYA} />
       </BarisField>
 
@@ -91,11 +119,22 @@ export function UbahTransaksi({
           <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
             Dibebankan ke
           </label>
-          <AlokasiBiaya total={nominal} pilihan={{ units, sarpras }} awal={awal} />
-          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8, lineHeight: 1.6 }}>
-            Biaya level proyek adalah yang tidak menempel pada unit maupun sarpras —
-            perijinan dan pengolahan lahan.
-          </div>
+          {adaObjek ? (
+            <AlokasiBiaya
+              key={peruntukan}
+              total={nominal}
+              pilihan={{
+                units: sasaran.unit ? units : [],
+                sarpras: sasaran.sarpras ? sarpras : [],
+              }}
+              awal={awalDipakai}
+            />
+          ) : (
+            <div style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6 }}>
+              Peruntukan <b>{peruntukan}</b> adalah <b>biaya level proyek</b> — tidak
+              menempel pada unit maupun sarana &amp; prasarana.
+            </div>
+          )}
         </div>
       </BarisField>
 

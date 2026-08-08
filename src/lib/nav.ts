@@ -5,7 +5,7 @@ export interface ItemNav {
   label: string;
   href: string;
   /** Ikon lucide-react, dipetakan di komponen sidebar. */
-  ikon: "LayoutGrid" | "Building2" | "Wallet" | "Map" | "ShieldCheck";
+  ikon: "LayoutGrid" | "Building2" | "Wallet" | "Map" | "ShieldCheck" | "Calculator";
   /** Bila diisi, menu hanya muncul untuk peran yang boleh melihat sub-bagian ini. */
   butuhSection?: Section;
   /** Bila diisi, menu hanya muncul untuk peran dalam daftar. */
@@ -16,6 +16,20 @@ export interface ItemNav {
 export const NAV: ItemNav[] = [
   { id: "ringkasan", label: "Ringkasan", href: "/", ikon: "LayoutGrid" },
   { id: "master", label: "Master Proyek", href: "/master", ikon: "Building2", butuhSection: "deskripsi" },
+  // Estimasi RAB berbasis AHSP — di bawah Master Proyek. Seluruhnya gerbang
+  // "hargaRabRap" karena isinya harga satuan pekerjaan & harga dasar.
+  {
+    id: "estimasi",
+    label: "Estimasi RAB",
+    href: "/estimasi",
+    ikon: "Calculator",
+    butuhSection: "hargaRabRap",
+    anak: [
+      { id: "estimasi-rab", label: "RAB Estimasi", href: "/estimasi", butuhSection: "hargaRabRap" },
+      { id: "estimasi-pustaka", label: "Pustaka AHSP", href: "/estimasi/pustaka", butuhSection: "hargaRabRap" },
+      { id: "estimasi-pemasok", label: "Pemasok", href: "/estimasi/pemasok", butuhSection: "hargaRabRap" },
+    ],
+  },
   {
     id: "manpro",
     label: "Manajemen Proyek",

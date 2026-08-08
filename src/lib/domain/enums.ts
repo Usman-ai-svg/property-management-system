@@ -52,17 +52,61 @@ export const STATUS_VO = ["Diajukan", "Disetujui", "Ditolak"] as const;
 
 export const STATUS_VENDOR = ["Aktif", "Nonaktif"] as const;
 
-/** Kelengkapan dokumen peserta tender. */
-export const DOKUMEN_TENDER = ["Lengkap", "Kurang dokumen"] as const;
+/** Kategori pemasok — menentukan jenis harga dasar yang lazim ditawarkannya. */
+export const KATEGORI_PEMASOK = ["Material", "Tenaga Kerja", "Alat"] as const;
 
-export const STATUS_TENDER = ["Dibuka", "Evaluasi", "Ditetapkan", "Batal"] as const;
+/** Status pemasok. Nilainya sama dengan vendor, tapi entitasnya terpisah. */
+export const STATUS_PEMASOK = ["Aktif", "Nonaktif"] as const;
 
+/**
+ * Alur pembelian material (PO → penerimaan barang).
+ *   Draft    — PO diterbitkan, barang belum diterima; belum boleh dibayar.
+ *   Diterima — barang diterima; jadi hutang berjalan & boleh dibayar bertermin.
+ * "Lunas" tidak disimpan — ia turunan dari Σ pembayaran ≥ total nota.
+ */
+export const STATUS_PEMBELIAN = ["Draft", "Diterima"] as const;
+
+/**
+ * Kelompok harga dasar pada AHSP: upah tenaga kerja (ΣA), bahan (ΣB), alat (ΣC).
+ * Menentukan komponen masuk ke kelompok mana saat menghitung harga satuan.
+ */
+export const KATEGORI_HARGA_DASAR = ["UPAH", "BAHAN", "ALAT"] as const;
+
+/**
+ * Status sebuah RAB Estimasi (alur persetujuan).
+ *   Draft    — sedang disusun, bisa diubah.
+ *   Diajukan — menunggu persetujuan, terkunci dari perubahan.
+ *   Ditolak  — dikembalikan dengan catatan; bisa diubah lalu diajukan ulang.
+ *   Final    — disetujui & terkunci; baru boleh ditenderkan.
+ */
+export const STATUS_RAB_ESTIMASI = ["Draft", "Diajukan", "Ditolak", "Final"] as const;
+
+// Peruntukan = SASARAN biaya (ke mana dibebankan), bukan jenis biaya. "Material"
+// sengaja TIDAK di sini — itu jenis biaya (lihat JENIS_BIAYA di bawah).
 export const PERUNTUKAN_BIAYA = [
   "Unit (rumah dijual)",
   "Prasarana & Sarana",
   "Perijinan & Ormas",
   "Pengolahan Lahan",
 ] as const;
+
+/**
+ * Jenis sasaran pembebanan yang absah untuk tiap peruntukan.
+ *
+ * Ini yang mengikat pilihan "Dibebankan ke": peruntukan unit hanya boleh ke
+ * unit, prasarana hanya ke sarpras, sisanya murni level proyek (tak ada objek).
+ * Dipakai bersama oleh form (menyaring pilihan) dan server (memvalidasi) supaya
+ * penyaringan UI bukan sekadar kosmetik.
+ */
+export const SASARAN_PERUNTUKAN: Record<
+  (typeof PERUNTUKAN_BIAYA)[number],
+  { unit: boolean; sarpras: boolean }
+> = {
+  "Unit (rumah dijual)": { unit: true, sarpras: false },
+  "Prasarana & Sarana": { unit: false, sarpras: true },
+  "Perijinan & Ormas": { unit: false, sarpras: false },
+  "Pengolahan Lahan": { unit: false, sarpras: false },
+};
 
 export const JENIS_BIAYA = [
   "Upah Borongan",
@@ -106,6 +150,7 @@ export const SECTIONS = [
   "daftarSarpras",
   "dokumenTeknis",
   "hargaRabRap",
+  "setujuiRab",
   "businessPlan",
   "keuangan",
   "progress",
@@ -119,6 +164,7 @@ export const SECTION_LABELS: Record<Section, string> = {
   daftarSarpras: "Daftar Sarpras",
   dokumenTeknis: "Dokumen Teknis",
   hargaRabRap: "Harga RAB & RAP",
+  setujuiRab: "Setujui RAB Estimasi",
   businessPlan: "Business Plan / Margin",
   keuangan: "Keuangan Operasional",
   progress: "Progress & Kontrak",
@@ -220,9 +266,12 @@ export type JenisSarpras = (typeof JENIS_SARPRAS)[number];
 export type JenisHakAtasTanah = (typeof JENIS_HAK_ATAS_TANAH)[number];
 export type JenisKontrak = (typeof JENIS_KONTRAK)[number];
 export type StatusVo = (typeof STATUS_VO)[number];
-export type StatusTender = (typeof STATUS_TENDER)[number];
 export type StatusVendor = (typeof STATUS_VENDOR)[number];
-export type DokumenTender = (typeof DOKUMEN_TENDER)[number];
+export type KategoriPemasok = (typeof KATEGORI_PEMASOK)[number];
+export type StatusPemasok = (typeof STATUS_PEMASOK)[number];
+export type StatusPembelian = (typeof STATUS_PEMBELIAN)[number];
+export type KategoriHargaDasar = (typeof KATEGORI_HARGA_DASAR)[number];
+export type StatusRabEstimasi = (typeof STATUS_RAB_ESTIMASI)[number];
 export type PeruntukanBiaya = (typeof PERUNTUKAN_BIAYA)[number];
 export type JenisBiaya = (typeof JENIS_BIAYA)[number];
 export type MetodeBayar = (typeof METODE_BAYAR)[number];
@@ -260,8 +309,11 @@ export const SEMUA_ENUM = {
   JenisKontrak: JENIS_KONTRAK,
   StatusVo: STATUS_VO,
   StatusVendor: STATUS_VENDOR,
-  DokumenTender: DOKUMEN_TENDER,
-  StatusTender: STATUS_TENDER,
+  KategoriPemasok: KATEGORI_PEMASOK,
+  StatusPemasok: STATUS_PEMASOK,
+  StatusPembelian: STATUS_PEMBELIAN,
+  KategoriHargaDasar: KATEGORI_HARGA_DASAR,
+  StatusRabEstimasi: STATUS_RAB_ESTIMASI,
   PeruntukanBiaya: PERUNTUKAN_BIAYA,
   JenisBiaya: JENIS_BIAYA,
   MetodeBayar: METODE_BAYAR,
