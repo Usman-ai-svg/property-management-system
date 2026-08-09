@@ -344,7 +344,6 @@ export default async function KeuanganProyek({
                   { label: "Metode" },
                   { label: "Alokasi ke Sini", rata: "kanan" },
                   { label: "Total Pembayaran", rata: "kanan" },
-                  { label: "Status" },
                 ]}
                 kosong="Belum ada transaksi yang dicatat langsung ke unit ini. Biaya yang masuk lewat kontrak borongan muncul sebagai Alokasi Kontrak, bukan sebagai transaksi unit."
               >
@@ -380,16 +379,13 @@ export default async function KeuanganProyek({
                         </div>
                       )}
                     </td>
-                    <td>
-                      <Badge nilai={e.status} peta={WARNA_STATUS.bayar} />
-                    </td>
                   </tr>
                 ))}
                 {tx.length > 0 && (
                   <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
                     <td colSpan={4}>JUMLAH DIBEBANKAN KE UNIT INI</td>
                     <td className="num" style={{ textAlign: "right" }}>{rp(terpakai)}</td>
-                    <td colSpan={2} style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
+                    <td style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
                       sama dengan Total Pengeluaran di atas
                     </td>
                   </tr>
@@ -590,7 +586,6 @@ export default async function KeuanganProyek({
                   { label: "Metode" },
                   { label: "Alokasi ke Sini", rata: "kanan" },
                   { label: "Total Pembayaran", rata: "kanan" },
-                  { label: "Status" },
                 ]}
                 kosong="Belum ada transaksi yang dicatat langsung ke item ini. Biaya yang masuk lewat kontrak vendor muncul sebagai Alokasi Kontrak."
               >
@@ -624,16 +619,13 @@ export default async function KeuanganProyek({
                         </div>
                       )}
                     </td>
-                    <td>
-                      <Badge nilai={e.status} peta={WARNA_STATUS.bayar} />
-                    </td>
                   </tr>
                 ))}
                 {tx.length > 0 && (
                   <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
                     <td colSpan={4}>JUMLAH DIBEBANKAN KE ITEM INI</td>
                     <td className="num" style={{ textAlign: "right" }}>{rp(terpakai)}</td>
-                    <td colSpan={2} style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
+                    <td style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
                       sama dengan Total Pengeluaran di atas
                     </td>
                   </tr>

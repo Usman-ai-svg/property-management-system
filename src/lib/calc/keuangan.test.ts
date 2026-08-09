@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  alokasiKontrak, bagiRata, periksaAlokasi, ringkasKontrak, statusSerapan, totalVoDisetujui,
-  alokasiPembayaran,
+  alokasiKontrak, bagiRata, periksaAlokasi, ringkasKontrak, statusBayarKontrak, statusSerapan,
+  totalVoDisetujui, alokasiPembayaran,
 } from "./keuangan";
 
 describe("statusSerapan", () => {
@@ -21,6 +21,49 @@ describe("statusSerapan", () => {
   it("memberi toleransi tiga poin persen agar tidak berkedip", () => {
     assert.equal(statusSerapan(0.52, 50), "Sesuai");
     assert.equal(statusSerapan(0.48, 50), "Sesuai");
+  });
+});
+
+describe("statusBayarKontrak", () => {
+  const dasar = {
+    nominal: 100_000_000,
+    retensiPct: 5, // retensi 5jt → pokok lunas di 95jt
+    jatuhTempoBln: 3,
+    variationOrders: [] as { nominal: number; status: string }[],
+  };
+  const bayar = (total: number, tanggal: string) => ({ total, tanggal });
+
+  it("Belum saat belum ada pembayaran", () => {
+    assert.equal(statusBayarKontrak({ ...dasar, expenses: [] }), "Belum");
+  });
+
+  it("DP saat baru sebagian pokok terbayar", () => {
+    assert.equal(statusBayarKontrak({ ...dasar, expenses: [bayar(10_000_000, "2026-01-01")] }), "DP");
+  });
+
+  it("Retensi saat pokok lunas & masa pemeliharaan belum lewat", () => {
+    const k = { ...dasar, expenses: [bayar(95_000_000, "2026-01-10")] };
+    assert.equal(statusBayarKontrak(k, new Date("2026-03-01")), "Retensi");
+  });
+
+  it("Retensi Jatuh Tempo saat masa pemeliharaan lewat sejak tgl pokok lunas", () => {
+    const k = { ...dasar, expenses: [bayar(95_000_000, "2026-01-10")] };
+    // jatuh tempo = 2026-01-10 + 3 bln = 2026-04-10; 2026-05-01 sudah lewat.
+    assert.equal(statusBayarKontrak(k, new Date("2026-05-01")), "Retensi Jatuh Tempo");
+  });
+
+  it("Lunas saat seluruh nilai termasuk retensi terbayar", () => {
+    const k = { ...dasar, expenses: [bayar(60_000_000, "2026-01-10"), bayar(40_000_000, "2026-06-10")] };
+    assert.equal(statusBayarKontrak(k, new Date("2026-07-01")), "Lunas");
+  });
+
+  it("tanpa retensi (0%) tak pernah masuk keadaan Retensi", () => {
+    const tanpa = { ...dasar, retensiPct: 0 };
+    assert.equal(
+      statusBayarKontrak({ ...tanpa, expenses: [bayar(99_000_000, "2026-01-10")] }, new Date("2026-12-01")),
+      "DP",
+    );
+    assert.equal(statusBayarKontrak({ ...tanpa, expenses: [bayar(100_000_000, "2026-01-10")] }), "Lunas");
   });
 });
 

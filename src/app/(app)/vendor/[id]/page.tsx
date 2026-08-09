@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
 import { proyekUntukKontrak as ambilProyekUntukKontrak, vendorDetail } from "@/lib/data/vendor";
-import { ringkasKontrak } from "@/lib/calc/keuangan";
+import { ringkasKontrak, statusBayarKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Badge, Kartu, KartuKosong, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { HapusPembayaran, TambahPembayaran, TambahVo } from "./editors";
@@ -152,6 +152,7 @@ export default async function DetailVendor({
 
                 {daftar.map((k) => {
                   const r = ringkasKontrak(k);
+                  const statusBayar = statusBayarKontrak(k);
                   const objek =
                     k.jenis === "Unit"
                       ? k.units.map((x) => `${x.unit.phase.kode}-${x.unit.nomor}`).join(", ")
@@ -187,6 +188,7 @@ export default async function DetailVendor({
                           </div>
                         </div>
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <Badge nilai={statusBayar} peta={WARNA_STATUS.bayar} />
                           <span
                             className="chip"
                             style={{

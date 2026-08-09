@@ -1,7 +1,6 @@
 "use client";
 
 import { BarisField, Field, FormModal, TombolTambah } from "@/components/form";
-import { STATUS_BAYAR } from "@/lib/domain/enums";
 import { catatBiayaOperasional } from "./plan-real-actions";
 import { Petunjuk } from "@/components/ui";
 
@@ -43,9 +42,8 @@ export function CatatBiayaOperasional({
         <Field label="Keterangan" nama="uraian" wajib petunjuk="mis. Biaya iklan properti kuartal III" />
       </BarisField>
 
-      <BarisField>
+      <BarisField kolom={1}>
         <Field label="Nominal" nama="nominal" tipe="number" satuan="Rp" wajib />
-        <Field label="Status Bayar" nama="status" nilai="Lunas" pilihan={STATUS_BAYAR} />
       </BarisField>
 
       <BarisField kolom={1}>

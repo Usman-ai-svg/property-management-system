@@ -1,7 +1,7 @@
 "use client";
 
 import { BarisField, Field, FieldTerkunci, FormModal, TombolHapus } from "@/components/form";
-import { METODE_BAYAR, STATUS_BAYAR, STATUS_VO } from "@/lib/domain/enums";
+import { METODE_BAYAR, STATUS_VO } from "@/lib/domain/enums";
 import { hapusPembayaran, tambahPembayaran, tambahVo } from "../actions";
 
 export function TambahVo({ contractId }: { contractId: string }) {
@@ -69,15 +69,12 @@ export function TambahPembayaran({
         <FieldTerkunci label="Peruntukan" nilai={peruntukan} />
         <FieldTerkunci label="Jenis Biaya" nilai={jenisBiaya} />
       </BarisField>
-      <BarisField>
-        <Field label="Metode" nama="metode" nilai={METODE_BAYAR[0]} pilihan={METODE_BAYAR} />
-        <Field label="Status Bayar" nama="status" nilai="Lunas" pilihan={STATUS_BAYAR} />
-      </BarisField>
       <BarisField kolom={1}>
         <Field label="Uraian" nama="uraian" wajib petunjuk="mis. Termin 3 borongan struktur" />
       </BarisField>
-      <BarisField kolom={1}>
+      <BarisField>
         <Field label="Nominal" nama="nominal" tipe="number" satuan="Rp" wajib />
+        <Field label="Metode" nama="metode" nilai={METODE_BAYAR[0]} pilihan={METODE_BAYAR} />
       </BarisField>
       <div style={{ marginBottom: 14 }}>
         <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>

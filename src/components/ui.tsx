@@ -26,10 +26,13 @@ export const WARNA_STATUS: Record<string, Record<string, [string, string]>> = {
     Sesuai: ["var(--rona-teal2)", "var(--teal)"],
     Over: ["var(--rona-merah)", "var(--red)"],
   },
+  // Status pembayaran kontrak — diturunkan (lihat statusBayarKontrak), bukan diinput.
   bayar: {
-    Lunas: ["var(--rona-hijau2)", "var(--green)"],
-    DP: ["var(--rona-amber)", "var(--amber)"],
     Belum: ["var(--rona-abu)", "var(--muted)"],
+    DP: ["var(--rona-teal2)", "var(--teal)"],
+    Retensi: ["var(--rona-amber)", "var(--amber)"],
+    "Retensi Jatuh Tempo": ["var(--rona-merah)", "var(--red)"],
+    Lunas: ["var(--rona-hijau2)", "var(--green)"],
   },
 };
 

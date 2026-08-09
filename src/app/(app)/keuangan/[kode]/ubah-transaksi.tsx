@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { BarisField, Field, FormModal, TombolHapus, TombolIkon } from "@/components/form";
 import { AlokasiBiaya } from "@/components/alokasi-biaya";
-import { JENIS_BIAYA, METODE_BAYAR, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN, STATUS_BAYAR } from "@/lib/domain/enums";
+import { JENIS_BIAYA_SWAKELOLA, METODE_BAYAR, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN } from "@/lib/domain/enums";
 import { hapusPengeluaran, ubahPengeluaran } from "../actions";
 import { Petunjuk } from "@/components/ui";
 
@@ -26,7 +26,6 @@ export function UbahTransaksi({
     metode: string;
     uraian: string;
     total: number;
-    status: string;
     bukti: string | null;
     alokasi: { unitId: string | null; infrastructureId: string | null; nominal: number }[];
   };
@@ -81,14 +80,14 @@ export function UbahTransaksi({
             ))}
           </select>
         </div>
-        <Field label="Jenis Biaya" nama="jenis" nilai={transaksi.jenis} pilihan={JENIS_BIAYA} />
+        <Field label="Jenis Biaya" nama="jenis" nilai={transaksi.jenis} pilihan={JENIS_BIAYA_SWAKELOLA} />
       </BarisField>
 
       <BarisField kolom={1}>
         <Field label="Keterangan" nama="uraian" nilai={transaksi.uraian} wajib />
       </BarisField>
 
-      <BarisField>
+      <BarisField kolom={1}>
         <div>
           <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
             Total <span style={{ color: "var(--red)" }}>*</span>
@@ -106,7 +105,6 @@ export function UbahTransaksi({
             <span style={{ fontSize: 12, color: "var(--muted)" }}>Rp</span>
           </div>
         </div>
-        <Field label="Status Bayar" nama="status" nilai={transaksi.status} pilihan={STATUS_BAYAR} />
       </BarisField>
 
       <BarisField>

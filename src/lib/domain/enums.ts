@@ -122,6 +122,22 @@ export const POS_HPP: Record<(typeof PERUNTUKAN_BIAYA)[number], string> = {
   "Pengolahan Lahan": "B — Pengolahan Lahan",
 };
 
+/**
+ * Jenis biaya sebuah pengeluaran.
+ *
+ * "Kontraktor" berbeda kodrat dari sisanya: ia BUKAN rincian biaya, melainkan
+ * penanda paket menyeluruh (upah + material) yang tak terurai — dipakai saat
+ * satu scope diborongkan penuh ke kontraktor dan perusahaan memang tidak
+ * melihat rincian pengeluarannya. Karena itu "Kontraktor" hanya sah lahir dari
+ * sebuah SPK (kontrak vendor), tak pernah dari pengeluaran swakelola. Dua
+ * himpunan bagian di bawah menegakkan pemisahan itu — dipakai bersama oleh form
+ * (menyaring pilihan) dan server (memvalidasi lewat `pilihan`).
+ *
+ * Satu proyek bisa mencampur keduanya: mis. pos satpam yang pek. sipilnya
+ * diborongkan (SPK "Kontraktor") sementara pek. pagarnya dikerjakan sendiri
+ * lewat subkon (pengeluaran/SPK "Subkon") — dua transaksi terpisah pada sarpras
+ * yang sama.
+ */
 export const JENIS_BIAYA = [
   "Kontraktor",
   "Upah Borongan",
@@ -130,6 +146,27 @@ export const JENIS_BIAYA = [
   "Upah Harian",
   "Lain-lain proyek",
 ] as const;
+
+// Dua himpunan bagian di bawah SENGAJA diturunkan dari JENIS_BIAYA (bukan
+// daftar `as const` tersendiri): selain anti-hanyut bila daftar induk berubah,
+// bentuk ini juga tidak dianggap "enum kolom baru" oleh penjaga SEMUA_ENUM —
+// keduanya memang bukan enum database, hanya penyaring pilihan.
+
+/** Set anggota outsourced — hanya di sinilah "Kontraktor" boleh dipilih. */
+const OUTSOURCED = new Set<JenisBiaya>(["Kontraktor", "Upah Borongan", "Subkon"]);
+
+/**
+ * Jenis biaya yang sah untuk SPK/kontrak vendor — pekerjaan yang di-outsource.
+ */
+export const JENIS_BIAYA_KONTRAK = JENIS_BIAYA.filter((j) => OUTSOURCED.has(j));
+
+/**
+ * Jenis biaya yang sah untuk pengeluaran swakelola (Pengeluaran Lain) — seluruh
+ * daftar KECUALI "Kontraktor", yang hanya boleh datang dari SPK.
+ */
+export const JENIS_BIAYA_SWAKELOLA = JENIS_BIAYA.filter(
+  (j): j is Exclude<JenisBiaya, "Kontraktor"> => j !== "Kontraktor",
+);
 
 export const METODE_BAYAR = ["Transfer", "Petty Cash", "Tunai langsung"] as const;
 

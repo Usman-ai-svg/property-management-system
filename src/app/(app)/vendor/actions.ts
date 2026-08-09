@@ -9,7 +9,7 @@ import {
 } from "@/lib/actions/guard";
 import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
 import { alokasiPembayaran, periksaAlokasi } from "@/lib/calc/keuangan";
-import { JENIS_BIAYA, JENIS_KONTRAK, METODE_BAYAR, POS_HPP, STATUS_BAYAR, STATUS_VENDOR, STATUS_VO } from "@/lib/domain/enums";
+import { JENIS_BIAYA_KONTRAK, JENIS_KONTRAK, METODE_BAYAR, POS_HPP, STATUS_VENDOR, STATUS_VO } from "@/lib/domain/enums";
 
 /**
  * Tambah Variation Order pada sebuah kontrak.
@@ -86,7 +86,6 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
     // Field yang bebas diisi pengguna (default aman bila terkunci/tak dikirim
     // oleh pemanggil ringkas seperti modal Pembayaran di Vendor).
     const metode = pilihanOpsional(form, "metode", METODE_BAYAR, "Transfer");
-    const status = pilihanOpsional(form, "status", STATUS_BAYAR, "Lunas");
     const bukti = teksOpsional(form, "bukti") || null;
 
     // Pembayaran yang melampaui nilai kontrak ditolak — kelebihan bayar pada
@@ -139,7 +138,6 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
         metode,
         uraian: `${uraian} — ${kontrak.kode} ${kontrak.vendor.nama}`,
         total: nominal,
-        status,
         bukti,
         posHpp: POS_HPP[peruntukan],
         pic: pengguna.nama,
@@ -365,7 +363,7 @@ async function bacaKontrak(form: FormData, projectId: string) {
     cakupan,
     data: {
       jenis,
-      jenisBiaya: pilihan(form, "jenisBiaya", JENIS_BIAYA),
+      jenisBiaya: pilihan(form, "jenisBiaya", JENIS_BIAYA_KONTRAK),
       deskripsi: teks(form, "deskripsi", true),
       nominal: angka(form, "nominal", { min: 1, wajib: true }),
       retensiPct: angka(form, "retensiPct", { min: 0, max: 100 }),
@@ -478,7 +476,7 @@ export async function ubahKontrak(_s: HasilAksi | null, form: FormData): Promise
     if (Number.isNaN(tgl.getTime())) throw new GagalIzin("Tanggal mulai tidak sah.");
 
     const data = {
-      jenisBiaya: pilihan(form, "jenisBiaya", JENIS_BIAYA),
+      jenisBiaya: pilihan(form, "jenisBiaya", JENIS_BIAYA_KONTRAK),
       deskripsi: teks(form, "deskripsi", true),
       nominal: angka(form, "nominal", { min: 1, wajib: true }),
       retensiPct: angka(form, "retensiPct", { min: 0, max: 100 }),

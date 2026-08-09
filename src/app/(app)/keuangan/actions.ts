@@ -7,7 +7,7 @@ import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, pilihanOpsional, teks, teksOpsional,
 } from "@/lib/actions/guard";
 import { periksaAlokasi } from "@/lib/calc/keuangan";
-import { JENIS_BIAYA, METODE_BAYAR, PERUNTUKAN_BIAYA, POS_HPP, SASARAN_PERUNTUKAN, STATUS_BAYAR, STATUS_PEMBELIAN } from "@/lib/domain/enums";
+import { JENIS_BIAYA_SWAKELOLA, METODE_BAYAR, PERUNTUKAN_BIAYA, POS_HPP, SASARAN_PERUNTUKAN, STATUS_PEMBELIAN } from "@/lib/domain/enums";
 
 /**
  * Baca pembebanan sebuah pembayaran dari formulir.
@@ -138,11 +138,10 @@ export async function catatPengeluaran(_s: HasilAksi | null, form: FormData): Pr
         projectId,
         tanggal: new Date(),
         peruntukan,
-        jenis: pilihan(form, "jenis", JENIS_BIAYA),
+        jenis: pilihan(form, "jenis", JENIS_BIAYA_SWAKELOLA),
         metode: pilihan(form, "metode", METODE_BAYAR),
         uraian,
         total,
-        status: pilihan(form, "status", STATUS_BAYAR),
         pic: pengguna.nama,
         bukti: teksOpsional(form, "bukti"),
         posHpp: POS_HPP[peruntukan],
@@ -210,11 +209,10 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
 
     const baru = {
       peruntukan,
-      jenis: pilihan(form, "jenis", JENIS_BIAYA),
+      jenis: pilihan(form, "jenis", JENIS_BIAYA_SWAKELOLA),
       metode: pilihan(form, "metode", METODE_BAYAR),
       uraian: teks(form, "uraian", true),
       total: totalBaru,
-      status: pilihan(form, "status", STATUS_BAYAR),
       bukti: teksOpsional(form, "bukti") || null,
       posHpp: POS_HPP[peruntukan],
     };
@@ -238,16 +236,16 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
       objek: `Pengeluaran · ${lama.uraian}`,
       sebelum: {
         peruntukan: lama.peruntukan, jenis: lama.jenis, metode: lama.metode,
-        uraian: lama.uraian, total: lama.total, status: lama.status,
+        uraian: lama.uraian, total: lama.total,
         bukti: lama.bukti, dibebankanKe: labelAlokasiTersimpan(lama.alokasi),
       },
       sesudah: {
         peruntukan: baru.peruntukan, jenis: baru.jenis, metode: baru.metode,
-        uraian: baru.uraian, total: baru.total, status: baru.status,
+        uraian: baru.uraian, total: baru.total,
         bukti: baru.bukti, dibebankanKe: namaAlokasiBaru,
       },
       label: {
-        uraian: "Keterangan", total: "Total", status: "Status bayar",
+        uraian: "Keterangan", total: "Total",
         bukti: "Berkas bukti", dibebankanKe: "Dibebankan ke",
         peruntukan: "Peruntukan", jenis: "Jenis biaya", metode: "Metode",
       },
@@ -621,7 +619,6 @@ export async function bayarPembelian(_s: HasilAksi | null, form: FormData): Prom
     const isiTanggal = teksOpsional(form, "tanggal");
     const tanggal = isiTanggal ? new Date(isiTanggal) : new Date();
     const metode = pilihan(form, "metode", METODE_BAYAR);
-    const status = pilihanOpsional(form, "status", STATUS_BAYAR, "Lunas");
     const bukti = teksOpsional(form, "bukti") || null;
     // Uang muka bila barang belum diterima — terbaca jelas di daftar Transaksi.
     const uraianBawaan = diterima
@@ -633,7 +630,7 @@ export async function bayarPembelian(_s: HasilAksi | null, form: FormData): Prom
       data: {
         projectId: beli.projectId, pembelianId, tanggal,
         peruntukan, jenis: "Material", metode, uraian,
-        total: bayar, status, bukti, pic: pengguna.nama,
+        total: bayar, bukti, pic: pengguna.nama,
         posHpp: POS_HPP[peruntukan],
         alokasi: { create: alokasi },
       },

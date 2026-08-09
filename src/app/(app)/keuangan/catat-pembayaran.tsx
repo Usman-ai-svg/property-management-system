@@ -4,7 +4,7 @@ import { useState } from "react";
 import { BarisField, Field, FieldTerkunci, FormModal, TombolTambah } from "@/components/form";
 import { AlokasiBiaya } from "@/components/alokasi-biaya";
 import {
-  JENIS_BIAYA, METODE_BAYAR, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN, STATUS_BAYAR,
+  JENIS_BIAYA_SWAKELOLA, METODE_BAYAR, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN,
 } from "@/lib/domain/enums";
 import { rp } from "@/lib/format";
 import { catatPengeluaran, bayarPembelian } from "./actions";
@@ -35,7 +35,11 @@ export type ProyekBayar = {
   nama: string;
   units: Objek[];
   sarpras: Objek[];
-  kontrak: { id: string; label: string; sisa: number; peruntukan: string; jenisBiaya: string; cakupan: number }[];
+  kontrak: {
+    id: string; label: string;
+    nilai: number; terbayar: number; sisa: number; retensi: number; retensiPct: number;
+    peruntukan: string; jenisBiaya: string; cakupan: number;
+  }[];
   po: { id: string; label: string; sisa: number; diterima: boolean }[];
 };
 
@@ -105,27 +109,15 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
         <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
           Sumber pembayaran
         </label>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {SUMBER.map(([nilai, label]) => {
-            const on = sumber === nilai;
-            return (
-              <button
-                key={nilai}
-                type="button"
-                onClick={() => setSumber(nilai)}
-                className="chip"
-                style={{
-                  cursor: "pointer", padding: "6px 12px",
-                  border: "1px solid " + (on ? "var(--teal)" : "var(--line)"),
-                  background: on ? "var(--rona-teal2)" : "transparent",
-                  color: on ? "var(--teal)" : "var(--text)", fontWeight: on ? 600 : 400,
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        <select
+          className="inp"
+          value={sumber}
+          onChange={(e) => setSumber(e.target.value as Sumber)}
+        >
+          {SUMBER.map(([nilai, label]) => (
+            <option key={nilai} value={nilai}>{label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Proyek + Peruntukan */}
@@ -171,24 +163,50 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
 
       {/* Pemilih kontrak / PO */}
       {sumber === "kontrak" && !kosong && (
-        <BarisField kolom={1}>
-          <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
-              Kontrak <span style={{ color: "var(--red)" }}>*</span>
-            </label>
-            <select
-              name="contractId"
-              className="inp"
-              value={kontrakId || aktif.kontrak[0].id}
-              onChange={(e) => setKontrakId(e.target.value)}
-              required
+        <>
+          <BarisField kolom={1}>
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+                Kontrak <span style={{ color: "var(--red)" }}>*</span>
+              </label>
+              <select
+                name="contractId"
+                className="inp"
+                value={kontrakId || aktif.kontrak[0].id}
+                onChange={(e) => setKontrakId(e.target.value)}
+                required
+              >
+                {aktif.kontrak.map((k) => (
+                  <option key={k.id} value={k.id}>{k.label}</option>
+                ))}
+              </select>
+            </div>
+          </BarisField>
+
+          {/* Ringkasan nilai kontrak terpilih — sisa pembayaran kini hidup di
+              sini, bukan lagi diimpit ke dalam nama pilihan. */}
+          {kontrakAktif && (
+            <div
+              style={{
+                display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 18px",
+                padding: "11px 14px", marginBottom: 14,
+                background: "var(--rona-panel)", borderRadius: 8,
+              }}
             >
-              {aktif.kontrak.map((k) => (
-                <option key={k.id} value={k.id}>{k.label} — sisa {rp(k.sisa)}</option>
-              ))}
-            </select>
-          </div>
-        </BarisField>
+              <InfoNilai label="Nilai kontrak" nilai={rp(kontrakAktif.nilai)} />
+              <InfoNilai label="Total terbayar" nilai={rp(kontrakAktif.terbayar)} warna="var(--green)" />
+              <InfoNilai label="Sisa pembayaran" nilai={rp(kontrakAktif.sisa)} warna="var(--amber)" />
+              <InfoNilai
+                label="Retensi"
+                nilai={
+                  kontrakAktif.retensiPct > 0
+                    ? `${kontrakAktif.retensiPct}% · ${rp(kontrakAktif.retensi)}`
+                    : "—"
+                }
+              />
+            </div>
+          )}
+        </>
       )}
       {sumber === "po" && !kosong && (
         <BarisField kolom={1}>
@@ -224,7 +242,7 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
           {/* Jenis + Metode */}
           <BarisField>
             {sumber === "manual" ? (
-              <Field label="Jenis Biaya" nama="jenis" nilai="Upah Borongan" pilihan={JENIS_BIAYA} />
+              <Field label="Jenis Biaya" nama="jenis" nilai="Upah Borongan" pilihan={JENIS_BIAYA_SWAKELOLA} />
             ) : (
               <FieldTerkunci
                 label="Jenis Biaya"
@@ -244,11 +262,11 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
             />
           </BarisField>
 
-          {/* Nominal + Status */}
-          <BarisField>
+          {/* Nominal */}
+          <BarisField kolom={1}>
             <div>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
-                {sumber === "kontrak" ? "Nominal" : "Total"} <span style={{ color: "var(--red)" }}>*</span>
+                Nominal <span style={{ color: "var(--red)" }}>*</span>
               </label>
               <div style={{ position: "relative" }}>
                 <input
@@ -268,7 +286,6 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
                 <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>Maks {rp(sisaMaks)}</div>
               )}
             </div>
-            <Field label="Status Bayar" nama="status" nilai="Lunas" pilihan={STATUS_BAYAR} />
           </BarisField>
 
           {/* Dibebankan ke */}
@@ -333,6 +350,15 @@ function Pembebanan({
           unit maupun sarana &amp; prasarana.
         </div>
       )}
+    </div>
+  );
+}
+
+function InfoNilai({ label, nilai, warna }: { label: string; nilai: string; warna?: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, fontSize: 12 }}>
+      <span style={{ color: "var(--muted)" }}>{label}</span>
+      <span className="num" style={{ fontWeight: 600, color: warna ?? "var(--text)" }}>{nilai}</span>
     </div>
   );
 }

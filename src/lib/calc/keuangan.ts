@@ -70,6 +70,61 @@ export function ringkasKontrak(k: KontrakLike) {
   };
 }
 
+export type StatusBayarKontrak = "Belum" | "DP" | "Retensi" | "Retensi Jatuh Tempo" | "Lunas";
+
+export interface KontrakStatusLike extends KontrakLike {
+  jatuhTempoBln: number;
+  expenses: { total: number; tanggal: Date | string }[];
+}
+
+/**
+ * Status pembayaran sebuah kontrak — DITURUNKAN dari akumulasi pembayaran,
+ * bukan diinput manual. Sengaja properti kontrak (bukan tiap baris pembayaran):
+ * satu termin tak bisa "Lunas", yang lunas adalah kontraknya.
+ *
+ *   Belum → DP → Retensi → Retensi Jatuh Tempo → Lunas
+ *
+ * Ambang "Retensi" = titik POKOK (nilai − retensi) lunas; yang tersisa hanyalah
+ * retensi yang ditahan. retensiPct 0 membuat pita Retensi kosong, jadi kontrak
+ * tanpa retensi lompat DP → Lunas. Retensi dilepas setelah masa pemeliharaan
+ * (`jatuhTempoBln`) berlalu terhitung sejak tanggal pokok lunas; lewat dari itu
+ * dan retensi belum dibayar → "Retensi Jatuh Tempo" (menuntut pelunasan).
+ */
+export function statusBayarKontrak(k: KontrakStatusLike, kini: Date = new Date()): StatusBayarKontrak {
+  const { nilaiEfektif, terbayar, retensi } = ringkasKontrak(k);
+  if (terbayar <= 0) return "Belum";
+  if (terbayar >= nilaiEfektif) return "Lunas";
+
+  const pokok = nilaiEfektif - retensi;
+  if (terbayar < pokok) return "DP";
+
+  // Pokok lunas, hanya retensi tersisa. Jatuh tempo dihitung dari tanggal
+  // pembayaran yang pertama kali membuat akumulasi mencapai titik pokok.
+  const tglPokokLunas = tanggalCapaiAmbang(k.expenses, pokok);
+  if (tglPokokLunas) {
+    const jatuh = new Date(tglPokokLunas);
+    jatuh.setMonth(jatuh.getMonth() + k.jatuhTempoBln);
+    if (kini >= jatuh) return "Retensi Jatuh Tempo";
+  }
+  return "Retensi";
+}
+
+/** Tanggal pembayaran (urut naik) saat akumulasi pertama kali ≥ ambang. */
+function tanggalCapaiAmbang(
+  expenses: { total: number; tanggal: Date | string }[],
+  ambang: number,
+): Date | null {
+  const urut = [...expenses].sort(
+    (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime(),
+  );
+  let kum = 0;
+  for (const e of urut) {
+    kum += e.total;
+    if (kum >= ambang) return new Date(e.tanggal);
+  }
+  return null;
+}
+
 /**
  * Bagi satu nominal ke beberapa penerima dalam rupiah bulat.
  *

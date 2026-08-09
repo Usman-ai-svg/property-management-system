@@ -290,17 +290,26 @@ export async function pintuBayar(u: Pengguna) {
     units: p.units.map((x) => ({ id: x.id, label: `${x.phase.kode}-${x.nomor}` })),
     sarpras: p.infrastructures.map((s) => ({ id: s.id, label: `${s.nama} · ${s.jenis}` })),
     kontrak: p.contracts
-      .map((k) => ({
-        id: k.id,
-        label: `${k.kode} · ${k.vendor.nama} — ${k.deskripsi}`,
-        sisa: ringkasKontrak(k).sisa,
-        // Terkunci di form pembayaran: peruntukan mengikuti lingkup kontrak,
-        // jenis biaya mengikuti jenisBiaya kontrak, pembebanan otomatis dibagi
-        // ke sekian objek cakupan.
-        peruntukan: k.jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana",
-        jenisBiaya: k.jenisBiaya,
-        cakupan: k._count.units + k._count.infrastructures,
-      }))
+      .map((k) => {
+        const r = ringkasKontrak(k);
+        return {
+          id: k.id,
+          label: `${k.kode} · ${k.vendor.nama} — ${k.deskripsi}`,
+          // Ringkasan nilai, ditampilkan sebagai info saat kontrak dipilih —
+          // bukan lagi diimpit ke dalam label pilihan.
+          nilai: r.nilaiEfektif,
+          terbayar: r.terbayar,
+          sisa: r.sisa,
+          retensi: r.retensi,
+          retensiPct: k.retensiPct,
+          // Terkunci di form pembayaran: peruntukan mengikuti lingkup kontrak,
+          // jenis biaya mengikuti jenisBiaya kontrak, pembebanan otomatis dibagi
+          // ke sekian objek cakupan.
+          peruntukan: k.jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana",
+          jenisBiaya: k.jenisBiaya,
+          cakupan: k._count.units + k._count.infrastructures,
+        };
+      })
       .filter((k) => k.sisa > 0),
     po: p.pembelian
       .map((b) => {

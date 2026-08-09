@@ -4,9 +4,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
-  angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
+  angka, GagalIzin, HasilAksi, izinkan, jalankan, teks, teksOpsional,
 } from "@/lib/actions/guard";
-import { STATUS_BAYAR } from "@/lib/domain/enums";
 
 /**
  * Catat biaya operasional proyek — pemasaran, umum & administrasi, bunga &
@@ -49,7 +48,6 @@ export async function catatBiayaOperasional(
     await prisma.operationalCost.create({
       data: {
         projectId, tanggal: new Date(), kategori, uraian, nominal,
-        status: pilihan(form, "status", STATUS_BAYAR),
         pic: pengguna.nama,
         bukti: teksOpsional(form, "bukti"),
       },

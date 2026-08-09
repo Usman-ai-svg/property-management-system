@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { PanelTabel, type FilterTabel } from "@/components/panel-tabel";
-import { Badge, WARNA_STATUS } from "@/components/ui";
 import { rp, tanggal } from "@/lib/format";
 import { PERUNTUKAN_BIAYA } from "@/lib/domain/enums";
 import { UbahTransaksi, HapusTransaksi } from "./ubah-transaksi";
@@ -91,7 +90,6 @@ export function PanelTransaksi({
         { label: "Keterangan" },
         { label: "Bukti" },
         { label: "Total", rata: "kanan" },
-        { label: "Status" },
         bolehUbah && { lebar: 74 },
       ]}
       kosong="Belum ada transaksi tercatat."
@@ -131,9 +129,6 @@ export function PanelTransaksi({
             )}
           </td>
           <td className="num" style={{ textAlign: "right" }}>{rp(e.total)}</td>
-          <td>
-            <Badge nilai={e.status} peta={WARNA_STATUS.bayar} />
-          </td>
           {bolehUbah && (
             <td>
               {e.contractId && e.contract ? (
@@ -159,7 +154,7 @@ export function PanelTransaksi({
                     transaksi={{
                       id: e.id, peruntukan: e.peruntukan, jenis: e.jenis,
                       metode: e.metode, uraian: e.uraian, total: e.total,
-                      status: e.status, bukti: e.bukti,
+                      bukti: e.bukti,
                       alokasi: e.alokasi.map((a) => ({
                         unitId: a.unitId, infrastructureId: a.infrastructureId, nominal: a.nominal,
                       })),
