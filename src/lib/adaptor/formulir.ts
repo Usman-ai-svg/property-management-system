@@ -125,3 +125,21 @@ export function bacaPilihan<T extends string>(
   if (!sah.includes(v)) throw new GagalIsian(`Nilai "${v}" tidak sah untuk kolom "${nama}".`);
   return v;
 }
+
+/**
+ * Seperti {@link bacaPilihan}, tetapi kolom yang KOSONG (mis. karena field-nya
+ * terkunci/disabled sehingga tak ikut terkirim) memakai `bawaan` alih-alih
+ * menolak. Nilai yang terisi tetap harus ada di daftar putih — nilai karangan
+ * ditolak seperti biasa.
+ */
+export function bacaPilihanOpsional<T extends string>(
+  baca: Pembaca,
+  nama: string,
+  sah: readonly T[],
+  bawaan: T,
+): T {
+  const v = (baca(nama) ?? "").trim();
+  if (v === "") return bawaan;
+  if (!sah.includes(v as T)) throw new GagalIsian(`Nilai "${v}" tidak sah untuk kolom "${nama}".`);
+  return v as T;
+}

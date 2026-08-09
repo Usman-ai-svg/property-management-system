@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, wajibUbah, type Pengguna } from "@/lib/auth/rbac";
 import type { Section } from "@/lib/domain/enums";
 import {
-  bacaAngka, bacaPilihan, bacaTeks, bacaTeksOpsional, GagalIsian, type OpsiAngka,
+  bacaAngka, bacaPilihan, bacaPilihanOpsional, bacaTeks, bacaTeksOpsional, GagalIsian, type OpsiAngka,
 } from "@/lib/adaptor/formulir";
 
 /**
@@ -91,3 +91,7 @@ export const angka = (form: FormData, nama: string, opts: OpsiAngka = {}): numbe
 
 export const pilihan = <T extends string>(form: FormData, nama: string, sah: readonly T[]): T =>
   bacaPilihan(dari(form), nama, sah);
+
+export const pilihanOpsional = <T extends string>(
+  form: FormData, nama: string, sah: readonly T[], bawaan: T,
+): T => bacaPilihanOpsional(dari(form), nama, sah, bawaan);

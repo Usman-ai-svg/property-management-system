@@ -101,6 +101,39 @@ export function Field({
   );
 }
 
+/**
+ * Field yang nilainya sudah ditentukan konteksnya — ditampilkan agar tata letak
+ * form tetap sama di semua tempat, tetapi tak bisa diubah dan tak ikut terkirim
+ * (server-lah yang menetapkan nilainya). Dipakai mis. peruntukan/jenis pembayaran
+ * kontrak yang mengikuti kontraknya.
+ */
+export function FieldTerkunci({
+  label, nilai, catatan = "otomatis",
+}: {
+  label: string;
+  nilai: string;
+  catatan?: string;
+}) {
+  return (
+    <div>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+        {label}
+      </label>
+      <div
+        className="inp"
+        aria-readonly="true"
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+          background: "var(--rona-abu)", color: "var(--muted)", cursor: "not-allowed",
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nilai}</span>
+        <span style={{ fontSize: 10, letterSpacing: ".03em", whiteSpace: "nowrap" }}>🔒 {catatan}</span>
+      </div>
+    </div>
+  );
+}
+
 export function BarisField({ children, kolom = 2 }: { children: React.ReactNode; kolom?: number }) {
   return (
     <div

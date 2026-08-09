@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
-  angka, GagalIzin, HasilAksi, idProyekDariKode, izinkan, jalankan, pilihan, teks,
+  angka, GagalIzin, HasilAksi, idProyekDariKode, izinkan, jalankan, pilihan, pilihanOpsional,
+  teks, teksOpsional,
 } from "@/lib/actions/guard";
 import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
 import { alokasiPembayaran, periksaAlokasi } from "@/lib/calc/keuangan";
-import { JENIS_KONTRAK, STATUS_VENDOR, STATUS_VO } from "@/lib/domain/enums";
+import { JENIS_BIAYA, JENIS_KONTRAK, METODE_BAYAR, POS_HPP, STATUS_BAYAR, STATUS_VENDOR, STATUS_VO } from "@/lib/domain/enums";
 
 /**
  * Tambah Variation Order pada sebuah kontrak.
@@ -66,7 +67,7 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
     const kontrak = await prisma.contract.findUnique({
       where: { id: contractId },
       select: {
-        id: true, kode: true, jenis: true, deskripsi: true,
+        id: true, kode: true, jenis: true, jenisBiaya: true, deskripsi: true,
         nominal: true, retensiPct: true, projectId: true,
         project: { select: { kode: true } },
         vendor: { select: { id: true, nama: true } },
@@ -82,6 +83,11 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
 
     const nominal = angka(form, "nominal", { min: 1, wajib: true });
     const uraian = teks(form, "uraian", true);
+    // Field yang bebas diisi pengguna (default aman bila terkunci/tak dikirim
+    // oleh pemanggil ringkas seperti modal Pembayaran di Vendor).
+    const metode = pilihanOpsional(form, "metode", METODE_BAYAR, "Transfer");
+    const status = pilihanOpsional(form, "status", STATUS_BAYAR, "Lunas");
+    const bukti = teksOpsional(form, "bukti") || null;
 
     // Pembayaran yang melampaui nilai kontrak ditolak — kelebihan bayar pada
     // kontrak borongan jauh lebih sulit ditarik kembali daripada dicegah.
@@ -117,17 +123,25 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
     const galat = periksaAlokasi(nominal, porsi);
     if (galat) throw new GagalIzin(galat);
 
+    // Peruntukan & pos HPP mengikuti enum resmi PERUNTUKAN_BIAYA supaya
+    // pembayaran ini terhitung di laporan realisasi & komposisi biaya. Nilai
+    // teks lama ("Unit"/"Sarana & Prasarana") tidak cocok enum → dulu bikin
+    // biaya konstruksi/sarpras luput dari laporan.
+    const peruntukan = kontrak.jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana";
+
     await prisma.expense.create({
       data: {
         projectId: kontrak.projectId,
         contractId,
         tanggal: new Date(),
-        peruntukan: kontrak.jenis === "Unit" ? "Unit" : "Sarana & Prasarana",
-        jenis: "Upah Borongan",
-        metode: "Transfer",
+        peruntukan,
+        jenis: kontrak.jenisBiaya,
+        metode,
         uraian: `${uraian} — ${kontrak.kode} ${kontrak.vendor.nama}`,
         total: nominal,
-        status: "Lunas",
+        status,
+        bukti,
+        posHpp: POS_HPP[peruntukan],
         pic: pengguna.nama,
         alokasi: { create: porsi },
       },
@@ -143,6 +157,53 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
     revalidatePath(`/vendor/${kontrak.vendor.id}`);
     revalidatePath("/vendor");
     revalidatePath(`/keuangan/${kontrak.project.kode}`);
+  });
+}
+
+/**
+ * Hapus satu pembayaran kontrak.
+ *
+ * Pembayaran kontrak tersimpan sebagai Expense bertaut `contractId`. Modul
+ * Keuangan sengaja TIDAK lagi mengizinkan hapus baris tertaut lewat jalur
+ * generiknya (bisa merusak invariant sisa kontrak), jadi inilah satu-satunya
+ * pintu hapusnya — dijaga izin "keuangan", sama seperti mencatatnya.
+ */
+export async function hapusPembayaran(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = String(form.get("id") ?? "");
+
+    const lama = await prisma.expense.findUnique({
+      where: { id },
+      select: {
+        id: true, total: true, projectId: true, contractId: true,
+        contract: {
+          select: {
+            kode: true, vendorId: true,
+            vendor: { select: { nama: true } },
+            project: { select: { kode: true } },
+          },
+        },
+      },
+    });
+    if (!lama) return;
+    if (!lama.contractId || !lama.contract) {
+      throw new GagalIzin("Pengeluaran ini bukan pembayaran kontrak.");
+    }
+
+    const pengguna = await izinkan("keuangan", lama.projectId);
+
+    await prisma.expense.delete({ where: { id } });
+
+    await catat({
+      pengguna, projectId: lama.projectId,
+      objek: `Kontrak ${lama.contract.kode} · ${lama.contract.vendor.nama}`,
+      aksi: "Hapus pembayaran",
+      dari: rpLog(lama.total), ke: "dihapus",
+    });
+
+    revalidatePath(`/vendor/${lama.contract.vendorId}`);
+    revalidatePath("/vendor");
+    revalidatePath(`/keuangan/${lama.contract.project.kode}`);
   });
 }
 
@@ -304,6 +365,7 @@ async function bacaKontrak(form: FormData, projectId: string) {
     cakupan,
     data: {
       jenis,
+      jenisBiaya: pilihan(form, "jenisBiaya", JENIS_BIAYA),
       deskripsi: teks(form, "deskripsi", true),
       nominal: angka(form, "nominal", { min: 1, wajib: true }),
       retensiPct: angka(form, "retensiPct", { min: 0, max: 100 }),
@@ -402,7 +464,8 @@ export async function ubahKontrak(_s: HasilAksi | null, form: FormData): Promise
       where: { id },
       select: {
         id: true, kode: true, projectId: true, vendorId: true, jenis: true,
-        deskripsi: true, nominal: true, retensiPct: true, jatuhTempoBln: true, mulai: true,
+        jenisBiaya: true, deskripsi: true, nominal: true, retensiPct: true,
+        jatuhTempoBln: true, mulai: true,
         project: { select: { kode: true } },
       },
     });
@@ -415,6 +478,7 @@ export async function ubahKontrak(_s: HasilAksi | null, form: FormData): Promise
     if (Number.isNaN(tgl.getTime())) throw new GagalIzin("Tanggal mulai tidak sah.");
 
     const data = {
+      jenisBiaya: pilihan(form, "jenisBiaya", JENIS_BIAYA),
       deskripsi: teks(form, "deskripsi", true),
       nominal: angka(form, "nominal", { min: 1, wajib: true }),
       retensiPct: angka(form, "retensiPct", { min: 0, max: 100 }),
@@ -430,7 +494,7 @@ export async function ubahKontrak(_s: HasilAksi | null, form: FormData): Promise
       sebelum: lama,
       sesudah: data,
       label: {
-        deskripsi: "Deskripsi", nominal: "Nilai kontrak",
+        jenisBiaya: "Jenis biaya", deskripsi: "Deskripsi", nominal: "Nilai kontrak",
         retensiPct: "Retensi", jatuhTempoBln: "Masa pemeliharaan", mulai: "Mulai",
       },
       format: { nominal: (v) => rpLog(Number(v)) },

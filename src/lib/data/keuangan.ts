@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/db";
 import { filterProyek, type Pengguna } from "@/lib/auth/rbac";
+import { ringkasKontrak } from "@/lib/calc/keuangan";
 
 /** Warna kategori — dipakai donat dan penanda jenis biaya. */
 export const WARNA_JENIS: Record<string, string> = {
+  Kontraktor: "#cf6a57",
   "Upah Borongan": "#3b82c4",
   "Upah Harian": "#e0619a",
   Material: "#d9a441",
@@ -132,7 +134,7 @@ export const totalRapDari = (x: {
 // ---------------------------------------------------------------------------
 
 /** Data halaman daftar Keuangan Proyek. */
-export async function dataKeuangan(u: Pengguna, bolehCatat: boolean) {
+export async function dataKeuangan(u: Pengguna) {
   const [proyek, tren, expenses] = await Promise.all([
     keuanganPerProyek(u),
     trenBulanan(u),
@@ -147,26 +149,7 @@ export async function dataKeuangan(u: Pengguna, bolehCatat: boolean) {
     }),
   ]);
 
-  // Pilihan unit dan sarpras untuk formulir pencatatan, hanya bila boleh mencatat.
-  const proyekUntukForm = bolehCatat
-    ? await prisma.project.findMany({
-        where: filterProyek(u),
-        orderBy: { kode: "asc" },
-        select: {
-          id: true, nama: true,
-          units: {
-            orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
-            select: { id: true, nomor: true, phase: { select: { kode: true } } },
-          },
-          infrastructures: {
-            orderBy: { kode: "asc" },
-            select: { id: true, nama: true, jenis: true },
-          },
-        },
-      })
-    : [];
-
-  return { proyek, tren, expenses, proyekUntukForm };
+  return { proyek, tren, expenses };
 }
 
 /** Satu proyek beserta unit, sarpras, dan seluruh pengeluarannya. */
@@ -198,10 +181,14 @@ export async function proyekKeuangan(kodeProyek: string) {
         select: {
           id: true, tanggal: true, jenis: true, peruntukan: true, metode: true,
           uraian: true, total: true, status: true, pic: true, bukti: true,
+          contractId: true, pembelianId: true,
           alokasi: {
             select: { id: true, unitId: true, infrastructureId: true, nominal: true },
           },
-          contract: { select: { vendor: { select: { nama: true } } } },
+          contract: {
+            select: { kode: true, vendorId: true, vendor: { select: { nama: true } } },
+          },
+          pembelian: { select: { nomor: true, pemasok: { select: { nama: true } } } },
         },
       },
     },
@@ -248,6 +235,86 @@ export async function hargaDasarUntukPembelian() {
     orderBy: { kode: "asc" },
     select: { id: true, kode: true, uraian: true, satuan: true, hargaAcuan: true },
   });
+}
+
+/**
+ * Data untuk pintu masuk tunggal "Catat Pembayaran": tiap proyek beserta
+ * kontrak & PO yang MASIH punya sisa bayar, plus unit/sarpras untuk pembebanan
+ * pengeluaran manual/PO.
+ *
+ * Dengan menawarkan kontrak/PO yang bisa dibayar langsung di sini, pengguna
+ * tidak perlu (dan tidak diberi jalan) mencatat pembayaran kontrak/PO sebagai
+ * pengeluaran manual lepas — itulah yang dulu membuka celah baris ganda tanpa
+ * tautan. Sisa dihitung sama seperti di modul asalnya (kontrak: nilai efektif −
+ * terbayar; PO: Σ item − Σ terbayar).
+ */
+export async function pintuBayar(u: Pengguna) {
+  const proyek = await prisma.project.findMany({
+    where: filterProyek(u),
+    orderBy: { kode: "asc" },
+    select: {
+      id: true, nama: true,
+      units: {
+        orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
+        select: { id: true, nomor: true, phase: { select: { kode: true } } },
+      },
+      infrastructures: {
+        orderBy: { kode: "asc" },
+        select: { id: true, nama: true, jenis: true },
+      },
+      contracts: {
+        orderBy: { kode: "asc" },
+        select: {
+          id: true, kode: true, deskripsi: true, jenis: true, jenisBiaya: true, nominal: true, retensiPct: true,
+          vendor: { select: { nama: true } },
+          expenses: { select: { total: true } },
+          variationOrders: { select: { nominal: true, status: true } },
+          _count: { select: { units: true, infrastructures: true } },
+        },
+      },
+      pembelian: {
+        orderBy: { tanggal: "desc" },
+        select: {
+          id: true, nomor: true, status: true,
+          pemasok: { select: { nama: true } },
+          items: { select: { qty: true, harga: true } },
+          pembayaran: { select: { total: true } },
+        },
+      },
+    },
+  });
+
+  return proyek.map((p) => ({
+    id: p.id,
+    nama: p.nama,
+    units: p.units.map((x) => ({ id: x.id, label: `${x.phase.kode}-${x.nomor}` })),
+    sarpras: p.infrastructures.map((s) => ({ id: s.id, label: `${s.nama} · ${s.jenis}` })),
+    kontrak: p.contracts
+      .map((k) => ({
+        id: k.id,
+        label: `${k.kode} · ${k.vendor.nama} — ${k.deskripsi}`,
+        sisa: ringkasKontrak(k).sisa,
+        // Terkunci di form pembayaran: peruntukan mengikuti lingkup kontrak,
+        // jenis biaya mengikuti jenisBiaya kontrak, pembebanan otomatis dibagi
+        // ke sekian objek cakupan.
+        peruntukan: k.jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana",
+        jenisBiaya: k.jenisBiaya,
+        cakupan: k._count.units + k._count.infrastructures,
+      }))
+      .filter((k) => k.sisa > 0),
+    po: p.pembelian
+      .map((b) => {
+        const total = b.items.reduce((s, i) => s + i.qty * i.harga, 0);
+        const terbayar = b.pembayaran.reduce((s, e) => s + e.total, 0);
+        return {
+          id: b.id,
+          label: `${b.nomor} · ${b.pemasok.nama}`,
+          sisa: total - terbayar,
+          diterima: b.status === "Diterima",
+        };
+      })
+      .filter((b) => b.sisa > 0),
+  }));
 }
 
 /** Kontrak sebuah proyek, dipakai membagi realisasi ke unit dan sarpras. */

@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
-import { dataKeuangan, komposisi, WARNA_JENIS } from "@/lib/data/keuangan";
+import { dataKeuangan, komposisi, pintuBayar, WARNA_JENIS } from "@/lib/data/keuangan";
 import { rp, rpRingkas, tanggal } from "@/lib/format";
 import { Donut, LegendaDonut, RvsRAP } from "@/components/charts";
 import { TrenChart } from "@/components/tren-chart";
 import { BarisKpi, Kartu, TabelHead } from "@/components/ui";
-import { CatatPengeluaran } from "./catat";
+import { CatatPembayaran } from "./catat-pembayaran";
 import { Tabel } from "@/components/kartu-tabel";
 
 export default async function DashboardKeuangan({
@@ -21,7 +21,8 @@ export default async function DashboardKeuangan({
   const mode = donat === "peruntukan" ? "peruntukan" : "jenis";
 
   const bolehCatat = bolehUbah(pengguna, "keuangan");
-  const { proyek, tren, expenses, proyekUntukForm } = await dataKeuangan(pengguna, bolehCatat);
+  const { proyek, tren, expenses } = await dataKeuangan(pengguna);
+  const proyekBayar = bolehCatat ? await pintuBayar(pengguna) : [];
 
   const batas = new Date(Date.now() - 30 * 864e5);
   const total30 = expenses.filter((e) => e.tanggal >= batas).reduce((s, e) => s + e.total, 0);
@@ -49,15 +50,7 @@ export default async function DashboardKeuangan({
           <div className="eyebrow">Manajemen Proyek · Keuangan Proyek</div>
           <h2 className="disp" style={{ margin: "4px 0 0", fontSize: 20 }}>Keuangan Proyek</h2>
         </div>
-        {bolehCatat && (
-          <CatatPengeluaran
-            proyek={proyekUntukForm.map((p) => ({
-              id: p.id, nama: p.nama,
-              units: p.units.map((u) => ({ id: u.id, label: `${u.phase.kode}-${u.nomor}` })),
-              sarpras: p.infrastructures.map((s) => ({ id: s.id, label: `${s.nama} · ${s.jenis}` })),
-            }))}
-          />
-        )}
+        {bolehCatat && <CatatPembayaran proyek={proyekBayar} />}
       </div>
 
       <BarisKpi kpi={kpi} />

@@ -13,7 +13,7 @@ import { alokasiKontrak, ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Donut, LegendaDonut, RvsRAP } from "@/components/charts";
 import { Badge, Kartu, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
-import { HapusTransaksi, UbahTransaksi } from "./ubah-transaksi";
+import { PanelTransaksi } from "./transaksi";
 import { BuatPO, PanelPembelian } from "../pembelian";
 import { Tabel } from "@/components/kartu-tabel";
 
@@ -667,86 +667,13 @@ export default async function KeuanganProyek({
       </div>
 
       {/* ---------- transaksi ---------- */}
-      <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
-        <TabelHead
-          judul={`Transaksi · ${proyek.expenses.length} entri`}
-          keterangan="Kontrak vendor dikelola di modul Vendor Management. Belanja material dicatat lewat PO di atas."
-        />
-        <Tabel
-          tinggiMaks={360}
-          kolom={[
-            { label: "Tanggal" },
-            { label: "Jenis" },
-            { label: "Keterangan" },
-            { label: "Bukti" },
-            { label: "Total", rata: "kanan" },
-            { label: "Status" },
-            bolehUbahKeuangan && { lebar: 74 },
-          ]}
-          kosong="Belum ada transaksi tercatat."
-        >
-          {proyek.expenses.map((e) => (
-            <tr key={e.id}>
-              <td style={{ color: "var(--muted)" }}>{tanggal(e.tanggal)}</td>
-              <td>
-                <span style={{ color: WARNA_JENIS[e.jenis] ?? "var(--muted)", marginRight: 4 }}>■</span>
-                {e.jenis}
-              </td>
-              <td>
-                <div>
-                  {e.uraian}
-                  {e.alokasi.length > 1 && (
-                    <span
-                      className="chip"
-                      title="Satu pembayaran yang dibebankan ke beberapa tujuan"
-                      style={{ background: "var(--rona-teal)", color: "var(--teal)", marginLeft: 6 }}
-                    >
-                      dibagi ke {e.alokasi.length} tujuan
-                    </span>
-                  )}
-                </div>
-                {(e.pic || e.contract) && (
-                  <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
-                    {e.pic ? `oleh ${e.pic}` : ""}
-                    {e.pic && e.contract ? " · " : ""}
-                    {e.contract ? e.contract.vendor.nama : ""}
-                  </div>
-                )}
-              </td>
-              <td>
-                {e.bukti ? (
-                  <span style={{ color: "var(--teal)", fontSize: 11 }}>📎 {e.bukti}</span>
-                ) : (
-                  <span style={{ color: "var(--muted)", fontSize: 11 }}>—</span>
-                )}
-              </td>
-              <td className="num" style={{ textAlign: "right" }}>{rp(e.total)}</td>
-              <td>
-                <Badge nilai={e.status} peta={WARNA_STATUS.bayar} />
-              </td>
-              {bolehUbahKeuangan && (
-                <td>
-                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                    <UbahTransaksi
-                      transaksi={{
-                        id: e.id, peruntukan: e.peruntukan, jenis: e.jenis,
-                        metode: e.metode, uraian: e.uraian, total: e.total,
-                        status: e.status, bukti: e.bukti,
-                        alokasi: e.alokasi.map((a) => ({
-                          unitId: a.unitId, infrastructureId: a.infrastructureId, nominal: a.nominal,
-                        })),
-                      }}
-                      units={pilihanUnit}
-                      sarpras={pilihanSarpras}
-                    />
-                    <HapusTransaksi id={e.id} uraian={e.uraian} />
-                  </div>
-                </td>
-              )}
-            </tr>
-          ))}
-        </Tabel>
-      </div>
+      <PanelTransaksi
+        expenses={proyek.expenses}
+        bolehUbah={bolehUbahKeuangan}
+        units={pilihanUnit}
+        sarpras={pilihanSarpras}
+        warnaJenis={WARNA_JENIS}
+      />
     </div>
   );
 }

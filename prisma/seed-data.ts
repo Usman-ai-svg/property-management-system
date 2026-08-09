@@ -359,42 +359,42 @@ export const VENDOR = [
 ];
 
 export const KONTRAK = [
-  { kode: "K1", jenis: "Unit", proyek: "NT4", vendor: "CV Baja Jaya Mandiri", deskripsi: "Borongan struktur & atap — tipe Tesla",
+  { kode: "K1", jenis: "Unit", jenisBiaya: "Upah Borongan", proyek: "NT4", vendor: "CV Baja Jaya Mandiri", deskripsi: "Borongan struktur & atap — tipe Tesla",
     units: ["NT4-F2-1", "NT4-F2-5", "NT4-F3-2", "NT4-F3-6", "NT4-F4-3", "NT4-F4-9"], nominal: 900000000, override: null as Record<string, number> | null,
     vo: [{ no: "VO-01", tgl: "20 Jun 2026", uraian: "Tambah kuda-kuda baja bentang 6 m (2 unit)", nominal: 24000000, status: "Disetujui" },
          { no: "VO-02", tgl: "10 Jul 2026", uraian: "Kurang pekerjaan lisplank (dialihkan ke vendor lain)", nominal: -8500000, status: "Disetujui" }],
     retensiPct: 5, jatuhTempoBln: 3, mulai: "01 Mei 2026",
     riwayat: [{ tgl: "01 Mei 2026", uraian: "DP 33% borongan struktur", nominal: 300000000 }, { tgl: "15 Jun 2026", uraian: "Termin 2 borongan", nominal: 250000000 }, { tgl: "16 Jul 2026", uraian: "Termin 3 borongan", nominal: 70000000 }] },
-  { kode: "K2", jenis: "Unit", proyek: "GN2", vendor: "Pemborong Hj. Hasim", deskripsi: "Borongan rumah tipe F1 — 4 unit",
+  { kode: "K2", jenis: "Unit", jenisBiaya: "Kontraktor", proyek: "GN2", vendor: "Pemborong Hj. Hasim", deskripsi: "Borongan rumah tipe F1 — 4 unit",
     units: ["GN2-F1-1", "GN2-F1-3", "GN2-F1-5", "GN2-F1-7"], nominal: 320000000, override: null,
     vo: [], retensiPct: 5, jatuhTempoBln: 3, mulai: "20 Mei 2026",
     riwayat: [{ tgl: "20 Mei 2026", uraian: "Termin 1 borongan F1", nominal: 120000000 }, { tgl: "02 Jul 2026", uraian: "Termin 2 borongan F1", nominal: 81000000 }] },
-  { kode: "K3", jenis: "Unit", proyek: "NT4", vendor: "CV Cipta Bangun", deskripsi: "Borongan finishing — tipe Galileo (unit sudut dihargai lebih)",
+  { kode: "K3", jenis: "Unit", jenisBiaya: "Upah Borongan", proyek: "NT4", vendor: "CV Cipta Bangun", deskripsi: "Borongan finishing — tipe Galileo (unit sudut dihargai lebih)",
     units: ["NT4-F1-2", "NT4-F1-8", "NT4-F4-1"], nominal: 540000000,
     override: { "NT4-F1-2": 165000000, "NT4-F1-8": 165000000, "NT4-F4-1": 210000000 },
     vo: [], retensiPct: 5, jatuhTempoBln: 3, mulai: "10 Jun 2026",
     riwayat: [{ tgl: "10 Jun 2026", uraian: "DP 30% finishing Galileo", nominal: 162000000 }] },
-  { kode: "K4", jenis: "Unit", proyek: "NT2", vendor: "CV Tanah Makmur", deskripsi: "Borongan carport & pagar — tipe 45",
+  { kode: "K4", jenis: "Unit", jenisBiaya: "Upah Borongan", proyek: "NT2", vendor: "CV Tanah Makmur", deskripsi: "Borongan carport & pagar — tipe 45",
     units: ["NT2-F2-5", "NT2-F2-7"], nominal: 96000000, override: null,
     vo: [], retensiPct: 0, jatuhTempoBln: 0, mulai: "05 Nov 2023",
     riwayat: [{ tgl: "05 Nov 2023", uraian: "Pelunasan carport & pagar", nominal: 96000000 }] },
-  { kode: "K5", jenis: "Unit", proyek: "NT4", vendor: "Pemborong Hj. Hasim", deskripsi: "Borongan rumah tipe Newton — 4 unit",
+  { kode: "K5", jenis: "Unit", jenisBiaya: "Kontraktor", proyek: "NT4", vendor: "Pemborong Hj. Hasim", deskripsi: "Borongan rumah tipe Newton — 4 unit",
     units: ["NT4-F1-3", "NT4-F1-6", "NT4-F2-2", "NT4-F2-9"], nominal: 520000000, override: null,
     vo: [], retensiPct: 5, jatuhTempoBln: 3, mulai: "15 Mar 2026",
     riwayat: [{ tgl: "15 Mar 2026", uraian: "DP 30% borongan Newton", nominal: 156000000 }, { tgl: "20 Jun 2026", uraian: "Termin 2 borongan Newton", nominal: 130000000 }] },
-  { kode: "S1", jenis: "Sarpras", proyek: "NT2", vendor: "CV Karya Aspal", deskripsi: "Pengerasan & pengaspalan jalan lingkungan", sarpras: ["NT2-S1"], nominal: 360000000, vo: [], retensiPct: 5, jatuhTempoBln: 3, mulai: "12 Mar 2023",
+  { kode: "S1", jenis: "Sarpras", jenisBiaya: "Subkon", proyek: "NT2", vendor: "CV Karya Aspal", deskripsi: "Pengerasan & pengaspalan jalan lingkungan", sarpras: ["NT2-S1"], nominal: 360000000, vo: [], retensiPct: 5, jatuhTempoBln: 3, mulai: "12 Mar 2023",
     riwayat: [{ tgl: "12 Mar 2023", uraian: "DP 40% pekerjaan jalan", nominal: 144000000 }, { tgl: "28 Apr 2023", uraian: "Pelunasan pekerjaan jalan", nominal: 216000000 }] },
-  { kode: "S2", jenis: "Sarpras", proyek: "NT2", vendor: "CV Hijau Lestari", deskripsi: "Penataan taman & ruang terbuka hijau", sarpras: ["NT2-S2"], nominal: 92000000, vo: [], retensiPct: 0, jatuhTempoBln: 0, mulai: "05 Apr 2023",
+  { kode: "S2", jenis: "Sarpras", jenisBiaya: "Subkon", proyek: "NT2", vendor: "CV Hijau Lestari", deskripsi: "Penataan taman & ruang terbuka hijau", sarpras: ["NT2-S2"], nominal: 92000000, vo: [], retensiPct: 0, jatuhTempoBln: 0, mulai: "05 Apr 2023",
     riwayat: [{ tgl: "05 Apr 2023", uraian: "Pelunasan penataan taman", nominal: 92000000 }] },
-  { kode: "S3", jenis: "Sarpras", proyek: "NT4", vendor: "PT Bina Marga Sejahtera", deskripsi: "Jalan lingkungan & saluran drainase", sarpras: ["NT4-S1", "NT4-S2"], nominal: 2260000000, retensiPct: 5, jatuhTempoBln: 3, mulai: "15 Feb 2025",
+  { kode: "S3", jenis: "Sarpras", jenisBiaya: "Kontraktor", proyek: "NT4", vendor: "PT Bina Marga Sejahtera", deskripsi: "Jalan lingkungan & saluran drainase", sarpras: ["NT4-S1", "NT4-S2"], nominal: 2260000000, retensiPct: 5, jatuhTempoBln: 3, mulai: "15 Feb 2025",
     vo: [{ no: "VO-01", tgl: "12 Mei 2025", uraian: "Tambah volume jalan 180 m² (pelebaran jalan masuk)", nominal: 84000000, status: "Disetujui" },
          { no: "VO-02", tgl: "02 Jul 2026", uraian: "Tambah saluran drainase 60 m sisi timur", nominal: 36000000, status: "Diajukan" }],
     riwayat: [{ tgl: "15 Feb 2025", uraian: "DP 30% jalan & drainase", nominal: 678000000 }, { tgl: "20 Apr 2025", uraian: "Termin 2", nominal: 452000000 }, { tgl: "18 Jun 2025", uraian: "Termin 3", nominal: 280000000 }] },
-  { kode: "S4", jenis: "Sarpras", proyek: "NT4", vendor: "CV Cipta Bangun", deskripsi: "Gerbang utama & pos jaga", sarpras: ["NT4-S3"], nominal: 370000000, vo: [], retensiPct: 5, jatuhTempoBln: 3, mulai: "08 Mar 2025",
+  { kode: "S4", jenis: "Sarpras", jenisBiaya: "Upah Borongan", proyek: "NT4", vendor: "CV Cipta Bangun", deskripsi: "Gerbang utama & pos jaga", sarpras: ["NT4-S3"], nominal: 370000000, vo: [], retensiPct: 5, jatuhTempoBln: 3, mulai: "08 Mar 2025",
     riwayat: [{ tgl: "08 Mar 2025", uraian: "DP 40% gerbang & pos jaga", nominal: 148000000 }] },
-  { kode: "S5", jenis: "Sarpras", proyek: "NT4", vendor: "CV Elektrindo Jaya", deskripsi: "Jaringan listrik 51 sambungan", sarpras: ["NT4-S5"], nominal: 595000000, vo: [], retensiPct: 5, jatuhTempoBln: 3, mulai: "02 Apr 2025",
+  { kode: "S5", jenis: "Sarpras", jenisBiaya: "Subkon", proyek: "NT4", vendor: "CV Elektrindo Jaya", deskripsi: "Jaringan listrik 51 sambungan", sarpras: ["NT4-S5"], nominal: 595000000, vo: [], retensiPct: 5, jatuhTempoBln: 3, mulai: "02 Apr 2025",
     riwayat: [{ tgl: "02 Apr 2025", uraian: "DP 50% jaringan listrik", nominal: 297500000 }] },
-  { kode: "S6", jenis: "Sarpras", proyek: "GN2", vendor: "CV Karya Aspal", deskripsi: "Jalan lingkungan & drainase", sarpras: ["GN2-S1", "GN2-S2"], nominal: 690000000, vo: [], retensiPct: 5, jatuhTempoBln: 3, mulai: "20 Okt 2024",
+  { kode: "S6", jenis: "Sarpras", jenisBiaya: "Subkon", proyek: "GN2", vendor: "CV Karya Aspal", deskripsi: "Jalan lingkungan & drainase", sarpras: ["GN2-S1", "GN2-S2"], nominal: 690000000, vo: [], retensiPct: 5, jatuhTempoBln: 3, mulai: "20 Okt 2024",
     riwayat: [{ tgl: "20 Okt 2024", uraian: "DP 40% jalan & drainase", nominal: 276000000 }, { tgl: "14 Jan 2025", uraian: "Termin 2", nominal: 207000000 }] },
 ];
 
@@ -424,12 +424,8 @@ export const ASET = [
 // BIAYA OPERASIONAL & LOG
 // ---------------------------------------------------------------------------
 
-export const POS_HPP: Record<string, string> = {
-  "Unit (rumah dijual)": "E — Konstruksi",
-  "Prasarana & Sarana": "D — Prasarana",
-  "Perijinan & Ormas": "C — Perijinan",
-  "Pengolahan Lahan": "B — Pengolahan Lahan",
-};
+// Satu sumber kebenaran di domain — lihat src/lib/domain/enums.
+export { POS_HPP } from "../src/lib/domain/enums";
 
 /**
  * Transaksi tingkat proyek — dipindahkan dari array EXPENSES pada artifact.
@@ -466,6 +462,7 @@ export const BIAYA_OPERASIONAL = [
 
 /** Warna kategori pada diagram donat dan penanda jenis biaya. */
 export const WARNA_JENIS: Record<string, string> = {
+  Kontraktor: "#cf6a57",
   "Upah Borongan": "#3b82c4",
   "Upah Harian": "#e0619a",
   Material: "#d9a441",

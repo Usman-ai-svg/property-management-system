@@ -5,7 +5,7 @@ import { proyekUntukKontrak as ambilProyekUntukKontrak, vendorDetail } from "@/l
 import { ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Badge, Kartu, KartuKosong, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
-import { TambahPembayaran, TambahVo } from "./editors";
+import { HapusPembayaran, TambahPembayaran, TambahVo } from "./editors";
 import { HapusKontrak, TambahKontrak, UbahKontrak } from "../editors-vendor";
 import { Tabel } from "@/components/kartu-tabel";
 
@@ -201,6 +201,7 @@ export default async function DetailVendor({
                               <UbahKontrak
                                 kontrak={{
                                   id: k.id, kode: k.kode, deskripsi: k.deskripsi,
+                                  jenisBiaya: k.jenisBiaya,
                                   nominal: k.nominal, retensiPct: k.retensiPct,
                                   jatuhTempoBln: k.jatuhTempoBln,
                                   mulai: k.mulai.toISOString().slice(0, 10),
@@ -367,7 +368,13 @@ export default async function DetailVendor({
                     </div>
                   </div>
                   {bolehBayar && r.sisa > 0 && (
-                    <TambahPembayaran contractId={k.id} sisa={r.sisa} />
+                    <TambahPembayaran
+                      contractId={k.id}
+                      sisa={r.sisa}
+                      peruntukan={k.jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana"}
+                      jenisBiaya={k.jenisBiaya}
+                      cakupan={k.units.length + k.infrastructures.length}
+                    />
                   )}
                 </div>
 
@@ -380,6 +387,7 @@ export default async function DetailVendor({
                       { label: "Uraian" },
                       { label: "Nominal", rata: "kanan" },
                       { label: "Kumulatif", rata: "kanan" },
+                      bolehBayar && { label: "", lebar: 70 },
                     ]}
                   >
                     {k.expenses.map((p, i) => {
@@ -394,6 +402,11 @@ export default async function DetailVendor({
                           <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
                             {rp(kumulatif)}
                           </td>
+                          {bolehBayar && (
+                            <td style={{ textAlign: "right" }}>
+                              <HapusPembayaran id={p.id} />
+                            </td>
+                          )}
                         </tr>
                       );
                     })}

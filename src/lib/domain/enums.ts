@@ -108,7 +108,22 @@ export const SASARAN_PERUNTUKAN: Record<
   "Pengolahan Lahan": { unit: false, sarpras: false },
 };
 
+/**
+ * Pos HPP yang dibiayai tiap peruntukan. Tidak diminta ke pengguna melainkan
+ * diturunkan dari peruntukannya, supaya kolom di laporan selalu sinkron dengan
+ * pembebanan. Dipakai bersama oleh Catat/Ubah Pengeluaran, Bayar PO, pembayaran
+ * kontrak vendor, dan penyemaian — satu sumber kebenaran menghindari data
+ * `posHpp` yang menyimpang antar-jalur.
+ */
+export const POS_HPP: Record<(typeof PERUNTUKAN_BIAYA)[number], string> = {
+  "Unit (rumah dijual)": "E — Konstruksi",
+  "Prasarana & Sarana": "D — Prasarana",
+  "Perijinan & Ormas": "C — Perijinan",
+  "Pengolahan Lahan": "B — Pengolahan Lahan",
+};
+
 export const JENIS_BIAYA = [
+  "Kontraktor",
   "Upah Borongan",
   "Material",
   "Subkon",

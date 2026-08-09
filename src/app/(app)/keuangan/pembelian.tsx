@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { Check, Plus, Trash2 } from "lucide-react";
-import { BarisField, Field, FormModal, TombolHapus, TombolTambah } from "@/components/form";
+import { BarisField, Field, FieldTerkunci, FormModal, TombolHapus, TombolTambah } from "@/components/form";
 import { AlokasiBiaya } from "@/components/alokasi-biaya";
 import { Badge } from "@/components/ui";
 import { Tabel } from "@/components/kartu-tabel";
-import { METODE_BAYAR, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN } from "@/lib/domain/enums";
+import { METODE_BAYAR, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN, STATUS_BAYAR } from "@/lib/domain/enums";
 import { rp, tanggal, tanggalJam } from "@/lib/format";
 import { bayarPembelian, buatPembelian, hapusPembayaran, hapusPembelian, terimaPembelian } from "./actions";
 
@@ -338,7 +338,11 @@ function BayarPO({
             ))}
           </select>
         </div>
+        <FieldTerkunci label="Jenis Biaya" nilai="Material" />
+      </BarisField>
+      <BarisField>
         <Field label="Metode" nama="metode" nilai={METODE_BAYAR[0]} pilihan={METODE_BAYAR} />
+        <Field label="Status Bayar" nama="status" nilai="Lunas" pilihan={STATUS_BAYAR} />
       </BarisField>
       <BarisField kolom={1}>
         <Field label="Uraian" nama="uraian" petunjuk="opsional" />
@@ -371,6 +375,10 @@ function BayarPO({
           unit maupun sarana &amp; prasarana, jadi tak perlu dibebankan ke objek tertentu.
         </div>
       )}
+
+      <div style={{ marginTop: 14 }}>
+        <Field label="Nama berkas bukti" nama="bukti" petunjuk="opsional — berkasnya belum diunggah pada demo ini" />
+      </div>
     </FormModal>
   );
 }

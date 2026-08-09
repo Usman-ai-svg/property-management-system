@@ -50,7 +50,7 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
           },
         },
       },
-      expenses: { select: { peruntukan: true, total: true } },
+      expenses: { select: { peruntukan: true, total: true, contractId: true } },
       biayaOperasional: { select: { kategori: true, nominal: true } },
       contracts: {
         where: { jenis: "Sarpras" },
@@ -81,8 +81,14 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
   const sarprasTerbayar = proyek.contracts.reduce((s, k) => s + ringkasKontrak(k).terbayar, 0);
 
   const perPeruntukan = new Map<string, number>();
+  // Pengeluaran sarpras yang TIDAK tertaut kontrak — dijumlah terpisah karena
+  // pembayaran kontrak sarpras sudah masuk lewat `sarprasTerbayar`. Kalau kedua
+  // sumber sama-sama dijumlah dari `perPeruntukan`, biaya kontrak sarpras
+  // terhitung dua kali.
+  let sarprasLangsung = 0;
   for (const e of proyek.expenses) {
     perPeruntukan.set(e.peruntukan, (perPeruntukan.get(e.peruntukan) ?? 0) + e.total);
+    if (e.peruntukan === "Prasarana & Sarana" && !e.contractId) sarprasLangsung += e.total;
   }
 
   const biaya = rencana.hpp.map((h, i) => {
@@ -93,8 +99,10 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
       real = perolehanLahan;
       sumber = "biaya perolehan lahan di Landbank";
     } else if (h.nama === "Prasarana & Sarana") {
-      // Sarpras dibiayai lewat kontrak dan pengeluaran langsung.
-      real = sarprasTerbayar + (perPeruntukan.get("Prasarana & Sarana") ?? 0);
+      // Sarpras dibiayai lewat kontrak dan pengeluaran langsung. Hanya
+      // pengeluaran non-kontrak yang ditambahkan; pembayaran kontrak sudah
+      // dihitung di `sarprasTerbayar` agar tak ganda.
+      real = sarprasTerbayar + sarprasLangsung;
       sumber = "pembayaran kontrak sarpras + pengeluaran";
     } else {
       const peruntukan = SUMBER_HPP[h.nama] ?? [];

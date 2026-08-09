@@ -50,7 +50,7 @@ export async function vendorDetail(u: Pengguna, id: string) {
         where: { project: filterProyek(u) },
         orderBy: { mulai: "desc" },
         select: {
-          id: true, kode: true, jenis: true, deskripsi: true, nominal: true,
+          id: true, kode: true, jenis: true, jenisBiaya: true, deskripsi: true, nominal: true,
           retensiPct: true, jatuhTempoBln: true, mulai: true,
           project: { select: { kode: true, nama: true } },
           expenses: {

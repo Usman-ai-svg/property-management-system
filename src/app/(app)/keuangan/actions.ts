@@ -4,17 +4,10 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
-  angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
+  angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, pilihanOpsional, teks, teksOpsional,
 } from "@/lib/actions/guard";
 import { periksaAlokasi } from "@/lib/calc/keuangan";
-import { JENIS_BIAYA, METODE_BAYAR, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN, STATUS_BAYAR, STATUS_PEMBELIAN } from "@/lib/domain/enums";
-
-const POS_HPP: Record<string, string> = {
-  "Unit (rumah dijual)": "E — Konstruksi",
-  "Prasarana & Sarana": "D — Prasarana",
-  "Perijinan & Ormas": "C — Perijinan",
-  "Pengolahan Lahan": "B — Pengolahan Lahan",
-};
+import { JENIS_BIAYA, METODE_BAYAR, PERUNTUKAN_BIAYA, POS_HPP, SASARAN_PERUNTUKAN, STATUS_BAYAR, STATUS_PEMBELIAN } from "@/lib/domain/enums";
 
 /**
  * Baca pembebanan sebuah pembayaran dari formulir.
@@ -99,6 +92,22 @@ function periksaSasaranPeruntukan(
 }
 
 /**
+ * Pengaman sisi-server: baris pengeluaran yang tertaut ke kontrak atau PO tidak
+ * boleh diubah/dihapus lewat jalur generik Keuangan. Keduanya punya invariant
+ * sendiri (sisa kontrak, sisa PO) yang hanya dijaga di modulnya — kontrak lewat
+ * Vendor, PO lewat kartu Pembelian Material. UI sudah menyembunyikan tombolnya;
+ * ini pagar terakhir bila permintaan datang langsung.
+ */
+function tolakBilaTertaut(e: { contractId: string | null; pembelianId: string | null }): void {
+  if (e.contractId) {
+    throw new GagalIzin("Ini pembayaran kontrak — ubah atau hapus lewat modul Vendor.");
+  }
+  if (e.pembelianId) {
+    throw new GagalIzin("Ini pembayaran PO — ubah atau hapus lewat kartu Pembelian Material.");
+  }
+}
+
+/**
  * Catat pengeluaran baru.
  *
  * Pos HPP tidak diminta ke pengguna melainkan diturunkan dari peruntukannya,
@@ -176,7 +185,7 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
     const lama = await prisma.expense.findUnique({
       where: { id },
       select: {
-        id: true, projectId: true,
+        id: true, projectId: true, contractId: true, pembelianId: true,
         peruntukan: true, jenis: true, metode: true, uraian: true,
         total: true, status: true, bukti: true,
         alokasi: {
@@ -190,6 +199,7 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
       },
     });
     if (!lama) throw new GagalIzin("Pengeluaran tidak ditemukan.");
+    tolakBilaTertaut(lama);
 
     const pengguna = await izinkan("keuangan", lama.projectId);
 
@@ -329,10 +339,12 @@ export async function hapusPengeluaran(_s: HasilAksi | null, form: FormData): Pr
       where: { id },
       select: {
         id: true, projectId: true, uraian: true, total: true, peruntukan: true,
+        contractId: true, pembelianId: true,
         project: { select: { kode: true } },
       },
     });
     if (!lama) return;
+    tolakBilaTertaut(lama);
 
     const pengguna = await izinkan("keuangan", lama.projectId);
 
@@ -609,6 +621,8 @@ export async function bayarPembelian(_s: HasilAksi | null, form: FormData): Prom
     const isiTanggal = teksOpsional(form, "tanggal");
     const tanggal = isiTanggal ? new Date(isiTanggal) : new Date();
     const metode = pilihan(form, "metode", METODE_BAYAR);
+    const status = pilihanOpsional(form, "status", STATUS_BAYAR, "Lunas");
+    const bukti = teksOpsional(form, "bukti") || null;
     // Uang muka bila barang belum diterima — terbaca jelas di daftar Transaksi.
     const uraianBawaan = diterima
       ? `Pembayaran PO ${beli.nomor} — ${beli.pemasok.nama}`
@@ -619,7 +633,7 @@ export async function bayarPembelian(_s: HasilAksi | null, form: FormData): Prom
       data: {
         projectId: beli.projectId, pembelianId, tanggal,
         peruntukan, jenis: "Material", metode, uraian,
-        total: bayar, status: "Lunas", pic: pengguna.nama,
+        total: bayar, status, bukti, pic: pengguna.nama,
         posHpp: POS_HPP[peruntukan],
         alokasi: { create: alokasi },
       },

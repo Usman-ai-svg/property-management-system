@@ -89,11 +89,11 @@ CREATE TYPE pm_peruntukan_biaya AS ENUM (
   'Unit (rumah dijual)',
   'Prasarana & Sarana',
   'Perijinan & Ormas',
-  'Pengolahan Lahan',
-  'Material'
+  'Pengolahan Lahan'
 );
 
 CREATE TYPE pm_jenis_biaya AS ENUM (
+  'Kontraktor',
   'Upah Borongan',
   'Material',
   'Subkon',

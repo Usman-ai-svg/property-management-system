@@ -646,8 +646,12 @@ model Contract {
   kode      String @unique
   projectId String
   vendorId  String
-  /// Unit | Sarpras
+  /// Unit | Sarpras — LINGKUP kontrak (ke mana biayanya dibebankan).
   jenis     String
+  /// Jenis biaya kontrak (JENIS_BIAYA), mis. Kontraktor / Upah Borongan / Subkon.
+  /// Diwariskan ke setiap pembayaran kontrak ini sebagai jenis biaya Expense-nya,
+  /// supaya donut "Breakdown Kategori" tidak menyamaratakan semua jadi borongan.
+  jenisBiaya String @default("Upah Borongan")
   deskripsi String
   /// Nilai kontrak awal, belum termasuk VO
   nominal   Float

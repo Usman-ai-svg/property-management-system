@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   BarisField, Field, FormModal, TombolHapus, TombolIkon, TombolTambah,
 } from "@/components/form";
-import { JENIS_KONTRAK, STATUS_VENDOR } from "@/lib/domain/enums";
+import { JENIS_BIAYA, JENIS_KONTRAK, STATUS_VENDOR } from "@/lib/domain/enums";
 import {
   hapusKontrak, hapusVendor, tambahKontrak, tambahVendor, ubahKontrak, ubahVendor,
 } from "./actions";
@@ -82,6 +82,7 @@ export interface KontrakForm {
   id: string;
   kode: string;
   deskripsi: string;
+  jenisBiaya: string;
   nominal: number;
   retensiPct: number;
   jatuhTempoBln: number;
@@ -152,6 +153,16 @@ export function TambahKontrak({
 
       <BarisField kolom={1}>
         <Field label="Deskripsi Pekerjaan" nama="deskripsi" wajib />
+      </BarisField>
+
+      <BarisField kolom={1}>
+        <Field
+          label="Jenis Biaya"
+          nama="jenisBiaya"
+          nilai="Upah Borongan"
+          pilihan={JENIS_BIAYA}
+          petunjuk="Diwariskan ke tiap pembayaran kontrak ini. Pilih Kontraktor untuk paket menyeluruh (material+upah+subkon)."
+        />
       </BarisField>
 
       <BarisField kolom={1}>
@@ -241,6 +252,9 @@ export function UbahKontrak({ kontrak }: { kontrak: KontrakForm }) {
       <input type="hidden" name="id" value={kontrak.id} />
       <BarisField kolom={1}>
         <Field label="Deskripsi Pekerjaan" nama="deskripsi" nilai={kontrak.deskripsi} wajib />
+      </BarisField>
+      <BarisField kolom={1}>
+        <Field label="Jenis Biaya" nama="jenisBiaya" nilai={kontrak.jenisBiaya} pilihan={JENIS_BIAYA} />
       </BarisField>
       <BarisField>
         <Field label="Nilai Kontrak" nama="nominal" nilai={kontrak.nominal} tipe="number" satuan="Rp" wajib />

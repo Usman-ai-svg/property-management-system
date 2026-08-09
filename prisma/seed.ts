@@ -632,7 +632,7 @@ async function main() {
     const c = await prisma.contract.create({
       data: {
         kode: K.kode, projectId: projectId.get(K.proyek)!, vendorId: vendorId.get(K.vendor)!,
-        jenis: K.jenis, deskripsi: K.deskripsi, nominal: K.nominal,
+        jenis: K.jenis, jenisBiaya: K.jenisBiaya, deskripsi: K.deskripsi, nominal: K.nominal,
         retensiPct: K.retensiPct, jatuhTempoBln: K.jatuhTempoBln, mulai: tgl(K.mulai)!,
         variationOrders: { create: (K.vo ?? []).map((v) => ({ nomor: v.no, tanggal: tgl(v.tgl)!, uraian: v.uraian, nominal: v.nominal, status: v.status })) },
       },
@@ -675,17 +675,19 @@ async function main() {
             }));
       if (porsi.length === 0) continue;
 
+      const peruntukan = K.jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana";
       await prisma.expense.create({
         data: {
           projectId: projectId.get(K.proyek)!,
           contractId: c.id,
           tanggal: tgl(r.tgl)!,
-          peruntukan: K.jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana",
-          jenis: "Upah Borongan",
+          peruntukan,
+          jenis: K.jenisBiaya,
           metode: "Transfer",
           uraian: `${r.uraian} — ${K.kode} ${K.vendor}`,
           total: r.nominal,
           status: "Lunas",
+          posHpp: POS_HPP[peruntukan],
           pic: "Sistem",
           alokasi: { create: porsi },
         },
@@ -742,7 +744,7 @@ async function main() {
         peruntukan: B.peruntukan, jenis: B.jenis, metode: B.metode,
         uraian: B.uraian, total: B.total, status: B.status,
         pic: B.pic, bukti: B.bukti || null,
-        posHpp: POS_HPP[B.peruntukan],
+        posHpp: POS_HPP[B.peruntukan as keyof typeof POS_HPP],
         contractId: B.kontrak ? kontrakPerVendor.get(`${pid}|${B.kontrak}`) ?? null : null,
         // Satu pembayaran = satu baris; pembebanannya ada di alokasi.
         alokasi: { create: [{ unitId: unitIdTerkait, nominal: B.total }] },
