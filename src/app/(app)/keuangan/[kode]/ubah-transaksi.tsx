@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { BarisField, Field, FormModal, TombolHapus, TombolIkon } from "@/components/form";
+import { BarisField, Field, FieldTerkunci, FormModal, TombolHapus, TombolIkon } from "@/components/form";
 import { AlokasiBiaya } from "@/components/alokasi-biaya";
-import { JENIS_BIAYA_SWAKELOLA, METODE_BAYAR, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN } from "@/lib/domain/enums";
+import { JENIS_BIAYA_SWAKELOLA, METODE_TUNAI, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN } from "@/lib/domain/enums";
+import { rp } from "@/lib/format";
 import { hapusPengeluaran, ubahPengeluaran } from "../actions";
 import { Petunjuk } from "@/components/ui";
 
@@ -27,6 +28,9 @@ export function UbahTransaksi({
     uraian: string;
     total: number;
     bukti: string | null;
+    kreditur: string | null;
+    tenggat: string | null;
+    terbayar: number;
     alokasi: { unitId: string | null; infrastructureId: string | null; nominal: number }[];
   };
   units: { id: string; label: string }[];
@@ -35,6 +39,11 @@ export function UbahTransaksi({
   const [total, setTotal] = useState(String(transaksi.total));
   const [peruntukan, setPeruntukan] = useState<string>(transaksi.peruntukan);
   const nominal = Number(total) || 0;
+
+  // Pengeluaran-hutang: metode terkunci "Hutang", kreditur/tenggat bisa
+  // dikoreksi, dan total tak boleh turun di bawah yang sudah dicicil.
+  const isHutang = transaksi.metode === "Hutang";
+  const totalMin = Math.max(1, transaksi.terbayar);
 
   // Nilai lama bisa saja di luar daftar baku (mis. data pra-perubahan). Ditambah
   // sebagai opsi supaya menyunting field lain tak diam-diam mengubah peruntukan.
@@ -100,17 +109,42 @@ export function UbahTransaksi({
               value={total}
               onChange={(e) => setTotal(e.target.value)}
               required
-              min={1}
+              min={totalMin}
             />
             <span style={{ fontSize: 12, color: "var(--muted)" }}>Rp</span>
           </div>
+          {isHutang && transaksi.terbayar > 0 && (
+            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+              Sudah dicicil {rp(transaksi.terbayar)} — total tak boleh kurang dari itu.
+            </div>
+          )}
         </div>
       </BarisField>
 
       <BarisField>
-        <Field label="Metode" nama="metode" nilai={transaksi.metode} pilihan={METODE_BAYAR} />
-        <Field label="Nama berkas bukti" nama="bukti" nilai={transaksi.bukti ?? ""} />
+        {isHutang ? (
+          <FieldTerkunci label="Metode" nilai="Hutang" />
+        ) : (
+          <Field label="Metode" nama="metode" nilai={transaksi.metode} pilihan={METODE_TUNAI} />
+        )}
+        <Field
+          label="Berkas bukti"
+          nama="berkas"
+          tipe="berkas"
+          petunjuk={
+            transaksi.bukti
+              ? `Sekarang: ${transaksi.bukti} — pilih berkas untuk mengganti (opsional)`
+              : "Opsional — unggah nota/kwitansi"
+          }
+        />
       </BarisField>
+
+      {isHutang && (
+        <BarisField>
+          <Field label="Kepada (kreditur)" nama="kreditur" nilai={transaksi.kreditur ?? ""} wajib />
+          <Field label="Tenggat pelunasan" nama="tenggat" tipe="tanggal" nilai={transaksi.tenggat ?? ""} wajib />
+        </BarisField>
+      )}
 
       <BarisField kolom={1}>
         <div>

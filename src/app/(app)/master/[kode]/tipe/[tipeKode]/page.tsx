@@ -55,7 +55,7 @@ export default async function RincianTipeUnit({
             rapItems: {
               orderBy: { urutan: "asc" as const },
               select: {
-                id: true, grup: true, nama: true, satuan: true,
+                id: true, grup: true, kategori: true, nama: true, satuan: true,
                 volume: true, hargaSatuan: true, keterangan: true,
               },
             },

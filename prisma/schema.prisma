@@ -335,6 +335,9 @@ model UnitTypeRapItem {
   id          String  @id @default(cuid())
   unitTypeId  String
   grup        String
+  /// Kategori pelacakan: "Material" | "Subkon". Eksplisit supaya tak bergantung
+  /// pada ejaan nama kelompok.
+  kategori    String  @default("Material")
   nama        String
   satuan      String
   volume      Float
@@ -437,6 +440,8 @@ model UnitRapItem {
   id          String  @id @default(cuid())
   unitId      String
   grup        String
+  /// Kategori pelacakan: "Material" | "Subkon" (eksplisit, bukan dari nama).
+  kategori    String  @default("Material")
   nama        String
   satuan      String
   volume      Float
@@ -502,6 +507,8 @@ model CustomWorkRapItem {
   id           String  @id @default(cuid())
   customWorkId String
   grup         String
+  /// Kategori pelacakan: "Material" | "Subkon" (eksplisit, bukan dari nama).
+  kategori     String  @default("Material")
   nama         String
   satuan       String
   volume       Float
@@ -580,6 +587,8 @@ model InfrastructureRapItem {
   id               String  @id @default(cuid())
   infrastructureId String
   grup             String
+  /// Kategori pelacakan: "Material" | "Subkon" (eksplisit, bukan dari nama).
+  kategori         String  @default("Material")
   nama             String
   satuan           String
   volume           Float
@@ -820,9 +829,16 @@ model Expense {
   pic        String?
   /// Pos HPP business plan yang dibebani, mis. "E — Konstruksi"
   posHpp     String?
-  /// Nama berkas bukti (nota, berita acara, kwitansi). Berkasnya sendiri
-  /// belum disimpan — lihat catatan pada model Document.
+  /// Nama berkas bukti (nota, berita acara, kwitansi) — untuk ditampilkan.
+  /// Berkas lama (pra-unggah) hanya berisi teks tanpa `buktiKey`.
   bukti      String?
+  /// Kunci objek berkas bukti di penyimpanan, bila benar-benar diunggah.
+  /// Kosong = tak ada berkas (atau baris lama yang hanya mencatat namanya).
+  buktiKey   String?
+  /// Untuk pengeluaran-hutang (metode "Hutang"): kepada siapa utang ini &
+  /// kapan tenggatnya. Kosong pada pengeluaran biasa yang kasnya langsung keluar.
+  kreditur   String?
+  tenggat    DateTime?
   /// Kontrak vendor yang membiayai pengeluaran ini, bila ada.
   contractId String?
   /// Pembelian material yang dibayar pengeluaran ini, bila ada. Tiap termin
@@ -834,9 +850,40 @@ model Expense {
   contract   Contract?           @relation(fields: [contractId], references: [id])
   pembelian  Pembelian?          @relation(fields: [pembelianId], references: [id])
   alokasi    ExpenseAllocation[]
+  cicilan    HutangCicilan[]
 
   @@index([projectId, tanggal])
   @@map("expenses")
+}
+
+/**
+ * Cicilan pelunasan sebuah pengeluaran-hutang.
+ *
+ * Pengeluaran-hutang dicatat AKRUAL: biaya penuhnya langsung masuk realisasi
+ * saat timbul (baris Expense itu sendiri). Cicilan di sini HANYA menggerakkan
+ * berapa yang sudah dibayar tunai — ia BUKAN pengeluaran baru, jadi tak pernah
+ * ikut dijumlahkan sebagai realisasi (kalau tidak, biayanya terhitung dua kali).
+ *
+ * Sisa hutang = Expense.total − Σ cicilan. Status Bayar (Belum/DP/Lunas)
+ * diturunkan dari sini, bukan disimpan. Tanggal tiap cicilan disimpan supaya
+ * kelak bisa menyusun laporan arus kas (kas benar-benar keluar) tanpa migrasi.
+ */
+model HutangCicilan {
+  id        String   @id @default(cuid())
+  expenseId String
+  tanggal   DateTime
+  nominal   Float
+  /// Cara kas keluar untuk cicilan ini — hanya metode tunai (bukan "Hutang").
+  metode    String
+  bukti     String?
+  buktiKey  String?
+  pic       String?
+  dibuatPada DateTime @default(now())
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@index([expenseId])
+  @@map("hutang_cicilan")
 }
 
 /// Pembebanan satu pembayaran ke unit atau item sarana & prasarana.

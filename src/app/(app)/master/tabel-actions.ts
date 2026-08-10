@@ -43,6 +43,8 @@ interface BarisBoqMasuk extends ItemBoqMasuk {
 
 interface KelompokRapMasuk {
   nama: string;
+  /** "Material" | "Subkon" — kategori seluruh baris kelompok ini. */
+  kategori?: string;
   items: {
     nama: string;
     satuan: string;
@@ -120,11 +122,12 @@ function bacaRap(json: string): { kelompok: KelompokRapMasuk[]; upahVolume: numb
 const totalRap = (rows: { volume: number; hargaSatuan: number }[], upahVolume: number, upahHarga: number) =>
   jumlah(rows) + upahVolume * upahHarga;
 
-/** Ratakan kelompok jadi baris siap simpan. */
+/** Ratakan kelompok jadi baris siap simpan. Kategori diambil per kelompok. */
 const ratakan = (kelompok: KelompokRapMasuk[]) =>
   kelompok.flatMap((g, gi) =>
     g.items.map((it, ii) => ({
       grup: g.nama.trim(),
+      kategori: g.kategori === "Subkon" ? "Subkon" : "Material",
       nama: it.nama.trim(),
       satuan: it.satuan?.trim() || "ls",
       volume: it.volume,
@@ -319,7 +322,10 @@ export async function simpanRapUnit(unitId: string, dataJson: string): Promise<H
       prisma.unitRapItem.createMany({
         data: ratakan(kelompok).map((r) => ({ ...r, unitId })),
       }),
-      prisma.unit.update({ where: { id: unitId }, data: { rapUpahVolume: upahVolume, rapUpahHarga: upahHarga } }),
+      prisma.unit.update({
+        where: { id: unitId },
+        data: { rapUpahVolume: upahVolume, rapUpahHarga: upahHarga },
+      }),
     ]);
 
     await catat({
@@ -360,7 +366,10 @@ export async function simpanRapKerjaTambah(customWorkId: string, dataJson: strin
       prisma.customWorkRapItem.createMany({
         data: ratakan(kelompok).map((r) => ({ ...r, customWorkId })),
       }),
-      prisma.customWork.update({ where: { id: customWorkId }, data: { rapUpahVolume: upahVolume, rapUpahHarga: upahHarga } }),
+      prisma.customWork.update({
+        where: { id: customWorkId },
+        data: { rapUpahVolume: upahVolume, rapUpahHarga: upahHarga },
+      }),
     ]);
 
     await catat({
@@ -396,7 +405,10 @@ export async function simpanRapSarpras(infrastructureId: string, dataJson: strin
       prisma.infrastructureRapItem.createMany({
         data: ratakan(kelompok).map((r) => ({ ...r, infrastructureId })),
       }),
-      prisma.infrastructure.update({ where: { id: infrastructureId }, data: { rapUpahVolume: upahVolume, rapUpahHarga: upahHarga } }),
+      prisma.infrastructure.update({
+        where: { id: infrastructureId },
+        data: { rapUpahVolume: upahVolume, rapUpahHarga: upahHarga },
+      }),
     ]);
 
     await catat({

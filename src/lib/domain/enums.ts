@@ -141,9 +141,9 @@ export const POS_HPP: Record<(typeof PERUNTUKAN_BIAYA)[number], string> = {
 export const JENIS_BIAYA = [
   "Kontraktor",
   "Upah Borongan",
+  "Upah Harian",
   "Material",
   "Subkon",
-  "Upah Harian",
   "Lain-lain proyek",
 ] as const;
 
@@ -168,7 +168,26 @@ export const JENIS_BIAYA_SWAKELOLA = JENIS_BIAYA.filter(
   (j): j is Exclude<JenisBiaya, "Kontraktor"> => j !== "Kontraktor",
 );
 
-export const METODE_BAYAR = ["Transfer", "Petty Cash", "Tunai langsung"] as const;
+/**
+ * Cara sebuah pengeluaran dibayar.
+ *
+ * "Hutang" berbeda kodrat dari sisanya: tiga yang lain adalah kas benar-benar
+ * keluar, sedangkan "Hutang" berarti biaya sudah timbul tapi kas BELUM keluar —
+ * ia menandai pengeluaran sebagai utang berjalan yang dilunasi bertahap lewat
+ * cicilan (lihat model HutangCicilan). Karena itu "Hutang" hanya sah pada
+ * pencatatan pengeluaran manual, tak pernah pada pembayaran tunai kontrak/PO/
+ * cicilan itu sendiri — subset METODE_TUNAI di bawah menegakkan pemisahan itu.
+ */
+export const METODE_BAYAR = ["Transfer", "Petty Cash", "Tunai langsung", "Hutang"] as const;
+
+/**
+ * Metode kas — seluruh METODE_BAYAR KECUALI "Hutang". Dipakai pada konteks di
+ * mana uang benar-benar keluar: pembayaran termin PO, pembayaran kontrak vendor,
+ * dan pelunasan cicilan hutang. Diturunkan dari daftar induk agar tak hanyut.
+ */
+export const METODE_TUNAI = METODE_BAYAR.filter(
+  (m): m is Exclude<MetodeBayar, "Hutang"> => m !== "Hutang",
+);
 
 export const STATUS_BAYAR = ["Lunas", "DP", "Belum"] as const;
 

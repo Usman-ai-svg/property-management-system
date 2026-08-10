@@ -4,6 +4,7 @@ import { Fragment, useState, useTransition } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { HasilAksi } from "@/lib/actions/guard";
 import { rp } from "@/lib/format";
+import { PORSI_LAIN_LAIN, SUBKON_RE } from "@/lib/calc/boq";
 import { ModalImpor } from "./impor";
 
 /**
@@ -18,6 +19,7 @@ import { ModalImpor } from "./impor";
 export interface BarisRapUI {
   id?: string;
   grup: string;
+  kategori?: string | null;
   nama: string;
   satuan: string;
   volume: number;
@@ -27,6 +29,8 @@ export interface BarisRapUI {
 
 interface Kelompok {
   nama: string;
+  /** "Material" | "Subkon" — kategori seluruh baris kelompok ini. */
+  kategori: string;
   items: BarisRapUI[];
 }
 
@@ -38,6 +42,17 @@ const ITEM_BARU: Omit<BarisRapUI, "grup"> = {
   nama: "Material baru", satuan: "ls", volume: 1, hargaSatuan: 0, keterangan: "",
 };
 
+/**
+ * Kategori efektif sebuah kelompok: kategori eksplisit baris pertama, atau
+ * (data lama) "Subkon" bila namanya memuat "subkon". Nama tak lagi menentukan —
+ * hanya jaring pengaman untuk data yang belum punya kategori.
+ */
+function kategoriKelompok(nama: string, items: BarisRapUI[]): string {
+  const eksplisit = items.find((i) => i.kategori === "Subkon" || i.kategori === "Material")?.kategori;
+  if (eksplisit) return eksplisit;
+  return SUBKON_RE.test(nama) ? "Subkon" : "Material";
+}
+
 /** Susun baris datar menjadi kelompok, dengan urutan kemunculan pertama. */
 function kelompokkan(baris: BarisRapUI[]): Kelompok[] {
   const peta = new Map<string, BarisRapUI[]>();
@@ -46,7 +61,7 @@ function kelompokkan(baris: BarisRapUI[]): Kelompok[] {
     if (ada) ada.push(b);
     else peta.set(b.grup, [b]);
   }
-  return [...peta.entries()].map(([nama, items]) => ({ nama, items }));
+  return [...peta.entries()].map(([nama, items]) => ({ nama, kategori: kategoriKelompok(nama, items), items }));
 }
 
 export function RapTable({
@@ -105,10 +120,14 @@ export function RapTable({
   const volUpah = sunting ? draftUpahVolume : upahVolume;
   const hargaUpah = sunting ? draftUpahHarga : upahHarga;
   const nilaiUpah = volUpah * hargaUpah;
-  const material = kelompok.reduce(
-    (s, g) => s + g.items.reduce((a, i) => a + i.volume * i.hargaSatuan, 0),
-    0,
-  );
+
+  // Kategori mengikuti pilihan eksplisit tiap kelompok (Material/Subkon), bukan
+  // ejaan namanya. Lain-lain = 5% dari (Material + Tenaga Kerja + Subkon).
+  const totalGrup = (g: Kelompok) => g.items.reduce((a, i) => a + i.volume * i.hargaSatuan, 0);
+  const subkon = kelompok.filter((g) => g.kategori === "Subkon").reduce((s, g) => s + totalGrup(g), 0);
+  const material = kelompok.filter((g) => g.kategori !== "Subkon").reduce((s, g) => s + totalGrup(g), 0);
+  const lain = (material + nilaiUpah + subkon) * PORSI_LAIN_LAIN;
+  const totalSwakelola = material + nilaiUpah + subkon + lain;
 
   const mulaiSunting = () => {
     setDraft(kelompokkan(baris).map((g) => ({ ...g, items: g.items.map((i) => ({ ...i })) })));
@@ -126,7 +145,11 @@ export function RapTable({
   const simpan = () =>
     mulai(async () => {
       const hasil = await aksiSimpan(
-        JSON.stringify({ kelompok: draft, upahVolume: draftUpahVolume, upahHarga: draftUpahHarga }),
+        JSON.stringify({
+          kelompok: draft,
+          upahVolume: draftUpahVolume,
+          upahHarga: draftUpahHarga,
+        }),
       );
       if (hasil.ok) {
         setSunting(false);
@@ -248,8 +271,20 @@ export function RapTable({
                           onChange={(e) =>
                             setDraft((d) => d.map((x, y) => (y === gi ? { ...x, nama: e.target.value } : x)))
                           }
-                          style={{ ...sel, width: 260, fontWeight: 600 }}
+                          style={{ ...sel, width: 220, fontWeight: 600 }}
                         />
+                        <select
+                          className="inp"
+                          title="Kategori kelompok — menentukan Material vs Subkon, bukan namanya"
+                          value={g.kategori === "Subkon" ? "Subkon" : "Material"}
+                          onChange={(e) =>
+                            setDraft((d) => d.map((x, y) => (y === gi ? { ...x, kategori: e.target.value } : x)))
+                          }
+                          style={{ ...sel, width: 110, fontWeight: 600 }}
+                        >
+                          <option value="Material">Material</option>
+                          <option value="Subkon">Subkon</option>
+                        </select>
                         <button
                           type="button"
                           title="Hapus kelompok"
@@ -263,7 +298,17 @@ export function RapTable({
                         </button>
                       </span>
                     ) : (
-                      g.nama
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        {g.nama}
+                        {g.kategori === "Subkon" && (
+                          <span
+                            className="chip"
+                            style={{ background: "var(--rona-ungu, var(--rona-teal))", color: "var(--brass)", textTransform: "none", letterSpacing: 0 }}
+                          >
+                            Subkon
+                          </span>
+                        )}
+                      </span>
                     )}
                   </td>
                 </tr>
@@ -346,7 +391,7 @@ export function RapTable({
                     onClick={() =>
                       setDraft((d) => [
                         ...d,
-                        { nama: "Kelompok Baru", items: [{ ...ITEM_BARU, grup: "Kelompok Baru" }] },
+                        { nama: "Kelompok Baru", kategori: "Material", items: [{ ...ITEM_BARU, grup: "Kelompok Baru" }] },
                       ])
                     }
                     style={{
@@ -366,6 +411,14 @@ export function RapTable({
               <td />
               {sunting && <td />}
             </tr>
+            {subkon > 0 && (
+              <tr style={{ fontWeight: 700 }}>
+                <td colSpan={5}>SUBKON</td>
+                <td className="num" style={{ textAlign: "right" }}>{rp(subkon)}</td>
+                <td />
+                {sunting && <td />}
+              </tr>
+            )}
             <tr style={{ fontWeight: 700 }}>
               <td>—</td>
               <td>UPAH TENAGA KERJA</td>
@@ -402,10 +455,16 @@ export function RapTable({
               <td />
               {sunting && <td />}
             </tr>
+            <tr style={{ fontWeight: 700 }}>
+              <td colSpan={5}>LAIN-LAIN PROYEK (5%)</td>
+              <td className="num" style={{ textAlign: "right" }}>{rp(lain)}</td>
+              <td />
+              {sunting && <td />}
+            </tr>
             <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
               <td colSpan={5}>TOTAL RAP</td>
               <td className="num" style={{ textAlign: "right", color: "var(--brass)" }}>
-                {rp(material + nilaiUpah)}
+                {rp(totalSwakelola)}
               </td>
               <td />
               {sunting && <td />}

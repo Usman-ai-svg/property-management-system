@@ -13,7 +13,7 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/lib/auth/password";
-import { buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap, rabAcuan, rapAcuan, totalBaris, boqSarprasDefault, rapGenerik } from "../src/lib/calc/boq";
+import { buatBoqDariTemplate, buatRapDariTemplate, buatSubkonDariTemplate, hitungUpahRap, rabAcuan, rapAcuan, totalBaris, boqSarprasDefault, rapGenerik } from "../src/lib/calc/boq";
 import { parseUkuran } from "../src/lib/format";
 import { alokasiPembayaran } from "../src/lib/calc/keuangan";
 import { terapkanPenyesuaian } from "../src/lib/calc/aset";
@@ -453,7 +453,7 @@ async function main() {
           docRenderId: await buatDokumen("render", T.docs.render),
           docSpekId: await buatDokumen("spek", T.docs.spek),
           boqItems: { create: boq },
-          rapItems: { create: rap },
+          rapItems: { create: [...rap, ...buatSubkonDariTemplate(T.lb)] },
         },
       });
       typeId.set(`${P.kode}|${T.kode}`, t.id);
@@ -517,7 +517,7 @@ async function main() {
             luasTanah: T.lt, statusPembangunan, statusJual, progress,
             hargaJual, rapUpahVolume: 1, rapUpahHarga: hitungUpahRap(T.lb),
             boqItems: { create: boq },
-            rapItems: { create: rap },
+            rapItems: { create: [...rap, ...buatSubkonDariTemplate(T.lb)] },
           },
         });
         unitId.set(kode, u.id);

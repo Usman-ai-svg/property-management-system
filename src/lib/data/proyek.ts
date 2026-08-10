@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { bolehAksesProyek, bolehLihat, filterProyek, type Pengguna } from "@/lib/auth/rbac";
+import { rapKategori, totalRap } from "@/lib/calc/boq";
 
 /** Luas total = kavling efektif + sarana + prasarana + RTH. */
 
@@ -134,7 +135,7 @@ export async function detailProyek(u: Pengguna, kode: string) {
                 rapUpahVolume: true,
                 rapUpahHarga: true,
                 boqItems: { select: { volume: true, hargaSatuan: true } },
-                rapItems: { select: { volume: true, hargaSatuan: true } },
+                rapItems: { select: { grup: true, volume: true, hargaSatuan: true } },
               }
             : {}),
         },
@@ -171,12 +172,12 @@ export async function detailProyek(u: Pengguna, kode: string) {
  */
 export function nilaiUnit(u: {
   boqItems?: { volume: number; hargaSatuan: number }[];
-  rapItems?: { volume: number; hargaSatuan: number }[];
+  rapItems?: { grup?: string | null; volume: number; hargaSatuan: number }[];
   rapUpahVolume?: number;
   rapUpahHarga?: number;
   customWorks?: {
     boqItems?: { volume: number; hargaSatuan: number }[] | false;
-    rapItems?: { volume: number; hargaSatuan: number }[] | false;
+    rapItems?: { grup?: string | null; volume: number; hargaSatuan: number }[] | false;
     rapUpahVolume?: number | false;
     rapUpahHarga?: number | false;
   }[];
@@ -187,10 +188,19 @@ export function nilaiUnit(u: {
   const rabStandar = jumlah(u.boqItems);
   const kerjaTambah = (u.customWorks ?? []).reduce((s, c) => s + jumlah(c.boqItems), 0);
 
-  const rapMaterialStandar = jumlah(u.rapItems);
-  const rapUpahStandar = (u.rapUpahVolume ?? 0) * (u.rapUpahHarga ?? 0);
+  // RAP: Material + Tenaga + Subkon + Lain-lain 5% (lewat `rapKategori`).
+  // rapMaterial/rapUpah tetap dikembalikan sebagai rincian mentah untuk tampilan.
+  const rincianStandar = rapKategori({
+    rapUpahVolume: u.rapUpahVolume ?? 0, rapUpahHarga: u.rapUpahHarga ?? 0,
+    rapItems: u.rapItems ?? [],
+  });
   const rapKerjaTambah = (u.customWorks ?? []).reduce(
-    (s, c) => s + jumlah(c.rapItems) + (c.rapUpahVolume || 0) * (c.rapUpahHarga || 0),
+    (s, c) =>
+      s +
+      totalRap({
+        rapUpahVolume: c.rapUpahVolume || 0, rapUpahHarga: c.rapUpahHarga || 0,
+        rapItems: c.rapItems || [],
+      }),
     0,
   );
 
@@ -198,9 +208,9 @@ export function nilaiUnit(u: {
     rabStandar,
     kerjaTambah,
     rab: rabStandar + kerjaTambah,
-    rap: rapMaterialStandar + rapUpahStandar + rapKerjaTambah,
-    rapMaterial: rapMaterialStandar,
-    rapUpah: rapUpahStandar,
+    rap: rincianStandar.total + rapKerjaTambah,
+    rapMaterial: rincianStandar.material + rincianStandar.subkon,
+    rapUpah: rincianStandar.tenaga,
     rapKerjaTambah,
   };
 }
@@ -214,10 +224,21 @@ export function nilaiUnit(u: {
 export function nilaiSarpras(s: {
   rab?: number;
   boqItems?: { volume: number; hargaSatuan: number }[];
+  rapItems?: { grup?: string | null; volume: number; hargaSatuan: number }[];
+  rapUpahVolume?: number | null;
+  rapUpahHarga?: number | null;
 }) {
   const dariBoq = (s.boqItems ?? []).reduce((a, r) => a + r.volume * r.hargaSatuan, 0);
   const rab = dariBoq || s.rab || 0;
-  return { rab, rap: Math.round(rab * 0.9) };
+
+  // RAP nyata (dari rincian material/upah + Lain-lain 5%) dipakai bila ada;
+  // bila sarpras belum punya rincian RAP, jatuh ke taksiran lama 90% dari RAB
+  // supaya angkanya tidak tiba-tiba nol.
+  const rapRinci = totalRap({
+    rapUpahVolume: s.rapUpahVolume ?? 0, rapUpahHarga: s.rapUpahHarga ?? 0,
+    rapItems: s.rapItems ?? [],
+  });
+  return { rab, rap: rapRinci > 0 ? rapRinci : Math.round(rab * 0.9) };
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +297,7 @@ export async function detailUnit(unitKode: string, bolehHarga: boolean) {
             rapItems: {
               orderBy: { urutan: "asc" as const },
               select: {
-                id: true, grup: true, nama: true, satuan: true,
+                id: true, grup: true, kategori: true, nama: true, satuan: true,
                 volume: true, hargaSatuan: true, keterangan: true,
               },
             },
@@ -301,7 +322,7 @@ export async function detailUnit(unitKode: string, bolehHarga: boolean) {
           rapItems: {
             orderBy: { urutan: "asc" as const },
             select: {
-              id: true, grup: true, nama: true, satuan: true,
+              id: true, grup: true, kategori: true, nama: true, satuan: true,
               volume: true, hargaSatuan: true, keterangan: true,
             },
           },
@@ -341,7 +362,7 @@ export async function detailSarpras(kodeSarpras: string, bolehHarga: boolean) {
             rapItems: {
               orderBy: { urutan: "asc" as const },
               select: {
-                id: true, grup: true, nama: true, satuan: true,
+                id: true, grup: true, kategori: true, nama: true, satuan: true,
                 volume: true, hargaSatuan: true, keterangan: true,
               },
             },

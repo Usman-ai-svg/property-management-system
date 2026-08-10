@@ -3,16 +3,19 @@ import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import {
   hargaDasarUntukPembelian, komposisi, kontrakUntukAlokasi, pemasokUntukPembelian,
-  pembelianProyek, proyekKeuangan, totalRapDari, WARNA_JENIS,
+  pembelianProyek, proyekKeuangan, WARNA_JENIS,
 } from "@/lib/data/keuangan";
 import {
   alokasiKontrakSarprasTerbayar, alokasiKontrakTerbayar, biayaLangsung,
   komposisiObjek, totalDibebankan, transaksiUntukObjek,
 } from "@/lib/tampilan/keuangan-proyek";
+import { nilaiUnit, nilaiSarpras } from "@/lib/data/proyek";
 import { alokasiKontrak, ringkasKontrak } from "@/lib/calc/keuangan";
+import { jumlahRapKategori, KATEGORI_DARI_JENIS, type KategoriRap } from "@/lib/calc/boq";
 import { pct, rp, tanggal } from "@/lib/format";
-import { Donut, LegendaDonut, RvsRAP } from "@/components/charts";
+import { RvsRAP } from "@/components/charts";
 import { Badge, Kartu, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
+import { BreakdownKategori } from "../breakdown-kategori";
 import { PanelTransaksi } from "./transaksi";
 import { BuatPO, PanelPembelian } from "../pembelian";
 import { Tabel } from "@/components/kartu-tabel";
@@ -22,14 +25,13 @@ export default async function KeuanganProyek({
   searchParams,
 }: {
   params: Promise<{ kode: string }>;
-  searchParams: Promise<{ donat?: string; unit?: string; sarpras?: string }>;
+  searchParams: Promise<{ unit?: string; sarpras?: string }>;
 }) {
   const pengguna = await ambilPengguna();
   if (!pengguna) redirect("/login");
 
   const { kode } = await params;
-  const { donat = "jenis", unit: unitDipilih, sarpras: sarprasDipilih } = await searchParams;
-  const mode = donat === "peruntukan" ? "peruntukan" : "jenis";
+  const { unit: unitDipilih, sarpras: sarprasDipilih } = await searchParams;
   const kodeProyek = kode.toUpperCase();
 
   if (!bolehLihat(pengguna, "keuangan")) {
@@ -53,10 +55,46 @@ export default async function KeuanganProyek({
   const alokasiPerUnit = alokasiKontrakTerbayar(kontrakUnit);
   const alokasiPerSarpras = alokasiKontrakSarprasTerbayar(kontrakSarpras);
 
-  const totalRap = proyek.units.reduce((s, u) => s + totalRapDari(u), 0);
+  // RAB & RAP proyek — dihitung lewat nilaiUnit/nilaiSarpras (fungsi yang sama
+  // dengan Master Proyek & dashboard Keuangan), jadi angkanya sinkron di semua
+  // halaman: mencakup unit (+ kerja tambah) dan sarpras.
+  const totalRab =
+    proyek.units.reduce((s, u) => s + nilaiUnit(u).rab, 0) +
+    proyek.infrastructures.reduce((s, x) => s + nilaiSarpras(x).rab, 0);
+  const totalRap =
+    proyek.units.reduce((s, u) => s + nilaiUnit(u).rap, 0) +
+    proyek.infrastructures.reduce((s, x) => s + nilaiSarpras(x).rap, 0);
   const totalRealisasi = proyek.expenses.reduce((s, e) => s + e.total, 0);
-  const nilaiKontrak = proyek.units.reduce((s, u) => s + u.hargaJual, 0);
-  const komp = komposisi(proyek.expenses, mode);
+  const kompJenis = komposisi(proyek.expenses, "jenis");
+  const kompPeruntukan = komposisi(proyek.expenses, "peruntukan");
+
+  // Anggaran per kategori (RAP unit + kerja tambah + sarpras) vs realisasi
+  // swakelola. Pengeluaran berjenis "Kontraktor" (borongan) TIDAK dihitung di
+  // sini — itu di luar basis RAP dan ditangani lewat nilai kontrak di Vendor.
+  const objekRap = [
+    ...proyek.units,
+    ...proyek.units.flatMap((u) => u.customWorks),
+    ...proyek.infrastructures,
+  ];
+  const rapKat = jumlahRapKategori(objekRap);
+  const realKat: Record<string, number> = {};
+  for (const e of proyek.expenses) {
+    const kat = KATEGORI_DARI_JENIS[e.jenis];
+    if (!kat) continue;
+    realKat[kat] = (realKat[kat] ?? 0) + e.total;
+  }
+  const anggaranKategori: { kategori: KategoriRap; rap: number; realisasi: number }[] = (
+    [
+      ["Material", rapKat.material],
+      ["Tenaga Kerja", rapKat.tenaga],
+      ["Subkon", rapKat.subkon],
+      ["Lain-lain Proyek", rapKat.lain],
+    ] as [KategoriRap, number][]
+  ).map(([kategori, rapNilai]) => ({
+    kategori,
+    rap: rapNilai,
+    realisasi: realKat[kategori] ?? 0,
+  }));
 
   // Satu pembayaran boleh menanggung beberapa unit, jadi angka per unit
   // dijumlahkan dari baris alokasinya — bukan dari totalnya.
@@ -78,7 +116,7 @@ export default async function KeuanganProyek({
   const sarprasRinci = sarprasDipilih
     ? proyek.infrastructures.find((s) => s.kode === sarprasDipilih.toUpperCase())
     : undefined;
-  const alamatDasar = `/keuangan/${proyek.kode}?donat=${mode}`;
+  const alamatDasar = `/keuangan/${proyek.kode}`;
 
   const bolehUbahKeuangan = bolehUbah(pengguna, "keuangan");
   const pilihanUnit = proyek.units.map((u) => ({
@@ -118,8 +156,8 @@ export default async function KeuanganProyek({
         <Badge nilai={proyek.statusLahan} peta={WARNA_STATUS.lahan} />
         <div style={{ display: "flex", gap: 26, textAlign: "right" }}>
           <div>
-            <div style={{ fontSize: 10, color: "var(--muted)", letterSpacing: 1 }}>NILAI KONTRAK</div>
-            <div className="num">{rp(nilaiKontrak)}</div>
+            <div style={{ fontSize: 10, color: "var(--muted)", letterSpacing: 1 }}>RAB</div>
+            <div className="num">{rp(totalRab)}</div>
           </div>
           <div>
             <div style={{ fontSize: 10, color: "var(--muted)", letterSpacing: 1 }}>RAP</div>
@@ -137,26 +175,7 @@ export default async function KeuanganProyek({
           <RvsRAP realisasi={totalRealisasi} rap={totalRap} denganLabel />
         </Kartu>
 
-        <Kartu>
-          <div
-            style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              marginBottom: 8, gap: 8, flexWrap: "wrap",
-            }}
-          >
-            <div className="disp" style={{ fontWeight: 600, fontSize: 15 }}>Breakdown Kategori</div>
-            <div style={{ display: "flex", gap: 4 }}>
-              <Link href="?donat=jenis" className={"pill" + (mode === "jenis" ? " active" : "")}>Jenis</Link>
-              <Link href="?donat=peruntukan" className={"pill" + (mode === "peruntukan" ? " active" : "")}>
-                Peruntukan
-              </Link>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
-            <Donut data={komp} ukuran={130} />
-            <LegendaDonut data={komp} />
-          </div>
-        </Kartu>
+        <BreakdownKategori jenis={kompJenis} peruntukan={kompPeruntukan} ukuran={130} />
       </div>
 
       {/* ---------- pengeluaran per unit ---------- */}
@@ -179,7 +198,7 @@ export default async function KeuanganProyek({
           ]}
         >
           {proyek.units.map((u) => {
-            const rap = totalRapDari(u);
+            const rap = nilaiUnit(u).rap;
             const langsung = langsungPerUnit.get(u.id) ?? 0;
             const alokasi = alokasiPerUnit.get(u.id) ?? 0;
             const total = langsung + alokasi;
@@ -192,7 +211,7 @@ export default async function KeuanganProyek({
                     href={
                       unitRinci?.id === u.id
                         ? alamatDasar
-                        : `${alamatDasar}&unit=${u.kode}#rincian-unit`
+                        : `${alamatDasar}?unit=${u.kode}#rincian-unit`
                     }
                     scroll={false}
                     style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
@@ -244,7 +263,7 @@ export default async function KeuanganProyek({
       {unitRinci &&
         (() => {
           const tx = transaksiUntuk({ unitId: unitRinci.id });
-          const rap = totalRapDari(unitRinci);
+          const rap = nilaiUnit(unitRinci).rap;
           const terpakai = totalDibebankan(tx);
           // Pembagi dijaga agar tidak nol supaya bar tetap tergambar walau unit
           // ini belum punya transaksi sama sekali.
@@ -416,7 +435,7 @@ export default async function KeuanganProyek({
           kosong="Proyek ini belum punya item sarana & prasarana."
         >
           {proyek.infrastructures.map((s) => {
-            const rap = totalRapDari(s);
+            const rap = nilaiSarpras(s).rap;
             const langsung = langsungPerSarpras.get(s.id) ?? 0;
             const alokasi = alokasiPerSarpras.get(s.id) ?? 0;
             const total = langsung + alokasi;
@@ -429,7 +448,7 @@ export default async function KeuanganProyek({
                     href={
                       sarprasRinci?.id === s.id
                         ? alamatDasar
-                        : `${alamatDasar}&sarpras=${s.kode}#rincian-sarpras`
+                        : `${alamatDasar}?sarpras=${s.kode}#rincian-sarpras`
                     }
                     scroll={false}
                     style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
@@ -477,7 +496,7 @@ export default async function KeuanganProyek({
       {sarprasRinci &&
         (() => {
           const tx = transaksiUntuk({ sarprasId: sarprasRinci.id });
-          const rap = totalRapDari(sarprasRinci);
+          const rap = nilaiSarpras(sarprasRinci).rap;
           const terpakai = totalDibebankan(tx);
           const pembagi = terpakai || 1;
 
@@ -658,6 +677,9 @@ export default async function KeuanganProyek({
         />
       </div>
 
+      {/* ---------- anggaran per kategori (RAP vs realisasi) ---------- */}
+      <KartuAnggaranKategori data={anggaranKategori} />
+
       {/* ---------- transaksi ---------- */}
       <PanelTransaksi
         expenses={proyek.expenses}
@@ -666,6 +688,67 @@ export default async function KeuanganProyek({
         sarpras={pilihanSarpras}
         warnaJenis={WARNA_JENIS}
       />
+    </div>
+  );
+}
+
+/**
+ * Sisa anggaran per kategori RAP. Tiap kategori: anggaran (RAP), realisasi
+ * (pengeluaran dengan jenis biaya yang jatuh ke kategori itu), dan sisa. Batang
+ * merah begitu realisasi melewati anggaran. Kategori "Kontraktor" muncul untuk
+ * objek yang diborongkan penuh; kategori tanpa anggaran maupun realisasi tetap
+ * ditampilkan agar strukturnya terbaca utuh.
+ */
+function KartuAnggaranKategori({
+  data,
+}: {
+  data: { kategori: string; rap: number; realisasi: number }[];
+}) {
+  const totalRapKat = data.reduce((s, d) => s + d.rap, 0);
+  const totalRealKat = data.reduce((s, d) => s + d.realisasi, 0);
+
+  return (
+    <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
+      <TabelHead
+        judul="Anggaran per Kategori (RAP)"
+        keterangan="Sisa anggaran tiap kategori: RAP dari Master Proyek dikurangi realisasi pengeluaran. Lain-lain Proyek = 5% dari (Material + Tenaga Kerja + Subkon)."
+      />
+      <Tabel
+        kolom={[
+          { label: "Kategori" },
+          { label: "Anggaran RAP", rata: "kanan" },
+          { label: "Realisasi", rata: "kanan" },
+          { label: "Sisa", rata: "kanan" },
+          { label: "Serapan", minLebar: 180 },
+        ]}
+      >
+        {data.map((d) => {
+          const sisa = d.rap - d.realisasi;
+          const over = d.realisasi > d.rap;
+          return (
+            <tr key={d.kategori}>
+              <td style={{ fontWeight: 600 }}>{d.kategori}</td>
+              <td style={{ textAlign: "right" }}>{rp(d.rap)}</td>
+              <td style={{ textAlign: "right" }}>{rp(d.realisasi)}</td>
+              <td style={{ textAlign: "right", color: over ? "var(--red)" : "var(--text)", fontWeight: 600 }}>
+                {rp(sisa)}
+              </td>
+              <td>
+                <RvsRAP realisasi={d.realisasi} rap={d.rap} />
+              </td>
+            </tr>
+          );
+        })}
+        <tr style={{ fontWeight: 700, borderTop: "2px solid var(--line)" }}>
+          <td>Total</td>
+          <td style={{ textAlign: "right" }}>{rp(totalRapKat)}</td>
+          <td style={{ textAlign: "right" }}>{rp(totalRealKat)}</td>
+          <td style={{ textAlign: "right", color: totalRealKat > totalRapKat ? "var(--red)" : "var(--text)" }}>
+            {rp(totalRapKat - totalRealKat)}
+          </td>
+          <td />
+        </tr>
+      </Tabel>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import { filterProyek, type Pengguna } from "@/lib/auth/rbac";
-import { ringkasKontrak } from "@/lib/calc/keuangan";
+import { jatuhTempo, ringkasKontrak, statusHutang } from "@/lib/calc/keuangan";
+import { nilaiUnit, nilaiSarpras } from "@/lib/data/proyek";
+import { rp, tanggal } from "@/lib/format";
 
 /** Warna kategori — dipakai donat dan penanda jenis biaya. */
 export const WARNA_JENIS: Record<string, string> = {
@@ -21,7 +23,14 @@ export const WARNA_PERUNTUKAN: Record<string, string> = {
 
 const BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
-/** Ringkasan keuangan tiap proyek: nilai kontrak, RAP, dan realisasi. */
+/**
+ * Ringkasan keuangan tiap proyek: RAB, RAP, dan realisasi.
+ *
+ * RAB & RAP dihitung lewat `nilaiUnit`/`nilaiSarpras` — fungsi yang SAMA dengan
+ * Master Proyek — jadi angkanya selalu sinkron antar-halaman: RAB = Σ BOQ unit
+ * (termasuk kerja tambah) + Σ RAB sarpras; RAP = Σ (Material+Tenaga+Subkon+5%)
+ * unit & sarpras. Menggantikan "nilai kontrak" lama yang sebenarnya harga jual.
+ */
 export async function keuanganPerProyek(u: Pengguna) {
   const proyek = await prisma.project.findMany({
     where: filterProyek(u),
@@ -30,8 +39,23 @@ export async function keuanganPerProyek(u: Pengguna) {
       id: true, kode: true, nama: true, status: true, statusLahan: true,
       units: {
         select: {
-          hargaJual: true, rapUpahVolume: true, rapUpahHarga: true,
-          rapItems: { select: { volume: true, hargaSatuan: true } },
+          rapUpahVolume: true, rapUpahHarga: true,
+          boqItems: { select: { volume: true, hargaSatuan: true } },
+          rapItems: { select: { grup: true, volume: true, hargaSatuan: true } },
+          customWorks: {
+            select: {
+              boqItems: { select: { volume: true, hargaSatuan: true } },
+              rapItems: { select: { grup: true, volume: true, hargaSatuan: true } },
+              rapUpahVolume: true, rapUpahHarga: true,
+            },
+          },
+        },
+      },
+      infrastructures: {
+        select: {
+          rab: true, rapUpahVolume: true, rapUpahHarga: true,
+          boqItems: { select: { volume: true, hargaSatuan: true } },
+          rapItems: { select: { grup: true, volume: true, hargaSatuan: true } },
         },
       },
       expenses: { select: { total: true } },
@@ -39,12 +63,17 @@ export async function keuanganPerProyek(u: Pengguna) {
   });
 
   return proyek.map((p) => {
-    const rap = p.units.reduce((s, x) => s + totalRapDari(x), 0);
+    const rab =
+      p.units.reduce((s, x) => s + nilaiUnit(x).rab, 0) +
+      p.infrastructures.reduce((s, x) => s + nilaiSarpras(x).rab, 0);
+    const rap =
+      p.units.reduce((s, x) => s + nilaiUnit(x).rap, 0) +
+      p.infrastructures.reduce((s, x) => s + nilaiSarpras(x).rap, 0);
     return {
       id: p.id, kode: p.kode, nama: p.nama,
       status: p.status, statusLahan: p.statusLahan,
       jumlahUnit: p.units.length,
-      nilaiKontrak: p.units.reduce((s, x) => s + x.hargaJual, 0),
+      rab,
       rap,
       realisasi: p.expenses.reduce((s, e) => s + e.total, 0),
     };
@@ -111,20 +140,6 @@ export async function trenBulanan(u: Pengguna, projectId?: string) {
   });
 }
 
-/**
- * Total RAP dari baris snapshot-nya: material ditambah upah.
- *
- * Dipakai untuk unit maupun item sarana & prasarana — keduanya menyimpan RAP
- * dengan bentuk yang sama, jadi rumusnya tidak perlu digandakan.
- */
-export const totalRapDari = (x: {
-  rapUpahVolume: number;
-  rapUpahHarga: number;
-  rapItems: { volume: number; hargaSatuan: number }[];
-}) =>
-  x.rapUpahVolume * x.rapUpahHarga +
-  x.rapItems.reduce((a, r) => a + r.volume * r.hargaSatuan, 0);
-
 // ---------------------------------------------------------------------------
 // Pengambilan data per halaman
 //
@@ -133,9 +148,47 @@ export const totalRapDari = (x: {
 // menjadi pemanggilan RPC — halamannya tidak perlu disentuh.
 // ---------------------------------------------------------------------------
 
+/**
+ * Hutang berjalan (pengeluaran metode "Hutang" yang sisanya > 0) lintas proyek.
+ *
+ * Dipakai pengingat di dashboard: mana yang lewat tenggat, mana yang mendekati.
+ * Sisa & status diturunkan dari cicilan — bukan disimpan — agar selalu sinkron.
+ */
+export async function hutangBerjalan(u: Pengguna) {
+  const rows = await prisma.expense.findMany({
+    where: { project: filterProyek(u), metode: "Hutang" },
+    orderBy: { tenggat: "asc" },
+    select: {
+      id: true, uraian: true, kreditur: true, tenggat: true, total: true,
+      project: { select: { kode: true, nama: true } },
+      cicilan: { select: { nominal: true } },
+    },
+  });
+
+  const sekarang = new Date();
+  return rows
+    .map((h) => {
+      const terbayar = h.cicilan.reduce((s, c) => s + c.nominal, 0);
+      return {
+        id: h.id,
+        kreditur: h.kreditur ?? "—",
+        uraian: h.uraian,
+        proyek: h.project.nama,
+        kodeProyek: h.project.kode,
+        total: h.total,
+        terbayar,
+        sisa: h.total - terbayar,
+        status: statusHutang(h.total, terbayar),
+        tenggat: h.tenggat ? tanggal(h.tenggat) : "—",
+        jatuhTempo: jatuhTempo(h.tenggat, sekarang),
+      };
+    })
+    .filter((h) => h.sisa > 0);
+}
+
 /** Data halaman daftar Keuangan Proyek. */
 export async function dataKeuangan(u: Pengguna) {
-  const [proyek, tren, expenses] = await Promise.all([
+  const [proyek, tren, expenses, hutang] = await Promise.all([
     keuanganPerProyek(u),
     trenBulanan(u),
     prisma.expense.findMany({
@@ -147,9 +200,10 @@ export async function dataKeuangan(u: Pengguna) {
         project: { select: { nama: true } },
       },
     }),
+    hutangBerjalan(u),
   ]);
 
-  return { proyek, tren, expenses };
+  return { proyek, tren, expenses, hutang };
 }
 
 /** Satu proyek beserta unit, sarpras, dan seluruh pengeluarannya. */
@@ -164,7 +218,15 @@ export async function proyekKeuangan(kodeProyek: string) {
           id: true, kode: true, nomor: true, hargaJual: true, rapUpahVolume: true, rapUpahHarga: true,
           phase: { select: { kode: true } },
           unitType: { select: { nama: true } },
-          rapItems: { select: { volume: true, hargaSatuan: true } },
+          boqItems: { select: { volume: true, hargaSatuan: true } },
+          rapItems: { select: { grup: true, volume: true, hargaSatuan: true } },
+          customWorks: {
+            select: {
+              boqItems: { select: { volume: true, hargaSatuan: true } },
+              rapItems: { select: { grup: true, volume: true, hargaSatuan: true } },
+              rapUpahVolume: true, rapUpahHarga: true,
+            },
+          },
         },
       },
       infrastructures: {
@@ -173,17 +235,26 @@ export async function proyekKeuangan(kodeProyek: string) {
           id: true, kode: true, nama: true, jenis: true, volume: true,
           status: true, progress: true, rab: true,
           rapUpahVolume: true, rapUpahHarga: true,
-          rapItems: { select: { volume: true, hargaSatuan: true } },
+          boqItems: { select: { volume: true, hargaSatuan: true } },
+          rapItems: { select: { grup: true, volume: true, hargaSatuan: true } },
         },
       },
       expenses: {
         orderBy: { tanggal: "desc" },
         select: {
           id: true, tanggal: true, jenis: true, peruntukan: true, metode: true,
-          uraian: true, total: true, status: true, pic: true, bukti: true,
+          uraian: true, total: true, status: true, pic: true, bukti: true, buktiKey: true,
+          kreditur: true, tenggat: true,
           contractId: true, pembelianId: true,
           alokasi: {
             select: { id: true, unitId: true, infrastructureId: true, nominal: true },
+          },
+          cicilan: {
+            orderBy: { tanggal: "asc" },
+            select: {
+              id: true, tanggal: true, nominal: true, metode: true,
+              bukti: true, buktiKey: true, pic: true,
+            },
           },
           contract: {
             select: { kode: true, vendorId: true, vendor: { select: { nama: true } } },
@@ -281,8 +352,18 @@ export async function pintuBayar(u: Pengguna) {
           pembayaran: { select: { total: true } },
         },
       },
+      expenses: {
+        where: { metode: "Hutang" },
+        orderBy: { tenggat: "asc" },
+        select: {
+          id: true, uraian: true, kreditur: true, tenggat: true, total: true,
+          cicilan: { select: { nominal: true } },
+        },
+      },
     },
   });
+
+  const sekarang = new Date();
 
   return proyek.map((p) => ({
     id: p.id,
@@ -323,6 +404,19 @@ export async function pintuBayar(u: Pengguna) {
         };
       })
       .filter((b) => b.sisa > 0),
+    hutang: p.expenses
+      .map((h) => {
+        const sisa = h.total - h.cicilan.reduce((s, c) => s + c.nominal, 0);
+        return {
+          id: h.id,
+          label: `${h.kreditur ?? "—"} — ${h.uraian} · sisa ${rp(sisa)}`,
+          kreditur: h.kreditur ?? "—",
+          sisa,
+          tenggat: h.tenggat ? tanggal(h.tenggat) : "—",
+          jatuhTempo: jatuhTempo(h.tenggat, sekarang),
+        };
+      })
+      .filter((h) => h.sisa > 0),
   }));
 }
 

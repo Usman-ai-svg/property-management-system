@@ -6,7 +6,7 @@ import { BarisField, Field, FieldTerkunci, FormModal, TombolHapus, TombolTambah 
 import { AlokasiBiaya } from "@/components/alokasi-biaya";
 import { Badge } from "@/components/ui";
 import { Tabel } from "@/components/kartu-tabel";
-import { METODE_BAYAR, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN } from "@/lib/domain/enums";
+import { METODE_TUNAI, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN } from "@/lib/domain/enums";
 import { rp, tanggal, tanggalJam } from "@/lib/format";
 import { bayarPembelian, buatPembelian, hapusPembayaran, hapusPembelian, terimaPembelian } from "./actions";
 
@@ -341,7 +341,7 @@ function BayarPO({
         <FieldTerkunci label="Jenis Biaya" nilai="Material" />
       </BarisField>
       <BarisField kolom={1}>
-        <Field label="Metode" nama="metode" nilai={METODE_BAYAR[0]} pilihan={METODE_BAYAR} />
+        <Field label="Metode" nama="metode" nilai={METODE_TUNAI[0]} pilihan={METODE_TUNAI} />
       </BarisField>
       <BarisField kolom={1}>
         <Field label="Uraian" nama="uraian" petunjuk="opsional" />

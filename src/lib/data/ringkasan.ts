@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { bolehLihat, filterProyek, type Pengguna } from "@/lib/auth/rbac";
+import { totalRap } from "@/lib/calc/boq";
 
 export interface RingkasProyek {
   id: string;
@@ -90,7 +91,7 @@ export async function ringkasanProyek(u: Pengguna): Promise<RingkasProyek[]> {
   });
 }
 
-/** Total RAP (material hasil snapshot + upah) per proyek. */
+/** Total RAP per proyek (menghormati mode borongan & Lain-lain 5%). */
 async function hitungAnggaran(u: Pengguna): Promise<Map<string, number>> {
   const unit = await prisma.unit.findMany({
     where: { project: filterProyek(u) },
@@ -98,14 +99,13 @@ async function hitungAnggaran(u: Pengguna): Promise<Map<string, number>> {
       projectId: true,
       rapUpahVolume: true,
       rapUpahHarga: true,
-      rapItems: { select: { volume: true, hargaSatuan: true } },
+      rapItems: { select: { grup: true, volume: true, hargaSatuan: true } },
     },
   });
 
   const peta = new Map<string, number>();
   for (const x of unit) {
-    const material = x.rapItems.reduce((s, r) => s + r.volume * r.hargaSatuan, 0);
-    peta.set(x.projectId, (peta.get(x.projectId) ?? 0) + material + x.rapUpahVolume * x.rapUpahHarga);
+    peta.set(x.projectId, (peta.get(x.projectId) ?? 0) + totalRap(x));
   }
   return peta;
 }

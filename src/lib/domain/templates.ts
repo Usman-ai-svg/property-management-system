@@ -156,6 +156,18 @@ export const TEMPLATE_RAP: BaseTemplateRapGroup[] = [
 ];
 
 /**
+ * Pekerjaan yang lazim DIBORONGKAN ke subkontraktor — dihitung sebagai kategori
+ * Subkon (kelompok RAP yang namanya memuat "subkon"). Ditambahkan di ATAS
+ * rincian material/upah, jadi menambah nilai RAP sebesar paket borongannya.
+ * Nilainya diskalakan dengan luas bangunan seperti template lain.
+ */
+export const TEMPLATE_SUBKON: BaseTemplateRapItem[] = [
+  { nama: "Rangka & penutup atap baja ringan", satuan: "m2", perM2: 1.0, hargaSatuan: 145_000, keterangan: "Borongan pasang rangka + penutup atap" },
+  { nama: "Kusen, pintu & jendela aluminium", satuan: "unit", perM2: 0.05, hargaSatuan: 2_200_000, keterangan: "Borongan fabrikasi & pemasangan" },
+  { nama: "Waterproofing dak & area basah", satuan: "m2", perM2: 0.15, hargaSatuan: 90_000, keterangan: "Borongan aplikasi membran" },
+];
+
+/**
  * Kelompok pekerjaan RAB — mengikuti struktur REKAP/RAB pada berkas AHSP
  * perusahaan (NL_DRAF_RAB_RAP.xlsx). Dipakai untuk:
  *   - mengelompokkan baris pada tabel Analisa AHSP dan rincian RAB Estimasi,

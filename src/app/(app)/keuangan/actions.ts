@@ -7,7 +7,9 @@ import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, pilihanOpsional, teks, teksOpsional,
 } from "@/lib/actions/guard";
 import { periksaAlokasi } from "@/lib/calc/keuangan";
-import { JENIS_BIAYA_SWAKELOLA, METODE_BAYAR, PERUNTUKAN_BIAYA, POS_HPP, SASARAN_PERUNTUKAN, STATUS_PEMBELIAN } from "@/lib/domain/enums";
+import { simpanBuktiOpsional } from "@/lib/actions/bukti";
+import { hapusBerkas } from "@/lib/storage";
+import { JENIS_BIAYA_SWAKELOLA, METODE_BAYAR, METODE_TUNAI, PERUNTUKAN_BIAYA, POS_HPP, SASARAN_PERUNTUKAN, STATUS_PEMBELIAN } from "@/lib/domain/enums";
 
 /**
  * Baca pembebanan sebuah pembayaran dari formulir.
@@ -108,6 +110,24 @@ function tolakBilaTertaut(e: { contractId: string | null; pembelianId: string | 
 }
 
 /**
+ * Baca isian khusus pengeluaran-hutang. Hanya bermakna saat metode "Hutang";
+ * pada metode kas keduanya null — pengeluaran biasa tak punya kreditur/tenggat.
+ */
+function bacaHutang(
+  form: FormData,
+  metode: string,
+): { kreditur: string | null; tenggat: Date | null } {
+  if (metode !== "Hutang") return { kreditur: null, tenggat: null };
+  const kreditur = teks(form, "kreditur", true);
+  const tenggat = new Date(teks(form, "tenggat", true));
+  if (Number.isNaN(tenggat.getTime())) throw new GagalIzin("Tenggat hutang tidak sah.");
+  return { kreditur, tenggat };
+}
+
+/** Tanggal untuk jejak audit (YYYY-MM-DD), atau "—" bila kosong. */
+const tglLog = (d: Date | null): string => (d ? d.toISOString().slice(0, 10) : "—");
+
+/**
  * Catat pengeluaran baru.
  *
  * Pos HPP tidak diminta ke pengguna melainkan diturunkan dari peruntukannya,
@@ -132,6 +152,13 @@ export async function catatPengeluaran(_s: HasilAksi | null, form: FormData): Pr
     const alokasi = await bacaAlokasiOpsional(form, projectId, total);
     periksaSasaranPeruntukan(peruntukan, alokasi);
     const uraian = teks(form, "uraian", true);
+    const { bukti, buktiKey } = await simpanBuktiOpsional(form);
+
+    // Metode "Hutang" menandai pengeluaran ini utang berjalan: biayanya tetap
+    // dicatat penuh (akrual → masuk realisasi), tapi kasnya belum keluar. Karena
+    // itu kreditur & tenggat wajib — keduanya yang menghidupi pengingat hutang.
+    const metode = pilihan(form, "metode", METODE_BAYAR);
+    const { kreditur, tenggat } = bacaHutang(form, metode);
 
     await prisma.expense.create({
       data: {
@@ -139,11 +166,14 @@ export async function catatPengeluaran(_s: HasilAksi | null, form: FormData): Pr
         tanggal: new Date(),
         peruntukan,
         jenis: pilihan(form, "jenis", JENIS_BIAYA_SWAKELOLA),
-        metode: pilihan(form, "metode", METODE_BAYAR),
+        metode,
+        kreditur,
+        tenggat,
         uraian,
         total,
         pic: pengguna.nama,
-        bukti: teksOpsional(form, "bukti"),
+        bukti,
+        buktiKey,
         posHpp: POS_HPP[peruntukan],
         alokasi: { create: alokasi },
       },
@@ -186,7 +216,9 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
       select: {
         id: true, projectId: true, contractId: true, pembelianId: true,
         peruntukan: true, jenis: true, metode: true, uraian: true,
-        total: true, status: true, bukti: true,
+        total: true, status: true, bukti: true, buktiKey: true,
+        kreditur: true, tenggat: true,
+        cicilan: { select: { nominal: true } },
         alokasi: {
           select: {
             nominal: true,
@@ -207,13 +239,35 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
     const alokasiBaru = await bacaAlokasiOpsional(form, lama.projectId, totalBaru);
     periksaSasaranPeruntukan(peruntukan, alokasiBaru);
 
+    // Berkas bukti hanya diganti bila pengguna mengunggah yang baru; bila kolom
+    // dikosongkan, berkas lama dipertahankan (berikut namanya). Yang lama baru
+    // dihapus dari penyimpanan setelah baris berhasil diperbarui.
+    const berkasBaru = await simpanBuktiOpsional(form);
+    const gantiBerkas = berkasBaru.buktiKey != null;
+
+    // Pengeluaran-hutang tak bisa berganti kelas: metodenya tetap "Hutang" dan
+    // kreditur/tenggatnya masih bisa dikoreksi. Total baru tak boleh turun di
+    // bawah yang sudah dicicil — itu akan membuat sisa hutang jadi negatif.
+    const isHutang = lama.metode === "Hutang";
+    const terbayar = lama.cicilan.reduce((s, c) => s + c.nominal, 0);
+    if (isHutang && totalBaru < terbayar) {
+      throw new GagalIzin(
+        `Total tak boleh kurang dari yang sudah dicicil (${rpLog(terbayar)}).`,
+      );
+    }
+    const metode = isHutang ? "Hutang" : pilihan(form, "metode", METODE_TUNAI);
+    const { kreditur, tenggat } = bacaHutang(form, metode);
+
     const baru = {
       peruntukan,
       jenis: pilihan(form, "jenis", JENIS_BIAYA_SWAKELOLA),
-      metode: pilihan(form, "metode", METODE_BAYAR),
+      metode,
+      kreditur,
+      tenggat,
       uraian: teks(form, "uraian", true),
       total: totalBaru,
-      bukti: teksOpsional(form, "bukti") || null,
+      bukti: gantiBerkas ? berkasBaru.bukti : lama.bukti,
+      buktiKey: gantiBerkas ? berkasBaru.buktiKey : lama.buktiKey,
       posHpp: POS_HPP[peruntukan],
     };
 
@@ -228,6 +282,12 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
       }),
     ]);
 
+    // Berkas lama dibuang hanya setelah baris tersimpan menunjuk berkas baru —
+    // supaya kegagalan di tengah tidak menghapus bukti yang masih dirujuk.
+    if (gantiBerkas && lama.buktiKey && lama.buktiKey !== baru.buktiKey) {
+      await hapusBerkas(lama.buktiKey);
+    }
+
     const namaAlokasiBaru = await ringkasAlokasi(alokasiBaru);
 
     const jml = await catatDiff({
@@ -237,17 +297,20 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
       sebelum: {
         peruntukan: lama.peruntukan, jenis: lama.jenis, metode: lama.metode,
         uraian: lama.uraian, total: lama.total,
+        kreditur: lama.kreditur ?? "—", tenggat: tglLog(lama.tenggat),
         bukti: lama.bukti, dibebankanKe: labelAlokasiTersimpan(lama.alokasi),
       },
       sesudah: {
         peruntukan: baru.peruntukan, jenis: baru.jenis, metode: baru.metode,
         uraian: baru.uraian, total: baru.total,
+        kreditur: baru.kreditur ?? "—", tenggat: tglLog(baru.tenggat),
         bukti: baru.bukti, dibebankanKe: namaAlokasiBaru,
       },
       label: {
         uraian: "Keterangan", total: "Total",
         bukti: "Berkas bukti", dibebankanKe: "Dibebankan ke",
         peruntukan: "Peruntukan", jenis: "Jenis biaya", metode: "Metode",
+        kreditur: "Kreditur", tenggat: "Tenggat",
       },
       format: { total: (v) => rpLog(Number(v)) },
     });
@@ -337,7 +400,8 @@ export async function hapusPengeluaran(_s: HasilAksi | null, form: FormData): Pr
       where: { id },
       select: {
         id: true, projectId: true, uraian: true, total: true, peruntukan: true,
-        contractId: true, pembelianId: true,
+        contractId: true, pembelianId: true, buktiKey: true,
+        _count: { select: { cicilan: true } },
         project: { select: { kode: true } },
       },
     });
@@ -346,7 +410,16 @@ export async function hapusPengeluaran(_s: HasilAksi | null, form: FormData): Pr
 
     const pengguna = await izinkan("keuangan", lama.projectId);
 
+    // Hutang yang sudah dicicil tak boleh langsung dihapus — cicilannya adalah
+    // catatan kas keluar; hapus dulu cicilannya agar penghapusan disengaja.
+    if (lama._count.cicilan > 0) {
+      throw new GagalIzin(
+        `Hutang ini punya ${lama._count.cicilan} cicilan tercatat. Hapus cicilannya lebih dulu.`,
+      );
+    }
+
     await prisma.expense.delete({ where: { id } });
+    if (lama.buktiKey) await hapusBerkas(lama.buktiKey);
 
     await catat({
       pengguna, projectId: lama.projectId,
@@ -618,8 +691,8 @@ export async function bayarPembelian(_s: HasilAksi | null, form: FormData): Prom
 
     const isiTanggal = teksOpsional(form, "tanggal");
     const tanggal = isiTanggal ? new Date(isiTanggal) : new Date();
-    const metode = pilihan(form, "metode", METODE_BAYAR);
-    const bukti = teksOpsional(form, "bukti") || null;
+    const metode = pilihan(form, "metode", METODE_TUNAI);
+    const { bukti, buktiKey } = await simpanBuktiOpsional(form);
     // Uang muka bila barang belum diterima — terbaca jelas di daftar Transaksi.
     const uraianBawaan = diterima
       ? `Pembayaran PO ${beli.nomor} — ${beli.pemasok.nama}`
@@ -630,7 +703,7 @@ export async function bayarPembelian(_s: HasilAksi | null, form: FormData): Prom
       data: {
         projectId: beli.projectId, pembelianId, tanggal,
         peruntukan, jenis: "Material", metode, uraian,
-        total: bayar, bukti, pic: pengguna.nama,
+        total: bayar, bukti, buktiKey, pic: pengguna.nama,
         posHpp: POS_HPP[peruntukan],
         alokasi: { create: alokasi },
       },
@@ -670,5 +743,92 @@ export async function hapusPembayaran(_s: HasilAksi | null, form: FormData): Pro
       aksi: "Hapus pembayaran termin", dari: rpLog(lama.total),
     });
     segarkanPembelian(lama.pembelian.project.kode, lama.pembelian.pemasokId);
+  });
+}
+
+// ===========================================================================
+// PELUNASAN HUTANG (cicilan)
+// ===========================================================================
+//
+// Pengeluaran-hutang (metode "Hutang") dicatat AKRUAL — biayanya sudah masuk
+// realisasi saat timbul. Melunasinya berarti KAS keluar, bukan biaya baru; jadi
+// tiap cicilan disimpan sebagai HutangCicilan, BUKAN Expense, agar tak terhitung
+// dua kali. Sisa = Expense.total − Σ cicilan; pelunasan berlebih ditolak.
+
+export async function bayarHutang(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const expenseId = teks(form, "expenseId", true);
+    const hutang = await prisma.expense.findUnique({
+      where: { id: expenseId },
+      select: {
+        id: true, projectId: true, metode: true, total: true, uraian: true, kreditur: true,
+        cicilan: { select: { nominal: true } },
+        project: { select: { kode: true } },
+      },
+    });
+    if (!hutang) throw new GagalIzin("Hutang tidak ditemukan.");
+    if (hutang.metode !== "Hutang") throw new GagalIzin("Pengeluaran ini bukan hutang.");
+    const pengguna = await izinkan("keuangan", hutang.projectId);
+
+    const terbayar = hutang.cicilan.reduce((s, c) => s + c.nominal, 0);
+    const sisa = hutang.total - terbayar;
+    if (sisa <= 0) throw new GagalIzin("Hutang ini sudah lunas.");
+
+    const bayar = angka(form, "nominal", { min: 1, wajib: true });
+    if (bayar > sisa) throw new GagalIzin(`Pembayaran ${rpLog(bayar)} melebihi sisa ${rpLog(sisa)}.`);
+
+    const metode = pilihan(form, "metode", METODE_TUNAI);
+    const isiTanggal = teksOpsional(form, "tanggal");
+    const tanggal = isiTanggal ? new Date(isiTanggal) : new Date();
+    if (Number.isNaN(tanggal.getTime())) throw new GagalIzin("Tanggal pembayaran tidak sah.");
+    const { bukti, buktiKey } = await simpanBuktiOpsional(form);
+
+    await prisma.hutangCicilan.create({
+      data: { expenseId, tanggal, nominal: bayar, metode, bukti, buktiKey, pic: pengguna.nama },
+    });
+    await catat({
+      pengguna, projectId: hutang.projectId,
+      objek: `Hutang · ${hutang.kreditur ?? hutang.uraian}`,
+      aksi: "Bayar cicilan hutang",
+      ke: `${rpLog(bayar)} (sisa ${rpLog(sisa - bayar)})`,
+    });
+
+    revalidatePath("/keuangan");
+    revalidatePath(`/keuangan/${hutang.project.kode}`);
+    revalidatePath("/");
+    return sisa - bayar <= 0
+      ? "Cicilan tercatat — hutang lunas."
+      : `Cicilan tercatat. Sisa ${rpLog(sisa - bayar)}.`;
+  });
+}
+
+export async function hapusCicilanHutang(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = String(form.get("id") ?? "");
+    const lama = await prisma.hutangCicilan.findUnique({
+      where: { id },
+      select: {
+        id: true, nominal: true, buktiKey: true,
+        expense: {
+          select: {
+            projectId: true, kreditur: true, uraian: true,
+            project: { select: { kode: true } },
+          },
+        },
+      },
+    });
+    if (!lama) return;
+    const pengguna = await izinkan("keuangan", lama.expense.projectId);
+
+    await prisma.hutangCicilan.delete({ where: { id } });
+    if (lama.buktiKey) await hapusBerkas(lama.buktiKey);
+    await catat({
+      pengguna, projectId: lama.expense.projectId,
+      objek: `Hutang · ${lama.expense.kreditur ?? lama.expense.uraian}`,
+      aksi: "Hapus cicilan hutang", dari: rpLog(lama.nominal),
+    });
+    revalidatePath("/keuangan");
+    revalidatePath(`/keuangan/${lama.expense.project.kode}`);
+    revalidatePath("/");
   });
 }

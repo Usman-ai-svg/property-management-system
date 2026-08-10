@@ -5,11 +5,12 @@ import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
   angka, GagalIzin, HasilAksi, idProyekDariKode, izinkan, jalankan, pilihan, pilihanOpsional,
-  teks, teksOpsional,
+  teks,
 } from "@/lib/actions/guard";
 import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
+import { simpanBuktiOpsional } from "@/lib/actions/bukti";
 import { alokasiPembayaran, periksaAlokasi } from "@/lib/calc/keuangan";
-import { JENIS_BIAYA_KONTRAK, JENIS_KONTRAK, METODE_BAYAR, POS_HPP, STATUS_VENDOR, STATUS_VO } from "@/lib/domain/enums";
+import { JENIS_BIAYA_KONTRAK, JENIS_KONTRAK, METODE_TUNAI, POS_HPP, STATUS_VENDOR, STATUS_VO } from "@/lib/domain/enums";
 
 /**
  * Tambah Variation Order pada sebuah kontrak.
@@ -85,8 +86,8 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
     const uraian = teks(form, "uraian", true);
     // Field yang bebas diisi pengguna (default aman bila terkunci/tak dikirim
     // oleh pemanggil ringkas seperti modal Pembayaran di Vendor).
-    const metode = pilihanOpsional(form, "metode", METODE_BAYAR, "Transfer");
-    const bukti = teksOpsional(form, "bukti") || null;
+    const metode = pilihanOpsional(form, "metode", METODE_TUNAI, "Transfer");
+    const { bukti, buktiKey } = await simpanBuktiOpsional(form);
 
     // Pembayaran yang melampaui nilai kontrak ditolak — kelebihan bayar pada
     // kontrak borongan jauh lebih sulit ditarik kembali daripada dicegah.
@@ -139,6 +140,7 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
         uraian: `${uraian} — ${kontrak.kode} ${kontrak.vendor.nama}`,
         total: nominal,
         bukti,
+        buktiKey,
         posHpp: POS_HPP[peruntukan],
         pic: pengguna.nama,
         alokasi: { create: porsi },

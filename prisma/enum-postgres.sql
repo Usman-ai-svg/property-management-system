@@ -95,16 +95,17 @@ CREATE TYPE pm_peruntukan_biaya AS ENUM (
 CREATE TYPE pm_jenis_biaya AS ENUM (
   'Kontraktor',
   'Upah Borongan',
+  'Upah Harian',
   'Material',
   'Subkon',
-  'Upah Harian',
   'Lain-lain proyek'
 );
 
 CREATE TYPE pm_metode_bayar AS ENUM (
   'Transfer',
   'Petty Cash',
-  'Tunai langsung'
+  'Tunai langsung',
+  'Hutang'
 );
 
 CREATE TYPE pm_status_bayar AS ENUM (

@@ -19,6 +19,35 @@ export function statusSerapan(terpakai: number, progres: number, toleransi = 0.0
   return "Hemat";
 }
 
+/**
+ * Status pelunasan sebuah hutang, diturunkan dari yang sudah terbayar — bukan
+ * disimpan sebagai kolom yang bisa menyimpang. Kosong = "Belum", penuh =
+ * "Lunas", di antaranya "DP". Inilah makna nyata dari Status Bayar untuk
+ * pengeluaran-hutang; metode "Hutang" dan status "Belum" dulunya konsep kembar.
+ */
+export function statusHutang(total: number, terbayar: number): "Lunas" | "DP" | "Belum" {
+  if (terbayar <= 0) return "Belum";
+  if (terbayar >= total) return "Lunas";
+  return "DP";
+}
+
+/**
+ * Seberapa mendesak sebuah tenggat hutang: "lewat" bila sudah terlampaui,
+ * "dekat" bila dalam `ambangHari` ke depan, selebihnya "aman". Dipakai untuk
+ * mewarnai pengingat hutang di dashboard.
+ */
+export function jatuhTempo(
+  tenggat: Date | null,
+  sekarang: Date,
+  ambangHari = 7,
+): "lewat" | "dekat" | "aman" {
+  if (!tenggat) return "aman";
+  const selisih = tenggat.getTime() - sekarang.getTime();
+  if (selisih < 0) return "lewat";
+  if (selisih <= ambangHari * 864e5) return "dekat";
+  return "aman";
+}
+
 export interface VariationOrderLike {
   nominal: number;
   status: string;

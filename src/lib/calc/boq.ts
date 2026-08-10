@@ -9,6 +9,7 @@
 import {
   TEMPLATE_BOQ,
   TEMPLATE_RAP,
+  TEMPLATE_SUBKON,
   RASIO_RAP_TERHADAP_RAB,
   PORSI_MATERIAL_DALAM_RAP,
 } from "../domain/templates";
@@ -25,6 +26,8 @@ export interface BarisBoq {
 
 export interface BarisRap {
   grup: string;
+  /** "Material" | "Subkon" — kategori eksplisit, bukan ditebak dari nama grup. */
+  kategori: string;
   nama: string;
   satuan: string;
   volume: number;
@@ -40,6 +43,102 @@ export const subtotal = (r: { volume: number; hargaSatuan: number }): number =>
 /** Jumlahkan subtotal sekumpulan baris. */
 export const totalBaris = (rows: { volume: number; hargaSatuan: number }[]): number =>
   rows.reduce((s, r) => s + subtotal(r), 0);
+
+// ---------------------------------------------------------------------------
+// Kategori RAP
+//
+// RAP sebuah objek dipecah jadi empat kategori yang sejajar dengan jenis biaya
+// pengeluaran, supaya sisa anggaran per kategori bisa dilacak di Keuangan Proyek.
+// RAP adalah dasar perhitungan untuk pekerjaan SWAKELOLA; pekerjaan borongan
+// (kontraktor) ditangani lewat nilai kontrak di modul Vendor, bukan di sini.
+//
+//   Material        — baris RAP di kelompok selain "Subkon".
+//   Tenaga Kerja    — upah (rapUpahVolume × rapUpahHarga).
+//   Subkon          — baris RAP di kelompok yang namanya memuat "subkon".
+//   Lain-lain Proyek— 5% dari (Material + Tenaga Kerja + Subkon).
+// ---------------------------------------------------------------------------
+
+/** Porsi Lain-lain Proyek terhadap (Material + Tenaga Kerja + Subkon). */
+export const PORSI_LAIN_LAIN = 0.05;
+
+/**
+ * Kelompok RAP lama yang namanya memuat "subkon" tetap dihitung Subkon — jaring
+ * pengaman untuk data lama/impor yang belum punya kolom `kategori` eksplisit.
+ */
+export const SUBKON_RE = /subkon/i;
+
+/** Sebuah baris RAP tergolong Subkon bila kategorinya "Subkon", atau (data lama)
+ *  namanya memuat "subkon". Kategori eksplisit menang atas ejaan nama. */
+export function isSubkon(it: { kategori?: string | null; grup?: string | null }): boolean {
+  return it.kategori === "Subkon" || SUBKON_RE.test(it.grup ?? "");
+}
+
+/** Empat kategori pelacakan anggaran, berurut untuk tampilan. */
+export const KATEGORI_RAP = [
+  "Material", "Tenaga Kerja", "Subkon", "Lain-lain Proyek",
+] as const;
+export type KategoriRap = (typeof KATEGORI_RAP)[number];
+
+/**
+ * Peta jenis biaya pengeluaran → kategori RAP, supaya realisasi bisa dijajarkan
+ * dengan anggaran. "Upah Borongan" dan "Upah Harian" sama-sama Tenaga Kerja.
+ * "Kontraktor" TIDAK dipetakan: itu pekerjaan borongan yang bukan basis RAP.
+ */
+export const KATEGORI_DARI_JENIS: Record<string, KategoriRap> = {
+  Material: "Material",
+  "Upah Borongan": "Tenaga Kerja",
+  "Upah Harian": "Tenaga Kerja",
+  Subkon: "Subkon",
+  "Lain-lain proyek": "Lain-lain Proyek",
+};
+
+export interface RapKategori {
+  material: number;
+  tenaga: number;
+  subkon: number;
+  lain: number;
+  total: number;
+}
+
+const NOL: RapKategori = { material: 0, tenaga: 0, subkon: 0, lain: 0, total: 0 };
+
+/** Objek pembawa RAP: unit, kerja tambah, atau sarpras. */
+export interface ObjekRap {
+  rapUpahVolume?: number | null;
+  rapUpahHarga?: number | null;
+  rapItems?: { grup?: string | null; kategori?: string | null; volume: number; hargaSatuan: number }[];
+}
+
+/** Rincian RAP satu objek per kategori (Lain-lain = 5% dari tiga lainnya). */
+export function rapKategori(o: ObjekRap): RapKategori {
+  let material = 0;
+  let subkon = 0;
+  for (const it of o.rapItems ?? []) {
+    const v = it.volume * it.hargaSatuan;
+    if (isSubkon(it)) subkon += v;
+    else material += v;
+  }
+  const tenaga = (o.rapUpahVolume ?? 0) * (o.rapUpahHarga ?? 0);
+  const lain = (material + tenaga + subkon) * PORSI_LAIN_LAIN;
+  return { material, tenaga, subkon, lain, total: material + tenaga + subkon + lain };
+}
+
+/** Jumlahkan rincian kategori beberapa objek. */
+export function jumlahRapKategori(objek: ObjekRap[]): RapKategori {
+  return objek.reduce<RapKategori>((acc, o) => {
+    const r = rapKategori(o);
+    return {
+      material: acc.material + r.material,
+      tenaga: acc.tenaga + r.tenaga,
+      subkon: acc.subkon + r.subkon,
+      lain: acc.lain + r.lain,
+      total: acc.total + r.total,
+    };
+  }, { ...NOL });
+}
+
+/** Total RAP satu objek (Material + Tenaga + Subkon + Lain-lain 5%). */
+export const totalRap = (o: ObjekRap): number => rapKategori(o).total;
 
 /**
  * Bangkitkan baris BOQ untuk sebuah unit berdasarkan luas bangunannya.
@@ -88,6 +187,7 @@ export function buatRapDariTemplate(luasBangunan: number): BarisRap[] {
 
   return mentah.map((m, i) => ({
     grup: m.grup,
+    kategori: "Material",
     nama: m.item.nama,
     satuan: m.item.satuan,
     volume: Math.round(m.volumeMentah * K * 100) / 100,
@@ -100,6 +200,26 @@ export function buatRapDariTemplate(luasBangunan: number): BarisRap[] {
 /** Upah tenaga kerja = RAP acuan dikurangi total material hasil kalibrasi. */
 export function hitungUpahRap(luasBangunan: number): number {
   return Math.round(rapAcuan(luasBangunan) - totalBaris(buatRapDariTemplate(luasBangunan)));
+}
+
+/**
+ * Baris RAP untuk pekerjaan yang diborongkan ke subkontraktor, dikelompokkan
+ * dalam grup "Subkon" (dikenali kategori Subkon). Volume diskalakan dengan luas
+ * bangunan. Ditambahkan di ATAS material + upah — jadi menaikkan RAP sebesar
+ * paket borongannya, terpisah dari kalibrasi 65% material.
+ */
+export function buatSubkonDariTemplate(luasBangunan: number): BarisRap[] {
+  return TEMPLATE_SUBKON.map((t, i) => ({
+    grup: "Subkon",
+    kategori: "Subkon",
+    nama: t.nama,
+    satuan: t.satuan,
+    volume: t.perM2 === 0 ? 1 : Math.round(luasBangunan * t.perM2 * 100) / 100,
+    hargaSatuan: t.hargaSatuan,
+    keterangan: t.keterangan ?? null,
+    // Urutan di belakang seluruh kelompok material supaya Subkon tampil terakhir.
+    urutan: 100 + i,
+  }));
 }
 
 /**
@@ -140,16 +260,19 @@ export function rapGenerik(total: number): { upah: number; items: BarisRap[] } {
     items: [
       {
         grup: "Material Struktur & Dinding",
+        kategori: "Material",
         nama: "Bata ringan, semen, pasir, besi",
         satuan: "ls", volume: 1, hargaSatuan: struktur, keterangan: null, urutan: 0,
       },
       {
         grup: "Material Finishing",
+        kategori: "Material",
         nama: "Keramik, cat, plafon",
         satuan: "ls", volume: 1, hargaSatuan: finishing, keterangan: null, urutan: 1,
       },
       {
         grup: "Material MEP & Lain-lain",
+        kategori: "Material",
         nama: "Pipa, kabel, aksesoris",
         // Sisa dihitung dari pengurangan, bukan persentase, supaya jumlah
         // ketiganya persis sama dengan nilai material.

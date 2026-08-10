@@ -167,7 +167,7 @@ export function selectUnit(u: Pengguna) {
             orderBy: { urutan: "asc" as const },
           },
           rapItems: {
-            select: { grup: true, nama: true, satuan: true, volume: true, hargaSatuan: true, keterangan: true },
+            select: { grup: true, kategori: true, nama: true, satuan: true, volume: true, hargaSatuan: true, keterangan: true },
             orderBy: { urutan: "asc" as const },
           },
         }

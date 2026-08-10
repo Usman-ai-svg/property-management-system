@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PanelTabel, type FilterTabel } from "@/components/panel-tabel";
 import { rp, tanggal } from "@/lib/format";
 import { PERUNTUKAN_BIAYA } from "@/lib/domain/enums";
+import { statusHutang } from "@/lib/calc/keuangan";
 import { UbahTransaksi, HapusTransaksi } from "./ubah-transaksi";
 
 /**
@@ -27,9 +28,16 @@ export type BarisTransaksi = {
   status: string;
   pic: string | null;
   bukti: string | null;
+  buktiKey: string | null;
+  kreditur: string | null;
+  tenggat: Date | null;
   contractId: string | null;
   pembelianId: string | null;
   alokasi: { id: string; unitId: string | null; infrastructureId: string | null; nominal: number }[];
+  cicilan: {
+    id: string; tanggal: Date; nominal: number; metode: string;
+    bukti: string | null; buktiKey: string | null; pic: string | null;
+  }[];
   contract: { kode: string; vendorId: string; vendor: { nama: string } } | null;
   pembelian: { nomor: string; pemasok: { nama: string } } | null;
 };
@@ -112,18 +120,37 @@ export function PanelTransaksi({
                   dibagi ke {e.alokasi.length} tujuan
                 </span>
               )}
+              {e.metode === "Hutang" && <ChipHutang e={e} />}
             </div>
-            {(e.pic || e.contract) && (
+            {(e.pic || e.contract || (e.metode === "Hutang" && e.kreditur)) && (
               <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
                 {e.pic ? `oleh ${e.pic}` : ""}
                 {e.pic && e.contract ? " · " : ""}
                 {e.contract ? e.contract.vendor.nama : ""}
+                {e.metode === "Hutang" && e.kreditur
+                  ? `${e.pic ? " · " : ""}kepada ${e.kreditur}${e.tenggat ? ` · tenggat ${tanggal(e.tenggat)}` : ""}`
+                  : ""}
               </div>
             )}
           </td>
           <td>
-            {e.bukti ? (
-              <span style={{ color: "var(--teal)", fontSize: 11 }}>📎 {e.bukti}</span>
+            {e.buktiKey ? (
+              <a
+                href={`/api/bukti/${e.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "var(--teal)", fontSize: 11, textDecoration: "none" }}
+                title={`Unduh ${e.bukti ?? "berkas bukti"}`}
+              >
+                📎 {e.bukti ?? "berkas"}
+              </a>
+            ) : e.bukti ? (
+              <span
+                style={{ color: "var(--muted)", fontSize: 11 }}
+                title="Hanya nama tercatat — berkasnya tidak diunggah"
+              >
+                {e.bukti}
+              </span>
             ) : (
               <span style={{ color: "var(--muted)", fontSize: 11 }}>—</span>
             )}
@@ -155,6 +182,9 @@ export function PanelTransaksi({
                       id: e.id, peruntukan: e.peruntukan, jenis: e.jenis,
                       metode: e.metode, uraian: e.uraian, total: e.total,
                       bukti: e.bukti,
+                      kreditur: e.kreditur,
+                      tenggat: e.tenggat ? e.tenggat.toISOString().slice(0, 10) : null,
+                      terbayar: e.cicilan.reduce((s, c) => s + c.nominal, 0),
                       alokasi: e.alokasi.map((a) => ({
                         unitId: a.unitId, infrastructureId: a.infrastructureId, nominal: a.nominal,
                       })),
@@ -170,5 +200,22 @@ export function PanelTransaksi({
         </tr>
       )}
     />
+  );
+}
+
+/** Penanda status pelunasan sebuah pengeluaran-hutang di daftar Transaksi. */
+function ChipHutang({ e }: { e: BarisTransaksi }) {
+  const terbayar = e.cicilan.reduce((s, c) => s + c.nominal, 0);
+  const sisa = e.total - terbayar;
+  const st = statusHutang(e.total, terbayar);
+  const warna = st === "Lunas" ? "var(--green)" : "var(--amber)";
+  return (
+    <span
+      className="chip"
+      title={`Hutang — terbayar ${rp(terbayar)} dari ${rp(e.total)}`}
+      style={{ background: "var(--rona-amber)", color: warna, marginLeft: 6, whiteSpace: "nowrap" }}
+    >
+      Hutang · {st}{sisa > 0 ? ` · sisa ${rp(sisa)}` : ""}
+    </span>
   );
 }

@@ -4,28 +4,26 @@ import { useState } from "react";
 import { BarisField, Field, FieldTerkunci, FormModal, TombolTambah } from "@/components/form";
 import { AlokasiBiaya } from "@/components/alokasi-biaya";
 import {
-  JENIS_BIAYA_SWAKELOLA, METODE_BAYAR, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN,
+  JENIS_BIAYA_SWAKELOLA, METODE_BAYAR, METODE_TUNAI, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN,
 } from "@/lib/domain/enums";
 import { rp } from "@/lib/format";
-import { catatPengeluaran, bayarPembelian } from "./actions";
+import { catatPengeluaran, bayarPembelian, bayarHutang } from "./actions";
 import { tambahPembayaran } from "../vendor/actions";
 
 /**
  * Pintu masuk TUNGGAL pencatatan uang keluar proyek.
  *
  * Langkah 1 memilih SUMBER; itu menentukan ke mesin mana pembayaran disalurkan
- * (kontrak → `tambahPembayaran`, PO → `bayarPembelian`, lain → `catatPengeluaran`).
- * Ketiganya memakai TATA LETAK ISIAN yang sama; yang membedakan hanyalah field
- * mana yang TERKUNCI karena nilainya sudah ditentukan sumbernya:
- *  - Kontrak: peruntukan (dari jenis kontrak), jenis biaya, dan pembebanan
- *    (otomatis per cakupan kontrak) — terkunci.
- *  - PO: jenis biaya "Material" — terkunci; peruntukan & pembebanan tetap dipilih
- *    (material bisa ke unit atau sarpras).
- *  - Pengeluaran lain: semua bebas diisi.
+ * (kontrak → `tambahPembayaran`, PO → `bayarPembelian`, hutang → `bayarHutang`,
+ * lain → `catatPengeluaran`). Field yang TERKUNCI berbeda per sumber:
+ *  - Kontrak: peruntukan, jenis biaya, pembebanan — terkunci (ikut kontrak).
+ *  - PO: jenis biaya "Material" — terkunci; peruntukan & pembebanan dipilih.
+ *  - Pengeluaran lain: semua bebas. Metode "Hutang" menandai biaya yang kasnya
+ *    belum keluar → memunculkan isian kreditur & tenggat, dan dilunasi bertahap.
+ *  - Bayar Hutang: melunasi cicilan sebuah hutang berjalan — mengurangi sisa,
+ *    BUKAN biaya baru (biaya akrualnya sudah dicatat saat hutang timbul).
  *
- * Dengan menyalurkan pembayaran kontrak/PO ke jalurnya, pencatatan manual tak
- * bisa lagi menduplikasi pembayaran yang seharusnya tertaut. Semua di bawah izin
- * "keuangan".
+ * Semua di bawah izin "keuangan".
  */
 
 type Objek = { id: string; label: string };
@@ -41,12 +39,17 @@ export type ProyekBayar = {
     peruntukan: string; jenisBiaya: string; cakupan: number;
   }[];
   po: { id: string; label: string; sisa: number; diterima: boolean }[];
+  hutang: {
+    id: string; label: string; kreditur: string; sisa: number;
+    tenggat: string; jatuhTempo: "lewat" | "dekat" | "aman";
+  }[];
 };
 
 const SUMBER = [
   ["kontrak", "Pembayaran Kontrak"],
   ["po", "Pembayaran PO"],
   ["manual", "Pengeluaran Lain"],
+  ["hutang", "Bayar Hutang"],
 ] as const;
 type Sumber = (typeof SUMBER)[number][0];
 
@@ -57,6 +60,8 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
   const [jumlah, setJumlah] = useState("");
   const [kontrakId, setKontrakId] = useState("");
   const [poId, setPoId] = useState("");
+  const [hutangId, setHutangId] = useState("");
+  const [metode, setMetode] = useState<string>(METODE_TUNAI[0]);
 
   if (proyek.length === 0) return null;
 
@@ -65,6 +70,7 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
 
   const kontrakAktif = aktif.kontrak.find((k) => k.id === (kontrakId || aktif.kontrak[0]?.id));
   const poAktif = aktif.po.find((b) => b.id === (poId || aktif.po[0]?.id));
+  const hutangAktif = aktif.hutang.find((h) => h.id === (hutangId || aktif.hutang[0]?.id));
 
   // Peruntukan efektif: untuk kontrak diturunkan (terkunci), selain itu dari state.
   const peruntukanEfektif = sumber === "kontrak" ? (kontrakAktif?.peruntukan ?? "") : peruntukan;
@@ -72,28 +78,64 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
     ?? { unit: false, sarpras: false };
   const adaObjek = sasaran.unit || sasaran.sarpras;
 
+  // Metode "Hutang" hanya untuk Pengeluaran Lain: menandai biaya yang kasnya
+  // belum keluar → butuh kreditur & tenggat, lalu dilunasi lewat "Bayar Hutang".
+  const isHutang = sumber === "manual" && metode === "Hutang";
+
   const aksi =
-    sumber === "kontrak" ? tambahPembayaran : sumber === "po" ? bayarPembelian : catatPengeluaran;
+    sumber === "kontrak" ? tambahPembayaran
+      : sumber === "po" ? bayarPembelian
+        : sumber === "hutang" ? bayarHutang
+          : catatPengeluaran;
 
   const keterangan =
     sumber === "kontrak"
       ? "Peruntukan & pembebanan mengikuti kontrak (terkunci). Field lain bebas diisi."
       : sumber === "po"
         ? "Tiap pembayaran PO menjadi satu pengeluaran (jenis biaya Material, terkunci)."
-        : "Pengeluaran lepas — bukan pembayaran kontrak atau PO.";
+        : sumber === "hutang"
+          ? "Cicilan pelunasan hutang berjalan — mengurangi sisa, bukan biaya baru."
+          : "Pengeluaran lepas. Pilih metode “Hutang” bila biayanya sudah timbul tapi kas belum keluar.";
 
   const gantiProyek = (id: string) => {
     setProjectId(id);
     setKontrakId("");
     setPoId("");
+    setHutangId("");
   };
 
   const kosong =
     (sumber === "kontrak" && aktif.kontrak.length === 0) ||
-    (sumber === "po" && aktif.po.length === 0);
+    (sumber === "po" && aktif.po.length === 0) ||
+    (sumber === "hutang" && aktif.hutang.length === 0);
 
-  const namaJumlah = sumber === "kontrak" ? "nominal" : "total";
-  const sisaMaks = sumber === "kontrak" ? kontrakAktif?.sisa : sumber === "po" ? poAktif?.sisa : undefined;
+  const namaJumlah = sumber === "po" || sumber === "manual" ? "total" : "nominal";
+  const sisaMaks =
+    sumber === "kontrak" ? kontrakAktif?.sisa
+      : sumber === "po" ? poAktif?.sisa
+        : sumber === "hutang" ? hutangAktif?.sisa
+          : undefined;
+
+  // Pilihan proyek — dipakai bersama semua sumber. Hanya jalur manual yang butuh
+  // projectId dikirim; kontrak/PO/hutang menurunkannya dari item terpilih.
+  const proyekField = (
+    <div>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+        Proyek <span style={{ color: "var(--red)" }}>*</span>
+      </label>
+      <select
+        name={sumber === "manual" ? "projectId" : undefined}
+        className="inp"
+        value={projectId}
+        onChange={(e) => gantiProyek(e.target.value)}
+        required={sumber === "manual"}
+      >
+        {proyek.map((p) => (
+          <option key={p.id} value={p.id}>{p.nama}</option>
+        ))}
+      </select>
+    </div>
+  );
 
   return (
     <FormModal
@@ -109,59 +151,42 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
         <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
           Sumber pembayaran
         </label>
-        <select
-          className="inp"
-          value={sumber}
-          onChange={(e) => setSumber(e.target.value as Sumber)}
-        >
+        <select className="inp" value={sumber} onChange={(e) => setSumber(e.target.value as Sumber)}>
           {SUMBER.map(([nilai, label]) => (
             <option key={nilai} value={nilai}>{label}</option>
           ))}
         </select>
       </div>
 
-      {/* Proyek + Peruntukan */}
-      <BarisField>
-        <div>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
-            Proyek <span style={{ color: "var(--red)" }}>*</span>
-          </label>
-          <select
-            // Hanya jalur manual yang butuh projectId; kontrak/PO menurunkannya
-            // dari item terpilih. Tetap ditampilkan untuk menyaring daftar.
-            name={sumber === "manual" ? "projectId" : undefined}
-            className="inp"
-            value={projectId}
-            onChange={(e) => gantiProyek(e.target.value)}
-            required={sumber === "manual"}
-          >
-            {proyek.map((p) => (
-              <option key={p.id} value={p.id}>{p.nama}</option>
-            ))}
-          </select>
-        </div>
-        {sumber === "kontrak" ? (
-          <FieldTerkunci label="Peruntukan" nilai={kontrakAktif?.peruntukan ?? "—"} />
-        ) : (
-          <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
-              Peruntukan
-            </label>
-            <select
-              name="peruntukan"
-              className="inp"
-              value={peruntukan}
-              onChange={(e) => setPeruntukan(e.target.value)}
-            >
-              {PERUNTUKAN_BIAYA.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </div>
-        )}
-      </BarisField>
+      {/* Proyek (+ Peruntukan untuk sumber selain hutang) */}
+      {sumber === "hutang" ? (
+        <BarisField kolom={1}>{proyekField}</BarisField>
+      ) : (
+        <BarisField>
+          {proyekField}
+          {sumber === "kontrak" ? (
+            <FieldTerkunci label="Peruntukan" nilai={kontrakAktif?.peruntukan ?? "—"} />
+          ) : (
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+                Peruntukan
+              </label>
+              <select
+                name="peruntukan"
+                className="inp"
+                value={peruntukan}
+                onChange={(e) => setPeruntukan(e.target.value)}
+              >
+                {PERUNTUKAN_BIAYA.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </BarisField>
+      )}
 
-      {/* Pemilih kontrak / PO */}
+      {/* Pemilih kontrak / PO / hutang */}
       {sumber === "kontrak" && !kosong && (
         <>
           <BarisField kolom={1}>
@@ -183,8 +208,6 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
             </div>
           </BarisField>
 
-          {/* Ringkasan nilai kontrak terpilih — sisa pembayaran kini hidup di
-              sini, bukan lagi diimpit ke dalam nama pilihan. */}
           {kontrakAktif && (
             <div
               style={{
@@ -230,13 +253,72 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
           </div>
         </BarisField>
       )}
+      {sumber === "hutang" && !kosong && (
+        <>
+          <BarisField kolom={1}>
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+                Hutang <span style={{ color: "var(--red)" }}>*</span>
+              </label>
+              <select
+                name="expenseId"
+                className="inp"
+                value={hutangId || aktif.hutang[0].id}
+                onChange={(e) => setHutangId(e.target.value)}
+                required
+              >
+                {aktif.hutang.map((h) => (
+                  <option key={h.id} value={h.id}>{h.label}</option>
+                ))}
+              </select>
+            </div>
+          </BarisField>
+
+          {hutangAktif && (
+            <div
+              style={{
+                display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 18px",
+                padding: "11px 14px", marginBottom: 14,
+                background: "var(--rona-panel)", borderRadius: 8,
+              }}
+            >
+              <InfoNilai label="Kreditur" nilai={hutangAktif.kreditur} />
+              <InfoNilai label="Sisa hutang" nilai={rp(hutangAktif.sisa)} warna="var(--amber)" />
+              <InfoNilai
+                label="Tenggat"
+                nilai={hutangAktif.tenggat}
+                warna={
+                  hutangAktif.jatuhTempo === "lewat" ? "var(--red)"
+                    : hutangAktif.jatuhTempo === "dekat" ? "var(--amber)" : undefined
+                }
+              />
+            </div>
+          )}
+        </>
+      )}
 
       {kosong ? (
         <PesanKosong>
           {sumber === "kontrak"
             ? "Tak ada kontrak dengan sisa bayar pada proyek ini — kelola kontrak di modul Vendor."
-            : "Tak ada PO dengan sisa bayar pada proyek ini — buat PO lewat kartu Pembelian Material di halaman proyek."}
+            : sumber === "po"
+              ? "Tak ada PO dengan sisa bayar pada proyek ini — buat PO lewat kartu Pembelian Material di halaman proyek."
+              : "Tak ada hutang berjalan pada proyek ini. Hutang lahir saat mencatat Pengeluaran Lain dengan metode “Hutang”."}
         </PesanKosong>
+      ) : sumber === "hutang" ? (
+        /* ---- Cicilan hutang: bentuk ringkas, bukan pengeluaran baru ---- */
+        <>
+          <BarisField>
+            <Field label="Metode" nama="metode" nilai={METODE_TUNAI[0]} pilihan={METODE_TUNAI} />
+            <Field label="Tanggal bayar" nama="tanggal" tipe="tanggal" petunjuk="kosongkan = hari ini" />
+          </BarisField>
+          <BarisField kolom={1}>
+            <NominalField jumlah={jumlah} setJumlah={setJumlah} nama={namaJumlah} sisaMaks={sisaMaks} />
+          </BarisField>
+          <BarisField kolom={1}>
+            <Field label="Berkas bukti" nama="berkas" tipe="berkas" petunjuk="Opsional — nota/kwitansi" />
+          </BarisField>
+        </>
       ) : (
         <>
           {/* Jenis + Metode */}
@@ -249,8 +331,34 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
                 nilai={sumber === "kontrak" ? (kontrakAktif?.jenisBiaya ?? "—") : "Material"}
               />
             )}
-            <Field label="Metode" nama="metode" nilai={METODE_BAYAR[0]} pilihan={METODE_BAYAR} />
+            {sumber === "manual" ? (
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+                  Metode
+                </label>
+                <select
+                  name="metode"
+                  className="inp"
+                  value={metode}
+                  onChange={(e) => setMetode(e.target.value)}
+                >
+                  {METODE_BAYAR.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <Field label="Metode" nama="metode" nilai={METODE_TUNAI[0]} pilihan={METODE_TUNAI} />
+            )}
           </BarisField>
+
+          {/* Kreditur + Tenggat — hanya bila metode Hutang */}
+          {isHutang && (
+            <BarisField>
+              <Field label="Kepada (kreditur)" nama="kreditur" wajib petunjuk="mis. Toko Bangunan Jaya" />
+              <Field label="Tenggat pelunasan" nama="tenggat" tipe="tanggal" wajib />
+            </BarisField>
+          )}
 
           {/* Keterangan */}
           <BarisField kolom={1}>
@@ -264,28 +372,7 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
 
           {/* Nominal */}
           <BarisField kolom={1}>
-            <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
-                Nominal <span style={{ color: "var(--red)" }}>*</span>
-              </label>
-              <div style={{ position: "relative" }}>
-                <input
-                  className="inp"
-                  type="number"
-                  name={namaJumlah}
-                  value={jumlah}
-                  onChange={(e) => setJumlah(e.target.value)}
-                  required
-                  min={1}
-                  max={sisaMaks}
-                  style={{ paddingRight: 34 }}
-                />
-                <span style={{ position: "absolute", right: 10, top: 9, fontSize: 11.5, color: "var(--muted)", pointerEvents: "none" }}>Rp</span>
-              </div>
-              {sisaMaks != null && (
-                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>Maks {rp(sisaMaks)}</div>
-              )}
-            </div>
+            <NominalField jumlah={jumlah} setJumlah={setJumlah} nama={namaJumlah} sisaMaks={sisaMaks} />
           </BarisField>
 
           {/* Dibebankan ke */}
@@ -313,11 +400,50 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
 
           {/* Bukti */}
           <BarisField kolom={1}>
-            <Field label="Nama berkas bukti" nama="bukti" petunjuk="Berkasnya belum diunggah pada demo ini" />
+            <Field
+              label="Berkas bukti"
+              nama="berkas"
+              tipe="berkas"
+              petunjuk="Opsional — nota, kwitansi, atau berita acara (PDF/gambar/Office)"
+            />
           </BarisField>
         </>
       )}
     </FormModal>
+  );
+}
+
+function NominalField({
+  jumlah, setJumlah, nama, sisaMaks,
+}: {
+  jumlah: string;
+  setJumlah: (v: string) => void;
+  nama: string;
+  sisaMaks?: number;
+}) {
+  return (
+    <div>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+        Nominal <span style={{ color: "var(--red)" }}>*</span>
+      </label>
+      <div style={{ position: "relative" }}>
+        <input
+          className="inp"
+          type="number"
+          name={nama}
+          value={jumlah}
+          onChange={(e) => setJumlah(e.target.value)}
+          required
+          min={1}
+          max={sisaMaks}
+          style={{ paddingRight: 34 }}
+        />
+        <span style={{ position: "absolute", right: 10, top: 9, fontSize: 11.5, color: "var(--muted)", pointerEvents: "none" }}>Rp</span>
+      </div>
+      {sisaMaks != null && (
+        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>Maks {rp(sisaMaks)}</div>
+      )}
+    </div>
   );
 }
 

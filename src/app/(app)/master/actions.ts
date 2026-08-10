@@ -759,7 +759,7 @@ export async function tambahUnit(_s: HasilAksi | null, form: FormData): Promise<
           },
           rapItems: {
             orderBy: { urutan: "asc" as const },
-            select: { grup: true, nama: true, satuan: true, volume: true, hargaSatuan: true, keterangan: true },
+            select: { grup: true, kategori: true, nama: true, satuan: true, volume: true, hargaSatuan: true, keterangan: true },
           },
         },
       }),
