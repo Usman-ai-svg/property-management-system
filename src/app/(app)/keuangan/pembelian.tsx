@@ -256,13 +256,11 @@ function TerimaPO({ id, nomor, namaPengguna }: { id: string; nomor: string; nama
 }
 
 function BayarPO({
-  pembelianId, nomor, sisa, diterima, units, sarpras,
+  pembelianId, nomor, sisa, units, sarpras,
 }: {
   pembelianId: string;
   nomor: string;
   sisa: number;
-  /** Barang sudah diterima? Bila belum, pembayaran ini adalah DP / uang muka. */
-  diterima: boolean;
   units: ObjekPilih[];
   sarpras: ObjekPilih[];
 }) {
@@ -277,16 +275,11 @@ function BayarPO({
     ?? { unit: false, sarpras: false };
   const adaObjek = sasaran.unit || sasaran.sarpras;
 
-  // Sebelum barang diterima, pembayaran adalah uang muka; setelahnya termin biasa.
-  const labelBayar = diterima ? "Bayar Termin" : "Bayar DP / Uang Muka";
-
   return (
     <FormModal
-      judul={`${labelBayar} — ${nomor}`}
+      judul={`Bayar — ${nomor}`}
       keterangan={
-        (diterima
-          ? `Sisa hutang ${rp(sisa)}. `
-          : `Barang belum diterima — pembayaran ini tercatat sebagai uang muka. Sisa ${rp(sisa)}. `) +
+        `Sisa hutang ${rp(sisa)}. ` +
         "Tiap pembayaran menjadi satu pengeluaran proyek (jenis biaya Material)."
       }
       aksi={bayarPembelian}
@@ -294,7 +287,7 @@ function BayarPO({
       lebar={560}
       pemicu={(buka) => (
         <button type="button" className="btn-garis" onClick={buka} style={{ fontSize: 11, padding: "4px 9px" }}>
-          {labelBayar}
+          Bayar
         </button>
       )}
     >
@@ -442,7 +435,6 @@ export function PanelPembelian({
                   pembelianId={b.id}
                   nomor={b.nomor}
                   sisa={b.hutang}
-                  diterima={b.diterima}
                   units={units}
                   sarpras={sarpras}
                 />
@@ -476,12 +468,12 @@ export function PanelPembelian({
           {/* Termin pembayaran */}
           <div style={{ padding: "8px 16px 12px", borderTop: "1px solid var(--line)", background: "var(--rona-abu)" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>
-              Termin Pembayaran · terbayar {rp(b.terbayar)} dari {rp(b.total)}
+              Pembayaran · terbayar {rp(b.terbayar)} dari {rp(b.total)}
             </div>
             {b.pembayaran.length === 0 ? (
               <div style={{ fontSize: 11.5, color: "var(--muted)" }}>
                 Belum ada pembayaran.
-                {!b.diterima && " DP / uang muka boleh dicatat walau barang belum diterima."}
+                {!b.diterima && " Pembayaran boleh dicatat walau barang belum diterima."}
               </div>
             ) : (
               <table style={{ width: "100%", fontSize: 11.5 }}>

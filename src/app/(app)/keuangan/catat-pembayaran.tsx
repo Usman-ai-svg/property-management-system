@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { BarisField, Field, FieldTerkunci, FormModal, TombolTambah } from "@/components/form";
 import { AlokasiBiaya } from "@/components/alokasi-biaya";
 import {
@@ -53,7 +54,13 @@ const SUMBER = [
 ] as const;
 type Sumber = (typeof SUMBER)[number][0];
 
-export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
+export function CatatPembayaran({
+  proyek,
+  pemasok,
+}: {
+  proyek: ProyekBayar[];
+  pemasok: { id: string; nama: string }[];
+}) {
   const [sumber, setSumber] = useState<Sumber>("kontrak");
   const [projectId, setProjectId] = useState(proyek[0]?.id ?? "");
   const [peruntukan, setPeruntukan] = useState<string>(PERUNTUKAN_BIAYA[0]);
@@ -355,7 +362,7 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
           {/* Kreditur + Tenggat — hanya bila metode Hutang */}
           {isHutang && (
             <BarisField>
-              <Field label="Kepada (kreditur)" nama="kreditur" wajib petunjuk="mis. Toko Bangunan Jaya" />
+              <KrediturField pemasok={pemasok} />
               <Field label="Tenggat pelunasan" nama="tenggat" tipe="tanggal" wajib />
             </BarisField>
           )}
@@ -410,6 +417,55 @@ export function CatatPembayaran({ proyek }: { proyek: ProyekBayar[] }) {
         </>
       )}
     </FormModal>
+  );
+}
+
+/**
+ * Pemilih kreditur untuk pengeluaran-hutang. Ketat — hanya dari daftar Pemasok
+ * aktif — dengan tautan ke laman Pemasok untuk menambah supplier baru bila
+ * belum terdaftar. Tautannya berpindah langsung (tab yang sama, bukan tab baru):
+ * setelah menambah supplier, pengguna kembali & membuka form ini lagi sehingga
+ * daftarnya termuat ulang berisi supplier baru. Nilainya disimpan sebagai NAMA
+ * pemasok (kolom `kreditur` di Expense berupa teks).
+ */
+function KrediturField({ pemasok }: { pemasok: { id: string; nama: string }[] }) {
+  return (
+    <div>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+        Kepada (kreditur) <span style={{ color: "var(--red)" }}>*</span>
+      </label>
+      {pemasok.length > 0 ? (
+        <>
+          <select name="kreditur" className="inp" defaultValue="" required>
+            <option value="" disabled>
+              Pilih supplier…
+            </option>
+            {pemasok.map((p) => (
+              <option key={p.id} value={p.nama}>{p.nama}</option>
+            ))}
+          </select>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, lineHeight: 1.5 }}>
+            Tak ada di daftar?{" "}
+            <Link href="/estimasi/pemasok" style={{ color: "var(--teal)", fontWeight: 600 }}>
+              Tambah supplier
+            </Link>
+          </div>
+        </>
+      ) : (
+        <div
+          style={{
+            fontSize: 11.5, color: "var(--muted)", lineHeight: 1.6,
+            padding: "10px 12px", background: "var(--rona-panel)", borderRadius: 8,
+          }}
+        >
+          Belum ada supplier terdaftar.{" "}
+          <Link href="/estimasi/pemasok" style={{ color: "var(--teal)", fontWeight: 600 }}>
+            Tambah supplier
+          </Link>{" "}
+          dulu di laman Pemasok, lalu buka kembali form ini.
+        </div>
+      )}
+    </div>
   );
 }
 

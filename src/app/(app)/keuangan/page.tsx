@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
-import { dataKeuangan, komposisi, pintuBayar, WARNA_JENIS } from "@/lib/data/keuangan";
+import { dataKeuangan, komposisi, pemasokUntukPembelian, pintuBayar, WARNA_JENIS } from "@/lib/data/keuangan";
 import { rp, rpRingkas, tanggal } from "@/lib/format";
 import { RvsRAP } from "@/components/charts";
 import { TrenChart } from "@/components/tren-chart";
 import { BarisKpi, Kartu, TabelHead } from "@/components/ui";
 import { CatatPembayaran } from "./catat-pembayaran";
 import { BreakdownKategori } from "./breakdown-kategori";
+import { KartuHutang } from "./hutang-tabel";
 import { Tabel } from "@/components/kartu-tabel";
 
 export default async function DashboardKeuangan() {
@@ -17,6 +18,9 @@ export default async function DashboardKeuangan() {
   const bolehCatat = bolehUbah(pengguna, "keuangan");
   const { proyek, tren, expenses, hutang } = await dataKeuangan(pengguna);
   const proyekBayar = bolehCatat ? await pintuBayar(pengguna) : [];
+  // Daftar kreditur untuk Pengeluaran Lain metode "Hutang" — diambil dari Pemasok
+  // aktif (dropdown ketat); menambah supplier baru lewat tautan ke laman Pemasok.
+  const pemasokBayar = bolehCatat ? await pemasokUntukPembelian() : [];
 
   const batas = new Date(Date.now() - 30 * 864e5);
   const total30 = expenses.filter((e) => e.tanggal >= batas).reduce((s, e) => s + e.total, 0);
@@ -28,12 +32,9 @@ export default async function DashboardKeuangan() {
   const kompJenis = komposisi(expenses, "jenis");
   const kompPeruntukan = komposisi(expenses, "peruntukan");
 
-  // Hutang berjalan: total sisa untuk KPI, dan proyek yang lewat tenggat untuk
-  // menandai baris tabel dengan lencana pengingat.
+  // Hutang berjalan: total sisa untuk KPI. Rinciannya (dikelompokkan per
+  // supplier, dengan filter & pencarian) ada di kartu Hutang Jatuh Tempo.
   const sisaHutang = hutang.reduce((s, h) => s + h.sisa, 0);
-  const proyekTelatHutang = new Set(
-    hutang.filter((h) => h.jatuhTempo === "lewat").map((h) => h.kodeProyek),
-  );
 
   const kpi: [string, string][] = [
     // Akrual: "Biaya" (bukan "Pengeluaran") karena memuat hutang sejak timbul,
@@ -56,7 +57,7 @@ export default async function DashboardKeuangan() {
           <div className="eyebrow">Manajemen Proyek · Keuangan Proyek</div>
           <h2 className="disp" style={{ margin: "4px 0 0", fontSize: 20 }}>Keuangan Proyek</h2>
         </div>
-        {bolehCatat && <CatatPembayaran proyek={proyekBayar} />}
+        {bolehCatat && <CatatPembayaran proyek={proyekBayar} pemasok={pemasokBayar} />}
       </div>
 
       <BarisKpi kpi={kpi} />
@@ -67,8 +68,6 @@ export default async function DashboardKeuangan() {
         </div>
         <TrenChart data={tren} />
       </Kartu>
-
-      {hutang.length > 0 && <KartuHutang hutang={hutang} />}
 
       <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
         <TabelHead
@@ -97,15 +96,6 @@ export default async function DashboardKeuangan() {
                   </Link>
                   <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
                     {p.kode} · {p.statusLahan}
-                    {proyekTelatHutang.has(p.kode) && (
-                      <span
-                        className="chip"
-                        title="Ada hutang yang lewat tenggat pada proyek ini"
-                        style={{ background: "var(--rona-merah)", color: "var(--red)", marginLeft: 6 }}
-                      >
-                        hutang lewat tenggat
-                      </span>
-                    )}
                   </div>
                 </td>
                 <td style={{ textAlign: "right" }}>{rp(p.rab)}</td>
@@ -118,6 +108,8 @@ export default async function DashboardKeuangan() {
             ))}
         </Tabel>
       </div>
+
+      <KartuHutang hutang={hutang} />
 
       <div className="grid grid2" style={{ marginTop: 16 }}>
         <BreakdownKategori jenis={kompJenis} peruntukan={kompPeruntukan} />
@@ -164,74 +156,5 @@ export default async function DashboardKeuangan() {
         </Kartu>
       </div>
     </div>
-  );
-}
-
-type BarisHutang = {
-  id: string;
-  kreditur: string;
-  uraian: string;
-  proyek: string;
-  sisa: number;
-  status: string;
-  tenggat: string;
-  jatuhTempo: "lewat" | "dekat" | "aman";
-};
-
-/**
- * Pengingat hutang jatuh tempo. Diurut dari yang paling mendesak (lewat tenggat
- * lebih dulu, lalu yang mendekati); baris lewat tenggat ditandai merah, yang
- * dekat kuning. Muncul hanya bila ada hutang berjalan.
- */
-function KartuHutang({ hutang }: { hutang: BarisHutang[] }) {
-  const urut = { lewat: 0, dekat: 1, aman: 2 } as const;
-  const daftar = [...hutang].sort((a, b) => urut[a.jatuhTempo] - urut[b.jatuhTempo]);
-
-  const warnaTempo = (t: BarisHutang["jatuhTempo"]) =>
-    t === "lewat" ? "var(--red)" : t === "dekat" ? "var(--amber)" : "var(--muted)";
-
-  return (
-    <Kartu atas={16}>
-      <div className="eyebrow" style={{ marginBottom: 10 }}>
-        Hutang Jatuh Tempo · {hutang.length} berjalan
-      </div>
-      <div style={{ maxHeight: 300, overflow: "auto" }}>
-        {daftar.map((h) => (
-          <div
-            key={h.id}
-            style={{
-              display: "grid", gridTemplateColumns: "1fr auto", gap: 10,
-              alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--garis-halus)",
-            }}
-          >
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600 }}>
-                {h.kreditur}
-                <span
-                  className="chip"
-                  style={{
-                    marginLeft: 6,
-                    background: h.status === "DP" ? "var(--rona-teal)" : "var(--rona-abu)",
-                    color: h.status === "DP" ? "var(--teal)" : "var(--muted)",
-                  }}
-                >
-                  {h.status}
-                </span>
-              </div>
-              <div style={{ fontSize: 11, color: "var(--muted)" }}>
-                {h.proyek} · {h.uraian}
-              </div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div className="num" style={{ fontSize: 12.5 }}>{rp(h.sisa)}</div>
-              <div style={{ fontSize: 10.5, color: warnaTempo(h.jatuhTempo), fontWeight: 600 }}>
-                {h.jatuhTempo === "lewat" ? "⚠ lewat " : h.jatuhTempo === "dekat" ? "⏳ " : ""}
-                {h.tenggat}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </Kartu>
   );
 }

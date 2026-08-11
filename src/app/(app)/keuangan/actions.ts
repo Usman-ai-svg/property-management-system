@@ -671,9 +671,7 @@ export async function bayarPembelian(_s: HasilAksi | null, form: FormData): Prom
     });
     if (!beli) throw new GagalIzin("Pembelian tidak ditemukan.");
     const pengguna = await izinkan("keuangan", beli.projectId);
-    // Sengaja TANPA gerbang status: DP/uang muka boleh sebelum barang datang.
-    const diterima = beli.status === PO_DITERIMA;
-
+    // Sengaja TANPA gerbang status: pembayaran boleh dicatat sebelum barang datang.
     const total = beli.items.reduce((s, b) => s + b.qty * b.harga, 0);
     const terbayar = beli.pembayaran.reduce((s, e) => s + e.total, 0);
     const sisa = total - terbayar;
@@ -693,10 +691,7 @@ export async function bayarPembelian(_s: HasilAksi | null, form: FormData): Prom
     const tanggal = isiTanggal ? new Date(isiTanggal) : new Date();
     const metode = pilihan(form, "metode", METODE_TUNAI);
     const { bukti, buktiKey } = await simpanBuktiOpsional(form);
-    // Uang muka bila barang belum diterima — terbaca jelas di daftar Transaksi.
-    const uraianBawaan = diterima
-      ? `Pembayaran PO ${beli.nomor} — ${beli.pemasok.nama}`
-      : `Uang muka PO ${beli.nomor} — ${beli.pemasok.nama}`;
+    const uraianBawaan = `Pembayaran PO ${beli.nomor} — ${beli.pemasok.nama}`;
     const uraian = teksOpsional(form, "uraian") ?? uraianBawaan;
 
     await prisma.expense.create({
@@ -710,7 +705,7 @@ export async function bayarPembelian(_s: HasilAksi | null, form: FormData): Prom
     });
     await catat({
       pengguna, projectId: beli.projectId, objek: `Pembelian ${beli.pemasok.nama} · ${beli.nomor}`,
-      aksi: diterima ? "Bayar termin PO" : "Bayar uang muka PO",
+      aksi: "Bayar PO",
       ke:
         `${rpLog(bayar)} (sisa ${rpLog(sisa - bayar)})` +
         (alokasi.length > 0 ? ` dibebankan ke ${alokasi.length} tujuan` : ""),

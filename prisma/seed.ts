@@ -15,7 +15,7 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/lib/auth/password";
 import { buatBoqDariTemplate, buatRapDariTemplate, buatSubkonDariTemplate, hitungUpahRap, rabAcuan, rapAcuan, totalBaris, boqSarprasDefault, rapGenerik } from "../src/lib/calc/boq";
 import { parseUkuran } from "../src/lib/format";
-import { alokasiPembayaran } from "../src/lib/calc/keuangan";
+import { alokasiPembayaran, statusHutang } from "../src/lib/calc/keuangan";
 import { terapkanPenyesuaian } from "../src/lib/calc/aset";
 import { seedAhsp } from "./seed-ahsp";
 import {
@@ -289,6 +289,206 @@ async function buatDokumen(kategori: string, dok: Dok | null | undefined): Promi
   return d.id;
 }
 
+/**
+ * PO material (Pembelian) & pengeluaran-hutang contoh.
+ *
+ * Keduanya sengaja dibuat bervariasi supaya dashboard Keuangan Proyek punya
+ * data hidup untuk diperagakan:
+ *  - PO: satu Diterima-DP (masih ada sisa → muncul di "Bayar PO"), satu Draft
+ *    belum dibayar (sisa penuh), satu Diterima-lunas (sisa 0, hanya tampil di
+ *    daftar pembelian proyek).
+ *  - Hutang: campuran lewat tenggat / mendekati / aman, sebagian sudah dicicil
+ *    (DP) sebagian belum, dan BEBERAPA dari pemasok yang sama — supaya
+ *    pengelompokan per-supplier di kartu Hutang terlihat gunanya.
+ *
+ * Tanggal tenggat diukur relatif terhadap "hari ini" data demo (Agu 2026):
+ * < hari ini = lewat, ≤ 7 hari ke depan = dekat, selebihnya = aman.
+ */
+type PoDemo = {
+  proyek: string; nomor: string; pemasok: string;
+  status: "Draft" | "Diterima"; tanggal: string;
+  tanggalTerima?: string; penerima?: string; keterangan?: string;
+  items: { uraian: string; satuan: string; qty: number; harga: number }[];
+  bayar?: number; tanggalBayar?: string;
+};
+
+type HutangDemo = {
+  proyek: string; pemasok: string; jenis: string; peruntukan: string;
+  uraian: string; total: number; timbul: string; tenggat: string;
+  cicilan?: number; tglCicilan?: string;
+};
+
+const PEMBELIAN_DEMO: PoDemo[] = [
+  {
+    proyek: "NT4", nomor: "PO-2026-021", pemasok: "Toko Bangunan Sejahtera",
+    status: "Diterima", tanggal: "28 Jul 2026", tanggalTerima: "30 Jul 2026",
+    penerima: "Agus Pratama", keterangan: "Material struktur Fase 2",
+    items: [
+      { uraian: "Semen Portland 50kg", satuan: "sak", qty: 300, harga: 62_000 },
+      { uraian: "Pasir beton (cor)", satuan: "m³", qty: 24, harga: 300_000 },
+      { uraian: "Besi beton polos Ø10", satuan: "kg", qty: 2_200, harga: 15_000 },
+    ],
+    bayar: 25_000_000, tanggalBayar: "2 Agu 2026",
+  },
+  {
+    proyek: "NT4", nomor: "PO-2026-022", pemasok: "CV Mitra Material Utama",
+    status: "Draft", tanggal: "6 Agu 2026", keterangan: "Bata ringan & mortar dinding",
+    items: [
+      { uraian: "Bata ringan (hebel)", satuan: "m³", qty: 45, harga: 640_000 },
+      { uraian: "Semen instan (mortar)", satuan: "sak", qty: 180, harga: 62_000 },
+    ],
+  },
+  {
+    proyek: "GN2", nomor: "PO-2026-023", pemasok: "Toko Bangunan Sejahtera",
+    status: "Diterima", tanggal: "18 Jul 2026", tanggalTerima: "20 Jul 2026",
+    penerima: "Hendra Kurnia", keterangan: "Keramik & cat finishing",
+    items: [
+      { uraian: "Keramik lantai 40×40", satuan: "m²", qty: 320, harga: 65_000 },
+      { uraian: "Cat tembok interior", satuan: "kg", qty: 180, harga: 35_000 },
+    ],
+    bayar: 27_100_000, tanggalBayar: "22 Jul 2026", // = total → Lunas
+  },
+];
+
+const HUTANG_DEMO: HutangDemo[] = [
+  {
+    proyek: "NT4", pemasok: "Toko Bangunan Sejahtera", jenis: "Material",
+    peruntukan: "Unit (rumah dijual)", uraian: "Semen & besi struktur Fase 2",
+    total: 48_500_000, timbul: "18 Jul 2026", tenggat: "5 Agu 2026", // lewat
+  },
+  {
+    proyek: "NT4", pemasok: "Toko Bangunan Sejahtera", jenis: "Material",
+    peruntukan: "Unit (rumah dijual)", uraian: "Bata ringan & mortar dinding",
+    total: 27_000_000, timbul: "25 Jul 2026", tenggat: "15 Agu 2026", // dekat
+    cicilan: 10_000_000, tglCicilan: "3 Agu 2026",
+  },
+  {
+    proyek: "NT4", pemasok: "Nusantara Sewa Alat", jenis: "Lain-lain proyek",
+    peruntukan: "Prasarana & Sarana", uraian: "Sewa molen & vibrator 2 minggu",
+    total: 8_400_000, timbul: "1 Agu 2026", tenggat: "14 Agu 2026", // dekat
+  },
+  {
+    proyek: "NT4", pemasok: "CV Mitra Material Utama", jenis: "Material",
+    peruntukan: "Unit (rumah dijual)", uraian: "Besi beton polos 3 ton",
+    total: 45_000_000, timbul: "28 Jul 2026", tenggat: "20 Sep 2026", // aman
+  },
+  {
+    proyek: "GN2", pemasok: "CV Mitra Material Utama", jenis: "Material",
+    peruntukan: "Unit (rumah dijual)", uraian: "Keramik & cat finishing",
+    total: 33_750_000, timbul: "20 Jul 2026", tenggat: "8 Agu 2026", // lewat
+    cicilan: 15_000_000, tglCicilan: "1 Agu 2026",
+  },
+  {
+    proyek: "GN2", pemasok: "Toko Bangunan Sejahtera", jenis: "Material",
+    peruntukan: "Prasarana & Sarana", uraian: "Pipa PVC & instalasi air bersih",
+    total: 12_300_000, timbul: "30 Jul 2026", tenggat: "5 Sep 2026", // aman
+  },
+];
+
+async function isiPembelianDanHutang(projectId: Map<string, string>) {
+  const pemasok = new Map(
+    (await prisma.pemasok.findMany({ select: { id: true, nama: true } })).map((p) => [p.nama, p.id]),
+  );
+
+  // Objek pertama tiap proyek untuk pembebanan (unit / sarpras). Dihitung sekali
+  // per proyek, lalu dipakai ulang oleh PO maupun hutang.
+  const objek = new Map<string, { pid: string; unitId: string | null; infraId: string | null }>();
+  const objekProyek = async (kode: string) => {
+    const ada = objek.get(kode);
+    if (ada) return ada;
+    const pid = projectId.get(kode)!;
+    const [unit, infra] = await Promise.all([
+      prisma.unit.findFirst({ where: { projectId: pid }, orderBy: { nomor: "asc" }, select: { id: true } }),
+      prisma.infrastructure.findFirst({ where: { projectId: pid }, orderBy: { kode: "asc" }, select: { id: true } }),
+    ]);
+    const hasil = { pid, unitId: unit?.id ?? null, infraId: infra?.id ?? null };
+    objek.set(kode, hasil);
+    return hasil;
+  };
+
+  // --- PO material ---
+  let jmlBayarPo = 0;
+  for (const po of PEMBELIAN_DEMO) {
+    const { pid, unitId } = await objekProyek(po.proyek);
+    const total = po.items.reduce((s, b) => s + b.qty * b.harga, 0);
+    const diterima = po.status === "Diterima";
+
+    const beli = await prisma.pembelian.create({
+      data: {
+        pemasokId: pemasok.get(po.pemasok)!, projectId: pid, nomor: po.nomor,
+        status: po.status, tanggal: tgl(po.tanggal)!, keterangan: po.keterangan ?? null,
+        tanggalTerima: diterima ? tgl(po.tanggalTerima ?? po.tanggal)! : null,
+        penerima: diterima ? po.penerima ?? null : null,
+        items: {
+          create: po.items.map((b, i) => ({
+            uraian: b.uraian, satuan: b.satuan, qty: b.qty, harga: b.harga, urutan: i,
+          })),
+        },
+      },
+    });
+
+    // Termin pembayaran opsional — Expense yang menunjuk pembelian ini, persis
+    // bentuk yang dihasilkan aksi bayarPembelian.
+    const bayar = po.bayar ?? 0;
+    if (bayar > 0) {
+      const peruntukan = "Unit (rumah dijual)";
+      await prisma.expense.create({
+        data: {
+          projectId: pid, pembelianId: beli.id,
+          tanggal: tgl(po.tanggalBayar ?? po.tanggal)!,
+          peruntukan, jenis: "Material", metode: "Transfer",
+          uraian: `${bayar >= total ? "Pembayaran" : "Uang muka"} PO ${po.nomor} — ${po.pemasok}`,
+          total: bayar, status: bayar >= total ? "Lunas" : "DP",
+          posHpp: POS_HPP[peruntukan], pic: "Sistem",
+          alokasi: { create: [{ unitId, infrastructureId: null, nominal: bayar }] },
+        },
+      });
+      jmlBayarPo++;
+    }
+  }
+
+  // --- Hutang (Expense metode "Hutang") ---
+  let jmlCicilan = 0;
+  for (const h of HUTANG_DEMO) {
+    const { pid, unitId, infraId } = await objekProyek(h.proyek);
+    const keSarpras = h.peruntukan === "Prasarana & Sarana";
+    const cicilan = h.cicilan ?? 0;
+
+    const exp = await prisma.expense.create({
+      data: {
+        projectId: pid, tanggal: tgl(h.timbul)!,
+        peruntukan: h.peruntukan, jenis: h.jenis, metode: "Hutang",
+        kreditur: h.pemasok, tenggat: tgl(h.tenggat)!,
+        uraian: h.uraian, total: h.total,
+        status: statusHutang(h.total, cicilan),
+        posHpp: POS_HPP[h.peruntukan as keyof typeof POS_HPP], pic: "Sistem",
+        alokasi: {
+          create: [{
+            unitId: keSarpras ? null : unitId,
+            infrastructureId: keSarpras ? infraId : null,
+            nominal: h.total,
+          }],
+        },
+      },
+    });
+
+    if (cicilan > 0) {
+      await prisma.hutangCicilan.create({
+        data: {
+          expenseId: exp.id, tanggal: tgl(h.tglCicilan ?? h.timbul)!,
+          nominal: cicilan, metode: "Transfer", pic: "Sistem",
+        },
+      });
+      jmlCicilan++;
+    }
+  }
+
+  console.log(
+    `  ${PEMBELIAN_DEMO.length} PO material (${jmlBayarPo} dg pembayaran), ` +
+    `${HUTANG_DEMO.length} hutang berjalan (${jmlCicilan} sudah dicicil)`,
+  );
+}
+
 async function main() {
   console.log("Menyemai data demo…\n");
 
@@ -302,8 +502,11 @@ async function main() {
   await prisma.pemasok.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.salesPayment.deleteMany();
+  await prisma.hutangCicilan.deleteMany();
   await prisma.expenseAllocation.deleteMany();
   await prisma.expense.deleteMany();
+  await prisma.pembelianItem.deleteMany();
+  await prisma.pembelian.deleteMany();
   await prisma.operationalCost.deleteMany();
   await prisma.variationOrder.deleteMany();
   await prisma.contractBoqItem.deleteMany();
@@ -698,6 +901,11 @@ async function main() {
   }
 
   console.log(`  ${VENDOR.length} vendor, ${KONTRAK.length} kontrak`);
+
+  // ---------------------------------------------------------------------
+  // 6b. PEMBELIAN MATERIAL (PO) & HUTANG
+  // ---------------------------------------------------------------------
+  await isiPembelianDanHutang(projectId);
 
   // ---------------------------------------------------------------------
   // 7. EQUIPMENT

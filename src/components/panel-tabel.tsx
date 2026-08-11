@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, Search, SlidersHorizontal } from "lucide-react";
 import { Tabel, type KolomOpsional } from "@/components/kartu-tabel";
 
 /**
@@ -77,7 +77,7 @@ function FilterPopover<T>({
   setPilih: React.Dispatch<React.SetStateAction<Record<number, string[]>>>;
 }) {
   const [buka, setBuka] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number; maxH: number } | null>(null);
   const tombolRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -87,12 +87,25 @@ function FilterPopover<T>({
   );
   const LEBAR = 300;
 
+  // Posisi popover dijaga di dalam viewport agar tak meluber di laman dengan
+  // tabel yang lebar/panjang: tepi KANAN disejajarkan ke tombol lalu dikurung
+  // horizontal; secara vertikal buka ke bawah, tapi pindah ke atas bila ruang
+  // bawah sempit, dan tingginya dibatasi ruang yang tersedia.
   const hitungPos = () => {
     const el = tombolRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const left = Math.max(8, Math.min(r.left, window.innerWidth - LEBAR - 8));
-    setPos({ top: r.bottom + 6, left });
+    const M = 8;
+    const left = Math.max(M, Math.min(r.right - LEBAR, window.innerWidth - LEBAR - M));
+    const bawah = window.innerHeight - r.bottom - M;
+    const atas = r.top - M;
+    const keAtas = bawah < 260 && atas > bawah;
+    const maxH = Math.max(160, Math.min(keAtas ? atas : bawah, Math.round(window.innerHeight * 0.7)));
+    setPos(
+      keAtas
+        ? { bottom: window.innerHeight - r.top + 6, left, maxH }
+        : { top: r.bottom + 6, left, maxH },
+    );
   };
 
   useLayoutEffect(() => {
@@ -160,27 +173,16 @@ function FilterPopover<T>({
         <div
           ref={panelRef}
           style={{
-            position: "fixed", top: pos.top, left: pos.left, width: LEBAR, zIndex: 60,
+            position: "fixed", top: pos.top, bottom: pos.bottom, left: pos.left,
+            width: LEBAR, maxHeight: pos.maxH, zIndex: 60,
             background: "var(--card, #fff)", border: "1px solid var(--line)", borderRadius: 10,
-            boxShadow: "0 10px 30px rgba(0,0,0,.14)", padding: "6px 0", maxHeight: "70vh", overflowY: "auto",
+            boxShadow: "0 10px 30px rgba(0,0,0,.14)",
+            display: "flex", flexDirection: "column", overflow: "hidden",
           }}
         >
-          <div
-            style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "4px 12px 8px", borderBottom: "1px solid var(--line)",
-            }}
-          >
+          <div style={{ overflowY: "auto", padding: "6px 0" }}>
+          <div style={{ padding: "4px 12px 8px", borderBottom: "1px solid var(--line)" }}>
             <span className="eyebrow" style={{ margin: 0 }}>Filter</span>
-            {jmlAktif > 0 && (
-              <button
-                type="button"
-                onClick={() => setPilih({})}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--teal)", font: "inherit", fontSize: 11, padding: 0 }}
-              >
-                Bersihkan semua
-              </button>
-            )}
           </div>
 
           {filter.map((f, i) => {
@@ -236,6 +238,21 @@ function FilterPopover<T>({
               </div>
             );
           })}
+          </div>
+
+          {jmlAktif > 0 && (
+            <button
+              type="button"
+              onClick={() => setPilih({})}
+              style={{
+                background: "none", border: "none", borderTop: "1px solid var(--line)",
+                width: "100%", textAlign: "center", padding: "10px 12px",
+                color: "var(--teal)", cursor: "pointer", font: "inherit", fontSize: 12, fontWeight: 600,
+              }}
+            >
+              Bersihkan semua
+            </button>
+          )}
         </div>,
         document.body,
       )}
@@ -256,6 +273,9 @@ export function PanelTabel<T>({
   filter,
   grup,
   urutanGrup,
+  ringkasGrup,
+  ringkasGrupSpan = 1,
+  footer,
   kosong,
   tinggiMaks = 460,
   atas = 16,
@@ -281,6 +301,21 @@ export function PanelTabel<T>({
   grup?: (t: T) => string;
   /** Urutan kelompok. Yang tak terdaftar disusun alfabetis di belakang. */
   urutanGrup?: readonly string[];
+  /**
+   * Ringkasan sebuah kelompok (mis. subtotal), dirender di baris judul kelompok
+   * sebagai sel-sel `<td>` TERAKHIR — nama kelompok mengisi sisa kolom di
+   * kirinya. Kembalikan ARRAY berisi ISI tiap sel (bukan `<td>`); tiap elemen
+   * dibungkus `<td>` rata-kanan oleh komponen ini. `ringkasGrupSpan` harus sama
+   * dengan panjang array. Hanya berlaku saat `grup` dipakai.
+   */
+  ringkasGrup?: (rows: T[]) => React.ReactNode[];
+  /** Banyak kolom terakhir yang diisi `ringkasGrup`. Bawaan 1. */
+  ringkasGrupSpan?: number;
+  /**
+   * Baris kaki tabel (mis. SUM/Grand Total). Menerima baris yang LOLOS saring,
+   * dirender sekali di bawah seluruh baris; harus mengembalikan satu `<tr>`.
+   */
+  footer?: (rows: T[]) => React.ReactNode;
   kosong?: React.ReactNode;
   tinggiMaks?: number;
   atas?: number;
@@ -312,7 +347,6 @@ export function PanelTabel<T>({
     });
   }, [data, q, pilih, cari, filter]);
 
-  const adaFilterAktif = Object.values(pilih).some((v) => v.length > 0);
   const adaAlat = Boolean(cari) || (filter && filter.length > 0);
   const disaring = tersaring.length !== data.length;
   const kolomN = kolom.filter(Boolean).length;
@@ -327,7 +361,7 @@ export function PanelTabel<T>({
             style={{ background: "var(--rona-abu)", cursor: "pointer" }}
             onClick={() => setTutupGrup((s) => ({ ...s, [nama]: !s[nama] }))}
           >
-            <td colSpan={kolomN} style={{ fontWeight: 700, fontSize: 12 }}>
+            <td colSpan={ringkasGrup ? kolomN - ringkasGrupSpan : kolomN} style={{ fontWeight: 700, fontSize: 12 }}>
               <ChevronDown
                 size={13}
                 style={{ verticalAlign: "-2px", marginRight: 5, color: "var(--muted)", transform: dilipat ? "rotate(-90deg)" : "none", transition: "transform .15s" }}
@@ -335,6 +369,12 @@ export function PanelTabel<T>({
               {nama}
               <span style={{ color: "var(--muted)", fontWeight: 400 }}> · {rows.length}</span>
             </td>
+            {ringkasGrup &&
+              ringkasGrup(rows).map((sel, i) => (
+                <td key={i} className="num" style={{ textAlign: "right", fontWeight: 700, fontSize: 12 }}>
+                  {sel}
+                </td>
+              ))}
           </tr>,
           ...(dilipat ? [] : rows.map((t) => <Fragment key={kunci(t)}>{baris(t)}</Fragment>)),
         ];
@@ -390,45 +430,12 @@ export function PanelTabel<T>({
               {filter && filter.length > 0 && (
                 <FilterPopover filter={filter} opsiFilter={opsiFilter} pilih={pilih} setPilih={setPilih} />
               )}
-
-              {/* Pil filter aktif — bisa dihapus tanpa membuka popover. */}
-              {filter?.flatMap((f, i) =>
-                (pilih[i] ?? []).map((v) => (
-                  <button
-                    key={`${f.label}-${v}`}
-                    type="button"
-                    className="chip"
-                    onClick={() =>
-                      setPilih((p) => ({ ...p, [i]: (p[i] ?? []).filter((x) => x !== v) }))
-                    }
-                    title="Hapus filter ini"
-                    style={{
-                      cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
-                      background: "var(--rona-teal2)", color: "var(--teal)", border: "1px solid var(--teal)",
-                    }}
-                  >
-                    <span style={{ color: "var(--muted)" }}>{f.label}:</span>
-                    {v}
-                    <X size={11} />
-                  </button>
-                )),
-              )}
-
-              {(q || adaFilterAktif) && (
-                <button
-                  type="button"
-                  className="btn-garis"
-                  style={{ fontSize: 11, padding: "5px 10px" }}
-                  onClick={() => { setQ(""); setPilih({}); }}
-                >
-                  Reset
-                </button>
-              )}
             </div>
           )}
 
       <Tabel kolom={kolom} kosong={kosong} tinggiMaks={tinggiMaks} kelasBungkus="tablewrap">
         {isiTabel}
+        {footer && tersaring.length > 0 ? footer(tersaring) : null}
       </Tabel>
     </div>
   );
