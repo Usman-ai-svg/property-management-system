@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { bolehAksesProyek, bolehLihat, filterProyek, type Pengguna } from "@/lib/auth/rbac";
 import { rapKategori, totalRap } from "@/lib/calc/boq";
+import { statusBangunSarpras, statusBangunUnit } from "@/lib/calc/status-bangun";
 
 /** Luas total = kavling efektif + sarana + prasarana + RTH. */
 
@@ -10,16 +11,67 @@ import { rapKategori, totalRap } from "@/lib/calc/boq";
  * luas total, jumlah unit, daftar fase, dan jumlah item sarpras.
  */
 export async function daftarProyek(u: Pengguna) {
-  return prisma.project.findMany({
+  // Total RAB & RAP per proyek hanya ikut bila peran berhak atas harga: baris
+  // BOQ/RAP tiap unit & sarpras di-SELECT lalu dijumlah dengan rumus yang sama
+  // dengan tabelnya (nilaiUnit/nilaiSarpras).
+  const bolehHarga = bolehLihat(u, "hargaRabRap");
+
+  const rapItemSel = { select: { grup: true, kategori: true, volume: true, hargaSatuan: true } } as const;
+  const boqItemSel = { select: { volume: true, hargaSatuan: true } } as const;
+
+  const proyek = await prisma.project.findMany({
     where: filterProyek(u),
     orderBy: { kode: "asc" },
     select: {
-      id: true, kode: true, nama: true, status: true, statusLahan: true,
+      id: true, kode: true, nama: true, status: true,
       kelurahan: true, kecamatan: true, kota: true,
       luasKavlingEfektif: true, luasSarana: true, luasPrasarana: true, luasRth: true,
       fases: { select: { kode: true }, orderBy: { urutan: "asc" } },
       _count: { select: { units: true, infrastructures: true, unitTypes: true } },
+      ...(bolehHarga
+        ? {
+            units: {
+              select: {
+                boqItems: boqItemSel,
+                rapItems: rapItemSel,
+                rapUpahVolume: true, rapUpahHarga: true,
+                customWorks: {
+                  select: {
+                    boqItems: boqItemSel,
+                    rapItems: rapItemSel,
+                    rapUpahVolume: true, rapUpahHarga: true,
+                  },
+                },
+              },
+            },
+            infrastructures: {
+              select: {
+                rab: true,
+                boqItems: boqItemSel,
+                rapItems: rapItemSel,
+                rapUpahVolume: true, rapUpahHarga: true,
+              },
+            },
+          }
+        : {}),
     },
+  });
+
+  return proyek.map((p) => {
+    const punyaHarga = "units" in p;
+    const units = punyaHarga ? (p as unknown as { units: Parameters<typeof nilaiUnit>[0][] }).units : [];
+    const sarpras = punyaHarga
+      ? (p as unknown as { infrastructures: Parameters<typeof nilaiSarpras>[0][] }).infrastructures
+      : [];
+    return {
+      ...p,
+      totalRab: bolehHarga
+        ? units.reduce((s, x) => s + nilaiUnit(x).rab, 0) + sarpras.reduce((s, x) => s + nilaiSarpras(x).rab, 0)
+        : null,
+      totalRap: bolehHarga
+        ? units.reduce((s, x) => s + nilaiUnit(x).rap, 0) + sarpras.reduce((s, x) => s + nilaiSarpras(x).rap, 0)
+        : null,
+    };
   });
 }
 
@@ -62,7 +114,7 @@ export async function detailProyek(u: Pengguna, kode: string) {
   const proyek = await prisma.project.findUnique({
     where: { kode },
     select: {
-      id: true, kode: true, nama: true, status: true, statusLahan: true,
+      id: true, kode: true, nama: true, status: true,
       alamat: true, kelurahan: true, kecamatan: true, kota: true, provinsi: true,
       pinLat: true, pinLng: true,
       luasKavlingEfektif: true, luasSarana: true, luasPrasarana: true, luasRth: true,
@@ -111,10 +163,11 @@ export async function detailProyek(u: Pengguna, kode: string) {
   const unit = bolehUnit
     ? await prisma.unit.findMany({
         where: { projectId: proyek.id },
-        orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
+        // Diurutkan berdasarkan nomor unit saja (bukan per fase).
+        orderBy: { nomor: "asc" },
         select: {
-          id: true, kode: true, nomor: true, luasTanah: true,
-          statusPembangunan: true, statusJual: true, progress: true,
+          id: true, kode: true, nomor: true, luasTanah: true, phaseId: true,
+          statusJual: true, tanggalSerahTerima: true, progress: true,
           // Menentukan apakah progres unit ini turunan dari opname BOQ
           // Master, yang berarti isian satu-angka manualnya ditiadakan.
           _count: { select: { boqItems: true } },
@@ -159,7 +212,10 @@ export async function detailProyek(u: Pengguna, kode: string) {
 
   return {
     proyek: { ...proyek, legalitas },
-    unit, sarpras,
+    // Status pembangunan & status sarpras dihitung ulang di sini (nilai turunan),
+    // supaya transisi Masa Garansi → Selesai (3 bulan) selalu mutakhir.
+    unit: unit.map((u) => ({ ...u, statusPembangunan: statusBangunUnit(u) })),
+    sarpras: sarpras.map((s) => ({ ...s, status: statusBangunSarpras(s.progress) })),
     bolehHarga, bolehUnit, bolehSarpras, bolehDokumen,
   };
 }
@@ -212,6 +268,9 @@ export function nilaiUnit(u: {
     rapMaterial: rincianStandar.material + rincianStandar.subkon,
     rapUpah: rincianStandar.tenaga,
     rapKerjaTambah,
+    // Rincian RAP dasar (Tipe) per 4 kategori — dipakai kartu Ringkasan agar
+    // angkanya identik dengan tabel RAP (yang juga memakai rumus rapKategori).
+    rap4: rincianStandar,
   };
 }
 
@@ -252,12 +311,12 @@ export function nilaiSarpras(s: {
 
 /** Satu unit beserta tipe, dokumen teknis, kerja tambah, dan BOQ/RAP-nya. */
 export async function detailUnit(unitKode: string, bolehHarga: boolean) {
-  return prisma.unit.findUnique({
+  const unit = await prisma.unit.findUnique({
     where: { kode: decodeURIComponent(unitKode).toUpperCase() },
     select: {
       id: true, kode: true, nomor: true, luasTanah: true, projectId: true,
       phaseId: true, unitTypeId: true,
-      statusPembangunan: true, statusJual: true, progress: true,
+      statusJual: true, tanggalSerahTerima: true, progress: true,
       // Jumlah baris BOQ Master menentukan apakah progres unit ini turunan
       // dari opname per baris atau masih diisi satu angka manual.
       _count: { select: { boqItems: true } },
@@ -330,11 +389,15 @@ export async function detailUnit(unitKode: string, bolehHarga: boolean) {
       },
     },
   });
+
+  if (!unit) return null;
+  // Status pembangunan = nilai turunan (lihat statusBangunUnit).
+  return { ...unit, statusPembangunan: statusBangunUnit(unit) };
 }
 
 /** Satu item sarpras beserta dokumen teknis dan BOQ/RAP-nya. */
 export async function detailSarpras(kodeSarpras: string, bolehHarga: boolean) {
-  return prisma.infrastructure.findUnique({
+  const item = await prisma.infrastructure.findUnique({
     where: { kode: decodeURIComponent(kodeSarpras).toUpperCase() },
     select: {
       id: true, kode: true, nama: true, jenis: true, volume: true,
@@ -370,6 +433,10 @@ export async function detailSarpras(kodeSarpras: string, bolehHarga: boolean) {
         : {}),
     },
   });
+
+  if (!item) return null;
+  // Status sarpras = nilai turunan dari progres (lihat statusBangunSarpras).
+  return { ...item, status: statusBangunSarpras(item.progress) };
 }
 
 /** Kontrak vendor yang mencakup sebuah unit. */

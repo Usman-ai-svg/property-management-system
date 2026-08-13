@@ -17,6 +17,7 @@ import { buatBoqDariTemplate, buatRapDariTemplate, buatSubkonDariTemplate, hitun
 import { parseUkuran } from "../src/lib/format";
 import { alokasiPembayaran, statusHutang } from "../src/lib/calc/keuangan";
 import { terapkanPenyesuaian } from "../src/lib/calc/aset";
+import { statusBangunSarpras, statusBangunUnit } from "../src/lib/calc/status-bangun";
 import { seedAhsp } from "./seed-ahsp";
 import {
   ACL_AWAL, ACL_UBAH, ASET, ASET_KENDARAAN, BIAYA_OPERASIONAL, BIAYA_UMUM, KERJA_TAMBAH,
@@ -641,7 +642,7 @@ async function main() {
 
     const p = await prisma.project.create({
       data: {
-        kode: P.kode, nama: P.nama, status: P.status, statusLahan: P.statusLahan,
+        kode: P.kode, nama: P.nama, status: P.status,
         alamat: P.lokasi.alamat, kelurahan: P.lokasi.kelurahan, kecamatan: P.lokasi.kecamatan,
         kota: P.lokasi.kota, provinsi: P.lokasi.provinsi, pinLat: P.lokasi.lat, pinLng: P.lokasi.lng,
         luasKavlingEfektif: P.luas.kavlingEfektif, luasSarana: P.luas.sarana,
@@ -756,19 +757,25 @@ async function main() {
         const kode = `${P.kode}-${fase}-${i}`;
         const T = tipes[(i + kodeFase) % tipes.length];
 
-        let statusPembangunan = "Belum terbangun";
         let statusJual = "Tersedia";
         let progress = 0;
+        let tanggalSerahTerima: Date | null = null;
 
         if (P.status === "Selesai") {
           progress = 100;
-          statusPembangunan = P.kode === "NT2" ? "Habis Masa Garansi" : "Serah Terima";
           statusJual = "Serah Terima";
-        } else if (P.status === "Dalam Pembangunan") {
+          // Sebar tanggal serah terima: sebagian sudah lewat 3 bulan (→ "Selesai"),
+          // sebagian baru diserahkan (→ "Masa Garansi"), agar kedua status turunan
+          // tampak di data demo.
+          tanggalSerahTerima = new Date();
+          tanggalSerahTerima.setMonth(tanggalSerahTerima.getMonth() - (i % 3 === 0 ? 1 : 5));
+        } else if (P.status === "Pembangunan") {
           progress = ((i * 17 + kodeFase * 9 + 23) % 78) + 15;
-          statusPembangunan = progress >= 95 ? "Selesai" : "Progress";
           statusJual = i % 4 === 0 ? "Akad" : i % 7 === 0 ? "Booking" : "Tersedia";
         }
+
+        // Status bangun adalah nilai turunan.
+        const statusPembangunan = statusBangunUnit({ progress, statusJual, tanggalSerahTerima });
 
         const kt = KERJA_TAMBAH[kode];
         const nilaiTambah = kt ? kt.boq.reduce((s, b) => s + b.vol * b.harga, 0) : 0;
@@ -781,7 +788,7 @@ async function main() {
           data: {
             kode, projectId: pid, phaseId: phaseId.get(`${P.kode}|${fase}`)!,
             unitTypeId: typeId.get(`${P.kode}|${T.kode}`)!, nomor: nomorProyek,
-            luasTanah: T.lt, statusPembangunan, statusJual, progress,
+            luasTanah: T.lt, statusPembangunan, statusJual, progress, tanggalSerahTerima,
             hargaJual, rapUpahVolume: 1, rapUpahHarga: hitungUpahRap(T.lb),
             boqItems: { create: boq },
             rapItems: { create: [...rap, ...buatSubkonDariTemplate(T.lb)] },
@@ -872,7 +879,7 @@ async function main() {
       const s = await prisma.infrastructure.create({
         data: {
           kode: S.id, projectId: pid, nama: S.nama, jenis: S.jenis, volume: S.vol,
-          status: S.status, progress: S.progress, rab: S.rab,
+          status: statusBangunSarpras(S.progress), progress: S.progress, rab: S.rab,
           rapUpahVolume: 1, rapUpahHarga: rap.upah,
           docModel3dId: await buatDokumen("model3d", S.docs.model3d),
           docGambarKerjaPdfId: await buatDokumen("gambarKerjaPdf", S.docs.gambarKerjaPdf),

@@ -36,7 +36,7 @@ export async function keuanganPerProyek(u: Pengguna) {
     where: filterProyek(u),
     orderBy: { kode: "asc" },
     select: {
-      id: true, kode: true, nama: true, status: true, statusLahan: true,
+      id: true, kode: true, nama: true, status: true,
       units: {
         select: {
           rapUpahVolume: true, rapUpahHarga: true,
@@ -71,7 +71,7 @@ export async function keuanganPerProyek(u: Pengguna) {
       p.infrastructures.reduce((s, x) => s + nilaiSarpras(x).rap, 0);
     return {
       id: p.id, kode: p.kode, nama: p.nama,
-      status: p.status, statusLahan: p.statusLahan,
+      status: p.status,
       jumlahUnit: p.units.length,
       rab,
       rap,
@@ -211,7 +211,7 @@ export async function proyekKeuangan(kodeProyek: string) {
   return prisma.project.findUnique({
     where: { kode: kodeProyek },
     select: {
-      id: true, kode: true, nama: true, statusLahan: true,
+      id: true, kode: true, nama: true, status: true,
       units: {
         orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
         select: {

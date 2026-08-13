@@ -3,7 +3,7 @@
 import { BarisField, Field, FormModal, TombolUbah } from "@/components/form";
 import { BoqTable, type BarisBoqUI } from "@/components/boq-table";
 import { RapTable, type BarisRapUI } from "@/components/rap-table";
-import { JENIS_SARPRAS, STATUS_SARPRAS } from "@/lib/domain/enums";
+import { JENIS_SARPRAS } from "@/lib/domain/enums";
 import { simpanSarpras } from "../../../actions";
 import { imporTabel, simpanBoqSarpras, simpanRapSarpras } from "../../../tabel-actions";
 import { Petunjuk } from "@/components/ui";
@@ -38,8 +38,7 @@ export function EditDeskripsiSarpras({
         <Field label="Volume" nama="volume" nilai={data.volume} wajib />
       </BarisField>
 
-      <BarisField>
-        <Field label="Status Bangun" nama="status" nilai={data.status} pilihan={STATUS_SARPRAS} />
+      <BarisField kolom={1}>
         {data.dariBoq ? (
           <div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
@@ -50,16 +49,14 @@ export function EditDeskripsiSarpras({
             </div>
           </div>
         ) : (
-          <Field label="Progres" nama="progress" nilai={data.progress} tipe="number" satuan="%" />
+          <Field label="Progres" nama="progress" nilai={data.progress} tipe="number" satuan="%" petunjuk="Status bangun otomatis dari progres" />
         )}
       </BarisField>
 
-      {data.dariBoq && (
-        <Petunjuk jarak="8px 0 0">
-          Isi progres lewat tabel opname di halaman Konstruksi, karena angka manual
-          akan tertulis ulang pada opname berikutnya.
-        </Petunjuk>
-      )}
+      <Petunjuk jarak="8px 0 0">
+        Status Bangun dihitung otomatis dari progres (Belum Terbangun / Progress /
+        Selesai).{data.dariBoq ? " Isi progres lewat tabel opname di halaman Konstruksi." : ""}
+      </Petunjuk>
     </FormModal>
   );
 }
@@ -71,7 +68,7 @@ export function TabelBoqSarpras({
 }) {
   return (
     <BoqTable
-      judul="BOQ · RAB · Spesifikasi"
+      judul="RAB · Spesifikasi"
       baris={baris}
       bolehHarga={bolehHarga}
       bolehUbah={bolehUbah}

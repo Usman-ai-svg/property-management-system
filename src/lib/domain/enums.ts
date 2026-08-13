@@ -11,28 +11,35 @@
 export const STATUS_PROYEK = [
   "Perencanaan",
   "Proses Legal & Perizinan",
-  "Dalam Pembangunan",
-  "Selesai",
-] as const;
-
-export const STATUS_LAHAN = [
-  "Perencanaan",
-  "Proses Legal & Perizinan",
   "Pembangunan",
-  "Selesai Terbangun",
+  "Selesai",
 ] as const;
 
+/**
+ * Status pembangunan sebuah unit — NILAI TURUNAN, tidak diinput manual.
+ * Diturunkan dari progres konstruksi + status jual + tanggal serah terima
+ * (lihat `statusBangunUnit()` di src/lib/calc/status-bangun.ts):
+ *   - Belum Terbangun — progres 0
+ *   - Progress        — 0 < progres < 100
+ *   - Terbangun       — progres 100, status jual belum "Serah Terima"
+ *   - Masa Garansi    — progres 100, sudah "Serah Terima", < 3 bulan
+ *   - Selesai         — progres 100, sudah "Serah Terima", ≥ 3 bulan
+ */
 export const STATUS_PEMBANGUNAN = [
-  "Belum terbangun",
+  "Belum Terbangun",
   "Progress",
+  "Terbangun",
+  "Masa Garansi",
   "Selesai",
-  "Serah Terima",
-  "Habis Masa Garansi",
 ] as const;
 
 export const STATUS_JUAL = ["Tersedia", "Booking", "Akad", "Serah Terima"] as const;
 
-export const STATUS_SARPRAS = ["Belum terbangun", "Progress", "Selesai"] as const;
+/**
+ * Status pembangunan sebuah sarana/prasarana — NILAI TURUNAN dari progres saja
+ * (tak punya status jual). Lihat `statusBangunSarpras()`.
+ */
+export const STATUS_SARPRAS = ["Belum Terbangun", "Progress", "Selesai"] as const;
 
 export const JENIS_SARPRAS = ["Sarana", "Prasarana"] as const;
 
@@ -338,7 +345,6 @@ export function divisiPeran(nama: string): number {
 }
 
 export type StatusProyek = (typeof STATUS_PROYEK)[number];
-export type StatusLahan = (typeof STATUS_LAHAN)[number];
 export type StatusPembangunan = (typeof STATUS_PEMBANGUNAN)[number];
 export type StatusJual = (typeof STATUS_JUAL)[number];
 export type StatusSarpras = (typeof STATUS_SARPRAS)[number];
@@ -382,7 +388,6 @@ export type RoleGroup =
  */
 export const SEMUA_ENUM = {
   StatusProyek: STATUS_PROYEK,
-  StatusLahan: STATUS_LAHAN,
   StatusPembangunan: STATUS_PEMBANGUNAN,
   StatusJual: STATUS_JUAL,
   StatusSarpras: STATUS_SARPRAS,

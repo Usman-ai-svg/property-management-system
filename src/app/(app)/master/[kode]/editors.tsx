@@ -5,9 +5,7 @@ import { Plus } from "lucide-react";
 import {
   BarisField, Field, FormModal, TombolHapus, TombolIkon, TombolTambah, TombolUbah,
 } from "@/components/form";
-import {
-  JENIS_HAK_ATAS_TANAH, JENIS_SARPRAS, STATUS_JUAL, STATUS_PEMBANGUNAN, STATUS_SARPRAS,
-} from "@/lib/domain/enums";
+import { JENIS_HAK_ATAS_TANAH, JENIS_SARPRAS, STATUS_JUAL } from "@/lib/domain/enums";
 import {
   hapusSarpras, hapusTipeUnit, hapusUnit, simpanSarpras, simpanTipeUnit,
   tambahUnit, ubahLegalitas, ubahLokasiProyek, ubahLuasLahan, ubahUnit,
@@ -310,42 +308,77 @@ export function AksiTipeUnit({
 
 export function EditUnit({
   data,
+  fases,
 }: {
   data: {
-    id: string; label: string; luasTanah: number;
-    statusPembangunan: string; statusJual: string; progress: number;
-    /** Benar bila progres unit ini turunan dari BOQ Master, bukan isian satu angka. */
-    dariBoq: boolean;
+    id: string; label: string; nomor: number; phaseId: string; luasTanah: number;
+    statusJual: string;
+    /** ISO yyyy-mm-dd, atau null bila belum diserahterimakan. */
+    tanggalSerahTerima: string | null;
   };
+  fases: { id: string; kode: string }[];
 }) {
+  const [statusJual, setStatusJual] = useState(data.statusJual);
+  const labelStyle = { display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 } as const;
+
   return (
     <FormModal
       judul={`Ubah Deskripsi Unit ${data.label}`}
-      keterangan="Perubahan progres dicatat sebagai titik riwayat baru, bukan menimpa angka sebelumnya."
       aksi={ubahUnit}
       pemicu={(buka) => <TombolIkon onClick={buka} judul={`Ubah unit ${data.label}`} />}
+      lebar={560}
     >
       <input type="hidden" name="id" value={data.id} />
+
       <BarisField>
-        <Field label="Status Bangun" nama="statusPembangunan" nilai={data.statusPembangunan} pilihan={STATUS_PEMBANGUNAN} />
-        <Field label="Status Jual" nama="statusJual" nilai={data.statusJual} pilihan={STATUS_JUAL} />
+        <Field label="Nomor Unit" nama="nomor" nilai={data.nomor} tipe="number" wajib />
+        <div>
+          <label style={labelStyle}>Fase</label>
+          <select name="phaseId" className="inp" defaultValue={data.phaseId}>
+            {fases.map((f) => (
+              <option key={f.id} value={f.id}>{f.kode}</option>
+            ))}
+          </select>
+        </div>
       </BarisField>
+
       <BarisField>
-        {data.dariBoq ? (
-          <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
-              Progres
-            </label>
-            <input type="hidden" name="progress" value={data.progress} />
-            <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
-              <b>{data.progress}%</b> — dari opname BOQ, tidak bisa diisi di sini.
-            </div>
-          </div>
-        ) : (
-          <Field label="Progres" nama="progress" nilai={data.progress} tipe="number" satuan="%" />
-        )}
+        <div>
+          <label style={labelStyle}>Status Jual</label>
+          <select
+            name="statusJual"
+            className="inp"
+            value={statusJual}
+            onChange={(e) => setStatusJual(e.target.value)}
+          >
+            {STATUS_JUAL.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
         <Field label="Luas Tanah" nama="luasTanah" nilai={data.luasTanah} tipe="number" satuan="m²" />
       </BarisField>
+
+      {statusJual === "Serah Terima" && (
+        <BarisField kolom={1}>
+          <div>
+            <label style={labelStyle}>Tanggal Serah Terima</label>
+            <input
+              type="date"
+              name="tanggalSerahTerima"
+              className="inp"
+              defaultValue={data.tanggalSerahTerima ?? ""}
+            />
+          </div>
+        </BarisField>
+      )}
+
+      <Petunjuk>
+        Kode unit ter-generate otomatis dari Fase + Nomor. <b>Status Bangun</b>{" "}
+        dihitung otomatis dari progres konstruksi, status jual, dan tanggal serah
+        terima — tidak diisi manual. Unit yang sudah diserahterimakan berstatus
+        &ldquo;Masa Garansi&rdquo; hingga 3 bulan, lalu menjadi &ldquo;Selesai&rdquo;.
+      </Petunjuk>
     </FormModal>
   );
 }
@@ -406,11 +439,12 @@ export function TambahUnit({
       </BarisField>
 
       <Petunjuk jarak={"0 0 14px"}>
-        Luas bangunan, dokumen, BOQ, RAB &amp; RAP mengikuti tipe. Luas tanah diisi per unit.
+        Luas bangunan, dokumen, BOQ, RAB &amp; RAP mengikuti tipe. Luas tanah diisi
+        per unit. Unit baru selalu mulai &ldquo;Belum Terbangun&rdquo; (progres 0) —
+        Status Bangun dihitung otomatis dari kemajuan konstruksi.
       </Petunjuk>
 
-      <BarisField>
-        <Field label="Status Bangun" nama="statusPembangunan" nilai="Belum terbangun" pilihan={STATUS_PEMBANGUNAN} />
+      <BarisField kolom={1}>
         <Field label="Status Jual" nama="statusJual" nilai="Tersedia" pilihan={STATUS_JUAL} />
       </BarisField>
     </FormModal>
@@ -453,21 +487,23 @@ function FormSarpras({
         <Field label="Jenis" nama="jenis" nilai={data?.jenis ?? "Prasarana"} pilihan={JENIS_SARPRAS} />
         <Field label="Volume" nama="volume" nilai={data?.volume} wajib petunjuk="mis. 420 m" />
       </BarisField>
-      <BarisField>
-        <Field label="Status Bangun" nama="status" nilai={data?.status ?? "Belum terbangun"} pilihan={STATUS_SARPRAS} />
-        {data?.dariBoq ? (
-          <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
-              Progres
-            </label>
-            <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
-              <b>{data.progress}%</b> — dari opname BOQ, tidak bisa diisi di sini.
+      {data && (
+        <BarisField kolom={1}>
+          {data.dariBoq ? (
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+                Progres
+              </label>
+              <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
+                <b>{data.progress}%</b> — dari opname BOQ, tidak bisa diisi di sini. Status
+                bangun dihitung otomatis dari progres ini.
+              </div>
             </div>
-          </div>
-        ) : (
-          <Field label="Progres" nama="progress" nilai={data?.progress ?? 0} tipe="number" satuan="%" />
-        )}
-      </BarisField>
+          ) : (
+            <Field label="Progres" nama="progress" nilai={data.progress} tipe="number" satuan="%" petunjuk="Status bangun otomatis dari progres" />
+          )}
+        </BarisField>
+      )}
     </FormModal>
   );
 }

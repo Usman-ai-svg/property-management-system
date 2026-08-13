@@ -142,7 +142,7 @@ export default async function Landbank({
                     )}
                   </td>
                   <td>
-                    <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
+                    <Badge nilai={p.status} peta={WARNA_STATUS.proyek} />
                   </td>
                 </tr>
               ))}

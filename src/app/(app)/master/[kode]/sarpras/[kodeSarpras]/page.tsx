@@ -1,14 +1,15 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
-import { detailSarpras, kontrakSarpras, riwayatObjek } from "@/lib/data/proyek";
+import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
+import { detailSarpras, kontrakSarpras } from "@/lib/data/proyek";
 import { Badge, CardHead, InfoRow, Kartu, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
 import { KATEGORI_EKSTENSI } from "@/lib/storage";
 import { hapusSarprasPaksa, unggahRevisi } from "../../../actions";
 import { HapusPaksa } from "@/components/hapus-paksa";
 import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
-import { rp, tanggalJam } from "@/lib/format";
+import { rapKategori } from "@/lib/calc/boq";
+import { rp } from "@/lib/format";
 import { EditDeskripsiSarpras, TabelBoqSarpras, TabelRapSarpras } from "./editors";
 
 
@@ -49,10 +50,6 @@ export default async function RincianSarpras({
 
   const kontrak = await kontrakSarpras(item.id);
 
-  // Riwayat perubahan item ini. Dibatasi ke proyek yang boleh diakses pengguna,
-  // supaya log tidak menjadi celah untuk mengintip proyek lain.
-  const riwayat = await riwayatObjek(pengguna, item.projectId, item.nama);
-
   const boqItems = "boqItems" in item ? item.boqItems : [];
   const rapItems = "rapItems" in item ? item.rapItems : [];
   const rapUpahVolume = "rapUpahVolume" in item ? item.rapUpahVolume : 0;
@@ -64,8 +61,9 @@ export default async function RincianSarpras({
   const dariBoq = item._count.boqItems > 0;
 
   const rab = boqItems.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
-  const rapMaterial = rapItems.reduce((s, r) => s + r.volume * r.hargaSatuan, 0);
-  const rapUpah = rapUpahVolume * rapUpahHarga;
+  // RAP dihitung 4 kategori (Material/Subkon/Upah/Lain-lain 5%) memakai rumus
+  // yang sama dengan tabel RAP, supaya kartu ringkasan & tabel selalu konsisten.
+  const rap = rapKategori({ rapUpahVolume, rapUpahHarga, rapItems });
 
   return (
     <div style={{ padding: 24 }}>
@@ -127,7 +125,7 @@ export default async function RincianSarpras({
             }
           />
           {bolehHarga && <InfoRow label="RAB" nilai={rp(rab)} />}
-          {bolehHarga && <InfoRow label="RAP" nilai={rp(rapMaterial + rapUpah)} />}
+          {bolehHarga && <InfoRow label="RAP" nilai={rp(rap.total)} />}
         </Kartu>
 
         <Kartu>
@@ -190,46 +188,30 @@ export default async function RincianSarpras({
             bolehUbah={ubahHarga}
             konteks={item.nama}
           />
-        </>
-      )}
 
-      {/* ---------- riwayat perubahan ---------- */}
-      <div className="card" style={{ marginTop: 16, padding: "16px 20px" }}>
-        <div className="eyebrow" style={{ marginBottom: 8 }}>Riwayat Perubahan</div>
-        {riwayat.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
-            Belum ada perubahan tercatat untuk item ini.
-          </div>
-        ) : (
-          riwayat.map((e) => (
-            <div
-              key={e.id}
-              style={{
-                display: "grid", gridTemplateColumns: "150px 1fr", gap: 10,
-                padding: "7px 0", borderBottom: "1px solid var(--garis-halus)", fontSize: 12,
-              }}
-            >
-              <div style={{ color: "var(--muted)" }}>{tanggalJam(e.waktu)}</div>
+          {/* ---------- Ringkasan RAB & RAP (konsisten dengan Detail Unit) ---------- */}
+          <Kartu atas={20}>
+            <div className="eyebrow" style={{ marginBottom: 8 }}>Ringkasan RAB &amp; RAP Item Ini</div>
+            <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 10, lineHeight: 1.6 }}>
+              RAB dijumlah dari baris BOQ; RAP dari rincian material, upah, dan Lain-lain 5%.
+            </div>
+            <div className="grid grid2" style={{ gap: 20 }}>
               <div>
-                <b>{e.aksi}</b> · {e.objek}
-                <div style={{ color: "var(--muted)", marginTop: 2 }}>
-                  {e.nilaiDari != null ? (
-                    <>
-                      <span style={{ textDecoration: "line-through" }}>{e.nilaiDari}</span>
-                      {" → "}
-                      <b style={{ color: "var(--text)" }}>{e.nilaiKe}</b>
-                    </>
-                  ) : (
-                    e.nilaiKe
-                  )}
-                  {" · oleh "}
-                  {e.user?.nama ?? "—"} ({e.peran})
-                </div>
+                <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>RAB</div>
+                <InfoRow label="Total RAB" nilai={rp(rab)} tebal />
+              </div>
+              <div>
+                <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>RAP</div>
+                <InfoRow label="Material" nilai={rp(rap.material)} />
+                <InfoRow label="Subkon" nilai={rp(rap.subkon)} />
+                <InfoRow label="Upah Tenaga Kerja" nilai={rp(rap.tenaga)} />
+                <InfoRow label="Lain-lain Proyek (5%)" nilai={rp(rap.lain)} />
+                <InfoRow label="Total RAP" nilai={rp(rap.total)} tebal />
               </div>
             </div>
-          ))
-        )}
-      </div>
+          </Kartu>
+        </>
+      )}
 
       {pengguna.peranAktif === "Administrator Sistem" && (
         <HapusPaksa

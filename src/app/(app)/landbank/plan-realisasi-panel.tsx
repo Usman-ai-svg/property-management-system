@@ -173,7 +173,7 @@ export async function PlanRealisasiPanel({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0" }}>
-        <Badge nilai={d.proyek.statusLahan} peta={WARNA_STATUS.lahan} />
+        <Badge nilai={d.proyek.status} peta={WARNA_STATUS.proyek} />
         <span style={{ fontSize: 12, color: "var(--muted)" }}>
           Progres fisik rata-rata {pct(d.progres, 1)}
           {melampaui > 0 && ` · ${melampaui} pos HPP menyerap lebih cepat dari progresnya`}

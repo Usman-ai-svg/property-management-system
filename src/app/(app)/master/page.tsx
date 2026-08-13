@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
+import { ambilPengguna, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { daftarProyek, kpiMaster } from "@/lib/data/proyek";
 import { luasTotal } from "@/lib/tampilan/landbank";
-import { m2 } from "@/lib/format";
+import { m2, rp } from "@/lib/format";
 import { Badge, TabelHead, WARNA_STATUS } from "@/components/ui";
 import { Tabel } from "@/components/kartu-tabel";
 import { TambahProyek } from "./editors-proyek";
@@ -13,6 +13,7 @@ export default async function MasterProyek() {
   if (!pengguna) redirect("/login");
 
   const bisaKelola = bolehUbah(pengguna, "deskripsi");
+  const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
 
   const [proyek, kpi] = await Promise.all([daftarProyek(pengguna), kpiMaster(pengguna)]);
 
@@ -55,6 +56,8 @@ export default async function MasterProyek() {
             { label: "Unit", rata: "kanan" },
             { label: "Fase" },
             { label: "Sarpras", rata: "kanan" },
+            bolehHarga && { label: "Total RAB", rata: "kanan" },
+            bolehHarga && { label: "Total RAP", rata: "kanan" },
             { label: "Status" },
           ]}
           kosong="Belum ada proyek yang dapat Anda akses."
@@ -79,8 +82,14 @@ export default async function MasterProyek() {
                 {p.fases.map((f) => f.kode).join(", ")}
               </td>
               <td style={{ textAlign: "right" }}>{p._count.infrastructures}</td>
+              {bolehHarga && (
+                <td className="num" style={{ textAlign: "right" }}>{rp(p.totalRab ?? 0)}</td>
+              )}
+              {bolehHarga && (
+                <td className="num" style={{ textAlign: "right" }}>{rp(p.totalRap ?? 0)}</td>
+              )}
               <td>
-                <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
+                <Badge nilai={p.status} peta={WARNA_STATUS.proyek} />
               </td>
             </tr>
           ))}

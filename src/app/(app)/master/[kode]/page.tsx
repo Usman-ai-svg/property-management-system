@@ -9,31 +9,17 @@ import { Badge, CardHead, InfoRow, Kartu, TabelHead, Terbatas, WARNA_STATUS } fr
 import { FileRow } from "@/components/file-row";
 import { unggahRevisi } from "../actions";
 import {
-  AksiSarpras, AksiTipeUnit, EditLegalitas, EditLokasi, EditLuasLahan, EditUnit,
-  HapusUnit, TambahSarpras, TambahTipeUnit, TambahUnit,
+  AksiTipeUnit, EditLegalitas, EditLokasi, EditLuasLahan,
+  TambahSarpras, TambahTipeUnit, TambahUnit,
 } from "./editors";
-import { HapusFase, HapusProyek, KelolaFase, UbahFase, UbahProyek } from "../editors-proyek";
+import { AturJumlahFase, HapusProyek, UbahProyek } from "../editors-proyek";
 import { Tabel } from "@/components/kartu-tabel";
+import { TabelUnit, type BarisUnit } from "./tabel-unit";
+import { TabelSarpras, type BarisSarpras } from "./tabel-sarpras";
 
-/** Baris total di kaki tabel: pasangan label–nilai, rata kanan. */
-function BarisTotal({ items }: { items: [string, string][] }) {
-  return (
-    <div
-      style={{
-        display: "flex", justifyContent: "flex-end", gap: 28, flexWrap: "wrap",
-        padding: "11px 16px", borderTop: "1px solid var(--line)", background: "var(--rona-baris)",
-      }}
-    >
-      {items.map(([label, nilai]) => (
-        <div key={label} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em" }}>
-            {label}
-          </span>
-          <span className="num" style={{ fontSize: 14, fontWeight: 700, color: "var(--brass)" }}>{nilai}</span>
-        </div>
-      ))}
-    </div>
-  );
+/** Tanggal → ISO yyyy-mm-dd untuk isian <input type="date">. */
+function iso(d: Date | null): string | null {
+  return d ? d.toISOString().slice(0, 10) : null;
 }
 
 export default async function DetailProyek({ params }: { params: Promise<{ kode: string }> }) {
@@ -48,7 +34,6 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
   const ubahData = bolehUbah(pengguna, "daftarUnit");
   const ubahDeskripsi = bolehUbah(pengguna, "deskripsi");
   const ubahTeknis = bolehUbah(pengguna, "dokumenTeknis");
-  const ubahHarga = bolehUbah(pengguna, "hargaRabRap");
   const ubahProgres = bolehUbah(pengguna, "progress");
   const ubahSarprasData = bolehUbah(pengguna, "daftarSarpras");
 
@@ -71,6 +56,26 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
   const totalRapUnit = bolehHarga ? unit.reduce((s, u) => s + nilaiUnit(u).rap, 0) : 0;
   const totalRabSarpras = bolehHarga ? sarpras.reduce((s, x) => s + nilaiSarpras(x).rab, 0) : 0;
   const totalRapSarpras = bolehHarga ? sarpras.reduce((s, x) => s + nilaiSarpras(x).rap, 0) : 0;
+
+  // Baris tabel (serializable) untuk komponen klien PanelTabel.
+  const barisUnit: BarisUnit[] = unit.map((u) => ({
+    id: u.id, kode: u.kode, nomor: u.nomor, faseKode: u.phase.kode, phaseId: u.phaseId,
+    tipeNama: u.unitType.nama, luasBangunan: u.unitType.luasBangunan, luasTanah: u.luasTanah,
+    custom: (u.customWorks?.length ?? 0) > 0,
+    statusPembangunan: u.statusPembangunan, statusJual: u.statusJual,
+    tanggalSerahTerima: iso(u.tanggalSerahTerima),
+    progress: u.progress,
+    rab: bolehHarga ? nilaiUnit(u).rab : null,
+    rap: bolehHarga ? nilaiUnit(u).rap : null,
+  }));
+
+  const barisSarpras: BarisSarpras[] = sarpras.map((s) => ({
+    id: s.id, kode: s.kode, nama: s.nama, jenis: s.jenis, volume: s.volume,
+    status: s.status, progress: s.progress, dariBoq: s._count.boqItems > 0,
+    terkontrak: s._count.contractItems,
+    rab: bolehHarga ? nilaiSarpras(s).rab : null,
+    rap: bolehHarga ? nilaiSarpras(s).rap : null,
+  }));
 
   return (
     <div style={{ padding: 24 }}>
@@ -103,7 +108,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
             </h3>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <Badge nilai={proyek.statusLahan} peta={WARNA_STATUS.lahan} />
+            <Badge nilai={proyek.status} peta={WARNA_STATUS.proyek} />
             {ubahDeskripsi && (
               <div style={{ display: "flex", gap: 2 }}>
                 <UbahProyek proyek={proyek} />
@@ -274,13 +279,6 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
             <span style={{ fontWeight: 600, fontSize: 13 }}>Luas Total</span>
             <span className="num" style={{ fontSize: 16 }}>{m2(total)}</span>
           </div>
-          <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 8 }}>
-            Biaya perolehan lahan dikelola di{" "}
-            <Link href={`/landbank/${kodeProyek}`} style={{ color: "var(--teal)", fontWeight: 600 }}>
-              halaman Landbank
-            </Link>
-            .
-          </div>
         </Kartu>
 
         {/* ---------- Fase ---------- */}
@@ -289,29 +287,14 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
             judul={`Fase · ${proyek.fases.length} fase`}
             aksi={
               ubahDeskripsi && (
-                <KelolaFase
-                  projectId={proyek.id}
-                  kodeProyek={kodeProyek}
-                  fases={proyek.fases.map((f) => ({
-                    id: f.id, kode: f.kode, nama: f.nama,
-                    urutan: f.urutan, jumlahUnit: f._count.units,
-                  }))}
-                />
+                <AturJumlahFase projectId={proyek.id} kodeProyek={kodeProyek} jumlah={proyek.fases.length} />
               )
             }
           />
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {proyek.fases.map((f) => (
-              <span key={f.id} style={{ display: "flex", alignItems: "center" }}>
-                <span className="chip" style={{ background: "var(--rona-teal)", color: "var(--muted)" }}>
-                  {f.kode}{f.nama ? ` · ${f.nama}` : ""} · {f._count.units} unit
-                </span>
-                {ubahDeskripsi && (
-                  <>
-                    <UbahFase fase={f} />
-                    <HapusFase id={f.id} kode={f.kode} />
-                  </>
-                )}
+              <span key={f.id} className="chip" style={{ background: "var(--rona-teal)", color: "var(--muted)" }}>
+                {f.kode} · {f._count.units} unit
               </span>
             ))}
           </div>
@@ -360,116 +343,30 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
         </div>
 
         {/* ---------- Daftar Unit ---------- */}
-        <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
-          <TabelHead
-            judul={`Daftar Unit · ${unit.length} unit`}
-            keterangan="Klik nomor unit untuk membuka Detail Data Unit · status diubah dari halaman detail."
+        {!bolehUnit ? (
+          <div className="card" style={{ marginTop: 16, padding: 16 }}>
+            <Terbatas apa="Daftar unit" />
+          </div>
+        ) : (
+          <TabelUnit
+            kodeProyek={kodeProyek}
+            data={barisUnit}
+            fases={proyek.fases.map((f) => ({ id: f.id, kode: f.kode }))}
+            bolehHarga={bolehHarga}
+            ubahProgres={ubahProgres}
+            ubahData={ubahData}
             aksi={
-              ubahData &&
-              proyek.unitTypes.length > 0 &&
-              proyek.fases.length > 0 && (
+              ubahData && proyek.unitTypes.length > 0 && proyek.fases.length > 0 ? (
                 <TambahUnit
                   kode={kodeProyek}
                   fases={proyek.fases}
                   tipes={proyek.unitTypes}
                   nomorBerikutnya={nomorBerikutnya}
                 />
-              )
+              ) : undefined
             }
           />
-
-          {!bolehUnit ? (
-            <div style={{ padding: 16 }}>
-              <Terbatas apa="Daftar unit" />
-            </div>
-          ) : (
-            <Tabel
-              tinggiMaks={400}
-              kolom={[
-                { label: "Unit" },
-                { label: "Fase" },
-                { label: "Tipe" },
-                { label: "LB", rata: "kanan" },
-                { label: "LT", rata: "kanan" },
-                { label: "Konfigurasi" },
-                { label: "Status Bangun" },
-                { label: "Status Jual" },
-                bolehHarga && { label: "RAB", rata: "kanan" },
-                bolehHarga && { label: "RAP", rata: "kanan" },
-                (ubahProgres || ubahData) && { lebar: 70 },
-              ]}
-              kosong="Belum ada unit pada proyek ini."
-            >
-              {unit.map((u) => {
-                const n = bolehHarga ? nilaiUnit(u) : null;
-                const custom = (u.customWorks?.length ?? 0) > 0;
-                const label = `${u.phase.kode}-${u.nomor}`;
-
-                return (
-                  <tr key={u.id}>
-                    <td>
-                      <Link
-                        href={`/master/${kodeProyek}/unit/${encodeURIComponent(u.kode)}`}
-                        style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
-                      >
-                        {u.nomor}
-                      </Link>
-                    </td>
-                    <td>{u.phase.kode}</td>
-                    <td>{u.unitType.nama}</td>
-                    <td style={{ textAlign: "right" }}>{u.unitType.luasBangunan} m²</td>
-                    <td style={{ textAlign: "right" }}>{u.luasTanah} m²</td>
-                    <td>
-                      {custom ? (
-                        <span className="chip" style={{ background: "var(--rona-amber)", color: "var(--amber)" }}>
-                          Custom
-                        </span>
-                      ) : (
-                        <span className="chip" style={{ background: "var(--rona-abu)", color: "var(--muted)" }}>
-                          Default
-                        </span>
-                      )}
-                    </td>
-                    <td><Badge nilai={u.statusPembangunan} peta={WARNA_STATUS.bangun} /></td>
-                    <td><Badge nilai={u.statusJual} peta={WARNA_STATUS.jual} /></td>
-                    {bolehHarga && (
-                      <td className="num" style={{ textAlign: "right" }}>{rp(n!.rab)}</td>
-                    )}
-                    {bolehHarga && (
-                      <td className="num" style={{ textAlign: "right" }}>{rp(n!.rap)}</td>
-                    )}
-                    {(ubahProgres || ubahData) && (
-                      <td>
-                        <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
-                          {ubahProgres && (
-                            <EditUnit
-                              data={{
-                                id: u.id, label, luasTanah: u.luasTanah,
-                                statusPembangunan: u.statusPembangunan,
-                                statusJual: u.statusJual, progress: u.progress,
-                                dariBoq: u._count.boqItems > 0,
-                              }}
-                            />
-                          )}
-                          {ubahData && u.progress === 0 && <HapusUnit id={u.id} label={label} />}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </Tabel>
-          )}
-
-          {bolehUnit && bolehHarga && (
-            <BarisTotal
-              items={[
-                ["Total RAB Unit", rp(totalRabUnit)],
-                ["Total RAP Unit", rp(totalRapUnit)],
-              ]}
-            />
-          )}
-        </div>
+        )}
 
         {bolehUnit && !bolehHarga && (
           <div style={{ marginTop: 12 }}>
@@ -478,79 +375,19 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
         )}
 
         {/* ---------- Daftar Sarpras ---------- */}
-        <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
-          <TabelHead
-            judul={`Daftar Sarana & Prasarana · ${sarpras.length} item`}
-            keterangan="Klik nama item untuk membuka Detail Data Sarana & Prasarana."
-            aksi={ubahSarprasData && <TambahSarpras kode={kodeProyek} />}
+        {!bolehSarpras ? (
+          <div className="card" style={{ marginTop: 16, padding: 16 }}>
+            <Terbatas apa="Daftar sarana & prasarana" />
+          </div>
+        ) : (
+          <TabelSarpras
+            kodeProyek={kodeProyek}
+            data={barisSarpras}
+            bolehHarga={bolehHarga}
+            ubahSarprasData={ubahSarprasData}
+            aksi={ubahSarprasData ? <TambahSarpras kode={kodeProyek} /> : undefined}
           />
-
-          {!bolehSarpras ? (
-            <div style={{ padding: 16 }}>
-              <Terbatas apa="Daftar sarana & prasarana" />
-            </div>
-          ) : (
-            <Tabel
-              kolom={[
-                { label: "Item" },
-                { label: "Jenis" },
-                { label: "Volume" },
-                { label: "Status Bangun" },
-                bolehHarga && { label: "RAB", rata: "kanan" },
-                bolehHarga && { label: "RAP", rata: "kanan" },
-                ubahSarprasData && { lebar: 70 },
-              ]}
-              kosong="Belum ada item sarana atau prasarana."
-            >
-              {sarpras.map((s) => {
-                const n = bolehHarga ? nilaiSarpras(s) : null;
-                return (
-                  <tr key={s.id}>
-                    <td>
-                      <Link
-                        href={`/master/${kodeProyek}/sarpras/${encodeURIComponent(s.kode)}`}
-                        style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
-                      >
-                        {s.nama}
-                      </Link>
-                    </td>
-                    <td style={{ color: "var(--muted)" }}>{s.jenis}</td>
-                    <td>{s.volume}</td>
-                    <td><Badge nilai={s.status} peta={WARNA_STATUS.bangun} /></td>
-                    {bolehHarga && (
-                      <td className="num" style={{ textAlign: "right" }}>{rp(n!.rab)}</td>
-                    )}
-                    {bolehHarga && (
-                      <td className="num" style={{ textAlign: "right" }}>{rp(n!.rap)}</td>
-                    )}
-                    {ubahSarprasData && (
-                      <td>
-                        <AksiSarpras
-                          kode={kodeProyek}
-                          data={{
-                            id: s.id, nama: s.nama, jenis: s.jenis, volume: s.volume,
-                            status: s.status, progress: s.progress,
-                            dariBoq: s._count.boqItems > 0,
-                          }}
-                          terkontrak={s._count.contractItems}
-                        />
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </Tabel>
-          )}
-
-          {bolehSarpras && bolehHarga && (
-            <BarisTotal
-              items={[
-                ["Total RAB Sarpras", rp(totalRabSarpras)],
-                ["Total RAP Sarpras", rp(totalRapSarpras)],
-              ]}
-            />
-          )}
-        </div>
+        )}
 
         {/* ---------- Grand Total RAB & RAP Proyek ---------- */}
         {bolehHarga && (bolehUnit || bolehSarpras) && (

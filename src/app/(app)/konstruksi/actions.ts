@@ -9,6 +9,7 @@ import {
   hitungUlangProgresUnit,
 } from "@/lib/data/progres-konstruksi";
 import { mingguBaru } from "@/lib/calc/hari-kerja";
+import { statusBangunSarpras, statusBangunUnit } from "@/lib/calc/status-bangun";
 
 /**
  * Pembaruan progres dari modul Konstruksi.
@@ -28,6 +29,7 @@ export async function ubahProgresUnit(_s: HasilAksi | null, form: FormData): Pro
       where: { id },
       select: {
         id: true, nomor: true, progress: true, projectId: true,
+        statusJual: true, tanggalSerahTerima: true,
         phase: { select: { kode: true } }, project: { select: { kode: true } },
       },
     });
@@ -48,9 +50,11 @@ export async function ubahProgresUnit(_s: HasilAksi | null, form: FormData): Pro
 
     if (progress === unit.progress) return "Progres tidak berubah.";
 
-    // Status bangun mengikuti progres, seperti pada artifact.
-    const statusPembangunan =
-      progress >= 100 ? "Selesai" : progress > 0 ? "Progress" : "Belum terbangun";
+    // Status bangun adalah nilai turunan — disimpulkan dari progres + status
+    // jual + tanggal serah terima (lihat statusBangunUnit).
+    const statusPembangunan = statusBangunUnit({
+      progress, statusJual: unit.statusJual, tanggalSerahTerima: unit.tanggalSerahTerima,
+    });
 
     await prisma.$transaction([
       prisma.unit.update({ where: { id }, data: { progress, statusPembangunan } }),
@@ -101,7 +105,7 @@ export async function ubahProgresSarpras(_s: HasilAksi | null, form: FormData): 
 
     if (progress === item.progress) return "Progres tidak berubah.";
 
-    const status = progress >= 100 ? "Selesai" : progress > 0 ? "Progress" : "Belum terbangun";
+    const status = statusBangunSarpras(progress);
 
     await prisma.$transaction([
       prisma.infrastructure.update({ where: { id }, data: { progress, status } }),

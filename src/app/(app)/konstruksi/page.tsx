@@ -93,7 +93,7 @@ export default async function DashboardKonstruksi() {
                 )}
               </td>
               <td>
-                <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
+                <Badge nilai={p.status} peta={WARNA_STATUS.proyek} />
               </td>
             </tr>
           ))}

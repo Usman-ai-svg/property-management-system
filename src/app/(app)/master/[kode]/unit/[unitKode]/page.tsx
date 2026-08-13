@@ -10,6 +10,7 @@ import { HapusPaksa } from "@/components/hapus-paksa";
 import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
 import { rp } from "@/lib/format";
 import { nilaiUnit } from "@/lib/data/proyek";
+import { totalRap } from "@/lib/calc/boq";
 import {
   EditDeskripsiUnit, HapusKerjaTambah, TabelBoqKt, TabelBoqUnit,
   TabelRapKt, TabelRapUnit, TambahKerjaTambah, UbahJudulKerjaTambah,
@@ -62,14 +63,15 @@ export default async function RincianUnit({
   const nilai = nilaiUnit({ boqItems, rapItems, rapUpahVolume, rapUpahHarga, customWorks: kts });
 
   // Rincian RAB & RAP per Kerja Tambah — dipisah agar ringkasan tidak lagi
-  // menggabung seluruh kerja tambah menjadi satu baris. Jumlah baris-baris ini
-  // tepat sama dengan nilai.kerjaTambah / nilai.rapKerjaTambah.
+  // menggabung seluruh kerja tambah menjadi satu baris. RAP tiap kerja tambah
+  // memakai `totalRap` (Material + Subkon + Upah + Lain-lain 5%) supaya angkanya
+  // identik dengan total di tabel RAP kerja tambah maupun `nilai.rapKerjaTambah`.
   const jumlahBaris = (rows?: { volume: number; hargaSatuan: number }[]) =>
     (rows ?? []).reduce((s, r) => s + r.volume * r.hargaSatuan, 0);
   const ktNilai = kts.map((kt) => ({
     judul: kt.judul,
     rab: jumlahBaris(kt.boqItems),
-    rap: jumlahBaris(kt.rapItems) + (kt.rapUpahVolume || 0) * (kt.rapUpahHarga || 0),
+    rap: totalRap({ rapUpahVolume: kt.rapUpahVolume, rapUpahHarga: kt.rapUpahHarga, rapItems: kt.rapItems }),
   }));
 
   return (
@@ -351,7 +353,7 @@ export default async function RincianUnit({
               </div>
               <div>
                 <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>RAP</div>
-                <InfoRow label={`Default · Tipe ${unit.unitType.nama}`} nilai={rp(nilai.rapMaterial + nilai.rapUpah)} />
+                <InfoRow label={`Default · Tipe ${unit.unitType.nama}`} nilai={rp(nilai.rap4.total)} />
                 {ktNilai.map((k, i) => (
                   <InfoRow key={i} label={`Kerja Tambah · ${k.judul}`} nilai={rp(k.rap)} />
                 ))}

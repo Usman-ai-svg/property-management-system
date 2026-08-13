@@ -118,7 +118,7 @@ export const USERS = [
 
 export const PROYEK = [
   {
-    kode: "NT2", nama: "Nano Town 2", status: "Selesai", statusLahan: "Selesai Terbangun",
+    kode: "NT2", nama: "Nano Town 2", status: "Selesai",
     fases: { F1: 4, F2: 8 },
     lokasi: { alamat: "Jl. Raya Bojongsari No. 21", kelurahan: "Bojongsari Baru", kecamatan: "Bojongsari", kota: "Kota Depok", provinsi: "Jawa Barat", lat: -6.4021, lng: 106.7532 },
     luas: { kavlingEfektif: 7800, sarana: 620, prasarana: 1450, rth: 780 },
@@ -140,7 +140,7 @@ export const PROYEK = [
     },
   },
   {
-    kode: "NT4", nama: "Nano Town 4", status: "Dalam Pembangunan", statusLahan: "Pembangunan",
+    kode: "NT4", nama: "Nano Town 4", status: "Pembangunan",
     fases: { F1: 11, F2: 11, F3: 13, F4: 16 },
     lokasi: { alamat: "Jl. Raya Tapos No. 104", kelurahan: "Sukatani", kecamatan: "Tapos", kota: "Kota Depok", provinsi: "Jawa Barat", lat: -6.4185, lng: 106.8471 },
     luas: { kavlingEfektif: 24500, sarana: 2100, prasarana: 4600, rth: 2800 },
@@ -164,7 +164,7 @@ export const PROYEK = [
     },
   },
   {
-    kode: "GN2", nama: "Griya Nanotech 2", status: "Dalam Pembangunan", statusLahan: "Pembangunan",
+    kode: "GN2", nama: "Griya Nanotech 2", status: "Pembangunan",
     fases: { F1: 15 },
     lokasi: { alamat: "Jl. Raya Karadenan No. 12", kelurahan: "Karadenan", kecamatan: "Cibinong", kota: "Kab. Bogor", provinsi: "Jawa Barat", lat: -6.4692, lng: 106.8281 },
     luas: { kavlingEfektif: 9000, sarana: 700, prasarana: 1800, rth: 900 },

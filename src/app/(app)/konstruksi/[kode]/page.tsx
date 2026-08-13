@@ -95,7 +95,7 @@ export default async function ProgresProyek({
       </Link>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-        <Badge nilai={proyek.statusLahan} peta={WARNA_STATUS.lahan} />
+        <Badge nilai={proyek.status} peta={WARNA_STATUS.proyek} />
       </div>
 
       {/* ---------- ringkasan progress ---------- */}

@@ -35,7 +35,7 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
   const proyek = await prisma.project.findUnique({
     where: { kode },
     select: {
-      id: true, kode: true, nama: true, statusLahan: true,
+      id: true, kode: true, nama: true, status: true,
       biayaPembelian: true, biayaNotaris: true, biayaBalikNama: true, biayaLegalLain: true,
       units: {
         orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
@@ -163,7 +163,7 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
     : 0;
 
   return {
-    proyek: { id: proyek.id, kode: proyek.kode, nama: proyek.nama, statusLahan: proyek.statusLahan },
+    proyek: { id: proyek.id, kode: proyek.kode, nama: proyek.nama, status: proyek.status },
     progres,
     biaya, ops, sales,
     penjualanPlan, penjualanReal,

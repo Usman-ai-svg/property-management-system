@@ -4,16 +4,21 @@ import { Fragment, useState, useTransition } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { HasilAksi } from "@/lib/actions/guard";
 import { rp } from "@/lib/format";
-import { PORSI_LAIN_LAIN, SUBKON_RE } from "@/lib/calc/boq";
+import { PORSI_LAIN_LAIN, isSubkon } from "@/lib/calc/boq";
 import { ModalImpor } from "./impor";
 
 /**
- * Tabel RAP: rincian material per kelompok, ditutup baris MATERIAL, UPAH
- * TENAGA KERJA, dan TOTAL RAP. Meniru komponen RapTable pada artifact,
- * termasuk penomoran kelompok dengan angka romawi.
+ * Tabel RAP dengan EMPAT kelompok tetap, sesuai kesepakatan:
  *
- * Dalam mode sunting, kelompok bisa ditambah, diganti namanya, atau dihapus —
- * bukan hanya barisnya. Semuanya dikirim sekaligus saat "Simpan".
+ *   I.   Material          — baris material (kategori Material)
+ *   II.  Subkon            — baris subkon (kategori Subkon)
+ *   III. Upah Tenaga Kerja — upah (volume OH × harga), satu baris
+ *   IV.  Lain-lain Proyek  — 5% dari (Material + Subkon + Upah), TANPA sub-isian
+ *
+ * Tiap kelompok (kecuali Lain-lain) punya baris isiannya sendiri dan bisa
+ * disunting seperti baris material. Subtotal tampil di kepala tiap kelompok,
+ * dan TOTAL RAP di kaki. Struktur ini persis sama dengan rincian pada kartu
+ * "Ringkasan RAB & RAP" supaya angka keduanya selalu konsisten.
  */
 
 export interface BarisRapUI {
@@ -27,41 +32,22 @@ export interface BarisRapUI {
   keterangan?: string | null;
 }
 
-interface Kelompok {
-  nama: string;
-  /** "Material" | "Subkon" — kategori seluruh baris kelompok ini. */
-  kategori: string;
-  items: BarisRapUI[];
-}
-
-const ROMAWI = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
-
 const sel = { fontSize: 11, padding: "3px 6px" } as const;
 
-const ITEM_BARU: Omit<BarisRapUI, "grup"> = {
-  nama: "Material baru", satuan: "ls", volume: 1, hargaSatuan: 0, keterangan: "",
-};
+const jumlah = (rows: { volume: number; hargaSatuan: number }[]) =>
+  rows.reduce((s, r) => s + r.volume * r.hargaSatuan, 0);
 
-/**
- * Kategori efektif sebuah kelompok: kategori eksplisit baris pertama, atau
- * (data lama) "Subkon" bila namanya memuat "subkon". Nama tak lagi menentukan —
- * hanya jaring pengaman untuk data yang belum punya kategori.
- */
-function kategoriKelompok(nama: string, items: BarisRapUI[]): string {
-  const eksplisit = items.find((i) => i.kategori === "Subkon" || i.kategori === "Material")?.kategori;
-  if (eksplisit) return eksplisit;
-  return SUBKON_RE.test(nama) ? "Subkon" : "Material";
-}
+const barisBaru = (kategori: "Material" | "Subkon"): BarisRapUI => ({
+  grup: kategori, kategori, nama: `${kategori === "Subkon" ? "Pekerjaan subkon" : "Material"} baru`,
+  satuan: "ls", volume: 1, hargaSatuan: 0, keterangan: "",
+});
 
-/** Susun baris datar menjadi kelompok, dengan urutan kemunculan pertama. */
-function kelompokkan(baris: BarisRapUI[]): Kelompok[] {
-  const peta = new Map<string, BarisRapUI[]>();
-  for (const b of baris) {
-    const ada = peta.get(b.grup);
-    if (ada) ada.push(b);
-    else peta.set(b.grup, [b]);
-  }
-  return [...peta.entries()].map(([nama, items]) => ({ nama, kategori: kategoriKelompok(nama, items), items }));
+/** Pisahkan baris datar menjadi dua kelompok kategori. */
+function pisah(baris: BarisRapUI[]): { material: BarisRapUI[]; subkon: BarisRapUI[] } {
+  const material: BarisRapUI[] = [];
+  const subkon: BarisRapUI[] = [];
+  for (const b of baris) (isSubkon(b) ? subkon : material).push(b);
+  return { material, subkon };
 }
 
 export function RapTable({
@@ -91,14 +77,13 @@ export function RapTable({
   konteksImpor: string;
   sasaranImpor: "unit" | "kerjaTambah" | "sarpras" | "tipeUnit";
   idImpor: string;
-  /** Aksi impor Excel — diterima lewat prop supaya komponen ini tidak
-   *  mengimpor dari `app/`. */
   aksiImpor: (sebelumnya: HasilAksi | null, form: FormData) => Promise<HasilAksi>;
 }) {
   const [sunting, setSunting] = useState(false);
-  const [draft, setDraft] = useState<Kelompok[]>(() => kelompokkan(baris));
-  const [draftUpahVolume, setDraftUpahVolume] = useState(upahVolume);
-  const [draftUpahHarga, setDraftUpahHarga] = useState(upahHarga);
+  const [mat, setMat] = useState<BarisRapUI[]>([]);
+  const [sub, setSub] = useState<BarisRapUI[]>([]);
+  const [uVol, setUVol] = useState(upahVolume);
+  const [uHrg, setUHrg] = useState(upahHarga);
   const [galat, setGalat] = useState<string | null>(null);
   const [menyimpan, mulai] = useTransition();
 
@@ -106,33 +91,30 @@ export function RapTable({
     return (
       <div style={{ marginTop: 16 }}>
         <div className="eyebrow" style={{ marginBottom: 8 }}>{judul}</div>
-        <div
-          className="card"
-          style={{ padding: 22, textAlign: "center", color: "var(--muted)", fontSize: 12.5 }}
-        >
+        <div className="card" style={{ padding: 22, textAlign: "center", color: "var(--muted)", fontSize: 12.5 }}>
           RAP tidak ditampilkan untuk peran Anda.
         </div>
       </div>
     );
   }
 
-  const kelompok = sunting ? draft : kelompokkan(baris);
-  const volUpah = sunting ? draftUpahVolume : upahVolume;
-  const hargaUpah = sunting ? draftUpahHarga : upahHarga;
-  const nilaiUpah = volUpah * hargaUpah;
+  const asal = pisah(baris);
+  const material = sunting ? mat : asal.material;
+  const subkon = sunting ? sub : asal.subkon;
+  const volUpah = sunting ? uVol : upahVolume;
+  const hargaUpah = sunting ? uHrg : upahHarga;
 
-  // Kategori mengikuti pilihan eksplisit tiap kelompok (Material/Subkon), bukan
-  // ejaan namanya. Lain-lain = 5% dari (Material + Tenaga Kerja + Subkon).
-  const totalGrup = (g: Kelompok) => g.items.reduce((a, i) => a + i.volume * i.hargaSatuan, 0);
-  const subkon = kelompok.filter((g) => g.kategori === "Subkon").reduce((s, g) => s + totalGrup(g), 0);
-  const material = kelompok.filter((g) => g.kategori !== "Subkon").reduce((s, g) => s + totalGrup(g), 0);
-  const lain = (material + nilaiUpah + subkon) * PORSI_LAIN_LAIN;
-  const totalSwakelola = material + nilaiUpah + subkon + lain;
+  const totMaterial = jumlah(material);
+  const totSubkon = jumlah(subkon);
+  const totUpah = volUpah * hargaUpah;
+  const totLain = (totMaterial + totSubkon + totUpah) * PORSI_LAIN_LAIN;
+  const totalRap = totMaterial + totSubkon + totUpah + totLain;
 
   const mulaiSunting = () => {
-    setDraft(kelompokkan(baris).map((g) => ({ ...g, items: g.items.map((i) => ({ ...i })) })));
-    setDraftUpahVolume(upahVolume);
-    setDraftUpahHarga(upahHarga);
+    setMat(asal.material.map((r) => ({ ...r })));
+    setSub(asal.subkon.map((r) => ({ ...r })));
+    setUVol(upahVolume);
+    setUHrg(upahHarga);
     setGalat(null);
     setSunting(true);
   };
@@ -146,9 +128,12 @@ export function RapTable({
     mulai(async () => {
       const hasil = await aksiSimpan(
         JSON.stringify({
-          kelompok: draft,
-          upahVolume: draftUpahVolume,
-          upahHarga: draftUpahHarga,
+          kelompok: [
+            { nama: "Material", kategori: "Material", items: mat },
+            { nama: "Subkon", kategori: "Subkon", items: sub },
+          ],
+          upahVolume: uVol,
+          upahHarga: uHrg,
         }),
       );
       if (hasil.ok) {
@@ -159,33 +144,95 @@ export function RapTable({
       }
     });
 
-  const ubahItem = (gi: number, ii: number, field: keyof BarisRapUI, nilai: string | number) =>
-    setDraft((d) =>
-      d.map((g, x) =>
-        x !== gi ? g : { ...g, items: g.items.map((it, y) => (y === ii ? { ...it, [field]: nilai } : it)) },
-      ),
-    );
+  const setter = (kat: "Material" | "Subkon") => (kat === "Subkon" ? setSub : setMat);
+  const ubahItem = (kat: "Material" | "Subkon", i: number, field: keyof BarisRapUI, nilai: string | number) =>
+    setter(kat)((rows) => rows.map((r, x) => (x === i ? { ...r, [field]: nilai } : r)));
+  const tambahItem = (kat: "Material" | "Subkon") =>
+    setter(kat)((rows) => [...rows, barisBaru(kat)]);
+  const hapusItem = (kat: "Material" | "Subkon", i: number) =>
+    setter(kat)((rows) => rows.filter((_, x) => x !== i));
 
   const isian = (
-    gi: number, ii: number, field: keyof BarisRapUI, lebar: number, angka?: boolean,
+    rows: BarisRapUI[], kat: "Material" | "Subkon", i: number, field: keyof BarisRapUI, lebar: number, angka?: boolean,
   ) => (
     <input
       className="inp"
       type={angka ? "number" : "text"}
-      value={String(kelompok[gi].items[ii][field] ?? "")}
-      onChange={(e) => ubahItem(gi, ii, field, angka ? Number(e.target.value) || 0 : e.target.value)}
+      value={String(rows[i][field] ?? "")}
+      onChange={(e) => ubahItem(kat, i, field, angka ? Number(e.target.value) || 0 : e.target.value)}
       style={{ ...sel, width: lebar, textAlign: angka ? "right" : "left" }}
     />
   );
 
+  const kolomTotal = 7; // No, Uraian, Volume, Sat, Harga, Jumlah, Keterangan
+
+  /** Satu kelompok kategori (Material / Subkon) beserta baris dan tombol. */
+  const renderSeksi = (
+    romawi: string, judulSeksi: string, kat: "Material" | "Subkon", rows: BarisRapUI[], subtotal: number,
+  ) => (
+    <Fragment key={kat}>
+      <tr style={{ background: "var(--rona-teal)" }}>
+        <td style={{ fontWeight: 700 }}>{romawi}</td>
+        <td colSpan={4} style={{ fontWeight: 700, textTransform: "uppercase", fontSize: 10.5, letterSpacing: ".04em" }}>
+          {judulSeksi}
+        </td>
+        <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>{rp(subtotal)}</td>
+        <td />
+        {sunting && <td />}
+      </tr>
+
+      {rows.map((it, i) => (
+        <tr key={it.id ?? `${kat}-${i}`}>
+          <td style={{ color: "var(--muted)" }}>{i + 1}</td>
+          <td>{sunting ? isian(rows, kat, i, "nama", 200) : it.nama}</td>
+          <td style={{ textAlign: "right" }}>
+            {sunting
+              ? isian(rows, kat, i, "volume", 64, true)
+              : it.volume.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </td>
+          <td>{sunting ? isian(rows, kat, i, "satuan", 54) : it.satuan}</td>
+          <td style={{ textAlign: "right" }}>
+            {sunting ? isian(rows, kat, i, "hargaSatuan", 96, true) : rp(it.hargaSatuan)}
+          </td>
+          <td className="num" style={{ textAlign: "right" }}>{rp(it.volume * it.hargaSatuan)}</td>
+          <td style={{ whiteSpace: "normal", color: "var(--muted)" }}>
+            {sunting ? isian(rows, kat, i, "keterangan", 140) : it.keterangan || "—"}
+          </td>
+          {sunting && (
+            <td>
+              <button
+                type="button"
+                title="Hapus baris"
+                onClick={() => hapusItem(kat, i)}
+                style={{ color: "var(--red)", cursor: "pointer", fontWeight: 700, background: "none", border: "none", fontSize: 15, padding: 0 }}
+              >
+                ×
+              </button>
+            </td>
+          )}
+        </tr>
+      ))}
+
+      {sunting && (
+        <tr>
+          <td />
+          <td colSpan={kolomTotal}>
+            <button
+              type="button"
+              onClick={() => tambahItem(kat)}
+              style={{ color: "var(--teal)", cursor: "pointer", fontSize: 11, fontWeight: 600, background: "none", border: "none", padding: 0, fontFamily: "inherit" }}
+            >
+              + Tambah baris {judulSeksi}
+            </button>
+          </td>
+        </tr>
+      )}
+    </Fragment>
+  );
+
   return (
     <div style={{ marginTop: 16 }}>
-      <div
-        style={{
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          marginBottom: 8, flexWrap: "wrap", gap: 8,
-        }}
-      >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
         <div className="eyebrow">{judul}</div>
         {bolehUbah && (
           <div style={{ display: "flex", gap: 6 }}>
@@ -230,12 +277,7 @@ export function RapTable({
 
       <div className="card tablewrap" style={{ maxHeight: 520, overflowY: "auto" }}>
         {keterangan && (
-          <div
-            style={{
-              padding: "10px 14px", borderBottom: "1px solid var(--line)",
-              fontSize: 11.5, color: "var(--muted)",
-            }}
-          >
+          <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--line)", fontSize: 11.5, color: "var(--muted)" }}>
             {keterangan}
           </div>
         )}
@@ -243,9 +285,9 @@ export function RapTable({
           <thead>
             <tr>
               <th style={{ width: 34 }}>No.</th>
-              <th style={{ minWidth: 210 }}>Material</th>
-              <th>Sat</th>
+              <th style={{ minWidth: 210 }}>Uraian</th>
               <th style={{ textAlign: "right" }}>Volume</th>
+              <th>Sat</th>
               <th style={{ textAlign: "right" }}>Harga</th>
               <th style={{ textAlign: "right" }}>Jumlah Harga</th>
               <th style={{ minWidth: 150 }}>Keterangan</th>
@@ -253,219 +295,68 @@ export function RapTable({
             </tr>
           </thead>
           <tbody>
-            {kelompok.map((g, gi) => (
-              // Fragment ini yang memegang key-nya — bukan <tr> di dalamnya —
-              // karena elemen inilah yang jadi anak langsung dari <tbody>.
-              <Fragment key={`grup-${gi}`}>
-                <tr style={{ background: "var(--rona-teal)" }}>
-                  <td style={{ fontWeight: 700 }}>{ROMAWI[gi] ?? gi + 1}</td>
-                  <td
-                    colSpan={sunting ? 7 : 6}
-                    style={{ fontWeight: 700, textTransform: sunting ? "none" : "uppercase", fontSize: 10.5, letterSpacing: ".04em" }}
-                  >
-                    {sunting ? (
-                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <input
-                          className="inp"
-                          value={g.nama}
-                          onChange={(e) =>
-                            setDraft((d) => d.map((x, y) => (y === gi ? { ...x, nama: e.target.value } : x)))
-                          }
-                          style={{ ...sel, width: 220, fontWeight: 600 }}
-                        />
-                        <select
-                          className="inp"
-                          title="Kategori kelompok — menentukan Material vs Subkon, bukan namanya"
-                          value={g.kategori === "Subkon" ? "Subkon" : "Material"}
-                          onChange={(e) =>
-                            setDraft((d) => d.map((x, y) => (y === gi ? { ...x, kategori: e.target.value } : x)))
-                          }
-                          style={{ ...sel, width: 110, fontWeight: 600 }}
-                        >
-                          <option value="Material">Material</option>
-                          <option value="Subkon">Subkon</option>
-                        </select>
-                        <button
-                          type="button"
-                          title="Hapus kelompok"
-                          onClick={() => setDraft((d) => d.filter((_, y) => y !== gi))}
-                          style={{
-                            color: "var(--red)", cursor: "pointer", fontWeight: 700,
-                            background: "none", border: "none", fontSize: 11.5, fontFamily: "inherit",
-                          }}
-                        >
-                          × kelompok
-                        </button>
-                      </span>
-                    ) : (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                        {g.nama}
-                        {g.kategori === "Subkon" && (
-                          <span
-                            className="chip"
-                            style={{ background: "var(--rona-ungu, var(--rona-teal))", color: "var(--brass)", textTransform: "none", letterSpacing: 0 }}
-                          >
-                            Subkon
-                          </span>
-                        )}
-                      </span>
-                    )}
-                  </td>
-                </tr>
+            {renderSeksi("I", "Material", "Material", material, totMaterial)}
+            {renderSeksi("II", "Subkon", "Subkon", subkon, totSubkon)}
 
-                {g.items.map((it, ii) => (
-                  <tr key={it.id ?? `${gi}-${ii}`}>
-                    <td style={{ color: "var(--muted)" }}>{ii + 1}</td>
-                    <td>{sunting ? isian(gi, ii, "nama", 200) : it.nama}</td>
-                    <td>{sunting ? isian(gi, ii, "satuan", 54) : it.satuan}</td>
-                    <td style={{ textAlign: "right" }}>
-                      {sunting
-                        ? isian(gi, ii, "volume", 64, true)
-                        : it.volume.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td style={{ textAlign: "right" }}>
-                      {sunting ? isian(gi, ii, "hargaSatuan", 96, true) : rp(it.hargaSatuan)}
-                    </td>
-                    <td className="num" style={{ textAlign: "right" }}>
-                      {rp(it.volume * it.hargaSatuan)}
-                    </td>
-                    <td style={{ whiteSpace: "normal", color: "var(--muted)" }}>
-                      {sunting ? isian(gi, ii, "keterangan", 140) : it.keterangan || "—"}
-                    </td>
-                    {sunting && (
-                      <td>
-                        <button
-                          type="button"
-                          title="Hapus baris"
-                          onClick={() =>
-                            setDraft((d) =>
-                              d.map((x, y) =>
-                                y !== gi ? x : { ...x, items: x.items.filter((_, z) => z !== ii) },
-                              ),
-                            )
-                          }
-                          style={{
-                            color: "var(--red)", cursor: "pointer", fontWeight: 700,
-                            background: "none", border: "none", fontSize: 15, padding: 0,
-                          }}
-                        >
-                          ×
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-
-                {sunting && (
-                  <tr>
-                    <td />
-                    <td colSpan={7}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setDraft((d) =>
-                            d.map((x, y) =>
-                              y !== gi ? x : { ...x, items: [...x.items, { ...ITEM_BARU, grup: x.nama }] },
-                            ),
-                          )
-                        }
-                        style={{
-                          color: "var(--teal)", cursor: "pointer", fontSize: 11, fontWeight: 600,
-                          background: "none", border: "none", padding: 0, fontFamily: "inherit",
-                        }}
-                      >
-                        + Tambah baris pada {g.nama}
-                      </button>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
-
-            {sunting && (
-              <tr>
-                <td />
-                <td colSpan={7}>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDraft((d) => [
-                        ...d,
-                        { nama: "Kelompok Baru", kategori: "Material", items: [{ ...ITEM_BARU, grup: "Kelompok Baru" }] },
-                      ])
-                    }
-                    style={{
-                      color: "var(--teal)", cursor: "pointer", fontSize: 11.5, fontWeight: 700,
-                      background: "none", border: "none", padding: 0, fontFamily: "inherit",
-                    }}
-                  >
-                    + Tambah kelompok baru
-                  </button>
-                </td>
-              </tr>
-            )}
-
-            <tr style={{ fontWeight: 700, borderTop: "2px solid var(--line)" }}>
-              <td colSpan={5}>MATERIAL</td>
-              <td className="num" style={{ textAlign: "right" }}>{rp(material)}</td>
+            {/* III. Upah Tenaga Kerja — satu baris (volume OH × harga) */}
+            <tr style={{ background: "var(--rona-teal)" }}>
+              <td style={{ fontWeight: 700 }}>III</td>
+              <td colSpan={4} style={{ fontWeight: 700, textTransform: "uppercase", fontSize: 10.5, letterSpacing: ".04em" }}>
+                Upah Tenaga Kerja
+              </td>
+              <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>{rp(totUpah)}</td>
               <td />
               {sunting && <td />}
             </tr>
-            {subkon > 0 && (
-              <tr style={{ fontWeight: 700 }}>
-                <td colSpan={5}>SUBKON</td>
-                <td className="num" style={{ textAlign: "right" }}>{rp(subkon)}</td>
-                <td />
-                {sunting && <td />}
-              </tr>
-            )}
-            <tr style={{ fontWeight: 700 }}>
-              <td>—</td>
-              <td>UPAH TENAGA KERJA</td>
-              <td>OH</td>
+            <tr>
+              <td style={{ color: "var(--muted)" }}>1</td>
+              <td>Tenaga kerja (borongan / harian)</td>
               <td style={{ textAlign: "right" }}>
                 {sunting ? (
                   <input
                     className="inp"
                     type="number"
-                    value={draftUpahVolume}
-                    onChange={(e) => setDraftUpahVolume(Number(e.target.value) || 0)}
+                    value={uVol}
+                    onChange={(e) => setUVol(Number(e.target.value) || 0)}
                     style={{ ...sel, width: 64, textAlign: "right" }}
                   />
                 ) : (
                   volUpah.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 )}
               </td>
+              <td>OH</td>
               <td style={{ textAlign: "right" }}>
                 {sunting ? (
                   <input
                     className="inp"
                     type="number"
-                    value={draftUpahHarga}
-                    onChange={(e) => setDraftUpahHarga(Number(e.target.value) || 0)}
+                    value={uHrg}
+                    onChange={(e) => setUHrg(Number(e.target.value) || 0)}
                     style={{ ...sel, width: 96, textAlign: "right" }}
                   />
                 ) : (
                   rp(hargaUpah)
                 )}
               </td>
-              <td style={{ textAlign: "right" }}>
-                <span className="num" style={{ color: "var(--teal)" }}>{rp(nilaiUpah)}</span>
+              <td className="num" style={{ textAlign: "right" }}>{rp(totUpah)}</td>
+              <td style={{ color: "var(--muted)" }}>Satuan OH (orang-hari)</td>
+              {sunting && <td />}
+            </tr>
+
+            {/* IV. Lain-lain Proyek — 5%, tanpa sub-isian */}
+            <tr style={{ background: "var(--rona-teal)" }}>
+              <td style={{ fontWeight: 700 }}>IV</td>
+              <td colSpan={4} style={{ fontWeight: 700, textTransform: "uppercase", fontSize: 10.5, letterSpacing: ".04em" }}>
+                Lain-lain Proyek (5%)
               </td>
-              <td />
+              <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>{rp(totLain)}</td>
+              <td style={{ color: "var(--muted)", fontSize: 10.5 }}>5% dari Material + Subkon + Upah</td>
               {sunting && <td />}
             </tr>
-            <tr style={{ fontWeight: 700 }}>
-              <td colSpan={5}>LAIN-LAIN PROYEK (5%)</td>
-              <td className="num" style={{ textAlign: "right" }}>{rp(lain)}</td>
-              <td />
-              {sunting && <td />}
-            </tr>
-            <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
+
+            <tr style={{ fontWeight: 700, borderTop: "2px solid var(--line)", background: "var(--rona-baris)" }}>
               <td colSpan={5}>TOTAL RAP</td>
-              <td className="num" style={{ textAlign: "right", color: "var(--brass)" }}>
-                {rp(totalSwakelola)}
-              </td>
+              <td className="num" style={{ textAlign: "right", color: "var(--brass)" }}>{rp(totalRap)}</td>
               <td />
               {sunting && <td />}
             </tr>

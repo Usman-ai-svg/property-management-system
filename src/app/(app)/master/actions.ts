@@ -17,11 +17,10 @@ import {
 const PERAN_HAPUS_PAKSA = "Administrator Sistem";
 import { bersihkanNamaFile, periksaBerkas, periksaBerkasKategori, simpanBerkas } from "@/lib/storage";
 import {
-  JENIS_HAK_ATAS_TANAH, JENIS_SARPRAS, STATUS_JUAL, STATUS_LAHAN, STATUS_PEMBANGUNAN,
-  STATUS_PROYEK, STATUS_SARPRAS,
+  JENIS_HAK_ATAS_TANAH, JENIS_SARPRAS, STATUS_JUAL, STATUS_PROYEK,
 } from "@/lib/domain/enums";
 import { buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap, rabAcuan, totalBaris } from "@/lib/calc/boq";
-import { statusSelaras } from "@/lib/calc/kontrak-boq";
+import { statusBangunSarpras, statusBangunUnit } from "@/lib/calc/status-bangun";
 
 /** Segarkan halaman proyek dan ringkasan setelah perubahan. */
 function segarkan(kode: string) {
@@ -65,7 +64,6 @@ export async function tambahProyek(_s: HasilAksi | null, form: FormData): Promis
       data: {
         kode, nama,
         status: pilihan(form, "status", STATUS_PROYEK),
-        statusLahan: pilihan(form, "statusLahan", STATUS_LAHAN),
         alamat: teks(form, "alamat", true),
         kelurahan: teks(form, "kelurahan", true),
         kecamatan: teks(form, "kecamatan", true),
@@ -100,7 +98,7 @@ export async function ubahProyek(_s: HasilAksi | null, form: FormData): Promise<
 
     const lama = await prisma.project.findUnique({
       where: { id },
-      select: { id: true, kode: true, nama: true, status: true, statusLahan: true },
+      select: { id: true, kode: true, nama: true, status: true },
     });
     if (!lama) throw new GagalIzin("Proyek tidak ditemukan.");
 
@@ -109,7 +107,6 @@ export async function ubahProyek(_s: HasilAksi | null, form: FormData): Promise<
     const data = {
       nama: teks(form, "nama", true),
       status: pilihan(form, "status", STATUS_PROYEK),
-      statusLahan: pilihan(form, "statusLahan", STATUS_LAHAN),
     };
 
     await prisma.project.update({ where: { id }, data });
@@ -118,7 +115,7 @@ export async function ubahProyek(_s: HasilAksi | null, form: FormData): Promise<
       pengguna, projectId: id,
       objek: `Proyek ${lama.kode}`,
       sebelum: lama, sesudah: data,
-      label: { nama: "Nama proyek", status: "Status", statusLahan: "Status lahan" },
+      label: { nama: "Nama proyek", status: "Status" },
     });
 
     segarkan(lama.kode);
@@ -267,6 +264,56 @@ export async function hapusFase(_s: HasilAksi | null, form: FormData): Promise<H
     });
 
     revalidatePath(`/master/${lama.project.kode}`);
+  });
+}
+
+/**
+ * Atur JUMLAH fase sebuah proyek. Fase digenerate otomatis F1..Fn menurut
+ * urutan; menaikkan jumlah menambah fase di belakang, menurunkan menghapus fase
+ * paling belakang — tetapi hanya bila fase itu kosong (tanpa unit), supaya
+ * penomoran tetap rapi dan tak ada unit yang yatim.
+ */
+export async function aturJumlahFase(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const projectId = teks(form, "projectId", true);
+    const jumlah = angka(form, "jumlah", { min: 1, wajib: true });
+    if (jumlah > 50) throw new GagalIzin("Jumlah fase terlalu banyak (maksimal 50).");
+
+    const pengguna = await izinkan("deskripsi", projectId);
+    const proyek = await prisma.project.findUnique({ where: { id: projectId }, select: { kode: true } });
+    if (!proyek) throw new GagalIzin("Proyek tidak ditemukan.");
+
+    const fases = await prisma.phase.findMany({
+      where: { projectId },
+      orderBy: { urutan: "asc" },
+      select: { id: true, kode: true, _count: { select: { units: true } } },
+    });
+    const kini = fases.length;
+    if (jumlah === kini) return "Jumlah fase tidak berubah.";
+
+    if (jumlah > kini) {
+      const baru = [];
+      for (let i = kini; i < jumlah; i++) baru.push({ projectId, kode: `F${i + 1}`, urutan: i });
+      await prisma.phase.createMany({ data: baru });
+    } else {
+      // Kurangi dari belakang; fase yang masih dipakai unit tidak boleh dihapus.
+      const dihapus = fases.slice(jumlah);
+      const berisi = dihapus.find((f) => f._count.units > 0);
+      if (berisi) {
+        throw new GagalIzin(
+          `Fase ${berisi.kode} masih dipakai ${berisi._count.units} unit. Pindahkan/hapus unitnya lebih dulu sebelum menurunkan jumlah fase.`,
+        );
+      }
+      await prisma.phase.deleteMany({ where: { id: { in: dihapus.map((f) => f.id) } } });
+    }
+
+    await catat({
+      pengguna, projectId, objek: `Proyek ${proyek.kode}`,
+      aksi: "Atur jumlah fase", dari: `${kini} fase`, ke: `${jumlah} fase`,
+    });
+
+    revalidatePath(`/master/${proyek.kode}`);
+    return `Jumlah fase kini ${jumlah} (F1–F${jumlah}).`;
   });
 }
 
@@ -615,33 +662,40 @@ export async function ubahUnit(_s: HasilAksi | null, form: FormData): Promise<Ha
     const dikendalikanBoq =
       (await prisma.unitBoqItem.count({ where: { unitId: id } })) > 0;
 
-    const progresDiminta = angka(form, "progress", { min: 0, max: 100 });
+    // Progres hanya diperbarui bila formulir benar-benar mengirimnya. Modal
+    // "Ubah Deskripsi Unit" di tabel Daftar Unit tidak lagi memuat Progres, jadi
+    // absennya field itu berarti "pertahankan", bukan "jadikan 0".
+    const progresIsian = teksOpsional(form, "progress");
+    const progresDiminta = progresIsian === null ? lama.progress : angka(form, "progress", { min: 0, max: 100 });
     const progress = dikendalikanBoq ? lama.progress : progresDiminta;
 
-    // Status bangun dan status jual hanya ikut bila formulir mengirimnya —
-    // fitur Ubah pada tabel Daftar Unit mengirim keduanya, sedangkan fitur
-    // Ubah Deskripsi Unit di halaman Detail Unit sengaja tidak lagi
-    // menyertakannya (status hanya boleh diubah dari Daftar Unit). Bila
-    // absen, nilai lama dipertahankan.
-    const statusPembangunanDiminta = teksOpsional(form, "statusPembangunan");
-    if (statusPembangunanDiminta !== null && !STATUS_PEMBANGUNAN.includes(statusPembangunanDiminta as (typeof STATUS_PEMBANGUNAN)[number])) {
-      throw new GagalIzin(`Nilai "${statusPembangunanDiminta}" tidak sah untuk kolom "statusPembangunan".`);
-    }
+    // Status jual & tanggal serah terima ikut bila formulir mengirimnya. Status
+    // bangun TIDAK lagi diinput — ia nilai turunan (statusBangunUnit) dari
+    // progres + status jual + tanggal serah terima.
     const statusJualDiminta = teksOpsional(form, "statusJual");
     if (statusJualDiminta !== null && !STATUS_JUAL.includes(statusJualDiminta as (typeof STATUS_JUAL)[number])) {
       throw new GagalIzin(`Nilai "${statusJualDiminta}" tidak sah untuk kolom "statusJual".`);
     }
+    const statusJual = statusJualDiminta ?? lama.statusJual;
+
+    // Tanggal serah terima hanya bermakna saat status jual sudah "Serah Terima".
+    // Bila baru mencapainya tanpa tanggal, dipakai hari ini; bila mundur dari
+    // "Serah Terima", tanggalnya dikosongkan.
+    const tglStr = teksOpsional(form, "tanggalSerahTerima");
+    const tglDiminta = tglStr ? new Date(tglStr) : null;
+    const tanggalSerahTerima =
+      statusJual === "Serah Terima"
+        ? (tglDiminta ?? lama.tanggalSerahTerima ?? new Date())
+        : null;
 
     const baru: {
-      statusPembangunan: string; statusJual: string; progress: number; luasTanah: number;
+      statusPembangunan: string; statusJual: string; tanggalSerahTerima: Date | null;
+      progress: number; luasTanah: number;
       nomor?: number; phaseId?: string; unitTypeId?: string; kode?: string;
     } = {
-      // Status bangun MENGIKUTI progres, sama seperti di halaman Konstruksi.
-      // Sebelumnya keduanya isian terpisah, sehingga sebuah unit bisa
-      // tersimpan sebagai "progres 100%, status Belum terbangun" — dua halaman
-      // menampilkan keadaan berbeda untuk unit yang sama.
-      statusPembangunan: statusSelaras(progress, statusPembangunanDiminta ?? lama.statusPembangunan),
-      statusJual: statusJualDiminta ?? lama.statusJual,
+      statusPembangunan: statusBangunUnit({ progress, statusJual, tanggalSerahTerima }),
+      statusJual,
+      tanggalSerahTerima,
       progress,
       luasTanah: angka(form, "luasTanah", { min: 1, wajib: true }),
     };
@@ -768,7 +822,6 @@ export async function tambahUnit(_s: HasilAksi | null, form: FormData): Promise<
     if (!tipe || tipe.projectId !== proyek.id) throw new GagalIzin("Tipe unit tidak sah.");
 
     const nomor = angka(form, "nomor", { min: 1, wajib: true });
-    const statusPembangunan = pilihan(form, "statusPembangunan", STATUS_PEMBANGUNAN);
     const statusJual = pilihan(form, "statusJual", STATUS_JUAL);
 
     // Luas tanah diisi per unit; bila dikosongkan, ikut luas tanah tipenya.
@@ -790,12 +843,10 @@ export async function tambahUnit(_s: HasilAksi | null, form: FormData): Promise<
     const bentrok = await prisma.unit.findUnique({ where: { kode: kodeUnit }, select: { id: true } });
     if (bentrok) throw new GagalIzin(`Unit ${kodeUnit} sudah ada. Pakai nomor lain.`);
 
-    // Progres awal mengikuti status bangunnya, sama seperti makeUnit pada artifact.
-    const progress = ["Selesai", "Serah Terima", "Habis Masa Garansi"].includes(statusPembangunan)
-      ? 100
-      : statusPembangunan === "Progress"
-        ? 10
-        : 0;
+    // Unit baru selalu mulai dari nol — status bangun ("Belum Terbangun") adalah
+    // nilai turunan; kemajuan diisi lewat opname konstruksi setelahnya.
+    const progress = 0;
+    const statusPembangunan = statusBangunUnit({ progress, statusJual, tanggalSerahTerima: null });
 
     // Snapshot BOQ & RAP dibuat SEKALI di sini. Sumber utamanya adalah RAB/RAP
     // master milik Tipe Unit ini (disunting dari halaman Detail Tipe Unit) —
@@ -1189,15 +1240,14 @@ export async function simpanSarpras(_s: HasilAksi | null, form: FormData): Promi
 
     const pengguna = await izinkan("daftarSarpras", proyek.id);
 
-    // Deskripsi dasar selalu ikut disunting. RAB dan Progres TIDAK — keduanya
-    // diturunkan dari tabel BOQ (RAB = jumlah baris BOQ, Progres = opname per
-    // baris BOQ di halaman Konstruksi), sama seperti unit. Mengisinya manual
+    // Deskripsi dasar selalu ikut disunting. RAB, Progres, dan Status TIDAK —
+    // RAB = jumlah baris BOQ, Progres = opname per baris BOQ, dan Status bangun
+    // adalah nilai turunan dari progres (statusBangunSarpras). Mengisinya manual
     // di sini akan tertimpa oleh nilai turunan itu pada kesempatan berikutnya.
     const data = {
       nama: teks(form, "nama", true),
       jenis: pilihan(form, "jenis", JENIS_SARPRAS),
       volume: teks(form, "volume", true),
-      status: pilihan(form, "status", STATUS_SARPRAS),
     };
 
     if (id) {
@@ -1216,7 +1266,7 @@ export async function simpanSarpras(_s: HasilAksi | null, form: FormData): Promi
         ? lama.progress
         : angka(form, "progress", { min: 0, max: 100 });
 
-      const sesudah = { ...data, progress };
+      const sesudah = { ...data, progress, status: statusBangunSarpras(progress) };
 
       await prisma.infrastructure.update({ where: { id }, data: sesudah });
 

@@ -106,7 +106,7 @@ export default async function Ringkasan() {
                 <div style={{ fontSize: 11, color: "var(--muted)" }}>{p.kode}</div>
               </td>
               <td>
-                <Badge nilai={p.statusLahan} peta={WARNA_STATUS.lahan} />
+                <Badge nilai={p.status} peta={WARNA_STATUS.proyek} />
               </td>
               <td style={{ textAlign: "right" }} className="num">
                 {p.jumlahUnit}

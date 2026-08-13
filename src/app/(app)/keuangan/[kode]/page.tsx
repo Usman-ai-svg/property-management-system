@@ -153,7 +153,7 @@ export default async function KeuanganProyek({
           flexWrap: "wrap", gap: 12, marginBottom: 16,
         }}
       >
-        <Badge nilai={proyek.statusLahan} peta={WARNA_STATUS.lahan} />
+        <Badge nilai={proyek.status} peta={WARNA_STATUS.proyek} />
         <div style={{ display: "flex", gap: 26, textAlign: "right" }}>
           <div>
             <div style={{ fontSize: 10, color: "var(--muted)", letterSpacing: 1 }}>RAB</div>

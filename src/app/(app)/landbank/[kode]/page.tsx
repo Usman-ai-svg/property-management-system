@@ -95,7 +95,7 @@ export default async function DetailLandbank({
           </div>
           <h3 className="disp" style={{ margin: "4px 0 0", fontSize: 19 }}>{proyek.nama}</h3>
         </div>
-        <Badge nilai={proyek.statusLahan} peta={WARNA_STATUS.lahan} />
+        <Badge nilai={proyek.status} peta={WARNA_STATUS.proyek} />
       </div>
 
       <div className="tabbar" style={{ marginBottom: 16 }}>

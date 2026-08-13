@@ -2,18 +2,18 @@ import { Lock } from "lucide-react";
 
 /** Peta warna status — dipindahkan dari artifact. */
 export const WARNA_STATUS: Record<string, Record<string, [string, string]>> = {
-  lahan: {
-    "Selesai Terbangun": ["var(--rona-hijau2)", "var(--green)"],
+  proyek: {
+    Selesai: ["var(--rona-hijau2)", "var(--green)"],
     Pembangunan: ["var(--rona-teal2)", "var(--teal)"],
     "Proses Legal & Perizinan": ["var(--rona-amber)", "var(--amber)"],
     Perencanaan: ["var(--rona-abu)", "var(--muted)"],
   },
   bangun: {
-    "Belum terbangun": ["var(--rona-abu)", "var(--muted)"],
+    "Belum Terbangun": ["var(--rona-abu)", "var(--muted)"],
     Progress: ["var(--rona-amber)", "var(--amber)"],
+    Terbangun: ["var(--rona-teal2)", "var(--teal)"],
+    "Masa Garansi": ["var(--rona-biru)", "var(--blue)"],
     Selesai: ["var(--rona-hijau2)", "var(--green)"],
-    "Serah Terima": ["var(--rona-teal2)", "var(--teal)"],
-    "Habis Masa Garansi": ["var(--rona-biru)", "var(--blue)"],
   },
   jual: {
     Tersedia: ["var(--rona-abu)", "var(--muted)"],

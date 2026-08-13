@@ -3,23 +3,16 @@
 CREATE TYPE pm_status_proyek AS ENUM (
   'Perencanaan',
   'Proses Legal & Perizinan',
-  'Dalam Pembangunan',
+  'Pembangunan',
   'Selesai'
 );
 
-CREATE TYPE pm_status_lahan AS ENUM (
-  'Perencanaan',
-  'Proses Legal & Perizinan',
-  'Pembangunan',
-  'Selesai Terbangun'
-);
-
 CREATE TYPE pm_status_pembangunan AS ENUM (
-  'Belum terbangun',
+  'Belum Terbangun',
   'Progress',
-  'Selesai',
-  'Serah Terima',
-  'Habis Masa Garansi'
+  'Terbangun',
+  'Masa Garansi',
+  'Selesai'
 );
 
 CREATE TYPE pm_status_jual AS ENUM (
@@ -30,7 +23,7 @@ CREATE TYPE pm_status_jual AS ENUM (
 );
 
 CREATE TYPE pm_status_sarpras AS ENUM (
-  'Belum terbangun',
+  'Belum Terbangun',
   'Progress',
   'Selesai'
 );

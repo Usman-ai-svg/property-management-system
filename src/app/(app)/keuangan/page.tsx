@@ -95,7 +95,7 @@ export default async function DashboardKeuangan() {
                     {p.nama}
                   </Link>
                   <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
-                    {p.kode} · {p.statusLahan}
+                    {p.kode} · {p.status}
                   </div>
                 </td>
                 <td style={{ textAlign: "right" }}>{rp(p.rab)}</td>

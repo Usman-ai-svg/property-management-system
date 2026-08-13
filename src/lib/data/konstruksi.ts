@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { filterProyek, type Pengguna } from "@/lib/auth/rbac";
 import { barisEfektif, progresTertimbang } from "@/lib/calc/kontrak-boq";
+import { statusBangunSarpras, statusBangunUnit } from "@/lib/calc/status-bangun";
 import { petaOverrideBoq } from "@/lib/data/vendor";
 
 /**
@@ -16,7 +17,7 @@ export async function dashboardKonstruksi(u: Pengguna) {
     where: filterProyek(u),
     orderBy: { kode: "asc" },
     select: {
-      id: true, kode: true, nama: true, statusLahan: true,
+      id: true, kode: true, nama: true, status: true,
       fases: { select: { kode: true }, orderBy: { urutan: "asc" } },
       units: { select: { progress: true } },
       infrastructures: { select: { progress: true } },
@@ -32,7 +33,7 @@ export async function dashboardKonstruksi(u: Pengguna) {
       : 0;
 
     return {
-      id: p.id, kode: p.kode, nama: p.nama, statusLahan: p.statusLahan,
+      id: p.id, kode: p.kode, nama: p.nama, status: p.status,
       fases: p.fases.map((f) => f.kode),
       jumlahUnit: p.units.length,
       dikerjakan: p.units.filter((x) => x.progress > 0 && x.progress < 100).length,
@@ -80,7 +81,7 @@ export async function proyekKonstruksi(kodeProyek: string) {
   return prisma.project.findUnique({
     where: { kode: kodeProyek },
     select: {
-      id: true, kode: true, nama: true, statusLahan: true,
+      id: true, kode: true, nama: true, status: true,
       fases: { select: { kode: true }, orderBy: { urutan: "asc" } },
     },
   });
@@ -106,7 +107,8 @@ export async function isiKonstruksiProyek(
         },
         orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
         select: {
-          id: true, kode: true, nomor: true, progress: true, statusPembangunan: true,
+          id: true, kode: true, nomor: true, progress: true,
+          statusJual: true, tanggalSerahTerima: true,
           phase: { select: { kode: true } },
           unitType: { select: { nama: true } },
           // Untuk "Keterangan Pekerjaan": grup BOQ yang sedang berjalan diturunkan
@@ -123,21 +125,25 @@ export async function isiKonstruksiProyek(
         where: { projectId },
         orderBy: { kode: "asc" },
         select: {
-          id: true, kode: true, nama: true, jenis: true, volume: true,
-          status: true, progress: true,
+          id: true, kode: true, nama: true, jenis: true, volume: true, progress: true,
         },
       })
     : [];
 
-  return { unit, sarpras };
+  // Status pembangunan & status sarpras = nilai turunan.
+  return {
+    unit: unit.map((u) => ({ ...u, statusPembangunan: statusBangunUnit(u) })),
+    sarpras: sarpras.map((s) => ({ ...s, status: statusBangunSarpras(s.progress) })),
+  };
 }
 
 /** Satu unit beserta BOQ Master-nya, untuk halaman opname konstruksi. */
 export async function unitKonstruksi(unitKode: string) {
-  return prisma.unit.findUnique({
+  const unit = await prisma.unit.findUnique({
     where: { kode: decodeURIComponent(unitKode).toUpperCase() },
     select: {
-      id: true, kode: true, nomor: true, progress: true, statusPembangunan: true,
+      id: true, kode: true, nomor: true, progress: true,
+      statusJual: true, tanggalSerahTerima: true,
       projectId: true,
       phase: { select: { kode: true } },
       project: { select: { kode: true, nama: true } },
@@ -158,6 +164,9 @@ export async function unitKonstruksi(unitKode: string) {
       },
     },
   });
+
+  if (!unit) return null;
+  return { ...unit, statusPembangunan: statusBangunUnit(unit) };
 }
 
 /**
@@ -238,11 +247,11 @@ export async function vendorKonstruksiProyek(projectId: string) {
 
 /** Satu item sarpras beserta BOQ Master-nya. */
 export async function sarprasKonstruksi(kodeSarpras: string) {
-  return prisma.infrastructure.findUnique({
+  const item = await prisma.infrastructure.findUnique({
     where: { kode: decodeURIComponent(kodeSarpras).toUpperCase() },
     select: {
       id: true, kode: true, nama: true, jenis: true, volume: true,
-      status: true, progress: true, projectId: true,
+      progress: true, projectId: true,
       project: { select: { kode: true, nama: true } },
       boqItems: {
         orderBy: { urutan: "asc" },
@@ -253,4 +262,7 @@ export async function sarprasKonstruksi(kodeSarpras: string) {
       },
     },
   });
+
+  if (!item) return null;
+  return { ...item, status: statusBangunSarpras(item.progress) };
 }

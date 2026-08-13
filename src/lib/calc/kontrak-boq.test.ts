@@ -6,8 +6,6 @@ import {
   progresPerSarpras,
   progresPerUnit,
   progresTertimbang,
-  statusDariProgres,
-  statusSelaras,
 } from "./kontrak-boq";
 
 /** Pembuat baris ringkas supaya maksud tiap tes tidak tertutup boilerplate. */
@@ -153,40 +151,5 @@ describe("periksaBarisBoqSpk", () => {
 
   it("meloloskan volume nol — pekerjaan bisa saja dibatalkan lewat VO", () => {
     assert.equal(periksaBarisBoqSpk({ ...sah, volume: 0 }), null);
-  });
-});
-
-describe("statusDariProgres", () => {
-  it("mengikuti aturan yang sama dengan jalur progres manual", () => {
-    assert.equal(statusDariProgres(0), "Belum terbangun");
-    assert.equal(statusDariProgres(1), "Progress");
-    assert.equal(statusDariProgres(99), "Progress");
-    assert.equal(statusDariProgres(100), "Selesai");
-  });
-});
-
-describe("statusSelaras", () => {
-  it("memaksa status mengikuti progres selama di bawah 100%", () => {
-    // Kombinasi yang dulu bisa tersimpan dari Master Proyek.
-    assert.equal(statusSelaras(0, "Selesai"), "Belum terbangun");
-    assert.equal(statusSelaras(40, "Belum terbangun"), "Progress");
-    assert.equal(statusSelaras(99, "Serah Terima"), "Progress");
-  });
-
-  it("membiarkan status pasca-selesai dipilih setelah 100%", () => {
-    // Ketiganya tidak bisa disimpulkan dari angka progres.
-    assert.equal(statusSelaras(100, "Selesai"), "Selesai");
-    assert.equal(statusSelaras(100, "Serah Terima"), "Serah Terima");
-    assert.equal(statusSelaras(100, "Habis Masa Garansi"), "Habis Masa Garansi");
-  });
-
-  it("mengembalikan status pra-selesai ke Selesai pada 100%", () => {
-    assert.equal(statusSelaras(100, "Belum terbangun"), "Selesai");
-    assert.equal(statusSelaras(100, "Progress"), "Selesai");
-  });
-
-  it("tidak pernah menghasilkan status di luar daftar yang sah", () => {
-    assert.equal(statusSelaras(100, "Entah apa"), "Selesai");
-    assert.equal(statusSelaras(50, "Entah apa"), "Progress");
   });
 });

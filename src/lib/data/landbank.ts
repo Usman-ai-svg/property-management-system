@@ -22,7 +22,7 @@ export async function dataLandbank(u: Pengguna) {
     where: filterProyek(u),
     orderBy: { kode: "asc" },
     select: {
-      id: true, kode: true, nama: true, statusLahan: true,
+      id: true, kode: true, nama: true, status: true,
       kecamatan: true, kota: true,
       luasKavlingEfektif: true, luasSarana: true, luasPrasarana: true, luasRth: true,
       analisaDocId: true,
@@ -58,7 +58,7 @@ export async function detailLandbank(kodeProyek: string, bolehHarga: boolean) {
   return prisma.project.findUnique({
     where: { kode: kodeProyek },
     select: {
-      id: true, kode: true, nama: true, statusLahan: true,
+      id: true, kode: true, nama: true, status: true,
       kecamatan: true, kota: true,
       luasKavlingEfektif: true, luasSarana: true, luasPrasarana: true, luasRth: true,
       analisaDoc: { select: { id: true, kategori: true, versions: pilihVersi } },

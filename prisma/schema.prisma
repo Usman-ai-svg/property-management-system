@@ -177,10 +177,8 @@ model Project {
   id   String @id @default(cuid())
   kode String @unique
   nama String
-  /// Perencanaan | Proses Legal & Perizinan | Dalam Pembangunan | Selesai
+  /// Perencanaan | Proses Legal & Perizinan | Pembangunan | Selesai
   status String
-  /// Status lahan: Perencanaan | Proses Legal & Perizinan | Pembangunan | Selesai Terbangun
-  statusLahan String
 
   // --- lokasi ---
   alamat    String
@@ -363,10 +361,17 @@ model Unit {
   /// Luas tanah unit ini — bisa berbeda dari tipe standar (kavling sudut, dll)
   luasTanah  Float
 
-  /// Belum terbangun | Progress | Selesai | Serah Terima | Habis Masa Garansi
-  statusPembangunan String @default("Belum terbangun")
+  /// NILAI TURUNAN (cache) — Belum Terbangun | Progress | Terbangun | Masa Garansi
+  /// | Selesai. Tidak diinput manual; disimpulkan dari progress + statusJual +
+  /// tanggalSerahTerima (lihat statusBangunUnit di src/lib/calc/status-bangun.ts).
+  /// Ditulis ulang tiap kali salah satu masukannya berubah; tampilan tetap
+  /// menghitung ulang agar transisi Masa Garansi → Selesai (3 bulan) tidak basi.
+  statusPembangunan String @default("Belum Terbangun")
   /// Tersedia | Booking | Akad | Serah Terima
   statusJual        String @default("Tersedia")
+  /// Kapan unit diserahterimakan ke pembeli. Diisi manual; dasar hitung masa
+  /// garansi 3 bulan sebelum status pembangunan menjadi "Selesai".
+  tanggalSerahTerima DateTime?
   /// 0–100
   progress          Int    @default(0)
 
@@ -554,8 +559,9 @@ model Infrastructure {
   jenis     String
   /// Volume beserta satuannya, mis. "3.400 m²" atau "51 sambungan"
   volume    String
-  /// Belum terbangun | Progress | Selesai
-  status    String @default("Belum terbangun")
+  /// NILAI TURUNAN (cache) dari progress: Belum Terbangun | Progress | Selesai.
+  /// Lihat statusBangunSarpras di src/lib/calc/status-bangun.ts.
+  status    String @default("Belum Terbangun")
   progress  Int    @default(0)
   rab       Float
   /// Upah tenaga kerja pada RAP (material ada di InfrastructureRapItem).

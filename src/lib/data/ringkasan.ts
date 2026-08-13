@@ -7,7 +7,6 @@ export interface RingkasProyek {
   kode: string;
   nama: string;
   status: string;
-  statusLahan: string;
   jumlahUnit: number;
   unitProgress: number;
   unitSelesai: number;
@@ -34,11 +33,10 @@ export async function ringkasanProyek(u: Pengguna): Promise<RingkasProyek[]> {
     where: filterProyek(u),
     orderBy: { kode: "asc" },
     select: {
-      id: true, kode: true, nama: true, status: true, statusLahan: true,
+      id: true, kode: true, nama: true, status: true,
       units: {
         select: {
           progress: true,
-          statusPembangunan: true,
           ...(bolehHarga ? { hargaJual: true } : {}),
         },
       },
@@ -75,12 +73,10 @@ export async function ringkasanProyek(u: Pengguna): Promise<RingkasProyek[]> {
       kode: p.kode,
       nama: p.nama,
       status: p.status,
-      statusLahan: p.statusLahan,
       jumlahUnit,
-      unitProgress: unit.filter((x) => x.statusPembangunan === "Progress").length,
-      unitSelesai: unit.filter((x) =>
-        ["Selesai", "Serah Terima", "Habis Masa Garansi"].includes(x.statusPembangunan),
-      ).length,
+      // Status pembangunan kini turunan; hitung langsung dari progres.
+      unitProgress: unit.filter((x) => x.progress > 0 && x.progress < 100).length,
+      unitSelesai: unit.filter((x) => x.progress >= 100).length,
       rataProgress,
       anggaran: bolehKeuangan ? (anggaranPerProyek.get(p.id) ?? 0) : null,
       realisasi: bolehKeuangan ? (realisasiPerProyek.get(p.id) ?? 0) : null,

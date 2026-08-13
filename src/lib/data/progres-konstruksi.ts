@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
-import { progresTertimbang, statusDariProgres } from "@/lib/calc/kontrak-boq";
+import { progresTertimbang } from "@/lib/calc/kontrak-boq";
+import { statusBangunSarpras, statusBangunUnit } from "@/lib/calc/status-bangun";
 
 /**
  * Progress Konstruksi — capaian seluruh lingkup pekerjaan sebuah unit.
@@ -46,6 +47,7 @@ export async function hitungUlangProgresUnit(
     where: { id: unitId },
     select: {
       id: true, nomor: true, progress: true,
+      statusJual: true, tanggalSerahTerima: true,
       phase: { select: { kode: true } },
       boqItems: { select: { volume: true, hargaSatuan: true, progress: true } },
     },
@@ -57,7 +59,12 @@ export async function hitungUlangProgresUnit(
 
   await prisma.unit.update({
     where: { id: unitId },
-    data: { progress: baru, statusPembangunan: statusDariProgres(baru) },
+    data: {
+      progress: baru,
+      statusPembangunan: statusBangunUnit({
+        progress: baru, statusJual: unit.statusJual, tanggalSerahTerima: unit.tanggalSerahTerima,
+      }),
+    },
   });
   await prisma.progressRecord.create({
     data: {
@@ -88,7 +95,7 @@ export async function hitungUlangProgresSarpras(
 
   await prisma.infrastructure.update({
     where: { id: sarprasId },
-    data: { progress: baru, status: statusDariProgres(baru) },
+    data: { progress: baru, status: statusBangunSarpras(baru) },
   });
   await prisma.progressRecord.create({
     data: {
