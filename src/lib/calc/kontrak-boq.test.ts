@@ -124,7 +124,6 @@ describe("nilaiTerpasang", () => {
 
 describe("periksaBarisBoqSpk", () => {
   const sah = {
-    unitId: "U1",
     uraian: "Pek. Pondasi",
     volume: 12,
     hargaSatuan: 750_000,
@@ -133,16 +132,6 @@ describe("periksaBarisBoqSpk", () => {
 
   it("meloloskan baris yang sah", () => {
     assert.equal(periksaBarisBoqSpk(sah), null);
-  });
-
-  it("menolak baris yang menunjuk unit sekaligus sarpras", () => {
-    const pesan = periksaBarisBoqSpk({ ...sah, infrastructureId: "S1" });
-    assert.match(pesan ?? "", /tidak keduanya/);
-  });
-
-  it("menolak baris tanpa tujuan sama sekali", () => {
-    const pesan = periksaBarisBoqSpk({ ...sah, unitId: null });
-    assert.match(pesan ?? "", /harus ditujukan/);
   });
 
   it("menolak uraian kosong", () => {

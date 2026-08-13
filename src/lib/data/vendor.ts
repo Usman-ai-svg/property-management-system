@@ -147,13 +147,38 @@ export async function kontrakDetail(kode: string) {
           },
         },
       },
+      // Template BOQ level-SPK (satu definisi untuk semua objek).
       boqItems: {
         orderBy: [{ urutan: "asc" }],
         select: {
-          id: true, unitId: true, infrastructureId: true, grup: true, uraian: true,
-          satuan: true, volume: true, hargaSatuan: true, progress: true, progressLalu: true,
+          id: true, grup: true, uraian: true, satuan: true, volume: true, hargaSatuan: true, urutan: true,
+        },
+      },
+      // Override + opname per objek. Dilebur dengan template lewat `barisEfektif`.
+      boqUnit: {
+        select: {
+          id: true, boqItemId: true, unitId: true, infrastructureId: true,
+          grup: true, uraian: true, satuan: true, volume: true, hargaSatuan: true,
+          progress: true, progressLalu: true, progressLaluPada: true,
         },
       },
     },
   });
+}
+
+/**
+ * Peta override per (baris template × objek), untuk melebur dengan template.
+ * Kunci: `${boqItemId}:${unitId|infrastructureId}`.
+ */
+export function petaOverrideBoq(
+  boqUnit: {
+    boqItemId: string; unitId: string | null; infrastructureId: string | null;
+    grup: string | null; uraian: string | null; satuan: string | null;
+    volume: number | null; hargaSatuan: number | null;
+    progress: number; progressLalu: number; progressLaluPada: Date | null;
+  }[],
+) {
+  return new Map(
+    boqUnit.map((o) => [`${o.boqItemId}:${o.unitId ?? o.infrastructureId}`, o]),
+  );
 }

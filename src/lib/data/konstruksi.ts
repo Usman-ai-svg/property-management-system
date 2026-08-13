@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { filterProyek, type Pengguna } from "@/lib/auth/rbac";
+import { barisEfektif, progresTertimbang } from "@/lib/calc/kontrak-boq";
+import { petaOverrideBoq } from "@/lib/data/vendor";
 
 /**
  * Data untuk modul Konstruksi.
@@ -191,15 +193,46 @@ export async function daftarSarprasKonstruksi(projectId: string) {
  * `lib/data/progres-konstruksi.ts`. Yang dihitung di sini hanya lingkup SPK.
  */
 export async function vendorKonstruksiProyek(projectId: string) {
-  return prisma.contract.findMany({
+  const kontrak = await prisma.contract.findMany({
     where: { projectId },
     orderBy: { kode: "asc" },
     select: {
       id: true, kode: true, jenis: true, deskripsi: true, nominal: true,
       vendor: { select: { id: true, nama: true } },
-      boqItems: { select: { volume: true, hargaSatuan: true, progress: true } },
+      boqItems: {
+        orderBy: { urutan: "asc" },
+        select: { id: true, grup: true, uraian: true, satuan: true, volume: true, hargaSatuan: true, urutan: true },
+      },
+      boqUnit: {
+        select: {
+          boqItemId: true, unitId: true, infrastructureId: true,
+          grup: true, uraian: true, satuan: true, volume: true, hargaSatuan: true,
+          progress: true, progressLalu: true, progressLaluPada: true,
+        },
+      },
+      units: { select: { unitId: true } },
+      infrastructures: { select: { infrastructureId: true } },
       _count: { select: { units: true, infrastructures: true } },
     },
+  });
+
+  // Progress Vendor SPK = tertimbang atas SELURUH baris efektif (template ⊕
+  // override) di semua objek yang dicakup — objek tanpa opname ikut sebagai 0.
+  return kontrak.map((c) => {
+    const peta = petaOverrideBoq(c.boqUnit);
+    const objekIds = [
+      ...c.units.map((u) => u.unitId),
+      ...c.infrastructures.map((s) => s.infrastructureId),
+    ];
+    const efektif = objekIds.flatMap((oid) =>
+      c.boqItems.map((t) => barisEfektif(t, peta.get(`${t.id}:${oid}`))),
+    );
+    return {
+      id: c.id, kode: c.kode, jenis: c.jenis, deskripsi: c.deskripsi, nominal: c.nominal,
+      vendor: c.vendor,
+      objek: c._count.units + c._count.infrastructures,
+      progres: efektif.length ? progresTertimbang(efektif) : 0,
+    };
   });
 }
 

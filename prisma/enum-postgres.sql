@@ -116,8 +116,8 @@ CREATE TYPE pm_status_bayar AS ENUM (
 
 CREATE TYPE pm_status_aset AS ENUM (
   'Tersedia',
+  'Sebagian',
   'Digunakan',
-  'Pemeliharaan',
   'Rusak'
 );
 
@@ -126,9 +126,14 @@ CREATE TYPE pm_kepemilikan_aset AS ENUM (
   'Sewa'
 );
 
-CREATE TYPE pm_satuan_pakai AS ENUM (
-  'jam',
-  'hari'
+CREATE TYPE pm_jenis_aset AS ENUM (
+  'Peralatan',
+  'Aset'
+);
+
+CREATE TYPE pm_status_penggunaan AS ENUM (
+  'Aktif',
+  'Selesai'
 );
 
 CREATE TYPE pm_jenis_penyesuaian_aset AS ENUM (

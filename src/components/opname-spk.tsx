@@ -47,12 +47,15 @@ function TombolSimpan({ berubah }: { berubah: number }) {
 export function TabelOpnameSpk({
   aksi,
   contractId,
+  tujuan,
   objek,
   bolehUbah,
   bolehHarga,
 }: {
   aksi: (sebelumnya: HasilAksi | null, form: FormData) => Promise<HasilAksi>;
   contractId: string;
+  /** Objek yang diopname: "unit:<id>" | "sarpras:<id>". */
+  tujuan: string;
   objek: ObjekOpname[];
   bolehUbah: boolean;
   bolehHarga: boolean;
@@ -78,6 +81,7 @@ export function TabelOpnameSpk({
   return (
     <form action={kirim}>
       <input type="hidden" name="contractId" value={contractId} />
+      <input type="hidden" name="objek" value={tujuan} />
 
       {objek.map((o) => {
         const total = o.baris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);

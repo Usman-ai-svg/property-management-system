@@ -7,7 +7,7 @@
 
 export interface AsetLike {
   kepemilikan: string;
-  status: string;
+  jumlahRusak: number;
   servisBerikut: Date | null;
   nilai?: number;
 }
@@ -16,7 +16,7 @@ export interface KpiAset {
   jumlahJenis: number;
   milikSendiri: number;
   sewa: number;
-  /** Aset berstatus Rusak atau Pemeliharaan — tidak siap dipakai. */
+  /** Jenis alat yang punya unit rusak — ada yang perlu diperbaiki. */
   perluPerhatian: number;
   nilaiMilikSendiri: number;
   /** Servis yang jatuh tempo dalam 30 hari ke depan, ATAU sudah terlewat. */
@@ -37,7 +37,7 @@ export function kpiAset(aset: AsetLike[], sekarang = new Date()): KpiAset {
     jumlahJenis: aset.length,
     milikSendiri: milikSendiri.length,
     sewa: aset.length - milikSendiri.length,
-    perluPerhatian: aset.filter((a) => a.status === "Rusak" || a.status === "Pemeliharaan").length,
+    perluPerhatian: aset.filter((a) => a.jumlahRusak > 0).length,
     nilaiMilikSendiri: milikSendiri.reduce((s, a) => s + (a.nilai ?? 0), 0),
     servisDekat: aset.filter((a) => a.servisBerikut && a.servisBerikut <= ambang).length,
   };

@@ -1,7 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
-import { kontrakDetail } from "@/lib/data/vendor";
+import { kontrakDetail, petaOverrideBoq } from "@/lib/data/vendor";
+import { barisEfektif } from "@/lib/calc/kontrak-boq";
 import { susunOpname } from "@/lib/calc/opname";
 import { Terbatas } from "@/components/ui";
 import { TabelOpnameSpk, type ObjekOpname } from "@/components/opname-spk";
@@ -58,9 +59,14 @@ export default async function OpnameVendorKonstruksi({
 
   const label = unit ? `Unit ${unit.phase.kode}-${unit.nomor}` : sarpras!.nama;
   const keterangan = unit ? unit.unitType.nama : sarpras!.jenis;
-  const baris = kontrak.boqItems.filter((b) =>
-    unit ? b.unitId === unit.id : b.infrastructureId === sarpras!.id,
-  );
+  const objId = unit ? unit.id : sarpras!.id;
+
+  // Baris efektif objek ini: template SPK dilebur dengan override objeknya.
+  const peta = petaOverrideBoq(kontrak.boqUnit);
+  const efektif = kontrak.boqItems.map((t) => {
+    const o = peta.get(`${t.id}:${objId}`);
+    return { ...barisEfektif(t, o), progressLalu: o?.progressLalu ?? 0 };
+  });
 
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
   const bolehUbahProgres = bolehUbah(pengguna, "progress");
@@ -70,8 +76,8 @@ export default async function OpnameVendorKonstruksi({
       kunci: `${jenis}:${objekId}`,
       label,
       keterangan,
-      baris: baris.map((b) => ({
-        id: b.id, grup: b.grup, uraian: b.uraian, satuan: b.satuan,
+      baris: efektif.map((b) => ({
+        id: b.boqItemId, grup: b.grup, uraian: b.uraian, satuan: b.satuan,
         volume: b.volume, hargaSatuan: b.hargaSatuan, progress: b.progress,
       })),
     },
@@ -80,7 +86,7 @@ export default async function OpnameVendorKonstruksi({
   // Laporan opname mingguan untuk objek ini (Progress Vendor), memakai
   // `progressLalu` yang digeser dengan aturan hari-kerja yang sama.
   const barisMingguan = susunOpname(
-    baris.map((b) => ({
+    efektif.map((b) => ({
       grup: b.grup, uraian: b.uraian, satuan: b.satuan,
       volume: b.volume, hargaSatuan: b.hargaSatuan,
       progress: b.progress, progressLalu: b.progressLalu,
@@ -135,7 +141,7 @@ export default async function OpnameVendorKonstruksi({
         <b>Progress Vendor</b> — lingkup satu SPK, terpisah dari Progress Konstruksi unit.
       </div>
 
-      {baris.length === 0 ? (
+      {efektif.length === 0 ? (
         <div className="card" style={{ padding: 22, textAlign: "center", color: "var(--muted)", fontSize: 12.5 }}>
           Objek ini belum punya baris BOQ pada SPK tersebut. Rinci dulu BOQ-nya di
           laman SPK (modul Vendor) sebelum bisa diopname di sini.
@@ -145,6 +151,7 @@ export default async function OpnameVendorKonstruksi({
           <TabelOpnameSpk
             aksi={simpanProgresBoqSpk}
             contractId={kontrak.id}
+            tujuan={`${jenis}:${objekId}`}
             objek={untukOpname}
             bolehUbah={bolehUbahProgres}
             bolehHarga={bolehHarga}

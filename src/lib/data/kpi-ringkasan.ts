@@ -3,7 +3,6 @@ import { bolehLihat, filterProyek, type Pengguna } from "@/lib/auth/rbac";
 import { komposisi, keuanganPerProyek } from "@/lib/data/keuangan";
 import { luasTotal } from "@/lib/tampilan/landbank";
 import { ringkasKontrak } from "@/lib/calc/keuangan";
-import { unitTerpakai } from "@/lib/calc/aset";
 import { m2, pct, rpRingkas } from "@/lib/format";
 import type { RingkasProyek } from "@/lib/data/ringkasan";
 
@@ -248,18 +247,22 @@ async function grupVendor(u: Pengguna): Promise<GrupKpi> {
 async function grupAset(u: Pengguna): Promise<GrupKpi> {
   const bolehHarga = bolehLihat(u, "hargaRabRap");
 
-  const aset = await prisma.equipment.findMany({
-    select: {
-      kepemilikan: true, status: true, servisBerikut: true,
-      jumlah: true, jumlahRusak: true,
-      ...(bolehHarga ? { nilai: true } : {}),
-    },
-  });
+  const [aset, dipakai] = await Promise.all([
+    prisma.equipment.findMany({
+      select: {
+        kepemilikan: true, servisBerikut: true,
+        jumlah: true, jumlahRusak: true,
+        ...(bolehHarga ? { nilai: true } : {}),
+      },
+    }),
+    // Unit yang benar-benar sedang dipakai = jumlah pada penggunaan aktif.
+    prisma.equipmentUsage.aggregate({ where: { status: "Aktif" }, _sum: { jumlah: true } }),
+  ]);
 
   const milikSendiri = aset.filter((a) => a.kepemilikan === "Milik Sendiri");
-  const perluPerhatian = aset.filter((a) => a.status === "Rusak" || a.status === "Pemeliharaan").length;
+  const perluPerhatian = aset.filter((a) => a.jumlahRusak > 0).length;
   const rusak = aset.reduce((s, a) => s + a.jumlahRusak, 0);
-  const terpakai = aset.reduce((s, a) => s + unitTerpakai(a), 0);
+  const terpakai = dipakai._sum.jumlah ?? 0;
 
   // Servis yang jatuh tempo dalam 30 hari ke depan, atau sudah terlewat.
   const ambang = new Date(Date.now() + 30 * 864e5);

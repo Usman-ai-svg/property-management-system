@@ -7,18 +7,18 @@ const KINI = new Date("2026-07-01T00:00:00Z");
 
 const aset = (
   kepemilikan: string,
-  status: string,
+  jumlahRusak: number,
   servisBerikut: Date | null = null,
   nilai?: number,
-) => ({ kepemilikan, status, servisBerikut, nilai });
+) => ({ kepemilikan, jumlahRusak, servisBerikut, nilai });
 
 describe("kpiAset", () => {
   it("memisahkan aset milik sendiri dari aset sewa", () => {
     const k = kpiAset(
       [
-        aset("Milik Sendiri", "Tersedia"),
-        aset("Milik Sendiri", "Digunakan"),
-        aset("Sewa", "Digunakan"),
+        aset("Milik Sendiri", 0),
+        aset("Milik Sendiri", 0),
+        aset("Sewa", 0),
       ],
       KINI,
     );
@@ -27,13 +27,13 @@ describe("kpiAset", () => {
     assert.equal(k.sewa, 1);
   });
 
-  it("perlu perhatian mencakup Rusak DAN Pemeliharaan", () => {
+  it("perlu perhatian menghitung jenis alat yang punya unit rusak", () => {
     const k = kpiAset(
       [
-        aset("Milik Sendiri", "Rusak"),
-        aset("Milik Sendiri", "Pemeliharaan"),
-        aset("Milik Sendiri", "Tersedia"),
-        aset("Sewa", "Digunakan"),
+        aset("Milik Sendiri", 2),
+        aset("Milik Sendiri", 1),
+        aset("Milik Sendiri", 0),
+        aset("Sewa", 0),
       ],
       KINI,
     );
@@ -41,25 +41,24 @@ describe("kpiAset", () => {
   });
 
   it("nilai hanya menjumlahkan aset milik sendiri", () => {
-    // Nilai pada aset sewa adalah TARIF, bukan nilai perolehan —
-    // menjumlahkannya menghasilkan angka yang tidak berarti apa-apa.
+    // Aset sewa tidak punya nilai perolehan (0) — tarifnya ada di penggunaan.
     const k = kpiAset(
-      [aset("Milik Sendiri", "Tersedia", null, 100), aset("Sewa", "Digunakan", null, 500)],
+      [aset("Milik Sendiri", 0, null, 100), aset("Sewa", 0, null, 0)],
       KINI,
     );
     assert.equal(k.nilaiMilikSendiri, 100);
   });
 
   it("nilai nol bila kolomnya tidak di-SELECT untuk peran ini", () => {
-    const k = kpiAset([aset("Milik Sendiri", "Tersedia")], KINI);
+    const k = kpiAset([aset("Milik Sendiri", 0)], KINI);
     assert.equal(k.nilaiMilikSendiri, 0);
   });
 
   it("servis dekat mencakup yang jatuh tempo 30 hari ke depan", () => {
     const k = kpiAset(
       [
-        aset("Milik Sendiri", "Tersedia", new Date(KINI.getTime() + 10 * HARI)),
-        aset("Milik Sendiri", "Tersedia", new Date(KINI.getTime() + 40 * HARI)),
+        aset("Milik Sendiri", 0, new Date(KINI.getTime() + 10 * HARI)),
+        aset("Milik Sendiri", 0, new Date(KINI.getTime() + 40 * HARI)),
       ],
       KINI,
     );
@@ -68,14 +67,14 @@ describe("kpiAset", () => {
 
   it("servis yang sudah TERLEWAT tetap terhitung, bukan diabaikan", () => {
     const k = kpiAset(
-      [aset("Milik Sendiri", "Tersedia", new Date(KINI.getTime() - 5 * HARI))],
+      [aset("Milik Sendiri", 0, new Date(KINI.getTime() - 5 * HARI))],
       KINI,
     );
     assert.equal(k.servisDekat, 1);
   });
 
   it("aset tanpa jadwal servis tidak ikut terhitung", () => {
-    const k = kpiAset([aset("Milik Sendiri", "Tersedia", null)], KINI);
+    const k = kpiAset([aset("Milik Sendiri", 0, null)], KINI);
     assert.equal(k.servisDekat, 0);
   });
 

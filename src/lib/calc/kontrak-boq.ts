@@ -26,6 +26,66 @@ export interface BarisBoqSpk {
 export const nilaiBaris = (b: { volume: number; hargaSatuan: number }): number =>
   b.volume * b.hargaSatuan;
 
+/** Satu baris template BOQ SPK (level kontrak). */
+export interface TemplateBoq {
+  id: string;
+  grup: string;
+  uraian: string;
+  satuan: string;
+  volume: number;
+  hargaSatuan: number;
+  urutan?: number;
+}
+
+/** Override + opname sebuah baris template untuk satu objek. Field definisi
+ * bernilai null berarti "ikut template". */
+export interface OverrideBoq {
+  grup?: string | null;
+  uraian?: string | null;
+  satuan?: string | null;
+  volume?: number | null;
+  hargaSatuan?: number | null;
+  progress?: number | null;
+  progressLalu?: number | null;
+  progressLaluPada?: Date | null;
+}
+
+/** Baris BOQ efektif untuk satu objek: template dilebur dengan override-nya. */
+export interface BarisEfektif {
+  /** id baris TEMPLATE (bukan id override) — kunci opname & override. */
+  boqItemId: string;
+  grup: string;
+  uraian: string;
+  satuan: string;
+  volume: number;
+  hargaSatuan: number;
+  progress: number;
+  /** true bila ada satu saja nilai definisi yang di-override untuk objek ini. */
+  disesuaikan: boolean;
+}
+
+/**
+ * Lebur satu baris template dengan override objeknya menjadi baris efektif.
+ * Field definisi memakai override bila terisi (bukan null), selain itu template
+ * — inilah "warisan field-level" yang membuat perubahan template menurun ke
+ * semua objek yang belum menyesuaikan field tersebut.
+ */
+export function barisEfektif(t: TemplateBoq, o?: OverrideBoq | null): BarisEfektif {
+  const disesuaikan = Boolean(
+    o && (o.grup != null || o.uraian != null || o.satuan != null || o.volume != null || o.hargaSatuan != null),
+  );
+  return {
+    boqItemId: t.id,
+    grup: o?.grup ?? t.grup,
+    uraian: o?.uraian ?? t.uraian,
+    satuan: o?.satuan ?? t.satuan,
+    volume: o?.volume ?? t.volume,
+    hargaSatuan: o?.hargaSatuan ?? t.hargaSatuan,
+    progress: o?.progress ?? 0,
+    disesuaikan,
+  };
+}
+
 /**
  * Progres gabungan sekumpulan baris, tertimbang nilai tiap baris.
  *
@@ -112,19 +172,11 @@ export function nilaiTerpasang(baris: BarisBoqSpk[]): number {
  * Mengembalikan pesan galat berbahasa manusia, atau null bila baris sah.
  */
 export function periksaBarisBoqSpk(b: {
-  unitId?: string | null;
-  infrastructureId?: string | null;
   uraian?: string;
   volume: number;
   hargaSatuan: number;
-  progress: number;
+  progress?: number;
 }): string | null {
-  if (b.unitId && b.infrastructureId) {
-    return "Satu baris BOQ hanya boleh untuk unit ATAU sarana & prasarana, tidak keduanya.";
-  }
-  if (!b.unitId && !b.infrastructureId) {
-    return "Tiap baris BOQ harus ditujukan ke satu unit atau satu item sarana & prasarana.";
-  }
   if (b.uraian !== undefined && b.uraian.trim() === "") {
     return "Uraian pekerjaan tidak boleh kosong.";
   }
@@ -134,7 +186,7 @@ export function periksaBarisBoqSpk(b: {
   if (!Number.isFinite(b.hargaSatuan) || b.hargaSatuan < 0) {
     return "Harga satuan harus berupa angka dan tidak boleh negatif.";
   }
-  if (!Number.isFinite(b.progress) || b.progress < 0 || b.progress > 100) {
+  if (b.progress !== undefined && (!Number.isFinite(b.progress) || b.progress < 0 || b.progress > 100)) {
     return "Progres tiap baris harus di antara 0 dan 100 persen.";
   }
   return null;

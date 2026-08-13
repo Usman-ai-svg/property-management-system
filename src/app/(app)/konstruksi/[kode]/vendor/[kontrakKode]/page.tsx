@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
-import { kontrakDetail } from "@/lib/data/vendor";
-import { nilaiTerpasang, progresTertimbang } from "@/lib/calc/kontrak-boq";
+import { kontrakDetail, petaOverrideBoq } from "@/lib/data/vendor";
+import { barisEfektif, nilaiTerpasang, progresTertimbang } from "@/lib/calc/kontrak-boq";
 import { ringkasKontrak } from "@/lib/calc/keuangan";
 import { rp } from "@/lib/format";
 import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
@@ -49,8 +49,11 @@ export default async function ObjekVendorKonstruksi({
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
 
   const ringkas = ringkasKontrak(kontrak);
-  const nilaiBoq = kontrak.boqItems.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
-  const terpasang = nilaiTerpasang(kontrak.boqItems);
+
+  // Baris efektif tiap objek = template SPK ⊕ override objeknya.
+  const peta = petaOverrideBoq(kontrak.boqUnit);
+  const efektifObjek = (objId: string) =>
+    kontrak.boqItems.map((t) => barisEfektif(t, peta.get(`${t.id}:${objId}`)));
 
   const objekUnit = kontrak.units.map(({ unit }) => ({
     jenis: "unit" as const,
@@ -61,7 +64,7 @@ export default async function ObjekVendorKonstruksi({
     keterangan: unit.unitType.nama,
     progresTersimpan: unit.progress,
     status: unit.statusPembangunan,
-    baris: kontrak.boqItems.filter((b) => b.unitId === unit.id),
+    baris: efektifObjek(unit.id),
   }));
   const objekSarpras = kontrak.infrastructures.map(({ infrastructure: s }) => ({
     jenis: "sarpras" as const,
@@ -71,9 +74,12 @@ export default async function ObjekVendorKonstruksi({
     keterangan: s.jenis,
     progresTersimpan: s.progress,
     status: s.status,
-    baris: kontrak.boqItems.filter((b) => b.infrastructureId === s.id),
+    baris: efektifObjek(s.id),
   }));
   const semuaObjek = [...objekUnit, ...objekSarpras];
+  const semuaBaris = semuaObjek.flatMap((o) => o.baris);
+  const nilaiBoq = semuaBaris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
+  const terpasang = nilaiTerpasang(semuaBaris);
 
   return (
     <div style={{ padding: 24 }}>

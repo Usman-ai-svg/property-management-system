@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { taksiranNilaiRusak, terapkanPenyesuaian, unitTerpakai } from "./aset";
+import {
+  biayaPenggunaan, durasiHari, statusAset, taksiranNilaiRusak, terapkanPenyesuaian,
+  unitDipakai, unitTerpakai, unitTersedia,
+} from "./aset";
 
 /** 5 helm, semuanya masih baik. */
 const utuh = { jumlah: 5, jumlahRusak: 0 };
@@ -114,5 +117,85 @@ describe("taksiranNilaiRusak", () => {
 
   it("mengembalikan nol bila tidak ada stok", () => {
     assert.equal(taksiranNilaiRusak({ jumlah: 0, jumlahRusak: 0, nilai: 10_000_000 }), 0);
+  });
+});
+
+describe("unitDipakai", () => {
+  it("hanya menjumlahkan penggunaan yang Aktif", () => {
+    const dipakai = unitDipakai([
+      { jumlah: 20, status: "Aktif" },
+      { jumlah: 20, status: "Aktif" },
+      { jumlah: 15, status: "Selesai" },
+    ]);
+    assert.equal(dipakai, 40);
+  });
+
+  it("nol bila tidak ada penggunaan aktif", () => {
+    assert.equal(unitDipakai([{ jumlah: 5, status: "Selesai" }]), 0);
+  });
+});
+
+describe("unitTersedia", () => {
+  it("stok baik dikurangi yang sedang dipakai", () => {
+    // 40 set, 0 rusak, 40 dipakai (20 GN2 + 20 NT4) → 0 tersedia.
+    assert.equal(unitTersedia({ jumlah: 40, jumlahRusak: 0 }, 40), 0);
+  });
+
+  it("memperhitungkan unit rusak", () => {
+    assert.equal(unitTersedia({ jumlah: 10, jumlahRusak: 2 }, 3), 5);
+  });
+
+  it("tidak pernah negatif", () => {
+    assert.equal(unitTersedia({ jumlah: 5, jumlahRusak: 0 }, 9), 0);
+  });
+});
+
+describe("statusAset", () => {
+  it("Tersedia bila tak ada yang dipakai", () => {
+    assert.equal(statusAset({ jumlah: 10, jumlahRusak: 0 }, 0), "Tersedia");
+  });
+
+  it("Sebagian bila sebagian dipakai", () => {
+    assert.equal(statusAset({ jumlah: 10, jumlahRusak: 0 }, 4), "Sebagian");
+  });
+
+  it("Digunakan bila seluruh unit baik dipakai", () => {
+    assert.equal(statusAset({ jumlah: 10, jumlahRusak: 0 }, 10), "Digunakan");
+  });
+
+  it("Digunakan meski hanya menghitung unit baik, bukan yang rusak", () => {
+    // 10 unit, 2 rusak → 8 baik. Dipakai 8 → seluruh yang baik dipakai.
+    assert.equal(statusAset({ jumlah: 10, jumlahRusak: 2 }, 8), "Digunakan");
+  });
+
+  it("Rusak bila tak ada unit baik tersisa", () => {
+    assert.equal(statusAset({ jumlah: 4, jumlahRusak: 4 }, 0), "Rusak");
+  });
+});
+
+describe("durasiHari", () => {
+  const mulai = new Date("2026-08-01T00:00:00Z");
+
+  it("menghitung inklusif — 1 s.d. 10 Agustus adalah 10 hari", () => {
+    assert.equal(durasiHari(mulai, new Date("2026-08-10T00:00:00Z")), 10);
+  });
+
+  it("penggunaan belum ditutup dihitung sampai kini", () => {
+    assert.equal(durasiHari(mulai, null, new Date("2026-08-05T00:00:00Z")), 5);
+  });
+
+  it("minimal satu hari", () => {
+    assert.equal(durasiHari(mulai, mulai), 1);
+  });
+});
+
+describe("biayaPenggunaan", () => {
+  it("tarif per hari × jumlah unit × lama hari", () => {
+    // Rp150.000/hari × 20 unit × 10 hari = Rp30.000.000.
+    assert.equal(biayaPenggunaan(150_000, 20, 10), 30_000_000);
+  });
+
+  it("nol untuk alat milik sendiri (tarif 0)", () => {
+    assert.equal(biayaPenggunaan(0, 5, 30), 0);
   });
 });

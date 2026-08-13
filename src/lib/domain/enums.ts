@@ -191,11 +191,20 @@ export const METODE_TUNAI = METODE_BAYAR.filter(
 
 export const STATUS_BAYAR = ["Lunas", "DP", "Belum"] as const;
 
-export const STATUS_ASET = ["Tersedia", "Digunakan", "Pemeliharaan", "Rusak"] as const;
+/**
+ * Status peralatan/aset yang DITURUNKAN dari stok dan penggunaan aktif — tidak
+ * disimpan di database. "Sebagian" berarti sebagian unit dipakai, sisanya masih
+ * tersedia. Lihat `statusAset()` di src/lib/calc/aset.ts.
+ */
+export const STATUS_ASET = ["Tersedia", "Sebagian", "Digunakan", "Rusak"] as const;
 
 export const KEPEMILIKAN_ASET = ["Milik Sendiri", "Sewa"] as const;
-/** Satuan pemakaian alat: alat berat dihitung per jam, alat bantu per hari. */
-export const SATUAN_PAKAI = ["jam", "hari"] as const;
+
+/** Jenis entri inventaris: alat kerja vs aset operasional (mis. mobil proyek). */
+export const JENIS_ASET = ["Peralatan", "Aset"] as const;
+
+/** Status satu penggunaan alat. Hanya "Aktif" yang mengurangi stok tersedia. */
+export const STATUS_PENGGUNAAN = ["Aktif", "Selesai"] as const;
 
 /**
  * Jenis penyesuaian stok aset.
@@ -349,7 +358,8 @@ export type MetodeBayar = (typeof METODE_BAYAR)[number];
 export type StatusBayar = (typeof STATUS_BAYAR)[number];
 export type StatusAset = (typeof STATUS_ASET)[number];
 export type KepemilikanAset = (typeof KEPEMILIKAN_ASET)[number];
-export type SatuanPakai = (typeof SATUAN_PAKAI)[number];
+export type JenisAset = (typeof JENIS_ASET)[number];
+export type StatusPenggunaan = (typeof STATUS_PENGGUNAAN)[number];
 export type Section = (typeof SECTIONS)[number];
 export type Role = (typeof ROLES)[number];
 export type RoleGroup =
@@ -391,7 +401,8 @@ export const SEMUA_ENUM = {
   StatusBayar: STATUS_BAYAR,
   StatusAset: STATUS_ASET,
   KepemilikanAset: KEPEMILIKAN_ASET,
-  SatuanPakai: SATUAN_PAKAI,
+  JenisAset: JENIS_ASET,
+  StatusPenggunaan: STATUS_PENGGUNAAN,
   JenisPenyesuaianAset: JENIS_PENYESUAIAN_ASET,
   JenisHakAtasTanah: JENIS_HAK_ATAS_TANAH,
 } as const satisfies Record<string, readonly string[]>;

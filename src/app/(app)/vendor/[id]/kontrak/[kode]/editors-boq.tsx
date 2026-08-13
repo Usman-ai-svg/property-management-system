@@ -1,32 +1,27 @@
 "use client";
 
+import { useActionState } from "react";
 import { BarisField, Field, FormModal, TombolHapus, TombolIkon } from "@/components/form";
+import { Petunjuk } from "@/components/ui";
 import {
   hapusBarisBoqSpk,
   imporBoqSpk,
-  salinBoqKeSemua,
+  resetOverrideBoq,
   tambahBarisBoqSpk,
   ubahBarisBoqSpk,
+  ubahOverrideBoq,
 } from "../../../boq-actions";
-import { Petunjuk } from "@/components/ui";
 
-export interface PilihanObjek {
-  kunci: string;
-  label: string;
-}
+// ===========================================================================
+// TEMPLATE BOQ (level SPK) — tanpa objek, berlaku untuk semua unit
+// ===========================================================================
 
-/** Tambah satu baris pekerjaan ke BOQ SPK. */
-export function TambahBarisBoq({
-  contractId,
-  objek,
-}: {
-  contractId: string;
-  objek: PilihanObjek[];
-}) {
+/** Tambah satu baris ke template BOQ SPK. */
+export function TambahBarisBoq({ contractId }: { contractId: string }) {
   return (
     <FormModal
       judul="Tambah Baris Pekerjaan"
-      keterangan="Rincian pekerjaan yang diperintahkan SPK ini. Progres diisi belakangan saat opname."
+      keterangan="Baris template ini berlaku untuk seluruh objek SPK. Nilai per objek bisa disesuaikan di laman detail objek."
       aksi={tambahBarisBoqSpk}
       lebar={620}
       pemicu={(buka) => (
@@ -36,14 +31,6 @@ export function TambahBarisBoq({
       )}
     >
       <input type="hidden" name="contractId" value={contractId} />
-      <BarisField kolom={1}>
-        <Field
-          label="Dikerjakan untuk"
-          nama="tujuan"
-          pilihan={objek.map((o) => ({ nilai: o.kunci, label: o.label }))}
-          wajib
-        />
-      </BarisField>
       <BarisField kolom={1}>
         <Field label="Uraian Pekerjaan" nama="uraian" wajib petunjuk="mis. Pek. Pondasi Batu Kali" />
       </BarisField>
@@ -55,37 +42,20 @@ export function TambahBarisBoq({
         <Field label="Volume" nama="volume" tipe="number" wajib />
         <Field label="Harga Satuan" nama="hargaSatuan" tipe="number" satuan="Rp" wajib />
       </BarisField>
-      <BarisField kolom={1}>
-        <Field
-          label="Progres Awal"
-          nama="progress"
-          tipe="number"
-          satuan="%"
-          nilai={0}
-          petunjuk="Biarkan 0 bila pekerjaan belum dimulai."
-        />
-      </BarisField>
     </FormModal>
   );
 }
 
-/** Ubah satu baris BOQ SPK. Objek tujuannya tidak bisa dipindah. */
+/** Ubah satu baris template BOQ SPK (berlaku ke semua objek yang belum disesuaikan). */
 export function UbahBarisBoq({
   baris,
 }: {
-  baris: {
-    id: string;
-    grup: string;
-    uraian: string;
-    satuan: string;
-    volume: number;
-    hargaSatuan: number;
-    progress: number;
-  };
+  baris: { id: string; grup: string; uraian: string; satuan: string; volume: number; hargaSatuan: number };
 }) {
   return (
     <FormModal
-      judul="Ubah Baris Pekerjaan"
+      judul="Ubah Baris Pekerjaan (Template)"
+      keterangan="Perubahan menurun ke semua objek yang belum menyesuaikan baris ini."
       aksi={ubahBarisBoqSpk}
       lebar={620}
       pemicu={(buka) => <TombolIkon onClick={buka} judul={`Ubah baris ${baris.uraian}`} />}
@@ -100,17 +70,7 @@ export function UbahBarisBoq({
       </BarisField>
       <BarisField>
         <Field label="Volume" nama="volume" nilai={baris.volume} tipe="number" wajib />
-        <Field
-          label="Harga Satuan"
-          nama="hargaSatuan"
-          nilai={baris.hargaSatuan}
-          tipe="number"
-          satuan="Rp"
-          wajib
-        />
-      </BarisField>
-      <BarisField kolom={1}>
-        <Field label="Progres" nama="progress" nilai={baris.progress} tipe="number" satuan="%" />
+        <Field label="Harga Satuan" nama="hargaSatuan" nilai={baris.hargaSatuan} tipe="number" satuan="Rp" wajib />
       </BarisField>
     </FormModal>
   );
@@ -120,14 +80,8 @@ export function HapusBarisBoq({ id, uraian }: { id: string; uraian: string }) {
   return <TombolHapus aksi={hapusBarisBoqSpk} id={id} nama={`baris ${uraian}`} />;
 }
 
-/** Impor BOQ satu objek dari Excel. Menggantikan baris objek itu, bukan menambah. */
-export function ImporBoqSpk({
-  contractId,
-  objek,
-}: {
-  contractId: string;
-  objek: PilihanObjek[];
-}) {
+/** Impor template BOQ SPK dari Excel — mengganti seluruh baris template. */
+export function ImporBoqSpk({ contractId }: { contractId: string }) {
   return (
     <FormModal
       judul="Impor BOQ dari Excel"
@@ -143,67 +97,82 @@ export function ImporBoqSpk({
     >
       <input type="hidden" name="contractId" value={contractId} />
       <BarisField kolom={1}>
-        <Field
-          label="Dikerjakan untuk"
-          nama="tujuan"
-          pilihan={objek.map((o) => ({ nilai: o.kunci, label: o.label }))}
-          wajib
-        />
-      </BarisField>
-      <BarisField kolom={1}>
         <Field label="Berkas Excel" nama="berkas" tipe="berkas" wajib />
       </BarisField>
       <Petunjuk>
-        Impor <b>mengganti</b> seluruh baris BOQ objek yang dipilih pada SPK ini,
-        supaya mengimpor ulang berkas yang sama tidak menggandakan isinya. Kolom
-        progres tidak ikut diimpor — berkas SPK berisi lingkup pekerjaan,
-        sedangkan progres adalah hasil opname.
+        Impor <b>mengganti</b> seluruh baris template BOQ SPK ini — mengimpor ulang
+        berkas yang sama tidak menggandakan isinya. Penyesuaian & progres per objek
+        ikut ter-reset karena barisnya berganti.
       </Petunjuk>
     </FormModal>
   );
 }
 
+// ===========================================================================
+// OVERRIDE per objek — di laman detail objek
+// ===========================================================================
+
 /**
- * Salin BOQ satu unit ke seluruh unit lain dalam kontrak.
- *
- * SPK borongan untuk sepuluh unit tipe sama berisi rincian yang sama sepuluh
- * kali; tanpa ini QS harus mengetik atau mengimpor sepuluh kali.
+ * Sesuaikan nilai satu baris untuk SATU objek. Field yang dikosongkan mengikuti
+ * template (petunjuk menampilkan nilai template-nya).
  */
-export function SalinBoqKeSemua({
-  contractId,
+export function SesuaikanBaris({
+  boqItemId,
   objek,
-  jumlahUnitLain,
+  template,
+  override,
 }: {
-  contractId: string;
-  objek: PilihanObjek[];
-  jumlahUnitLain: number;
+  boqItemId: string;
+  /** "unit:<id>" | "sarpras:<id>". */
+  objek: string;
+  template: { grup: string; uraian: string; satuan: string; volume: number; hargaSatuan: number };
+  override: {
+    grup: string | null; uraian: string | null; satuan: string | null;
+    volume: number | null; hargaSatuan: number | null;
+  } | null;
 }) {
   return (
     <FormModal
-      judul="Salin BOQ ke Seluruh Unit"
-      keterangan={`Menyalin rincian pekerjaan satu unit ke ${jumlahUnitLain} unit lain dalam SPK ini.`}
-      aksi={salinBoqKeSemua}
-      labelSimpan="Salin"
-      lebar={560}
-      pemicu={(buka) => (
-        <button type="button" className="btn-garis" onClick={buka}>
-          Salin ke Semua Unit
-        </button>
-      )}
+      judul="Sesuaikan Baris untuk Objek Ini"
+      keterangan="Hanya berlaku untuk objek ini. Kosongkan sebuah field untuk mengikuti template SPK."
+      aksi={ubahOverrideBoq}
+      lebar={620}
+      pemicu={(buka) => <TombolIkon onClick={buka} judul={`Sesuaikan ${template.uraian}`} />}
     >
-      <input type="hidden" name="contractId" value={contractId} />
+      <input type="hidden" name="boqItemId" value={boqItemId} />
+      <input type="hidden" name="objek" value={objek} />
       <BarisField kolom={1}>
-        <Field
-          label="Unit sumber"
-          nama="sumber"
-          pilihan={objek.map((o) => ({ nilai: o.kunci, label: o.label }))}
-          wajib
-        />
+        <Field label="Uraian" nama="uraian" nilai={override?.uraian ?? ""} petunjuk={`Template: ${template.uraian}`} />
       </BarisField>
-      <Petunjuk>
-        BOQ unit lain akan <b>diganti</b>, dan progresnya dimulai dari nol —
-        yang disalin lingkup pekerjaannya, bukan capaian lapangannya.
-      </Petunjuk>
+      <BarisField>
+        <Field label="Grup" nama="grup" nilai={override?.grup ?? ""} petunjuk={`Template: ${template.grup}`} />
+        <Field label="Satuan" nama="satuan" nilai={override?.satuan ?? ""} petunjuk={`Template: ${template.satuan}`} />
+      </BarisField>
+      <BarisField>
+        <Field label="Volume" nama="volume" nilai={override?.volume ?? ""} tipe="number" petunjuk={`Template: ${template.volume}`} />
+        <Field label="Harga Satuan" nama="hargaSatuan" nilai={override?.hargaSatuan ?? ""} tipe="number" satuan="Rp" petunjuk={`Template: ${template.hargaSatuan}`} />
+      </BarisField>
     </FormModal>
+  );
+}
+
+/** Kembalikan sebuah baris objek ke nilai template (buang penyesuaiannya). */
+export function SamakanKeTemplate({ boqItemId, objek }: { boqItemId: string; objek: string }) {
+  const [, kirim] = useActionState(resetOverrideBoq, null);
+  return (
+    <form action={kirim} style={{ display: "inline" }}>
+      <input type="hidden" name="boqItemId" value={boqItemId} />
+      <input type="hidden" name="objek" value={objek} />
+      <button
+        type="submit"
+        title="Samakan baris ini ke template SPK"
+        style={{
+          background: "none", border: "none", cursor: "pointer",
+          color: "var(--muted)", font: "inherit", fontSize: 11, padding: "2px 4px",
+        }}
+      >
+        ↺ template
+      </button>
+    </form>
   );
 }

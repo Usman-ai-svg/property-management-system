@@ -420,6 +420,59 @@ export const ASET = [
   { kode: "TWL-015", jumlah: 4, satuan: "unit", nama: "Tower Lamp / Lampu Sorot Proyek", kategori: "Daya & Listrik", merk: "Airman 4x400W", milik: "Sewa", vendor: "CV Elektrindo Jaya", lokasi: "NT4", pj: "Agus Pratama", status: "Rusak", satuanPakai: "jam", pakai: 210, servisAkhir: "30 Jun 2026", servisBerikut: null, nilai: 400000 },
 ];
 
+/**
+ * Aset operasional perusahaan untuk keperluan proyek — mis. mobil proyek.
+ *
+ * Dipisah dari peralatan kerja hanya untuk ditampilkan sebagai daftar sendiri;
+ * bentuk datanya sama (jenis = "Aset"). Nilai untuk aset milik sendiri adalah
+ * nilai perolehan; untuk aset sewa 0 — tarifnya melekat di tiap penggunaan.
+ */
+export const ASET_KENDARAAN = [
+  { kode: "MBL-001", jumlah: 2, satuan: "unit", nama: "Toyota Hilux Double Cabin 4x4", kategori: "Kendaraan Operasional", merk: "Toyota Hilux 2.4", milik: "Milik Sendiri", vendor: null as string | null, servisAkhir: "15 Jun 2026", servisBerikut: "15 Des 2026", nilai: 485000000 },
+  { kode: "MBL-002", jumlah: 2, satuan: "unit", nama: "Mitsubishi L300 Pick Up", kategori: "Kendaraan Angkut", merk: "Mitsubishi L300", milik: "Milik Sendiri", vendor: null, servisAkhir: "20 Apr 2026", servisBerikut: "20 Okt 2026", nilai: 220000000 },
+  { kode: "MBL-003", jumlah: 1, satuan: "unit", nama: "Dump Truck Hino Dutro", kategori: "Kendaraan Angkut", merk: "Hino Dutro 130 HD", milik: "Sewa", vendor: "CV Karya Aspal", servisAkhir: null, servisBerikut: null, nilai: 0 },
+];
+
+/**
+ * Penggunaan (deployment) alat pada proyek — ledger yang menjawab "alat ini
+ * sedang di mana, berapa, sejak kapan, dengan tarif berapa, dan siapa PJ-nya".
+ *
+ * Satu alat bisa muncul beberapa kali: SCF-001 dipakai di NT4 (60 set) DAN GN2
+ * (25 set) sekaligus — dua baris terpisah dari satu Equipment yang sama. Tarif
+ * berlaku per hari per unit; 0 untuk alat milik sendiri. Baris "Selesai" tidak
+ * lagi menahan stok.
+ */
+export const PENGGUNAAN = [
+  { alat: "SCF-001", proyek: "NT4", jumlah: 60, mulai: "20 Jul 2026", selesai: null as string | null, tarif: 0, pj: "Agus Pratama", catatan: "Perancah struktur blok A", status: "Aktif" },
+  { alat: "SCF-001", proyek: "GN2", jumlah: 25, mulai: "01 Agu 2026", selesai: null, tarif: 0, pj: "Hendra Kurnia", catatan: "Perancah cluster tahap 1", status: "Aktif" },
+  { alat: "MLN-002", proyek: "NT4", jumlah: 3, mulai: "15 Jul 2026", selesai: null, tarif: 0, pj: "Agus Pratama", catatan: "Pengecoran jalan lingkungan", status: "Aktif" },
+  { alat: "STP-003", proyek: "GN2", jumlah: 2, mulai: "10 Jul 2026", selesai: null, tarif: 0, pj: "Hendra Kurnia", catatan: "Pemadatan tanah kavling", status: "Aktif" },
+  { alat: "GEN-007", proyek: "GN2", jumlah: 1, mulai: "05 Jun 2026", selesai: null, tarif: 0, pj: "Hendra Kurnia", catatan: "Sumber daya lokasi GN2", status: "Aktif" },
+  { alat: "LAS-008", proyek: "NT4", jumlah: 2, mulai: "01 Agu 2026", selesai: null, tarif: 0, pj: "Agus Pratama", catatan: "Pengelasan besi struktur", status: "Aktif" },
+  { alat: "BCT-009", proyek: "NT4", jumlah: 2, mulai: "20 Jul 2026", selesai: null, tarif: 0, pj: "Agus Pratama", catatan: "Pemotongan besi tulangan", status: "Aktif" },
+  { alat: "BOR-005", proyek: "NT4", jumlah: 4, mulai: "01 Jun 2026", selesai: "20 Jun 2026", tarif: 0, pj: "Agus Pratama", catatan: "Pengeboran dinding fase 1 — selesai", status: "Selesai" },
+  { alat: "STP-004", proyek: "NT4", jumlah: 2, mulai: "01 Agu 2026", selesai: null, tarif: 450000, pj: "Agus Pratama", catatan: "Pemadatan lapis aspal (sewa)", status: "Aktif" },
+  { alat: "SRV-011", proyek: "NT4", jumlah: 1, mulai: "05 Agu 2026", selesai: null, tarif: 350000, pj: "Fajar Ramadhan", catatan: "Pengukuran & stake out (sewa)", status: "Aktif" },
+  { alat: "JCH-014", proyek: "GN2", jumlah: 2, mulai: "28 Jul 2026", selesai: null, tarif: 275000, pj: "Hendra Kurnia", catatan: "Bobok beton lama (sewa)", status: "Aktif" },
+  { alat: "TWL-015", proyek: "NT4", jumlah: 2, mulai: "18 Jul 2026", selesai: null, tarif: 400000, pj: "Agus Pratama", catatan: "Penerangan kerja malam (sewa)", status: "Aktif" },
+  { alat: "MBL-001", proyek: "NT4", jumlah: 1, mulai: "01 Jul 2026", selesai: null, tarif: 0, pj: "Budi Hartono", catatan: "Kendaraan operasional site NT4", status: "Aktif" },
+  { alat: "MBL-002", proyek: "GN2", jumlah: 1, mulai: "10 Jul 2026", selesai: null, tarif: 0, pj: "Sari Kusuma", catatan: "Angkut material GN2", status: "Aktif" },
+  { alat: "MBL-003", proyek: "NT4", jumlah: 1, mulai: "01 Agu 2026", selesai: null, tarif: 850000, pj: "Budi Hartono", catatan: "Angkut tanah urug (sewa)", status: "Aktif" },
+];
+
+/**
+ * Riwayat servis/perawatan alat. Tanggalnya selaras dengan servisAkhir/berikut
+ * di daftar induk supaya konsisten — inilah "peristiwa" yang menghasilkan
+ * tanggal servis terakhir tiap alat.
+ */
+export const SERVIS = [
+  { alat: "MBL-001", tanggal: "15 Jun 2026", berikut: "15 Des 2026", biaya: 2500000, catatan: "Servis berkala 20.000 km — ganti oli, filter, kampas rem", oleh: "Budi Hartono" },
+  { alat: "MBL-002", tanggal: "20 Apr 2026", berikut: "20 Okt 2026", biaya: 1800000, catatan: "Servis berkala — ganti kampas kopling & tune up", oleh: "Sari Kusuma" },
+  { alat: "GEN-007", tanggal: "28 Jun 2026", berikut: "28 Agu 2026", biaya: 1200000, catatan: "Servis dinamo & ganti filter udara", oleh: "Hendra Kurnia" },
+  { alat: "MLN-002", tanggal: "02 Jun 2026", berikut: "02 Sep 2026", biaya: 850000, catatan: "Servis rutin 3 bulan — ganti oli & seal", oleh: "Agus Pratama" },
+  { alat: "STP-003", tanggal: "18 Apr 2026", berikut: "18 Agu 2026", biaya: 600000, catatan: "Servis mesin pemadatan", oleh: "Hendra Kurnia" },
+];
+
 // ---------------------------------------------------------------------------
 // BIAYA OPERASIONAL & LOG
 // ---------------------------------------------------------------------------

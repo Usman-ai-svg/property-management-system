@@ -64,7 +64,7 @@ export function TabelUnitKonstruksi({ kodeProyek, data }: { kodeProyek: string; 
       cari={(u) => `${u.fase}-${u.nomor} ${u.tipe}`}
       petunjukCari="Cari unit / tipe…"
       filter={[
-        { label: "Fase", ambil: (u) => u.fase, jenis: "pill" },
+        { label: "Fase", ambil: (u) => u.fase },
         { label: "Status", ambil: (u) => u.status },
       ]}
       tinggiMaks={400}

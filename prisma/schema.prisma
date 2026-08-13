@@ -222,7 +222,7 @@ model Project {
   contracts       Contract[]
   expenses        Expense[]
   biayaOperasional OperationalCost[]
-  equipments      Equipment[]
+  equipmentUsages EquipmentUsage[]
   rabEstimasi     RabEstimasi[]
   pembelian       Pembelian[]
   aksesUser       UserProjectAccess[]
@@ -388,7 +388,7 @@ model Unit {
   customWorks    CustomWork[]
   progressRecords ProgressRecord[]
   contractUnits  ContractUnit[]
-  boqSpk         ContractBoqItem[]
+  boqSpk         ContractBoqUnit[]
   alokasiBiaya   ExpenseAllocation[]
   penerimaan     SalesPayment[]
 
@@ -576,7 +576,7 @@ model Infrastructure {
   rapItems        InfrastructureRapItem[]
   progressRecords ProgressRecord[]
   contractItems   ContractInfrastructure[]
-  boqSpk          ContractBoqItem[]
+  boqSpk          ContractBoqUnit[]
   alokasiBiaya    ExpenseAllocation[]
 
   @@map("infrastructures")
@@ -698,6 +698,7 @@ model Contract {
   /// `ExpenseAllocation`.
   expenses        Expense[]
   boqItems        ContractBoqItem[]
+  boqUnit         ContractBoqUnit[]
 
   @@index([projectId])
   @@map("contracts")
@@ -717,13 +718,13 @@ model Contract {
 /// progres tiap baris dijumlahkan tertimbang nilai menjadi progres unit.
 /// Karena itu salah satu dari keduanya WAJIB terisi dan tidak boleh
 /// dua-duanya — ditegakkan `periksaBarisBoqSpk()` di lib/calc/kontrak-boq.ts.
+/// TEMPLATE BOQ sebuah SPK — definisi lingkup pekerjaan di level KONTRAK, bukan
+/// per objek. "Satu BOQ berlaku untuk tiap unit": baris di sini menurun ke semua
+/// unit & sarpras yang dicakup SPK. Nilai per objek boleh di-override, dan
+/// progres (opname) per objek disimpan di `ContractBoqUnit`.
 model ContractBoqItem {
   id         String @id @default(cuid())
   contractId String
-
-  /// Objek yang dikerjakan baris ini. Tepat satu yang terisi.
-  unitId           String?
-  infrastructureId String?
 
   grup        String
   uraian      String
@@ -731,26 +732,52 @@ model ContractBoqItem {
   volume      Float
   hargaSatuan Float
 
-  /// Persentase penyelesaian baris ini, 0–100. Diisi QS saat opname (Progress
-  /// Vendor). Terpisah dari Progress Konstruksi pada BOQ Master.
-  progress Int @default(0)
+  urutan   Int @default(0)
 
-  /// Nilai `progress` pada opname sebelumnya + kapan minggu berjalan dimulai —
-  /// sama peran & aturannya dengan `UnitBoqItem.progressLalu`/`progressLaluPada`.
-  /// Dipakai tabel Laporan Opname Mingguan pada Progress Vendor.
+  contract Contract          @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  perObjek ContractBoqUnit[]
+
+  @@index([contractId])
+  @@map("contract_boq_items")
+}
+
+/// Turunan template BOQ untuk SATU objek (unit/sarpras): menyimpan OVERRIDE
+/// nilai (nullable → ikut template) dan OPNAME (progress) objek itu atas sebuah
+/// baris template. Tidak semua pasangan (baris × objek) harus punya record —
+/// yang tak punya berarti murni mengikuti template dengan progres 0.
+model ContractBoqUnit {
+  id         String @id @default(cuid())
+  contractId String
+  boqItemId  String
+
+  /// Objek yang dikerjakan. Tepat satu yang terisi.
+  unitId           String?
+  infrastructureId String?
+
+  /// Override definisi — null berarti mengikuti nilai template.
+  grup        String?
+  uraian      String?
+  satuan      String?
+  volume      Float?
+  hargaSatuan Float?
+
+  /// Opname per objek (Progress Vendor), 0–100. Terpisah dari Progress
+  /// Konstruksi pada BOQ Master.
+  progress         Int       @default(0)
   progressLalu     Int       @default(0)
   progressLaluPada DateTime?
 
-  urutan   Int @default(0)
-
   contract       Contract        @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  boqItem        ContractBoqItem @relation(fields: [boqItemId], references: [id], onDelete: Cascade)
   unit           Unit?           @relation(fields: [unitId], references: [id], onDelete: Cascade)
   infrastructure Infrastructure? @relation(fields: [infrastructureId], references: [id], onDelete: Cascade)
 
+  @@unique([boqItemId, unitId])
+  @@unique([boqItemId, infrastructureId])
   @@index([contractId])
   @@index([unitId])
   @@index([infrastructureId])
-  @@map("contract_boq_items")
+  @@map("contract_boq_unit")
 }
 
 /// Unit yang tercakup dalam sebuah kontrak. `nilaiOverride` dipakai bila unit
@@ -1054,40 +1081,113 @@ model MarketComparableType {
 // EQUIPMENT & ASET
 // =============================================================================
 
+/// Inventaris peralatan & aset perusahaan.
+///
+/// Model ini adalah DAFTAR INDUK yang stabil: ia menjawab "barang apa yang
+/// dimiliki perusahaan dan berapa stoknya", BUKAN "sedang dipakai di mana".
+/// Penempatan ke proyek, penanggung jawab, tarif, dan lamanya pemakaian tidak
+/// lagi menempel di sini — semuanya dicatat sebagai baris `EquipmentUsage`,
+/// sehingga satu alat (mis. 40 set scaffolding) bisa terbagi ke beberapa
+/// proyek sekaligus dan tiap pemakaian punya jejak sendiri.
+///
+/// Karena itu daftar ini nyaris tak berubah: jumlah hanya bergerak lewat
+/// `EquipmentAdjustment` (opname/kehilangan/kerusakan), dan pemakaian lewat
+/// `EquipmentUsage`. Formulir "Ubah" hanya membetulkan identitas barang.
 model Equipment {
   id        String  @id @default(cuid())
   kode      String  @unique
+  /// Peralatan | Aset — pembeda dua daftar. "Peralatan" untuk alat kerja
+  /// (scaffolding, molen, bor); "Aset" untuk aset operasional (mobil proyek dsb).
+  jenis     String  @default("Peralatan")
   nama      String
   kategori  String
   merk      String?
   jumlah    Int     @default(1)
   /// Bagian dari `jumlah` yang sedang rusak dan tidak bisa dipakai.
   ///
-  /// Dipisah dari `status` karena status melekat pada seluruh baris: 5 helm
-  /// yang 2 di antaranya rusak tidak bisa dinyatakan lewat satu status saja.
-  /// Selalu <= jumlah; ditegakkan `terapkanPenyesuaian()` di lib/calc/aset.ts.
+  /// Dipisah dari status yang ditampilkan: 5 helm yang 2 di antaranya rusak
+  /// tidak bisa dinyatakan lewat satu status saja. Status Tersedia/Digunakan
+  /// TIDAK disimpan — ia diturunkan dari stok dan penggunaan aktif di
+  /// `lib/calc/aset.ts`. Selalu <= jumlah; ditegakkan `terapkanPenyesuaian()`.
   jumlahRusak Int   @default(0)
   satuan    String  @default("unit")
   /// Milik Sendiri | Sewa
   kepemilikan String @default("Milik Sendiri")
   vendorId  String?
-  projectId String?
-  penanggungJawab String?
-  /// Tersedia | Digunakan | Pemeliharaan | Rusak
-  status    String  @default("Tersedia")
-  /// jam | hari
-  satuanPakai String @default("jam")
-  pemakaian   Float  @default(0)
   servisTerakhir DateTime?
   servisBerikut  DateTime?
-  /// Nilai aset, atau tarif sewa bila kepemilikan = "Sewa"
+  /// Nilai perolehan aset milik sendiri. Untuk aset sewa bernilai 0 — tarifnya
+  /// ada di tiap `EquipmentUsage`, bukan di sini.
   nilai     Float   @default(0)
 
   vendor  Vendor?  @relation(fields: [vendorId], references: [id])
-  project Project? @relation(fields: [projectId], references: [id])
   penyesuaian EquipmentAdjustment[]
+  penggunaan  EquipmentUsage[]
+  servis      EquipmentService[]
 
   @@map("equipments")
+}
+
+/// Riwayat servis/perawatan alat.
+///
+/// Servis dicatat sebagai peristiwa tersendiri, bukan sekadar menyunting tanggal
+/// di daftar induk: dengan begitu terlihat KAPAN alat terakhir diservis, oleh
+/// siapa, berapa biayanya, dan kapan jadwal berikutnya. Tiap pencatatan servis
+/// memperbarui `Equipment.servisTerakhir` dan `Equipment.servisBerikut` sekaligus
+/// menambah satu baris di sini.
+model EquipmentService {
+  id            String   @id @default(cuid())
+  equipmentId   String
+  /// Tanggal servis dilakukan.
+  tanggal       DateTime @default(now())
+  /// Jadwal servis berikutnya, bila sudah ditentukan.
+  servisBerikut DateTime?
+  /// Biaya servis. 0 bila tak dicatat.
+  biaya         Float    @default(0)
+  catatan       String?
+  dicatatOleh   String
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@index([equipmentId, tanggal])
+  @@map("equipment_services")
+}
+
+/// Penggunaan (deployment) satu peralatan/aset pada sebuah proyek.
+///
+/// Inilah ledger yang menjawab "alat ini sedang di mana, berapa banyak, sejak
+/// kapan, dengan tarif berapa, dan siapa penanggung jawabnya". Satu peralatan
+/// bisa punya banyak baris aktif sekaligus — 20 set scaffolding di GN2 dan 20
+/// di NT4 adalah dua baris terpisah dari satu Equipment yang sama.
+///
+/// Ketersediaan dihitung, tidak disimpan: tersedia = jumlah − rusak − jumlah
+/// unit pada penggunaan berstatus "Aktif". Penambahan penggunaan yang melebihi
+/// stok tersedia ditolak di server. Tarif berlaku per hari per unit; total
+/// biayanya = tarif × jumlah × lama hari, dihitung di `lib/calc/aset.ts`.
+model EquipmentUsage {
+  id           String   @id @default(cuid())
+  equipmentId  String
+  projectId    String
+  /// Banyaknya unit yang dialokasikan ke proyek ini.
+  jumlah       Int
+  tanggalMulai   DateTime @default(now())
+  /// Kosong berarti pemakaian masih berjalan (belum dikembalikan).
+  tanggalSelesai DateTime?
+  /// Tarif per hari per unit. 0 untuk alat milik sendiri (tanpa biaya sewa).
+  tarif        Float    @default(0)
+  penanggungJawab String?
+  catatan      String?
+  /// Aktif | Selesai. Hanya penggunaan "Aktif" yang mengurangi stok tersedia.
+  status       String   @default("Aktif")
+  dicatatOleh  String
+  dibuatPada   DateTime @default(now())
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  project   Project   @relation(fields: [projectId], references: [id])
+
+  @@index([equipmentId, status])
+  @@index([projectId, status])
+  @@map("equipment_usages")
 }
 
 /// Riwayat penyesuaian stok aset: kehilangan, kerusakan, dan koreksi opname.

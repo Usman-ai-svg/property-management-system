@@ -121,8 +121,76 @@ export function terapkanPenyesuaian(
   }
 }
 
-/** Banyaknya unit yang masih bisa dipakai. */
+/** Banyaknya unit yang masih baik (tidak rusak), terlepas dari sedang dipakai atau tidak. */
 export const unitTerpakai = (s: StokAset): number => Math.max(0, s.jumlah - s.jumlahRusak);
+
+// ===========================================================================
+// PENGGUNAAN (deployment) ALAT
+// ===========================================================================
+//
+// Ketersediaan alat DIHITUNG dari penggunaan aktif, tidak disimpan. Dengan
+// begitu satu alat bisa terbagi ke beberapa proyek sekaligus (20 scaffolding
+// di GN2 + 20 di NT4) tanpa saling menimpa, dan status Tersedia/Digunakan
+// selalu jujur mengikuti keadaan lapangan. Semua fungsi di bawah bebas Prisma
+// dan bebas framework supaya bisa diuji sendirian.
+
+export interface PenggunaanRingkas {
+  jumlah: number;
+  /** "Aktif" | "Selesai". Hanya "Aktif" yang menahan stok. */
+  status: string;
+}
+
+/** Total unit yang sedang tertahan oleh penggunaan berstatus "Aktif". */
+export function unitDipakai(penggunaan: PenggunaanRingkas[]): number {
+  return penggunaan
+    .filter((p) => p.status === "Aktif")
+    .reduce((s, p) => s + p.jumlah, 0);
+}
+
+/**
+ * Unit yang masih bisa dialokasikan: stok baik dikurangi yang sedang dipakai.
+ * Tidak pernah negatif.
+ */
+export function unitTersedia(stok: StokAset, dipakai: number): number {
+  return Math.max(0, stok.jumlah - stok.jumlahRusak - dipakai);
+}
+
+/**
+ * Status alat yang DITURUNKAN dari stok dan penggunaan aktif.
+ *
+ *   - Rusak    : tak ada satu pun unit yang masih baik.
+ *   - Digunakan: seluruh unit baik sedang dipakai.
+ *   - Sebagian : sebagian dipakai, sisanya masih tersedia.
+ *   - Tersedia : tidak ada yang dipakai.
+ */
+export function statusAset(stok: StokAset, dipakai: number): "Tersedia" | "Sebagian" | "Digunakan" | "Rusak" {
+  const baik = Math.max(0, stok.jumlah - stok.jumlahRusak);
+  if (stok.jumlah > 0 && baik === 0) return "Rusak";
+  if (dipakai <= 0) return "Tersedia";
+  if (dipakai >= baik) return "Digunakan";
+  return "Sebagian";
+}
+
+/**
+ * Lama penggunaan dalam hari, dihitung inklusif.
+ *
+ * Sebuah pemakaian 1–10 Agustus berlangsung 10 hari, bukan 9 — hari mulai ikut
+ * dihitung. Penggunaan yang belum ditutup (`selesai` null) dihitung sampai
+ * `kini`. Minimal satu hari.
+ */
+export function durasiHari(mulai: Date, selesai: Date | null, kini = new Date()): number {
+  const akhir = selesai ?? kini;
+  const hari = Math.floor((akhir.getTime() - mulai.getTime()) / 864e5) + 1;
+  return Math.max(1, hari);
+}
+
+/**
+ * Estimasi biaya sebuah penggunaan: tarif per hari per unit × jumlah unit ×
+ * lama hari. Untuk alat milik sendiri tarifnya 0, jadi biayanya pun 0.
+ */
+export function biayaPenggunaan(tarifPerHari: number, jumlah: number, hari: number): number {
+  return Math.round(tarifPerHari * jumlah * hari);
+}
 
 /**
  * Taksiran nilai unit yang rusak, memakai nilai rata-rata per unit.

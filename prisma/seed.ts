@@ -19,9 +19,9 @@ import { alokasiPembayaran, statusHutang } from "../src/lib/calc/keuangan";
 import { terapkanPenyesuaian } from "../src/lib/calc/aset";
 import { seedAhsp } from "./seed-ahsp";
 import {
-  ACL_AWAL, ACL_UBAH, ASET, BIAYA_OPERASIONAL, BIAYA_UMUM, KERJA_TAMBAH, KONTRAK, LOG_AWAL,
-  PORSI_BIAYA_SARPRAS, PORSI_BIAYA_UNIT, POS_HPP, PROYEK, ROLE_GRUP, SARPRAS, SEMUA_PERAN,
-  TIPE_UNIT, USERS, VENDOR, type Dok, tgl,
+  ACL_AWAL, ACL_UBAH, ASET, ASET_KENDARAAN, BIAYA_OPERASIONAL, BIAYA_UMUM, KERJA_TAMBAH,
+  KONTRAK, LOG_AWAL, PENGGUNAAN, PORSI_BIAYA_SARPRAS, PORSI_BIAYA_UNIT, POS_HPP, PROYEK,
+  ROLE_GRUP, SARPRAS, SEMUA_PERAN, SERVIS, TIPE_UNIT, USERS, VENDOR, type Dok, tgl,
 } from "./seed-data";
 
 const prisma = new PrismaClient({
@@ -78,46 +78,41 @@ async function isiBoqSpk(contractId: string, K: { nominal: number }) {
   // Nilai SPK dibagi rata ke seluruh unit, lalu dipecah menurut bobot pekerjaan.
   const nilaiPerUnit = K.nominal / cakupan.length;
 
-  for (const { unit } of cakupan) {
-    // Harga satuan dibulatkan lebih dulu supaya nilai yang dipakai di sini
-    // sama persis dengan yang nanti dibaca aplikasi dari database.
-    const baris = BOQ_SPK.map((b) => ({
-      ...b,
-      hargaSatuan: Math.round((nilaiPerUnit * b.bagian) / b.volume),
-    }));
-    const totalNilai = baris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
+  // TEMPLATE BOQ SPK — satu untuk semua unit ("satu BOQ berlaku untuk tiap unit").
+  // Harga satuan dibulatkan lebih dulu supaya nilai sama persis dengan yang nanti
+  // dibaca aplikasi dari database.
+  const template: { id: string; volume: number; hargaSatuan: number }[] = [];
+  let urutan = 1;
+  for (const b of BOQ_SPK) {
+    const hargaSatuan = Math.round((nilaiPerUnit * b.bagian) / b.volume);
+    const t = await prisma.contractBoqItem.create({
+      data: { contractId, grup: b.grup, uraian: b.uraian, satuan: b.satuan, volume: b.volume, hargaSatuan, urutan: urutan++ },
+    });
+    template.push({ id: t.id, volume: b.volume, hargaSatuan });
+  }
+  const totalNilai = template.reduce((s, t) => s + t.volume * t.hargaSatuan, 0);
 
+  // Opname per unit → ContractBoqUnit.progress (tanpa override definisi).
+  for (const { unit } of cakupan) {
     // Vendor borongan struktur biasanya berjalan lebih dulu daripada rata-rata
     // pekerjaan unit — finishing dan MEP menyusul belakangan. Progres SPK
     // karena itu sengaja dibuat lebih maju daripada progres konstruksi, supaya
-    // data demo memperlihatkan bahwa keduanya memang angka yang BERBEDA:
-    // Progress Vendor mengukur lingkup satu SPK, Progress Konstruksi mengukur
-    // seluruh lingkup unit.
+    // data demo memperlihatkan bahwa keduanya memang angka yang BERBEDA.
     const majuVendor = Math.min(100, Math.round(unit.progress * 1.3));
     const sasaran = totalNilai * (majuVendor / 100);
 
     let terkumpul = 0;
-    await prisma.contractBoqItem.createMany({
-      data: baris.map((b, i) => {
-        const nilaiBaris = b.volume * b.hargaSatuan;
-        // Isi baris ini sebanyak sisa sasaran yang masih bisa ditampungnya.
-        const fraksi = nilaiBaris
-          ? Math.max(0, Math.min(1, (sasaran - terkumpul) / nilaiBaris))
-          : 0;
-        terkumpul += nilaiBaris;
-        return {
-          contractId,
-          unitId: unit.id,
-          grup: b.grup,
-          uraian: b.uraian,
-          satuan: b.satuan,
-          volume: b.volume,
-          hargaSatuan: b.hargaSatuan,
-          progress: Math.round(fraksi * 100),
-          urutan: i + 1,
-        };
-      }),
-    });
+    const opname: { contractId: string; boqItemId: string; unitId: string; progress: number }[] = [];
+    for (const t of template) {
+      const nilaiBaris = t.volume * t.hargaSatuan;
+      // Isi baris ini sebanyak sisa sasaran yang masih bisa ditampungnya.
+      const fraksi = nilaiBaris ? Math.max(0, Math.min(1, (sasaran - terkumpul) / nilaiBaris)) : 0;
+      terkumpul += nilaiBaris;
+      const progress = Math.round(fraksi * 100);
+      // Baris progres 0 dibiarkan tak ber-record — efektifnya tetap 0 (ikut template).
+      if (progress > 0) opname.push({ contractId, boqItemId: t.id, unitId: unit.id, progress });
+    }
+    if (opname.length > 0) await prisma.contractBoqUnit.createMany({ data: opname });
   }
 }
 
@@ -267,6 +262,72 @@ async function isiPenyesuaianAset() {
     n++;
   }
   console.log(`  ${n} penyesuaian stok aset`);
+}
+
+/**
+ * Penggunaan alat pada proyek — ledger yang menempatkan alat ke lapangan.
+ *
+ * Dijalankan setelah penyesuaian stok supaya alokasinya konsisten dengan stok
+ * akhir tiap alat. Baris ditulis apa adanya (tanpa validasi ketersediaan) karena
+ * datanya sudah dirancang tidak melampaui stok — termasuk contoh satu alat yang
+ * terbagi ke dua proyek (SCF-001 di NT4 dan GN2).
+ */
+async function isiPenggunaan(projectId: Map<string, string>) {
+  let n = 0;
+  for (const p of PENGGUNAAN) {
+    const alat = await prisma.equipment.findUnique({
+      where: { kode: p.alat },
+      select: { id: true },
+    });
+    const pid = projectId.get(p.proyek);
+    if (!alat || !pid) continue;
+
+    await prisma.equipmentUsage.create({
+      data: {
+        equipmentId: alat.id,
+        projectId: pid,
+        jumlah: p.jumlah,
+        tanggalMulai: tgl(p.mulai) ?? new Date(),
+        tanggalSelesai: tgl(p.selesai),
+        tarif: p.tarif,
+        penanggungJawab: p.pj,
+        catatan: p.catatan,
+        status: p.status,
+        dicatatOleh: p.pj,
+      },
+    });
+    n++;
+  }
+  console.log(`  ${n} penggunaan alat`);
+}
+
+/**
+ * Riwayat servis alat. Equipment sudah membawa tanggal servis terakhir/berikut
+ * dari data induk; di sini tinggal menuliskan peristiwa servisnya sebagai
+ * riwayat, tanpa mengubah lagi tanggal di induk.
+ */
+async function isiServis() {
+  let n = 0;
+  for (const s of SERVIS) {
+    const alat = await prisma.equipment.findUnique({
+      where: { kode: s.alat },
+      select: { id: true },
+    });
+    if (!alat) continue;
+
+    await prisma.equipmentService.create({
+      data: {
+        equipmentId: alat.id,
+        tanggal: tgl(s.tanggal) ?? new Date(),
+        servisBerikut: tgl(s.berikut),
+        biaya: s.biaya,
+        catatan: s.catatan,
+        dicatatOleh: s.oleh,
+      },
+    });
+    n++;
+  }
+  console.log(`  ${n} riwayat servis alat`);
 }
 
 /** Buat Document + DocumentVersion R1 dari metadata artifact. */
@@ -509,10 +570,13 @@ async function main() {
   await prisma.pembelian.deleteMany();
   await prisma.operationalCost.deleteMany();
   await prisma.variationOrder.deleteMany();
+  await prisma.contractBoqUnit.deleteMany();
   await prisma.contractBoqItem.deleteMany();
   await prisma.contractUnit.deleteMany();
   await prisma.contractInfrastructure.deleteMany();
   await prisma.contract.deleteMany();
+  await prisma.equipmentUsage.deleteMany();
+  await prisma.equipmentService.deleteMany();
   await prisma.equipmentAdjustment.deleteMany();
   await prisma.equipment.deleteMany();
   await prisma.progressRecord.deleteMany();
@@ -910,21 +974,25 @@ async function main() {
   // ---------------------------------------------------------------------
   // 7. EQUIPMENT
   // ---------------------------------------------------------------------
-  for (const A of ASET) {
+  // Daftar induk hanya berisi identitas & stok — penempatan ke proyek, PIC,
+  // tarif, dan status dicatat sebagai penggunaan (lihat isiPenggunaan). Nilai
+  // untuk aset sewa 0: tarifnya melekat di penggunaan, bukan di barangnya.
+  const induk = [
+    ...ASET.map((A) => ({ ...A, jenis: "Peralatan" })),
+    ...ASET_KENDARAAN.map((A) => ({ ...A, jenis: "Aset" })),
+  ];
+  for (const A of induk) {
     await prisma.equipment.create({
       data: {
-        kode: A.kode, nama: A.nama, kategori: A.kategori, merk: A.merk,
+        kode: A.kode, jenis: A.jenis, nama: A.nama, kategori: A.kategori, merk: A.merk,
         jumlah: A.jumlah, satuan: A.satuan, kepemilikan: A.milik,
         vendorId: A.vendor ? vendorId.get(A.vendor) ?? null : null,
-        projectId: projectId.get(A.lokasi) ?? null,
-        penanggungJawab: A.pj, status: A.status,
-        satuanPakai: A.satuanPakai, pemakaian: A.pakai,
         servisTerakhir: tgl(A.servisAkhir), servisBerikut: tgl(A.servisBerikut),
-        nilai: A.nilai,
+        nilai: A.milik === "Sewa" ? 0 : A.nilai,
       },
     });
   }
-  console.log(`  ${ASET.length} peralatan & aset`);
+  console.log(`  ${ASET.length} peralatan + ${ASET_KENDARAAN.length} aset`);
 
   // ---------------------------------------------------------------------
   // 8. BIAYA OPERASIONAL
@@ -1088,6 +1156,8 @@ async function main() {
   // ---------------------------------------------------------------------
   const totalRab = await prisma.unitBoqItem.findMany({ select: { volume: true, hargaSatuan: true } });
   await isiPenyesuaianAset();
+  await isiPenggunaan(projectId);
+  await isiServis();
 
   await isiProgresBoqMaster();
 

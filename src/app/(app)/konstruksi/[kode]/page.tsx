@@ -3,7 +3,6 @@ import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
 import { isiKonstruksiProyek, proyekKonstruksi, vendorKonstruksiProyek } from "@/lib/data/konstruksi";
 import { grupBerjalan } from "@/lib/calc/opname";
-import { progresTertimbang } from "@/lib/calc/kontrak-boq";
 import { tanggal } from "@/lib/format";
 import { Badge, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { RingkasProgress } from "@/components/ringkas-progress";
@@ -51,8 +50,7 @@ export default async function ProgresProyek({
   }));
   const vendorRows = kontrak.map((c) => ({
     id: c.id, kode: c.kode, vendor: c.vendor.nama, deskripsi: c.deskripsi,
-    nominal: c.nominal, objek: c._count.units + c._count.infrastructures,
-    progres: c.boqItems.length ? progresTertimbang(c.boqItems) : 0,
+    nominal: c.nominal, objek: c.objek, progres: c.progres,
   }));
 
   // Data laporan meeting — memuat SELURUH unit & sarpras (bukan hasil saringan),
