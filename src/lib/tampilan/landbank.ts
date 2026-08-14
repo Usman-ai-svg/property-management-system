@@ -23,10 +23,21 @@ export interface BiayaLahan {
 }
 
 export interface RencanaBisnis {
-  omzet: { jumlah: number; harga: number }[];
-  hpp: { nilai: number }[];
-  operasional: { nilai: number }[];
+  /** Satu entri per unit; total omset = Σ harga dasar (non-PPN). */
+  omzet: { hargaDasar: number }[];
+  /** Kategori HPP; nilai kategori = Σ (volume × harga) baris di bawahnya. */
+  hpp: { rows: { volume: number; harga: number }[] }[];
+  /** Kategori operasional; nilai kategori = Σ nilai baris di bawahnya. */
+  operasional: { rows: { nilai: number }[] }[];
 }
+
+/** Nilai satu kategori HPP: Σ volume × harga seluruh barisnya. */
+export const totalKategoriHpp = (rows: { volume: number; harga: number }[]): number =>
+  rows.reduce((s, r) => s + r.volume * r.harga, 0);
+
+/** Nilai satu kategori operasional: Σ nilai seluruh barisnya. */
+export const totalKategoriOps = (rows: { nilai: number }[]): number =>
+  rows.reduce((s, r) => s + r.nilai, 0);
 
 /** Luas keseluruhan sebuah proyek: kavling + sarana + prasarana + RTH. */
 export const luasTotal = (l: LuasLahan): number =>
@@ -56,9 +67,9 @@ export interface RingkasRencana {
  * dan bernilai 0 bila omzetnya nol supaya tidak menghasilkan Infinity.
  */
 export function ringkasRencana(bp: RencanaBisnis | undefined): RingkasRencana {
-  const omzet = bp ? bp.omzet.reduce((s, o) => s + o.jumlah * o.harga, 0) : 0;
-  const hpp = bp ? bp.hpp.reduce((s, h) => s + h.nilai, 0) : 0;
-  const ops = bp ? bp.operasional.reduce((s, o) => s + o.nilai, 0) : 0;
+  const omzet = bp ? bp.omzet.reduce((s, o) => s + o.hargaDasar, 0) : 0;
+  const hpp = bp ? bp.hpp.reduce((s, h) => s + totalKategoriHpp(h.rows), 0) : 0;
+  const ops = bp ? bp.operasional.reduce((s, o) => s + totalKategoriOps(o.rows), 0) : 0;
   const laba = omzet - hpp - ops;
   return { omzet, hpp, ops, laba, margin: omzet ? laba / omzet : 0 };
 }

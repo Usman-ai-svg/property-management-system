@@ -592,8 +592,10 @@ async function main() {
   await prisma.infrastructure.deleteMany();
   await prisma.unitType.deleteMany();
   await prisma.phase.deleteMany();
+  await prisma.bpHppRow.deleteMany();
+  await prisma.bpOmzetUnit.deleteMany();
+  await prisma.bpOperasionalRow.deleteMany();
   await prisma.bpHppItem.deleteMany();
-  await prisma.bpOmzetItem.deleteMany();
   await prisma.bpOperasionalItem.deleteMany();
   await prisma.bpCashflowItem.deleteMany();
   await prisma.businessPlan.deleteMany();
@@ -636,6 +638,7 @@ async function main() {
   // 2. PROYEK
   // ---------------------------------------------------------------------
   const projectId = new Map<string, string>();
+  const bpId = new Map<string, string>();   // kode proyek → businessPlanId
 
   for (const P of PROYEK) {
     const analisaId = await buatDokumen("analisa", P.analisa);
@@ -673,15 +676,28 @@ async function main() {
       });
     }
 
-    await prisma.businessPlan.create({
+    // Omset TIDAK dibuat di sini: BpOmzetUnit butuh unitId, sedangkan unit baru
+    // dibuat di tahap 4. Override harga dasar rencana disemai setelah unit ada.
+    const bp = await prisma.businessPlan.create({
       data: {
         projectId: p.id,
-        hpp: { create: P.bplan.hpp.map((h, i) => ({ nama: h.nama, nilai: h.v, urutan: i })) },
-        omzet: { create: P.bplan.omzet.map((o, i) => ({ tipe: o.tipe, jumlah: o.jml, harga: o.harga, urutan: i })) },
-        operasional: { create: P.bplan.operasional.map((o, i) => ({ nama: o.nama, nilai: o.v, urutan: i })) },
+        hpp: {
+          create: P.bplan.hpp.map((h, i) => ({
+            nama: h.kategori, urutan: i,
+            rows: { create: h.rows.map((r, k) => ({ uraian: r.u, satuan: r.sat, volume: r.vol, harga: r.harga, urutan: k })) },
+          })),
+        },
+        operasional: {
+          create: P.bplan.operasional.map((o, i) => ({
+            nama: o.kategori, urutan: i,
+            rows: { create: o.rows.map((r, k) => ({ nama: r.nama, nilai: r.v, urutan: k })) },
+          })),
+        },
         cashflow: { create: P.bplan.cashflow.map((c, i) => ({ periode: c.periode, masuk: c.masuk, keluar: c.keluar, urutan: i })) },
       },
+      select: { id: true },
     });
+    bpId.set(P.kode, bp.id);
   }
   console.log(`  ${PROYEK.length} proyek beserta legalitas, pembanding pasar & business plan`);
 
@@ -797,6 +813,16 @@ async function main() {
         unitId.set(kode, u.id);
         jmlBoq += boq.length;
         jmlRap += rap.length;
+
+        // Override harga dasar rencana Omset bila tipe unit ini punya harga
+        // rencana pada business plan. Tanpa override, harga dasar default ke
+        // hargaJual unit (lihat omzetUnitProyek di src/lib/data/landbank.ts).
+        const omzetRencana = P.bplan.omzet.find((o) => o.tipe === T.nama);
+        if (omzetRencana) {
+          await prisma.bpOmzetUnit.create({
+            data: { businessPlanId: bpId.get(P.kode)!, unitId: u.id, hargaDasar: omzetRencana.harga },
+          });
+        }
 
         // Kerja tambah
         if (kt) {

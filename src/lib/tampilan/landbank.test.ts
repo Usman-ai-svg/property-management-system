@@ -6,7 +6,10 @@ import {
   rataRasioEfektif,
   ringkasRencana,
   susunBarisLandbank,
+  totalKategoriHpp,
+  totalKategoriOps,
 } from "./landbank";
+import { hargaAllIn, hargaPpn } from "../format";
 
 describe("luasTotal", () => {
   it("menjumlahkan kavling, sarana, prasarana, dan RTH", () => {
@@ -37,20 +40,45 @@ describe("biayaPerolehan", () => {
   });
 });
 
+describe("totalKategoriHpp", () => {
+  it("menjumlahkan volume × harga tiap baris", () => {
+    assert.equal(
+      totalKategoriHpp([{ volume: 7, harga: 100 }, { volume: 1, harga: 300 }]),
+      1000,
+    );
+  });
+
+  it("nol untuk kategori tanpa baris", () => {
+    assert.equal(totalKategoriHpp([]), 0);
+  });
+});
+
+describe("totalKategoriOps", () => {
+  it("menjumlahkan nilai tiap baris", () => {
+    assert.equal(totalKategoriOps([{ nilai: 200 }, { nilai: 100 }]), 300);
+  });
+});
+
 describe("ringkasRencana", () => {
   const bp = {
-    omzet: [{ jumlah: 10, harga: 100 }, { jumlah: 5, harga: 200 }],
-    hpp: [{ nilai: 800 }],
-    operasional: [{ nilai: 200 }, { nilai: 100 }],
+    // Total omset = Σ harga dasar (non-PPN) seluruh unit.
+    omzet: [{ hargaDasar: 1200 }, { hargaDasar: 800 }],
+    // HPP = Σ (volume × harga) baris tiap kategori.
+    hpp: [{ rows: [{ volume: 1, harga: 500 }, { volume: 1, harga: 300 }] }],
+    // Operasional = Σ nilai baris tiap kategori.
+    operasional: [{ rows: [{ nilai: 200 }] }, { rows: [{ nilai: 100 }] }],
   };
 
-  it("omzet = jumlah unit dikali harga, dijumlahkan per tipe", () => {
+  it("omzet = jumlah harga dasar seluruh unit", () => {
     assert.equal(ringkasRencana(bp).omzet, 2000);
+  });
+
+  it("HPP = jumlah volume × harga seluruh baris kategori", () => {
+    assert.equal(ringkasRencana(bp).hpp, 800);
   });
 
   it("laba bersih = omzet dikurangi HPP dan operasional", () => {
     const r = ringkasRencana(bp);
-    assert.equal(r.hpp, 800);
     assert.equal(r.ops, 300);
     assert.equal(r.laba, 900);
   });
@@ -60,7 +88,7 @@ describe("ringkasRencana", () => {
   });
 
   it("margin nol saat omzet nol, bukan Infinity", () => {
-    const r = ringkasRencana({ omzet: [], hpp: [{ nilai: 500 }], operasional: [] });
+    const r = ringkasRencana({ omzet: [], hpp: [{ rows: [{ volume: 1, harga: 500 }] }], operasional: [] });
     assert.equal(r.laba, -500);
     assert.equal(r.margin, 0);
   });
@@ -68,6 +96,17 @@ describe("ringkasRencana", () => {
   it("seluruh angka nol bila proyek belum punya business plan", () => {
     const r = ringkasRencana(undefined);
     assert.deepEqual(r, { omzet: 0, hpp: 0, ops: 0, laba: 0, margin: 0 });
+  });
+});
+
+describe("harga rencana omset", () => {
+  it("Harga+PPN menambah 11% ke harga dasar", () => {
+    assert.equal(hargaPpn(1_000_000_000), 1_110_000_000);
+  });
+
+  it("All-In menambah 10% di atas harga ber-PPN (bertingkat, bukan datar)", () => {
+    // (1M × 1,11) × 1,10 = 1,221M — bukan 1M × 1,21.
+    assert.equal(hargaAllIn(1_000_000_000), 1_221_000_000);
   });
 });
 
@@ -89,7 +128,7 @@ describe("susunBarisLandbank", () => {
 
   it("menandai proyek yang belum punya business plan", () => {
     const baris = susunBarisLandbank(proyek, [
-      { projectId: "p1", omzet: [{ jumlah: 2, harga: 500 }], hpp: [], operasional: [] },
+      { projectId: "p1", omzet: [{ hargaDasar: 500 }, { hargaDasar: 500 }], hpp: [], operasional: [] },
     ]);
     assert.equal(baris[0].punyaBp, true);
     assert.equal(baris[0].omzet, 1000);

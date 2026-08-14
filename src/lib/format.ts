@@ -2,8 +2,32 @@
 
 const BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
+/**
+ * Tarif rencana omset unit.
+ *
+ * PPN dikenakan atas harga dasar (11%). "All-In" menambahkan lagi 10% di atas
+ * harga ber-PPN untuk biaya AJB/notaris/BPHTB — jadi bertingkat, bukan
+ * dijumlahkan datar. Total omset yang dipakai untuk laba/margin & pembanding
+ * realisasi tetap memakai HARGA DASAR (non-PPN).
+ */
+export const PPN_RATE = 0.11;
+export const ALLIN_RATE = 0.1;
+
+/** Harga dasar + PPN 11%. */
+export const hargaPpn = (dasar: number): number => dasar * (1 + PPN_RATE);
+
+/** (Harga dasar + PPN) + 10% biaya AJB/notaris/BPHTB. */
+export const hargaAllIn = (dasar: number): number => hargaPpn(dasar) * (1 + ALLIN_RATE);
+
 /** "Rp 1.250.000" */
 export const rp = (v: number): string => "Rp " + Math.round(v).toLocaleString("id-ID");
+
+/** Periode cashflow "YYYY-MM" → "Agu 2026". Format lain ditampilkan apa adanya. */
+export function periodeBulan(periode: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(periode);
+  if (!m) return periode;
+  return `${BULAN[Number(m[2]) - 1] ?? m[2]} ${m[1]}`;
+}
 
 /** Rupiah ringkas untuk KPI sempit: "Rp 1,25 M", "Rp 850 jt". */
 export function rpRingkas(v: number): string {

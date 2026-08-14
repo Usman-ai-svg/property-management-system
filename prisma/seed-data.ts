@@ -133,10 +133,19 @@ export const PROYEK = [
       { nama: "Permata Sawangan", jarak: 3.4, tipe: [{ tipe: "Standard", jml: 52, luasUnit: 40, luasLahan: 66, harga: 820000000 }] },
     ],
     bplan: {
-      hpp: [{ nama: "Perolehan Tanah", v: 1106000000 }, { nama: "Perijinan & Legalitas", v: 780000000 }, { nama: "Prasarana & Sarana", v: 481000000 }, { nama: "Konstruksi Rumah", v: 4920000000 }],
-      omzet: [{ tipe: "Tipe 36", jml: 7, harga: 780000000 }, { tipe: "Tipe 45", jml: 5, harga: 985000000 }],
-      operasional: [{ nama: "Pemasaran", v: 522250000 }, { nama: "Umum & Administrasi", v: 334240000 }, { nama: "Bunga & Pajak", v: 490910000 }],
-      cashflow: [{ periode: "2023 Q1", masuk: 1200000000, keluar: 2600000000 }, { periode: "2023 Q2", masuk: 2800000000, keluar: 2900000000 }, { periode: "2023 Q3", masuk: 3400000000, keluar: 1800000000 }, { periode: "2023 Q4", masuk: 3045000000, keluar: 900000000 }],
+      hpp: [
+        { kategori: "Perolehan Tanah", rows: [{ u: "Pembelian lahan", sat: "m²", vol: 7800, harga: 130000 }, { u: "Notaris, BBN & legal", sat: "ls", vol: 1, harga: 92000000 }] },
+        { kategori: "Perijinan & Legalitas", rows: [{ u: "PBG/IMB & site plan", sat: "ls", vol: 1, harga: 480000000 }, { u: "Izin lingkungan & ormas", sat: "ls", vol: 1, harga: 300000000 }] },
+        { kategori: "Prasarana & Sarana", rows: [{ u: "Jalan lingkungan & saluran", sat: "m²", vol: 1450, harga: 220000 }, { u: "Jaringan listrik & air", sat: "ls", vol: 1, harga: 162000000 }] },
+        { kategori: "Konstruksi Rumah", rows: [{ u: "Bangun rumah Tipe 36 (7 unit)", sat: "unit", vol: 7, harga: 360000000 }, { u: "Bangun rumah Tipe 45 (5 unit)", sat: "unit", vol: 5, harga: 480000000 }] },
+      ],
+      omzet: [{ tipe: "Tipe 36", harga: 780000000 }, { tipe: "Tipe 45", harga: 985000000 }],
+      operasional: [
+        { kategori: "Pemasaran", rows: [{ nama: "Iklan & promosi", v: 300000000 }, { nama: "Komisi agen", v: 222250000 }] },
+        { kategori: "Umum & Administrasi", rows: [{ nama: "Gaji staf", v: 240000000 }, { nama: "Sewa kantor & utilitas", v: 94240000 }] },
+        { kategori: "Bunga & Pajak", rows: [{ nama: "Bunga pinjaman", v: 350000000 }, { nama: "Pajak (PPh final)", v: 140910000 }] },
+      ],
+      cashflow: [{ periode: "2023-01", masuk: 400000000, keluar: 900000000 }, { periode: "2023-02", masuk: 380000000, keluar: 850000000 }, { periode: "2023-03", masuk: 420000000, keluar: 850000000 }, { periode: "2023-04", masuk: 900000000, keluar: 980000000 }, { periode: "2023-05", masuk: 950000000, keluar: 980000000 }, { periode: "2023-06", masuk: 950000000, keluar: 940000000 }, { periode: "2023-07", masuk: 1150000000, keluar: 620000000 }, { periode: "2023-08", masuk: 1200000000, keluar: 600000000 }],
     },
   },
   {
@@ -157,10 +166,20 @@ export const PROYEK = [
       { nama: "Bukit Sukatani", jarak: 4.5, tipe: [{ tipe: "Tipe 36", jml: 88, luasUnit: 36, luasLahan: 60, harga: 865000000 }] },
     ],
     bplan: {
-      hpp: [{ nama: "Perolehan Tanah", v: 5755000000 }, { nama: "Pengolahan Lahan", v: 1850000000 }, { nama: "Perijinan & Legalitas", v: 3200000000 }, { nama: "Prasarana & Sarana", v: 4305000000 }, { nama: "Konstruksi Rumah", v: 22400000000 }, { nama: "Marketing Gallery", v: 620000000 }],
-      omzet: [{ tipe: "Newton", jml: 17, harga: 1250000000 }, { tipe: "Tesla", jml: 17, harga: 1480000000 }, { tipe: "Galileo", jml: 17, harga: 1780000000 }],
-      operasional: [{ nama: "Pemasaran", v: 3928500000 }, { nama: "Umum & Administrasi", v: 2514240000 }, { nama: "Bunga & Pajak", v: 3692790000 }],
-      cashflow: [{ periode: "2025 Q1", masuk: 4000000000, keluar: 9500000000 }, { periode: "2025 Q2", masuk: 9800000000, keluar: 11200000000 }, { periode: "2025 Q3", masuk: 14500000000, keluar: 10800000000 }, { periode: "2025 Q4", masuk: 18200000000, keluar: 7400000000 }, { periode: "2026 Q1", masuk: 32010000000, keluar: 4200000000 }],
+      hpp: [
+        { kategori: "Perolehan Tanah", rows: [{ u: "Pembelian lahan", sat: "m²", vol: 34000, harga: 165000 }, { u: "Notaris, BBN & legal", sat: "ls", vol: 1, harga: 145000000 }] },
+        { kategori: "Pengolahan Lahan", rows: [{ u: "Cut & fill / pematangan", sat: "m³", vol: 37000, harga: 40000 }, { u: "Land clearing & pemadatan", sat: "ls", vol: 1, harga: 370000000 }] },
+        { kategori: "Perijinan & Legalitas", rows: [{ u: "PBG/IMB, site plan & AMDAL", sat: "ls", vol: 1, harga: 2000000000 }, { u: "Izin lingkungan, ormas & retribusi", sat: "ls", vol: 1, harga: 1200000000 }] },
+        { kategori: "Prasarana & Sarana", rows: [{ u: "Jalan lingkungan & drainase", sat: "m²", vol: 4600, harga: 550000 }, { u: "Jaringan listrik, air & PJU", sat: "ls", vol: 1, harga: 1775000000 }, { u: "Marketing gallery & pos jaga", sat: "ls", vol: 1, harga: 620000000 }] },
+        { kategori: "Konstruksi Rumah", rows: [{ u: "Bangun rumah Newton (17 unit)", sat: "unit", vol: 17, harga: 380000000 }, { u: "Bangun rumah Tesla (17 unit)", sat: "unit", vol: 17, harga: 450000000 }, { u: "Bangun rumah Galileo (17 unit)", sat: "unit", vol: 17, harga: 490000000 }] },
+      ],
+      omzet: [{ tipe: "Newton", harga: 1250000000 }, { tipe: "Tesla", harga: 1480000000 }, { tipe: "Galileo", harga: 1780000000 }],
+      operasional: [
+        { kategori: "Pemasaran", rows: [{ nama: "Iklan & billboard", v: 1800000000 }, { nama: "Komisi agen", v: 1528500000 }, { nama: "Pameran & event", v: 600000000 }] },
+        { kategori: "Umum & Administrasi", rows: [{ nama: "Gaji staf proyek & kantor", v: 1800000000 }, { nama: "Sewa kantor & utilitas", v: 500000000 }, { nama: "ATK & operasional kantor", v: 214240000 }] },
+        { kategori: "Bunga & Pajak", rows: [{ nama: "Bunga pinjaman konstruksi", v: 2800000000 }, { nama: "Pajak (PPh final & PBB)", v: 892790000 }] },
+      ],
+      cashflow: [{ periode: "2025-07", masuk: 1300000000, keluar: 3100000000 }, { periode: "2025-08", masuk: 1350000000, keluar: 3200000000 }, { periode: "2025-09", masuk: 1350000000, keluar: 3200000000 }, { periode: "2025-10", masuk: 3200000000, keluar: 3700000000 }, { periode: "2025-11", masuk: 3300000000, keluar: 3800000000 }, { periode: "2025-12", masuk: 3300000000, keluar: 3700000000 }, { periode: "2026-01", masuk: 6000000000, keluar: 3600000000 }, { periode: "2026-02", masuk: 10500000000, keluar: 2600000000 }],
     },
   },
   {
@@ -179,10 +198,19 @@ export const PROYEK = [
       { nama: "Karadenan Residence", jarak: 3.9, tipe: [{ tipe: "Standard", jml: 48, luasUnit: 40, luasLahan: 65, harga: 845000000 }] },
     ],
     bplan: {
-      hpp: [{ nama: "Perolehan Tanah", v: 1500000000 }, { nama: "Perijinan & Legalitas", v: 1100000000 }, { nama: "Prasarana & Sarana", v: 1600000000 }, { nama: "Konstruksi Rumah", v: 6070000000 }],
-      omzet: [{ tipe: "Tipe F1", jml: 10, harga: 950000000 }, { tipe: "Tipe F2", jml: 5, harga: 1150000000 }],
-      operasional: [{ nama: "Pemasaran", v: 695000000 }, { nama: "Umum & Administrasi", v: 444800000 }, { nama: "Bunga & Pajak", v: 653300000 }],
-      cashflow: [{ periode: "2025 Q3", masuk: 2000000000, keluar: 3500000000 }, { periode: "2025 Q4", masuk: 4500000000, keluar: 4000000000 }, { periode: "2026 Q1", masuk: 7400000000, keluar: 2400000000 }],
+      hpp: [
+        { kategori: "Perolehan Tanah", rows: [{ u: "Pembelian lahan", sat: "m²", vol: 12400, harga: 115000 }, { u: "Notaris, BBN & legal", sat: "ls", vol: 1, harga: 74000000 }] },
+        { kategori: "Perijinan & Legalitas", rows: [{ u: "PBG/IMB & site plan", sat: "ls", vol: 1, harga: 700000000 }, { u: "Izin lingkungan & ormas", sat: "ls", vol: 1, harga: 400000000 }] },
+        { kategori: "Prasarana & Sarana", rows: [{ u: "Jalan lingkungan & drainase", sat: "m²", vol: 1800, harga: 600000 }, { u: "Jaringan listrik & air", sat: "ls", vol: 1, harga: 520000000 }] },
+        { kategori: "Konstruksi Rumah", rows: [{ u: "Bangun rumah Tipe F1 (10 unit)", sat: "unit", vol: 10, harga: 370000000 }, { u: "Bangun rumah Tipe F2 (5 unit)", sat: "unit", vol: 5, harga: 474000000 }] },
+      ],
+      omzet: [{ tipe: "Tipe F1", harga: 950000000 }, { tipe: "Tipe F2", harga: 1150000000 }],
+      operasional: [
+        { kategori: "Pemasaran", rows: [{ nama: "Iklan & digital ads", v: 400000000 }, { nama: "Komisi agen", v: 295000000 }] },
+        { kategori: "Umum & Administrasi", rows: [{ nama: "Gaji staf proyek", v: 320000000 }, { nama: "Sewa & utilitas", v: 124800000 }] },
+        { kategori: "Bunga & Pajak", rows: [{ nama: "Bunga pinjaman", v: 480000000 }, { nama: "Pajak (PPh final)", v: 173300000 }] },
+      ],
+      cashflow: [{ periode: "2025-09", masuk: 650000000, keluar: 1150000000 }, { periode: "2025-10", masuk: 680000000, keluar: 1180000000 }, { periode: "2025-11", masuk: 670000000, keluar: 1170000000 }, { periode: "2025-12", masuk: 1500000000, keluar: 1350000000 }, { periode: "2026-01", masuk: 1550000000, keluar: 1300000000 }, { periode: "2026-02", masuk: 2450000000, keluar: 800000000 }],
     },
   },
 ];

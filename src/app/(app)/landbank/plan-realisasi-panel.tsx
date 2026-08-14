@@ -1,8 +1,8 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { bolehUbah, type Pengguna } from "@/lib/auth/rbac";
-import { daftarProyekPlanReal, planVsRealisasi } from "@/lib/data/plan-real";
+import { planVsRealisasi } from "@/lib/data/plan-real";
 import { kpiPlanRealisasi, warnaSerapan } from "@/lib/tampilan/plan-realisasi";
 import { pct, rp } from "@/lib/format";
 import { Badge, Kartu, TabelHead, Track, WARNA_STATUS } from "@/components/ui";
@@ -11,13 +11,11 @@ import { HapusPembayaranJual, KelolaPembayaranJual, UbahPembayaranJual } from ".
 import { Tabel } from "@/components/kartu-tabel";
 
 /**
- * Panel Plan vs Realisasi — dulu laman `/plan-realisasi` yang berdiri sendiri,
- * kini menjadi tab ketiga pada indeks Landbank. Rencana bersumber dari Business
- * Plan (juga di Landbank); realisasinya dari data unit, kontrak, & pengeluaran.
- *
- * Karena hidup di dalam tab Landbank, penanda navigasinya berbeda dari laman
- * lama: pemilih proyek dan sub-tab menautkan ke `/landbank?tab=pvr&…`, dengan
- * sub-tab memakai parameter `pv` supaya tidak bentrok dengan `tab` milik indeks.
+ * Panel Plan vs Realisasi — kini menjadi tab ketiga pada laman DETAIL proyek
+ * Landbank (`/landbank/[kode]?tab=pvr`), bukan lagi tab global. Proyeknya tetap
+ * (ditentukan rute), jadi tak ada lagi pemilih proyek di sini; sub-tab memakai
+ * parameter `pv`. Rencana bersumber dari Business Plan; realisasinya dari data
+ * unit, kontrak, & pengeluaran.
  */
 
 const PVR_TAB = [
@@ -118,25 +116,25 @@ function Kpi4({
 
 export async function PlanRealisasiPanel({
   pengguna,
-  kodeParam,
+  kode,
   subParam,
 }: {
   pengguna: Pengguna;
-  kodeParam?: string;
+  kode: string;
   subParam?: string;
 }) {
-  const daftar = await daftarProyekPlanReal(pengguna);
-  if (daftar.length === 0) {
-    return (
-      <div className="terbatas">Belum ada proyek dengan business plan yang dapat Anda akses.</div>
-    );
-  }
-
-  const kode = daftar.some((p) => p.kode === kodeParam) ? kodeParam! : daftar[0].kode;
   const subAktif = PVR_TAB.some(([t]) => t === subParam) ? subParam : "hpp";
 
   const d = await planVsRealisasi(pengguna, kode);
-  if (!d) redirect("/landbank?tab=pvr");
+  if (!d) {
+    return (
+      <div className="card" style={{ padding: 34, textAlign: "center", color: "var(--muted)" }}>
+        <div style={{ fontSize: 12.5, lineHeight: 1.6 }}>
+          Proyek ini belum punya business plan, jadi belum ada perbandingan rencana vs realisasi.
+        </div>
+      </div>
+    );
+  }
 
   const bolehCatatOps = bolehUbah(pengguna, "businessPlan");
   const bolehCatatCair = bolehUbah(pengguna, "keuangan");
@@ -147,28 +145,10 @@ export async function PlanRealisasiPanel({
 
   return (
     <>
-      <div
-        style={{
-          display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-          flexWrap: "wrap", gap: 12,
-        }}
-      >
-        <div>
-          <div className="eyebrow">Kokpit Kendali · Komisaris, BOD &amp; Business Development</div>
-          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
-            Rencana dari Business Plan · realisasi dari data unit, kontrak &amp; pengeluaran
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
-          {daftar.map((p) => (
-            <Link
-              key={p.kode}
-              href={`?tab=pvr&proyek=${p.kode}&pv=${subAktif}`}
-              className={"pill" + (kode === p.kode ? " active" : "")}
-            >
-              {p.nama}
-            </Link>
-          ))}
+      <div>
+        <div className="eyebrow">Kokpit Kendali · Komisaris, BOD &amp; Business Development</div>
+        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+          Rencana dari Business Plan · realisasi dari data unit, kontrak &amp; pengeluaran
         </div>
       </div>
 
@@ -184,7 +164,7 @@ export async function PlanRealisasiPanel({
         {PVR_TAB.map(([id, label]) => (
           <Link
             key={id}
-            href={`?tab=pvr&proyek=${kode}&pv=${id}`}
+            href={`?tab=pvr&pv=${id}`}
             className={"pill" + (subAktif === id ? " active" : "")}
           >
             {label}

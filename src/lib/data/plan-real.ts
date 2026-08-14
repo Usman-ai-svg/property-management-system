@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { filterProyek, type Pengguna } from "@/lib/auth/rbac";
+import { type Pengguna } from "@/lib/auth/rbac";
 import { ringkasKontrak } from "@/lib/calc/keuangan";
 
 /**
@@ -23,14 +23,6 @@ const SUMBER_HPP: Record<string, string[]> = {
   "Konstruksi Rumah": ["Unit (rumah dijual)"],
 };
 
-export async function daftarProyekPlanReal(u: Pengguna) {
-  return prisma.project.findMany({
-    where: { ...filterProyek(u), businessPlan: { isNot: null } },
-    orderBy: { kode: "asc" },
-    select: { id: true, kode: true, nama: true },
-  });
-}
-
 export async function planVsRealisasi(u: Pengguna, kode: string) {
   const proyek = await prisma.project.findUnique({
     where: { kode },
@@ -44,6 +36,8 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
           statusJual: true, progress: true,
           phase: { select: { kode: true } },
           unitType: { select: { nama: true, luasBangunan: true } },
+          // Harga dasar rencana (Omset) — dipakai sebagai target penjualan.
+          bpOmzet: { select: { hargaDasar: true } },
           penerimaan: {
             orderBy: { tanggal: "asc" as const },
             select: { id: true, tanggal: true, uraian: true, nominal: true },
@@ -68,9 +62,14 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
   const rencana = await prisma.businessPlan.findUnique({
     where: { projectId: proyek.id },
     select: {
-      hpp: { orderBy: { urutan: "asc" }, select: { id: true, nama: true, nilai: true } },
-      omzet: { select: { jumlah: true, harga: true } },
-      operasional: { orderBy: { urutan: "asc" }, select: { id: true, nama: true, nilai: true } },
+      hpp: {
+        orderBy: { urutan: "asc" },
+        select: { id: true, nama: true, rows: { select: { volume: true, harga: true } } },
+      },
+      operasional: {
+        orderBy: { urutan: "asc" },
+        select: { id: true, nama: true, rows: { select: { nilai: true } } },
+      },
     },
   });
   if (!rencana) return null;
@@ -92,6 +91,7 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
   }
 
   const biaya = rencana.hpp.map((h, i) => {
+    const plan = h.rows.reduce((s, r) => s + r.volume * r.harga, 0);
     let real = 0;
     let sumber: string;
 
@@ -110,7 +110,7 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
       sumber = peruntukan.length ? `pengeluaran · ${peruntukan.join(", ")}` : "belum ada sumber data";
     }
 
-    return { kode: String.fromCharCode(65 + i), nama: h.nama, plan: h.nilai, real, sumber };
+    return { kode: String.fromCharCode(65 + i), nama: h.nama, plan, real, sumber };
   });
 
   // Realisasi biaya operasional dicocokkan lewat nama kategorinya, yang memang
@@ -122,19 +122,21 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
 
   const ops = rencana.operasional.map((o) => ({
     nama: o.nama,
-    plan: o.nilai,
+    plan: o.rows.reduce((s, r) => s + r.nilai, 0),
     real: perKategori.get(o.nama) ?? 0,
   }));
 
   const sales = proyek.units.map((x) => {
     const akad = x.statusJual === "Akad" || x.statusJual === "Serah Terima";
+    // Target = harga dasar rencana (Omset); default hargaJual bila belum di-override.
+    const target = x.bpOmzet?.hargaDasar ?? x.hargaJual;
     return {
       id: x.id,
       no: `${x.phase.kode}-${x.nomor}`,
       tipe: x.unitType.nama,
       luasBangunan: x.unitType.luasBangunan,
       luasTanah: x.luasTanah,
-      target: x.hargaJual,
+      target,
       akad,
       real: akad ? x.hargaJual : 0,
       pencairan: akad ? x.hargaJual : 0,
@@ -150,7 +152,8 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
     };
   });
 
-  const penjualanPlan = rencana.omzet.reduce((s, o) => s + o.jumlah * o.harga, 0);
+  // Rencana penjualan = Σ harga dasar rencana seluruh unit (non-PPN).
+  const penjualanPlan = sales.reduce((s, x) => s + x.target, 0);
   const penjualanReal = sales.reduce((s, x) => s + x.sudahCair, 0);
 
   const hppPlan = biaya.reduce((s, x) => s + x.plan, 0);

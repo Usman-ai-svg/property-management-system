@@ -1,11 +1,14 @@
 "use client";
 
-import { BarisField, Field, FormModal, TombolHapus, TombolIkon, TombolTambah } from "@/components/form";
+import { BarisField, Field, FieldTerkunci, FormModal, TombolHapus, TombolIkon, TombolTambah } from "@/components/form";
 import {
-  hapusCashflow, hapusPembanding, hapusPosHpp, hapusPosOmzet, hapusPosOperasional,
-  simpanCashflow, simpanPembanding, simpanPosHpp, simpanPosOmzet, simpanPosOperasional,
+  hapusBarisHpp, hapusBarisOperasional, hapusCashflow, hapusKategoriHpp,
+  hapusKategoriOperasional, hapusPembanding, resetHargaDasarUnit,
+  simpanBarisHpp, simpanBarisOperasional, simpanCashflow, simpanHargaDasarUnit,
+  simpanKategoriHpp, simpanKategoriOperasional, simpanPembanding,
 } from "./actions";
 import { Petunjuk } from "@/components/ui";
+import { rp } from "@/lib/format";
 
 /**
  * Formulir business plan.
@@ -19,128 +22,199 @@ import { Petunjuk } from "@/components/ui";
 const CATATAN_RENCANA =
   "Business plan adalah rencana, bukan realisasi. Mengubahnya tidak menyentuh transaksi yang sudah tercatat — yang bergeser hanya pembandingnya di Plan vs Realisasi.";
 
-/* ---------- Pos HPP ---------- */
+/* ---------- HPP: kategori (induk) & baris rincian ---------- */
 
-export function FormPosHpp({
+export function FormKategoriHpp({
   businessPlanId,
-  pos,
+  kategori,
 }: {
   businessPlanId: string;
-  pos?: { id: string; nama: string; nilai: number };
+  kategori?: { id: string; nama: string };
 }) {
   return (
     <FormModal
-      judul={pos ? `Ubah Pos ${pos.nama}` : "Tambah Pos HPP"}
+      judul={kategori ? `Ubah Kategori ${kategori.nama}` : "Tambah Kategori HPP"}
       keterangan={CATATAN_RENCANA}
-      aksi={simpanPosHpp}
-      labelSimpan={pos ? "Simpan" : "Tambah"}
+      aksi={simpanKategoriHpp}
+      labelSimpan={kategori ? "Simpan" : "Tambah"}
       pemicu={(buka) =>
-        pos ? (
-          <TombolIkon onClick={buka} judul={`Ubah pos ${pos.nama}`} />
+        kategori ? (
+          <TombolIkon onClick={buka} judul={`Ubah kategori ${kategori.nama}`} />
         ) : (
-          <TombolTambah onClick={buka} label="Tambah Pos" />
+          <TombolTambah onClick={buka} label="Tambah Kategori" />
         )
       }
     >
-      <input type="hidden" name="id" value={pos?.id ?? ""} />
+      <input type="hidden" name="id" value={kategori?.id ?? ""} />
       <input type="hidden" name="businessPlanId" value={businessPlanId} />
       <BarisField kolom={1}>
-        <Field label="Nama Komponen" nama="nama" nilai={pos?.nama} wajib petunjuk="mis. E — Konstruksi" />
+        <Field label="Nama Kategori" nama="nama" nilai={kategori?.nama} wajib petunjuk="mis. Konstruksi Rumah" />
       </BarisField>
+      <Petunjuk>
+        Anggaran kategori dihitung otomatis dari baris rinciannya. Nama kategori dipakai untuk
+        mencocokkan realisasi di Plan vs Realisasi.
+      </Petunjuk>
+    </FormModal>
+  );
+}
+
+export function HapusKategoriHpp({ id, nama }: { id: string; nama: string }) {
+  return <TombolHapus aksi={hapusKategoriHpp} id={id} nama={`kategori ${nama}`} />;
+}
+
+export function FormBarisHpp({
+  hppItemId,
+  baris,
+}: {
+  hppItemId: string;
+  baris?: { id: string; uraian: string; satuan: string; volume: number; harga: number };
+}) {
+  return (
+    <FormModal
+      judul={baris ? `Ubah Baris ${baris.uraian}` : "Tambah Baris HPP"}
+      keterangan={CATATAN_RENCANA}
+      aksi={simpanBarisHpp}
+      labelSimpan={baris ? "Simpan" : "Tambah"}
+      pemicu={(buka) =>
+        baris ? (
+          <TombolIkon onClick={buka} judul={`Ubah baris ${baris.uraian}`} />
+        ) : (
+          <TombolTambah onClick={buka} label="Tambah Baris" />
+        )
+      }
+    >
+      <input type="hidden" name="id" value={baris?.id ?? ""} />
+      <input type="hidden" name="hppItemId" value={hppItemId} />
       <BarisField kolom={1}>
-        <Field label="Anggaran" nama="nilai" nilai={pos?.nilai ?? 0} tipe="number" satuan="Rp" wajib />
+        <Field label="Uraian" nama="uraian" nilai={baris?.uraian} wajib petunjuk="mis. Pekerjaan struktur & pondasi" />
+      </BarisField>
+      <BarisField kolom={3}>
+        <Field label="Satuan" nama="satuan" nilai={baris?.satuan} wajib petunjuk="mis. m², ls, unit" />
+        <Field label="Volume" nama="volume" nilai={baris?.volume ?? 0} tipe="number" wajib />
+        <Field label="Harga Satuan" nama="harga" nilai={baris?.harga ?? 0} tipe="number" satuan="Rp" wajib />
       </BarisField>
     </FormModal>
   );
 }
 
-export function HapusPosHpp({ id, nama }: { id: string; nama: string }) {
-  return <TombolHapus aksi={hapusPosHpp} id={id} nama={`pos ${nama}`} />;
+export function HapusBarisHpp({ id, uraian }: { id: string; uraian: string }) {
+  return <TombolHapus aksi={hapusBarisHpp} id={id} nama={`baris ${uraian}`} />;
 }
 
-/* ---------- Pos Omzet ---------- */
+/* ---------- Omset: harga dasar rencana per unit ---------- */
 
-export function FormPosOmzet({
+export function FormHargaDasarUnit({
   businessPlanId,
-  pos,
+  unit,
 }: {
   businessPlanId: string;
-  pos?: { id: string; tipe: string; jumlah: number; harga: number };
+  unit: { unitId: string; no: string; tipe: string; hargaJual: number; hargaDasar: number; dioverride: boolean };
 }) {
   return (
     <FormModal
-      judul={pos ? `Ubah Omzet ${pos.tipe}` : "Tambah Pos Omzet"}
+      judul={`Harga Dasar Unit ${unit.no}`}
       keterangan={CATATAN_RENCANA}
-      aksi={simpanPosOmzet}
-      labelSimpan={pos ? "Simpan" : "Tambah"}
-      pemicu={(buka) =>
-        pos ? (
-          <TombolIkon onClick={buka} judul={`Ubah omzet ${pos.tipe}`} />
-        ) : (
-          <TombolTambah onClick={buka} label="Tambah Pos" />
-        )
-      }
+      aksi={simpanHargaDasarUnit}
+      labelSimpan="Simpan"
+      pemicu={(buka) => <TombolIkon onClick={buka} judul={`Ubah harga dasar unit ${unit.no}`} />}
     >
-      <input type="hidden" name="id" value={pos?.id ?? ""} />
       <input type="hidden" name="businessPlanId" value={businessPlanId} />
-      <BarisField kolom={1}>
-        <Field label="Tipe Unit" nama="tipe" nilai={pos?.tipe} wajib />
-      </BarisField>
+      <input type="hidden" name="unitId" value={unit.unitId} />
       <BarisField>
-        <Field label="Jumlah Unit" nama="jumlah" nilai={pos?.jumlah ?? 0} tipe="number" wajib />
-        <Field label="Harga Satuan" nama="harga" nilai={pos?.harga ?? 0} tipe="number" satuan="Rp" wajib />
+        <FieldTerkunci label="Unit" nilai={`${unit.no} · ${unit.tipe}`} catatan="dari daftar unit" />
+        <FieldTerkunci label="Harga Jual Unit" nilai={rp(unit.hargaJual)} catatan="default" />
       </BarisField>
+      <BarisField kolom={1}>
+        <Field label="Harga Dasar Rencana (non-PPN)" nama="hargaDasar" nilai={unit.hargaDasar} tipe="number" satuan="Rp" wajib />
+      </BarisField>
+      <Petunjuk>
+        Harga+PPN (11%) dan All-In (+10% AJB/notaris/BPHTB) dihitung otomatis dari harga dasar.
+        Total omset memakai harga dasar (non-PPN).
+      </Petunjuk>
     </FormModal>
   );
 }
 
-export function HapusPosOmzet({ id, tipe }: { id: string; tipe: string }) {
-  return <TombolHapus aksi={hapusPosOmzet} id={id} nama={`omzet ${tipe}`} />;
+export function ResetHargaDasarUnit({ unitId, no }: { unitId: string; no: string }) {
+  return <TombolHapus aksi={resetHargaDasarUnit} id={unitId} nama={`harga dasar unit ${no} (kembali ke harga jual)`} />;
 }
 
-/* ---------- Pos Operasional ---------- */
+/* ---------- Operasional: kategori (induk) & baris rincian ---------- */
 
-export function FormPosOperasional({
+export function FormKategoriOperasional({
   businessPlanId,
-  pos,
+  kategori,
 }: {
   businessPlanId: string;
-  pos?: { id: string; nama: string; nilai: number };
+  kategori?: { id: string; nama: string };
 }) {
   return (
     <FormModal
-      judul={pos ? `Ubah Pos ${pos.nama}` : "Tambah Pos Operasional"}
+      judul={kategori ? `Ubah Kategori ${kategori.nama}` : "Tambah Kategori Operasional"}
       keterangan={CATATAN_RENCANA}
-      aksi={simpanPosOperasional}
-      labelSimpan={pos ? "Simpan" : "Tambah"}
+      aksi={simpanKategoriOperasional}
+      labelSimpan={kategori ? "Simpan" : "Tambah"}
       pemicu={(buka) =>
-        pos ? (
-          <TombolIkon onClick={buka} judul={`Ubah pos ${pos.nama}`} />
+        kategori ? (
+          <TombolIkon onClick={buka} judul={`Ubah kategori ${kategori.nama}`} />
         ) : (
-          <TombolTambah onClick={buka} label="Tambah Pos" />
+          <TombolTambah onClick={buka} label="Tambah Kategori" />
         )
       }
     >
-      <input type="hidden" name="id" value={pos?.id ?? ""} />
+      <input type="hidden" name="id" value={kategori?.id ?? ""} />
       <input type="hidden" name="businessPlanId" value={businessPlanId} />
       <BarisField kolom={1}>
-        <Field label="Nama Pos" nama="nama" nilai={pos?.nama} wajib petunjuk="mis. Pemasaran" />
+        <Field label="Nama Kategori" nama="nama" nilai={kategori?.nama} wajib petunjuk="mis. Pemasaran" />
       </BarisField>
-      <BarisField kolom={1}>
-        <Field label="Anggaran" nama="nilai" nilai={pos?.nilai ?? 0} tipe="number" satuan="Rp" wajib />
-      </BarisField>
-      {pos && (
-        <Petunjuk>
-          Biaya operasional yang sudah dicatat dicocokkan lewat <b>nama pos</b>. Bila namanya
-          diganti, biaya yang sudah ada ikut dipindahkan supaya realisasinya tidak hilang.
-        </Petunjuk>
-      )}
+      <Petunjuk>
+        Anggaran kategori dihitung otomatis dari baris rinciannya. Biaya operasional yang
+        sudah dicatat dicocokkan lewat <b>nama kategori</b>; bila namanya diganti, biaya yang
+        sudah ada ikut dipindahkan supaya realisasinya tidak hilang.
+      </Petunjuk>
     </FormModal>
   );
 }
 
-export function HapusPosOperasional({ id, nama }: { id: string; nama: string }) {
-  return <TombolHapus aksi={hapusPosOperasional} id={id} nama={`pos ${nama}`} />;
+export function HapusKategoriOperasional({ id, nama }: { id: string; nama: string }) {
+  return <TombolHapus aksi={hapusKategoriOperasional} id={id} nama={`kategori ${nama}`} />;
+}
+
+export function FormBarisOperasional({
+  operasionalItemId,
+  baris,
+}: {
+  operasionalItemId: string;
+  baris?: { id: string; nama: string; nilai: number };
+}) {
+  return (
+    <FormModal
+      judul={baris ? `Ubah Baris ${baris.nama}` : "Tambah Baris Operasional"}
+      keterangan={CATATAN_RENCANA}
+      aksi={simpanBarisOperasional}
+      labelSimpan={baris ? "Simpan" : "Tambah"}
+      pemicu={(buka) =>
+        baris ? (
+          <TombolIkon onClick={buka} judul={`Ubah baris ${baris.nama}`} />
+        ) : (
+          <TombolTambah onClick={buka} label="Tambah Baris" />
+        )
+      }
+    >
+      <input type="hidden" name="id" value={baris?.id ?? ""} />
+      <input type="hidden" name="operasionalItemId" value={operasionalItemId} />
+      <BarisField kolom={1}>
+        <Field label="Uraian" nama="nama" nilai={baris?.nama} wajib petunjuk="mis. Gaji, Bonus, THR" />
+      </BarisField>
+      <BarisField kolom={1}>
+        <Field label="Anggaran" nama="nilai" nilai={baris?.nilai ?? 0} tipe="number" satuan="Rp" wajib />
+      </BarisField>
+    </FormModal>
+  );
+}
+
+export function HapusBarisOperasional({ id, nama }: { id: string; nama: string }) {
+  return <TombolHapus aksi={hapusBarisOperasional} id={id} nama={`baris ${nama}`} />;
 }
 
 /* ---------- Cashflow ---------- */
@@ -169,7 +243,7 @@ export function FormCashflow({
       <input type="hidden" name="id" value={baris?.id ?? ""} />
       <input type="hidden" name="businessPlanId" value={businessPlanId} />
       <BarisField kolom={1}>
-        <Field label="Periode" nama="periode" nilai={baris?.periode} wajib petunjuk="mis. 2026 Q3" />
+        <Field label="Bulan" nama="periode" nilai={baris?.periode} tipe="bulan" wajib petunjuk="Cashflow direncanakan per bulan" />
       </BarisField>
       <BarisField>
         <Field label="Kas Masuk" nama="masuk" nilai={baris?.masuk ?? 0} tipe="number" satuan="Rp" />

@@ -5,21 +5,20 @@ import { ambilPengguna, bolehLihat } from "@/lib/auth/rbac";
 import { dataLandbank } from "@/lib/data/landbank";
 import { rataRasioEfektif, susunBarisLandbank } from "@/lib/tampilan/landbank";
 import { m2, pct, rp } from "@/lib/format";
-import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
+import { Badge, TabelHead, Track, WARNA_STATUS } from "@/components/ui";
 import { Tabel } from "@/components/kartu-tabel";
-import { PlanRealisasiPanel } from "./plan-realisasi-panel";
+import { Perbandingan, type BarisIndikator } from "./perbandingan";
 
 export default async function Landbank({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; proyek?: string; pv?: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const pengguna = await ambilPengguna();
   if (!pengguna) redirect("/login");
 
-  const { tab = "portofolio", proyek: proyekParam, pv } = await searchParams;
-  const tabAktif =
-    tab === "banding" ? "banding" : tab === "pvr" ? "pvr" : "portofolio";
+  const { tab = "portofolio" } = await searchParams;
+  const tabAktif = tab === "banding" ? "banding" : "portofolio";
 
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
   const bolehBp = bolehLihat(pengguna, "businessPlan");
@@ -38,7 +37,9 @@ export default async function Landbank({
     ],
   ];
 
-  const indikator: [string, (p: (typeof baris)[number]) => string, boolean][] = [
+  // Baris indikator disusun di server (fungsi format tak bisa menyeberang ke
+  // klien), lalu komponen Perbandingan hanya menyaring KOLOM proyek.
+  const defIndikator: [string, (p: (typeof baris)[number]) => string, boolean, boolean?][] = [
     ["Luas Total", (p) => m2(p.luasTotal), true],
     ["Kavling Efektif", (p) => m2(p.luasKavlingEfektif), true],
     ["Rasio Efektif", (p) => pct(p.rasioEfektif, 1), true],
@@ -49,8 +50,16 @@ export default async function Landbank({
     ["Rencana HPP", (p) => rp(p.hpp), bolehBp],
     ["Rencana Biaya Operasional", (p) => rp(p.ops), bolehBp],
     ["Rencana Laba Bersih", (p) => rp(p.laba), bolehBp],
-    ["Margin Rencana", (p) => pct(p.margin, 1), bolehBp],
+    ["Margin Rencana", (p) => pct(p.margin, 1), bolehBp, true],
   ];
+
+  const indikator: BarisIndikator[] = defIndikator
+    .filter(([, , tampil]) => tampil)
+    .map(([label, ambil, , sorotHijau]) => ({
+      label,
+      sorotHijau,
+      nilai: Object.fromEntries(baris.map((p) => [p.id, ambil(p)])),
+    }));
 
   return (
     <div style={{ padding: 24 }}>
@@ -64,11 +73,6 @@ export default async function Landbank({
         <Link href="?tab=banding" className={"tab" + (tabAktif === "banding" ? " active" : "")}>
           Perbandingan Proyek
         </Link>
-        {bolehBp && (
-          <Link href="?tab=pvr" className={"tab" + (tabAktif === "pvr" ? " active" : "")}>
-            Plan vs Realisasi
-          </Link>
-        )}
       </div>
 
       {tabAktif === "portofolio" && (
@@ -152,50 +156,17 @@ export default async function Landbank({
       )}
 
       {tabAktif === "banding" && (
-        <div className="card" style={{ overflow: "hidden" }}>
-          <TabelHead
-            judul="Perbandingan Proyek"
-            keterangan={
-              bolehBp
-                ? "Termasuk proyeksi laba & margin rencana."
-                : "Proyeksi laba & margin tidak ditampilkan untuk peran Anda."
-            }
-          />
-          <Tabel
-            kolom={[
-              { label: "Indikator" },
-              ...baris.map((p) => ({ label: p.nama, rata: "kanan" as const })),
-            ]}
-          >
-            {indikator
-              .filter(([, , tampil]) => tampil)
-              .map(([label, ambil]) => (
-                <tr key={label}>
-                  <td style={{ fontWeight: 600 }}>{label}</td>
-                  {baris.map((p) => (
-                    <td
-                      key={p.id}
-                      className="num"
-                      style={{
-                        textAlign: "right",
-                        color: label === "Margin Rencana" ? "var(--green)" : "inherit",
-                      }}
-                    >
-                      {ambil(p)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-          </Tabel>
-        </div>
+        <Perbandingan
+          proyek={baris.map((p) => ({ id: p.id, nama: p.nama }))}
+          indikator={indikator}
+          keterangan={
+            (bolehBp
+              ? "Termasuk proyeksi laba & margin rencana."
+              : "Proyeksi laba & margin tidak ditampilkan untuk peran Anda.") +
+            " Pilih proyek yang ingin dibandingkan."
+          }
+        />
       )}
-
-      {tabAktif === "pvr" &&
-        (bolehBp ? (
-          <PlanRealisasiPanel pengguna={pengguna} kodeParam={proyekParam} subParam={pv} />
-        ) : (
-          <Terbatas apa="Perbandingan rencana dan realisasi" />
-        ))}
     </div>
   );
 }

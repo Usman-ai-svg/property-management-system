@@ -7,8 +7,8 @@
 // Yang sudah dikerjakan:
 //   - provider postgresql
 //   - 48 kolom uang jadi Decimal(18, 2)
-//   - 28 kolom Float BUKAN uang dibiarkan (volume, luas, persentase)
-//   - 58 tabel diberi awalan "pm_" pada @@map yang sudah ada
+//   - 29 kolom Float BUKAN uang dibiarkan (volume, luas, persentase)
+//   - 60 tabel diberi awalan "pm_" pada @@map yang sudah ada
 //
 // Yang masih harus dikerjakan manusia:
 //   - Enum masih bertipe String. Daftar nilai sahnya ada di bawah sebagai
@@ -412,6 +412,7 @@ model Unit {
   boqSpk         ContractBoqUnit[]
   alokasiBiaya   ExpenseAllocation[]
   penerimaan     SalesPayment[]
+  bpOmzet        BpOmzetUnit?
 
   @@index([projectId, phaseId])
   @@unique([projectId, nomor])
@@ -1013,54 +1014,97 @@ model BusinessPlan {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   hpp         BpHppItem[]
-  omzet       BpOmzetItem[]
+  omzet       BpOmzetUnit[]
   operasional BpOperasionalItem[]
   cashflow    BpCashflowItem[]
 
   @@map("pm_business_plans")
 }
 
+/// Kategori HPP (induk). Nilainya TURUNAN — jumlah baris `rows` di bawahnya.
+/// Pencocokan realisasi di Plan vs Realisasi memakai `nama` kategori ini
+/// (lihat SUMBER_HPP di src/lib/data/plan-real.ts), jadi nama induklah yang
+/// menjadi kunci — bukan baris rinciannya.
 model BpHppItem {
   id             String @id @default(cuid())
   businessPlanId String
   nama           String
-  nilai          Decimal @db.Decimal(18, 2)
   urutan         Int    @default(0)
 
   businessPlan BusinessPlan @relation(fields: [businessPlanId], references: [id], onDelete: Cascade)
+  rows         BpHppRow[]
 
   @@map("pm_bp_hpp_items")
 }
 
-model BpOmzetItem {
-  id             String @id @default(cuid())
-  businessPlanId String
-  tipe           String
-  jumlah         Int
-  harga          Decimal @db.Decimal(18, 2)
-  urutan         Int    @default(0)
+/// Baris rincian sebuah kategori HPP, ala RAB: uraian, satuan, volume, harga.
+/// Nilai baris = volume * harga; total kategori = Σ baris.
+model BpHppRow {
+  id        String @id @default(cuid())
+  hppItemId String
+  uraian    String
+  satuan    String
+  volume    Float
+  harga     Decimal @db.Decimal(18, 2)
+  urutan    Int    @default(0)
 
-  businessPlan BusinessPlan @relation(fields: [businessPlanId], references: [id], onDelete: Cascade)
+  hppItem BpHppItem @relation(fields: [hppItemId], references: [id], onDelete: Cascade)
 
-  @@map("pm_bp_omzet_items")
+  @@index([hppItemId])
+  @@map("pm_bp_hpp_rows")
 }
 
+/// Rencana omset per unit. Daftarnya "hidup" mengikuti tabel Unit; baris ini
+/// hanya menyimpan HARGA DASAR rencana (non-PPN) yang terpisah dari
+/// `Unit.hargaJual` — supaya peran Business Plan bisa menyusun rencana harga
+/// tanpa mengubah harga jual unit. Bila sebuah unit belum punya baris ini,
+/// harga dasarnya default ke `Unit.hargaJual`.
+model BpOmzetUnit {
+  id             String @id @default(cuid())
+  businessPlanId String
+  unitId         String @unique
+  hargaDasar     Decimal @db.Decimal(18, 2)
+
+  businessPlan BusinessPlan @relation(fields: [businessPlanId], references: [id], onDelete: Cascade)
+  unit         Unit         @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([businessPlanId])
+  @@map("pm_bp_omzet_units")
+}
+
+/// Kategori biaya operasional (induk). Nilainya TURUNAN — jumlah baris di
+/// bawahnya. Realisasi dicocokkan lewat `nama` induk yang sama dengan
+/// `OperationalCost.kategori` (lihat Plan vs Realisasi).
 model BpOperasionalItem {
   id             String @id @default(cuid())
   businessPlanId String
   nama           String
-  nilai          Decimal @db.Decimal(18, 2)
   urutan         Int    @default(0)
 
   businessPlan BusinessPlan @relation(fields: [businessPlanId], references: [id], onDelete: Cascade)
+  rows         BpOperasionalRow[]
 
   @@map("pm_bp_operasional_items")
+}
+
+/// Baris rincian sebuah kategori operasional (mis. gaji, bonus, THR).
+model BpOperasionalRow {
+  id                String @id @default(cuid())
+  operasionalItemId String
+  nama              String
+  nilai             Decimal @db.Decimal(18, 2)
+  urutan            Int    @default(0)
+
+  operasionalItem BpOperasionalItem @relation(fields: [operasionalItemId], references: [id], onDelete: Cascade)
+
+  @@index([operasionalItemId])
+  @@map("pm_bp_operasional_rows")
 }
 
 model BpCashflowItem {
   id             String @id @default(cuid())
   businessPlanId String
-  /// mis. "2025 Q1"
+  /// Bulan rencana, format "YYYY-MM" (mis. "2026-08"). Urut string = urut waktu.
   periode        String
   masuk          Decimal @db.Decimal(18, 2)
   keluar         Decimal @db.Decimal(18, 2)

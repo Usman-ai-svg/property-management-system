@@ -38,17 +38,44 @@ export async function dataLandbank(u: Pengguna) {
 
   // Business plan diambil terpisah dan hanya bila peran berhak — sekaligus
   // menghindari pelebaran tipe akibat relasi bersyarat di dalam select.
-  const rencana = bolehBp
-    ? await prisma.businessPlan.findMany({
-        where: { project: filterProyek(u) },
-        select: {
-          projectId: true,
-          hpp: { select: { nilai: true } },
-          omzet: { select: { jumlah: true, harga: true } },
-          operasional: { select: { nilai: true } },
-        },
-      })
-    : [];
+  // Omset kini "hidup" dari tabel Unit: totalnya Σ harga dasar seluruh unit
+  // (default hargaJual, kecuali di-override di BpOmzetUnit). Karena itu unit
+  // dan override-nya diambil terpisah lalu dirakit jadi bentuk RencanaBisnis.
+  if (!bolehBp) return { proyek, rencana: [] };
+
+  const [plans, units, overrides] = await Promise.all([
+    prisma.businessPlan.findMany({
+      where: { project: filterProyek(u) },
+      select: {
+        projectId: true,
+        hpp: { select: { rows: { select: { volume: true, harga: true } } } },
+        operasional: { select: { rows: { select: { nilai: true } } } },
+      },
+    }),
+    prisma.unit.findMany({
+      where: { project: filterProyek(u) },
+      select: { id: true, projectId: true, hargaJual: true },
+    }),
+    prisma.bpOmzetUnit.findMany({
+      where: { businessPlan: { project: filterProyek(u) } },
+      select: { unitId: true, hargaDasar: true },
+    }),
+  ]);
+
+  const hargaDasarUnit = new Map(overrides.map((o) => [o.unitId, o.hargaDasar]));
+  const unitPerProyek = new Map<string, { hargaDasar: number }[]>();
+  for (const un of units) {
+    const list = unitPerProyek.get(un.projectId) ?? [];
+    list.push({ hargaDasar: hargaDasarUnit.get(un.id) ?? un.hargaJual });
+    unitPerProyek.set(un.projectId, list);
+  }
+
+  const rencana = plans.map((p) => ({
+    projectId: p.projectId,
+    hpp: p.hpp,
+    operasional: p.operasional,
+    omzet: unitPerProyek.get(p.projectId) ?? [],
+  }));
 
   return { proyek, rencana };
 }
@@ -80,20 +107,79 @@ export async function detailLandbank(kodeProyek: string, bolehHarga: boolean) {
 }
 
 /**
+ * Rencana omset sebuah proyek: daftar SELURUH unitnya.
+ *
+ * Daftar ini "hidup" dari tabel Unit (No, Tipe, LB, LT diambil apa adanya),
+ * sedangkan HARGA DASAR rencana disimpan terpisah di BpOmzetUnit supaya bisa
+ * disunting peran Business Plan tanpa menyentuh `Unit.hargaJual`. Unit yang
+ * belum punya override memakai hargaJual sebagai default.
+ */
+export async function omzetUnitProyek(projectId: string, businessPlanId: string) {
+  const units = await prisma.unit.findMany({
+    where: { projectId },
+    orderBy: [{ phase: { urutan: "asc" } }, { nomor: "asc" }],
+    select: {
+      id: true, nomor: true, luasTanah: true, hargaJual: true,
+      phase: { select: { kode: true } },
+      unitType: { select: { nama: true, luasBangunan: true } },
+      bpOmzet: { select: { id: true, hargaDasar: true } },
+    },
+  });
+
+  return units.map((u) => ({
+    unitId: u.id,
+    businessPlanId,
+    omzetId: u.bpOmzet?.id ?? null,
+    no: `${u.phase.kode}-${u.nomor}`,
+    tipe: u.unitType.nama,
+    lb: u.unitType.luasBangunan,
+    lt: u.luasTanah,
+    hargaJual: u.hargaJual,
+    hargaDasar: u.bpOmzet?.hargaDasar ?? u.hargaJual,
+    dioverride: !!u.bpOmzet,
+  }));
+}
+
+/**
  * Business plan sebuah proyek.
  *
  * Diambil terpisah, dan hanya bila peran berhak — menyisipkan relasi lewat
- * select bersyarat membuat Prisma kehilangan tipe pastinya.
+ * select bersyarat membuat Prisma kehilangan tipe pastinya. HPP & operasional
+ * kini dua tingkat (kategori induk berisi baris rincian); omset dirakit dari
+ * daftar unit lewat `omzetUnitProyek`.
  */
 export async function businessPlanProyek(projectId: string) {
-  return prisma.businessPlan.findUnique({
+  const bp = await prisma.businessPlan.findUnique({
     where: { projectId },
     select: {
       id: true,
-      hpp: { orderBy: { urutan: "asc" }, select: { id: true, nama: true, nilai: true } },
-      omzet: { orderBy: { urutan: "asc" }, select: { id: true, tipe: true, jumlah: true, harga: true } },
-      operasional: { orderBy: { urutan: "asc" }, select: { id: true, nama: true, nilai: true } },
-      cashflow: { orderBy: { urutan: "asc" }, select: { id: true, periode: true, masuk: true, keluar: true } },
+      hpp: {
+        orderBy: { urutan: "asc" },
+        select: {
+          id: true, nama: true, urutan: true,
+          rows: {
+            orderBy: { urutan: "asc" },
+            select: { id: true, uraian: true, satuan: true, volume: true, harga: true },
+          },
+        },
+      },
+      operasional: {
+        orderBy: { urutan: "asc" },
+        select: {
+          id: true, nama: true, urutan: true,
+          rows: {
+            orderBy: { urutan: "asc" },
+            select: { id: true, nama: true, nilai: true },
+          },
+        },
+      },
+      // Diurut kronologis: periode disimpan "YYYY-MM" sehingga urut string = urut waktu.
+      cashflow: { orderBy: { periode: "asc" }, select: { id: true, periode: true, masuk: true, keluar: true } },
     },
   });
+
+  if (!bp) return null;
+
+  const omzet = await omzetUnitProyek(projectId, bp.id);
+  return { ...bp, omzet };
 }

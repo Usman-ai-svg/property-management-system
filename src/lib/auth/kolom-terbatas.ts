@@ -103,6 +103,11 @@ export const DIJAGA_DI_HALAMAN: Record<string, Section> = {
   "keuangan.ts": "keuangan",
   "ringkasan.ts": "keuangan",
   "plan-real.ts": "businessPlan",
+  // Omset business plan memakai `Unit.hargaJual` sebagai default harga dasar
+  // rencana. hargaJual di-SELECT tanpa syarat, tapi hanya pada jalur yang
+  // dijaga izin "businessPlan": dataLandbank di balik early-return bolehBp, dan
+  // omzetUnitProyek hanya dipanggil businessPlanProyek (dipanggil saat bolehBp).
+  "landbank.ts": "businessPlan",
   "proyek.ts": "hargaRabRap",
   // Seluruh modul Estimasi RAB (harga satuan AHSP, harga dasar, penawaran
   // pemasok) berada di bawah "hargaRabRap" dan dijaga di tiap halamannya.

@@ -36,7 +36,7 @@ export function Field({
   label: string;
   nama: string;
   nilai?: string | number | null;
-  tipe?: "text" | "number" | "textarea" | "tanggal" | "waktu" | "berkas";
+  tipe?: "text" | "number" | "textarea" | "tanggal" | "bulan" | "waktu" | "berkas";
   satuan?: string;
   petunjuk?: string;
   wajib?: boolean;
@@ -81,7 +81,12 @@ export function Field({
             id={id}
             name={nama}
             className="inp"
-            type={tipe === "tanggal" ? "date" : tipe === "waktu" ? "datetime-local" : "text"}
+            type={
+              tipe === "tanggal" ? "date"
+                : tipe === "bulan" ? "month"
+                : tipe === "waktu" ? "datetime-local"
+                : "text"
+            }
             inputMode={tipe === "number" ? "decimal" : undefined}
             defaultValue={nilai ?? ""}
             required={wajib}
