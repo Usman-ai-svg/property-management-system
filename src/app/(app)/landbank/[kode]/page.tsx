@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight, Lock, MapPin } from "lucide-react";
@@ -23,7 +22,7 @@ import { EditBiayaLahan } from "./editors";
 import { Tabel } from "@/components/kartu-tabel";
 import { GrafikCashflow } from "../grafik-cashflow";
 import { TabelRencanaBp } from "../tabel-rencana";
-import { CatatPencairan, HapusPembayaranJual, UbahPembayaranJual } from "../bayar-jual";
+import { CatatPencairan } from "../bayar-jual";
 
 const BP_TAB = [
   ["hpp", "Rencana HPP"],
@@ -399,10 +398,9 @@ export default async function DetailLandbank({
                     { label: "Harga Dasar", rata: "kanan" },
                     { label: "Harga + PPN", rata: "kanan" },
                     { label: "All-In", rata: "kanan" },
-                    { label: "Harga Realisasi", rata: "kanan" },
                     { label: "Realisasi Cair", minLebar: 190 },
                     { label: "Status" },
-                    (bolehUbahBp || bolehCatatCair) && { lebar: 56 },
+                    bolehUbahBp && { lebar: 56 },
                   ]}
                   kosong="Proyek ini belum punya unit."
                 >
@@ -422,9 +420,6 @@ export default async function DetailLandbank({
                         </td>
                         <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
                           {rp(hargaAllIn(u.hargaDasar))}
-                        </td>
-                        <td className="num" style={{ textAlign: "right", color: s?.akad ? "var(--ink)" : "var(--muted)" }}>
-                          {s?.akad ? rp(s.pencairan) : "—"}
                         </td>
                         <td>
                           {adaPembayaran ? (
@@ -447,20 +442,12 @@ export default async function DetailLandbank({
                         <td>
                           <Badge nilai={s?.akad ? "Akad" : "Tersedia"} peta={WARNA_STATUS.jual} />
                         </td>
-                        {(bolehUbahBp || bolehCatatCair) && (
+                        {bolehUbahBp && (
                           <td>
-                            {(bolehUbahBp || adaPembayaran) && (
-                              <MenuAksi>
-                                {bolehUbahBp && <FormHargaDasarUnit businessPlanId={rencana.id} unit={u} />}
-                                {bolehUbahBp && u.dioverride && <ResetHargaDasarUnit unitId={u.unitId} no={u.no} />}
-                                {bolehCatatCair && s && s.penerimaan.map((p, i) => (
-                                  <Fragment key={p.id}>
-                                    <UbahPembayaranJual bayar={p} labelUnit={`${s.no} · cair ke-${i + 1}`} />
-                                    <HapusPembayaranJual id={p.id} uraian={`pencairan ke-${i + 1} unit ${s.no}`} />
-                                  </Fragment>
-                                ))}
-                              </MenuAksi>
-                            )}
+                            <MenuAksi>
+                              <FormHargaDasarUnit businessPlanId={rencana.id} unit={u} />
+                              {u.dioverride && <ResetHargaDasarUnit unitId={u.unitId} no={u.no} />}
+                            </MenuAksi>
                           </td>
                         )}
                       </tr>
@@ -476,14 +463,11 @@ export default async function DetailLandbank({
                       {rp(rencana.omzet.reduce((s, u) => s + hargaAllIn(u.hargaDasar), 0))}
                     </td>
                     <td className="num" style={{ textAlign: "right" }}>
-                      {rp(pvr ? pvr.sales.reduce((a, x) => a + x.pencairan, 0) : 0)}
-                    </td>
-                    <td className="num" style={{ textAlign: "right" }}>
                       <span style={{ color: "var(--green)" }}>{rp(pvr?.penjualanReal ?? 0)}</span>
                       <span style={{ color: "var(--muted)", fontWeight: 400 }}> cair</span>
                     </td>
                     <td />
-                    {(bolehUbahBp || bolehCatatCair) && <td />}
+                    {bolehUbahBp && <td />}
                   </tr>
                 </Tabel>
               </div>

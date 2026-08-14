@@ -103,18 +103,23 @@ export function CatatPencairan({ units }: { units: UnitPencairan[] }) {
       {u.riwayat.length > 0 && (
         <div className="card" style={{ padding: "10px 12px", background: "var(--rona-panel)", marginBottom: 12 }}>
           <div className="eyebrow" style={{ marginBottom: 6 }}>
-            Riwayat pencairan unit {u.no} · {u.riwayat.length} kali
+            Riwayat pencairan unit {u.no} · {u.riwayat.length} kali — sunting/hapus di sini
           </div>
-          {u.riwayat.map((r) => (
+          {u.riwayat.map((r, i) => (
             <div
               key={r.id}
               style={{
-                display: "flex", justifyContent: "space-between", gap: 10,
-                fontSize: 11.5, padding: "3px 0", color: "var(--muted)",
+                display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+                fontSize: 11.5, padding: "4px 0", color: "var(--muted)",
+                borderTop: i > 0 ? "1px solid var(--garis-halus)" : undefined,
               }}
             >
-              <span>{fmtTanggal(r.tanggal)} · {r.uraian}</span>
-              <span className="num">{rp(r.nominal)}</span>
+              <span>Cair ke-{i + 1} · {fmtTanggal(r.tanggal)} · {r.uraian}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <span className="num" style={{ color: "var(--text)", fontWeight: 600 }}>{rp(r.nominal)}</span>
+                <UbahPembayaranJual bayar={r} labelUnit={`${u.no} · cair ke-${i + 1}`} />
+                <HapusPembayaranJual id={r.id} uraian={`pencairan ke-${i + 1} unit ${u.no}`} />
+              </span>
             </div>
           ))}
         </div>

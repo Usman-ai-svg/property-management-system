@@ -39,7 +39,7 @@ const soroti = {
  */
 export function MenuAksi({ children }: { children: React.ReactNode }) {
   const [buka, setBuka] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
 
@@ -66,7 +66,10 @@ export function MenuAksi({ children }: { children: React.ReactNode }) {
   const toggle = () => {
     if (buka) return setBuka(false);
     const r = btnRef.current?.getBoundingClientRect();
-    if (r) setPos({ top: r.bottom + 4, left: r.right });
+    // Jarak dari tepi kanan viewport ke tepi kanan tombol — menu rata kanan
+    // TANPA transform. (transform pada induk akan membuat modal position:fixed
+    // di dalamnya melenceng keluar halaman.)
+    if (r) setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
     setBuka(true);
   };
 
@@ -90,8 +93,8 @@ export function MenuAksi({ children }: { children: React.ReactNode }) {
           ref={ref}
           role="menu"
           style={{
-            position: "fixed", top: pos.top, left: pos.left, transform: "translateX(-100%)",
-            zIndex: 55, minWidth: 180, maxWidth: 300,
+            position: "fixed", top: pos.top, right: pos.right,
+            zIndex: 55, minWidth: 140, maxWidth: 260,
             background: "var(--card, #fff)", border: "1px solid var(--line)", borderRadius: 10,
             boxShadow: "0 10px 28px rgba(0,0,0,.16)", padding: 5,
             display: "flex", flexDirection: "column", gap: 1,
@@ -271,20 +274,23 @@ export function TombolIkon({
   onClick,
   judul,
   jenis = "ubah",
+  labelMenu,
 }: {
   onClick: () => void;
   judul: string;
   jenis?: "ubah" | "hapus";
+  /** Label ringkas satu kata saat berada di dalam MenuAksi (mis. "Ubah", "Reset"). */
+  labelMenu?: string;
 }) {
   const menu = useContext(KonteksMenu);
 
-  // Di dalam MenuAksi: tampil sebagai baris menu berlabel. Modalnya tetap
-  // dibuka (onClick), menu dibiarkan terbuka di belakang modal.
+  // Di dalam MenuAksi: tampil sebagai baris menu berlabel SATU KATA. Modalnya
+  // tetap dibuka (onClick), menu dibiarkan terbuka di belakang modal.
   if (menu.dalamMenu) {
     return (
       <button type="button" onClick={onClick} style={{ ...gayaMenuItem, color: jenis === "hapus" ? "var(--red)" : "var(--text)" }} {...soroti}>
         {jenis === "hapus" ? <Trash2 size={13} /> : <Pencil size={13} />}
-        <span>{judul}</span>
+        <span>{labelMenu ?? (jenis === "hapus" ? "Hapus" : "Ubah")}</span>
       </button>
     );
   }
@@ -539,10 +545,13 @@ export function TombolHapus({
   aksi,
   id,
   nama,
+  labelMenu,
 }: {
   aksi: (sebelumnya: HasilAksi | null, form: FormData) => Promise<HasilAksi>;
   id: string;
   nama: string;
+  /** Label ringkas satu kata saat di dalam MenuAksi (mis. "Hapus", "Reset"). */
+  labelMenu?: string;
 }) {
   const [siap, setSiap] = useState(false);
   const [hasil, kirim] = useActionState(aksi, null);
@@ -576,11 +585,11 @@ export function TombolHapus({
                   }
             }
           >
-            {menu.dalamMenu ? `Yakin hapus ${nama}?` : "Yakin?"}
+            {menu.dalamMenu ? `Yakin, ${(labelMenu ?? "hapus").toLowerCase()}?` : "Yakin?"}
           </button>
         </form>
       ) : (
-        <TombolIkon jenis="hapus" judul={`Hapus ${nama}`} onClick={() => setSiap(true)} />
+        <TombolIkon jenis="hapus" judul={`${labelMenu ?? "Hapus"} ${nama}`} labelMenu={labelMenu ?? "Hapus"} onClick={() => setSiap(true)} />
       )}
 
       {hasil && !hasil.ok && (

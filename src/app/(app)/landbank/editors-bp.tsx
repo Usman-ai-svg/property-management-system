@@ -184,7 +184,7 @@ export function FormHargaDasarUnit({
 }
 
 export function ResetHargaDasarUnit({ unitId, no }: { unitId: string; no: string }) {
-  return <TombolHapus aksi={resetHargaDasarUnit} id={unitId} nama={`harga dasar unit ${no} (kembali ke harga jual)`} />;
+  return <TombolHapus aksi={resetHargaDasarUnit} id={unitId} nama={`harga dasar unit ${no} (kembali ke harga jual)`} labelMenu="Reset" />;
 }
 
 /* ---------- Operasional: kategori (induk) & baris rincian ---------- */
