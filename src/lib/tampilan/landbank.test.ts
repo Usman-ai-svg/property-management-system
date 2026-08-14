@@ -2,6 +2,8 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import {
   biayaPerolehan,
+  kelompokKuartal,
+  kuartalPeriode,
   luasTotal,
   rataRasioEfektif,
   ringkasRencana,
@@ -54,8 +56,15 @@ describe("totalKategoriHpp", () => {
 });
 
 describe("totalKategoriOps", () => {
-  it("menjumlahkan nilai tiap baris", () => {
-    assert.equal(totalKategoriOps([{ nilai: 200 }, { nilai: 100 }]), 300);
+  it("menjumlahkan volume × harga tiap baris (ala RAB)", () => {
+    assert.equal(
+      totalKategoriOps([{ volume: 12, harga: 20 }, { volume: 1, harga: 60 }]),
+      300,
+    );
+  });
+
+  it("nol untuk kategori tanpa baris", () => {
+    assert.equal(totalKategoriOps([]), 0);
   });
 });
 
@@ -65,8 +74,8 @@ describe("ringkasRencana", () => {
     omzet: [{ hargaDasar: 1200 }, { hargaDasar: 800 }],
     // HPP = Σ (volume × harga) baris tiap kategori.
     hpp: [{ rows: [{ volume: 1, harga: 500 }, { volume: 1, harga: 300 }] }],
-    // Operasional = Σ nilai baris tiap kategori.
-    operasional: [{ rows: [{ nilai: 200 }] }, { rows: [{ nilai: 100 }] }],
+    // Operasional = Σ (volume × harga) baris tiap kategori.
+    operasional: [{ rows: [{ volume: 2, harga: 100 }] }, { rows: [{ volume: 1, harga: 100 }] }],
   };
 
   it("omzet = jumlah harga dasar seluruh unit", () => {
@@ -161,5 +170,63 @@ describe("rataRasioEfektif", () => {
 
   it("nol untuk daftar kosong, bukan NaN", () => {
     assert.equal(rataRasioEfektif([]), 0);
+  });
+});
+
+describe("kuartalPeriode", () => {
+  it("memetakan bulan ke kuartal 1..4", () => {
+    assert.deepEqual(kuartalPeriode("2025-01"), { tahun: 2025, kuartal: 1 });
+    assert.deepEqual(kuartalPeriode("2025-03"), { tahun: 2025, kuartal: 1 });
+    assert.deepEqual(kuartalPeriode("2025-04"), { tahun: 2025, kuartal: 2 });
+    assert.deepEqual(kuartalPeriode("2025-09"), { tahun: 2025, kuartal: 3 });
+    assert.deepEqual(kuartalPeriode("2025-12"), { tahun: 2025, kuartal: 4 });
+  });
+});
+
+describe("kelompokKuartal", () => {
+  const data = [
+    { periode: "2025-02", masuk: 100, keluar: 40 }, // Q1 2025
+    { periode: "2025-05", masuk: 200, keluar: 250 }, // Q2 2025
+    { periode: "2025-06", masuk: 300, keluar: 100 }, // Q2 2025
+    { periode: "2026-01", masuk: 500, keluar: 300 }, // Q1 2026
+  ];
+
+  it("mengelompokkan per tahun lalu per kuartal", () => {
+    const g = kelompokKuartal(data);
+    assert.equal(g.length, 2);
+    assert.equal(g[0].tahun, 2025);
+    assert.deepEqual(g[0].kuartal.map((q) => q.kuartal), [1, 2]);
+    assert.equal(g[1].tahun, 2026);
+    assert.deepEqual(g[1].kuartal.map((q) => q.kuartal), [1]);
+  });
+
+  it("menjumlah subtotal kuartal dari baris di bawahnya", () => {
+    const q2 = kelompokKuartal(data)[0].kuartal[1];
+    assert.equal(q2.bulan.length, 2);
+    assert.equal(q2.masuk, 500);
+    assert.equal(q2.keluar, 350);
+    assert.equal(q2.net, 150);
+  });
+
+  it("subtotal tahun = jumlah kuartalnya", () => {
+    const t2025 = kelompokKuartal(data)[0];
+    assert.equal(t2025.masuk, 600);
+    assert.equal(t2025.keluar, 390);
+    assert.equal(t2025.net, 210);
+  });
+
+  it("kumulatif net berjalan lintas kuartal & tahun", () => {
+    const g = kelompokKuartal(data);
+    // 60, lalu 60-50=10, lalu 10+200=210 (akhir 2025), lalu 210+200=410 (2026).
+    assert.equal(g[0].kuartal[0].bulan[0].kumulatif, 60);
+    assert.equal(g[0].kumulatifAkhir, 210);
+    assert.equal(g[1].kumulatifAkhir, 410);
+  });
+
+  it("mengurutkan periode kronologis lebih dulu, tak bergantung urutan masukan", () => {
+    const acak = [data[3], data[1], data[0], data[2]];
+    const g = kelompokKuartal(acak);
+    assert.deepEqual(g.map((t) => t.tahun), [2025, 2026]);
+    assert.equal(g[0].kumulatifAkhir, 210);
   });
 });

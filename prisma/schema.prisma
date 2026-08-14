@@ -1071,12 +1071,16 @@ model BpOperasionalItem {
   @@map("bp_operasional_items")
 }
 
-/// Baris rincian sebuah kategori operasional (mis. gaji, bonus, THR).
+/// Baris rincian sebuah kategori operasional, kini ala RAB seperti BpHppRow:
+/// uraian (nama), satuan, volume, harga. Nilai baris = volume × harga;
+/// total kategori = Σ baris. Mis. "Gaji staf · 12 bulan × Rp 20 jt".
 model BpOperasionalRow {
   id                String @id @default(cuid())
   operasionalItemId String
   nama              String
-  nilai             Float
+  satuan            String
+  volume            Float
+  harga             Float
   urutan            Int    @default(0)
 
   operasionalItem BpOperasionalItem @relation(fields: [operasionalItemId], references: [id], onDelete: Cascade)

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { BarisField, Field, FieldTerkunci, FormModal, TombolHapus, TombolIkon, TombolTambah } from "@/components/form";
 import {
   hapusBarisHpp, hapusBarisOperasional, hapusCashflow, hapusKategoriHpp,
@@ -22,7 +23,49 @@ import { rp } from "@/lib/format";
 const CATATAN_RENCANA =
   "Business plan adalah rencana, bukan realisasi. Mengubahnya tidak menyentuh transaksi yang sudah tercatat — yang bergeser hanya pembandingnya di Plan vs Realisasi.";
 
-/* ---------- HPP: kategori (induk) & baris rincian ---------- */
+const KATEGORI_BARU = "__baru__";
+
+/**
+ * Pemilih kategori untuk sebuah baris — meniru kolom "Grup" pada tabel RAB.
+ *
+ * Kategori tak lagi punya tombol tambah/ubah sendiri: dibuat langsung dari sini
+ * dengan memilih "＋ Kategori baru…", dan sebuah baris bisa dipindah antar
+ * kategori hanya dengan mengganti pilihannya. Nilai `kategori` yang terkirim
+ * adalah id kategori, atau sentinel `__baru__` disertai `kategoriBaru`.
+ */
+function PilihKategori({
+  pilihan,
+  terpilih,
+}: {
+  pilihan: { id: string; nama: string }[];
+  terpilih?: string;
+}) {
+  const [val, setVal] = useState(terpilih ?? pilihan[0]?.id ?? KATEGORI_BARU);
+  return (
+    <>
+      <BarisField kolom={1}>
+        <div>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+            Kategori<span style={{ color: "var(--red)" }}> *</span>
+          </label>
+          <select name="kategori" className="inp" value={val} onChange={(e) => setVal(e.target.value)}>
+            {pilihan.map((k) => (
+              <option key={k.id} value={k.id}>{k.nama}</option>
+            ))}
+            <option value={KATEGORI_BARU}>＋ Kategori baru…</option>
+          </select>
+        </div>
+      </BarisField>
+      {val === KATEGORI_BARU && (
+        <BarisField kolom={1}>
+          <Field label="Nama Kategori Baru" nama="kategoriBaru" wajib petunjuk="mis. Konstruksi Rumah — nama ini yang mencocokkan realisasi" />
+        </BarisField>
+      )}
+    </>
+  );
+}
+
+/* ---------- HPP: baris rincian (kategori dipilih di dalam form) ---------- */
 
 export function FormKategoriHpp({
   businessPlanId,
@@ -63,10 +106,14 @@ export function HapusKategoriHpp({ id, nama }: { id: string; nama: string }) {
 }
 
 export function FormBarisHpp({
-  hppItemId,
+  businessPlanId,
+  pilihanKategori,
+  kategoriTerpilih,
   baris,
 }: {
-  hppItemId: string;
+  businessPlanId: string;
+  pilihanKategori: { id: string; nama: string }[];
+  kategoriTerpilih?: string;
   baris?: { id: string; uraian: string; satuan: string; volume: number; harga: number };
 }) {
   return (
@@ -84,13 +131,14 @@ export function FormBarisHpp({
       }
     >
       <input type="hidden" name="id" value={baris?.id ?? ""} />
-      <input type="hidden" name="hppItemId" value={hppItemId} />
+      <input type="hidden" name="businessPlanId" value={businessPlanId} />
+      <PilihKategori pilihan={pilihanKategori} terpilih={kategoriTerpilih} />
       <BarisField kolom={1}>
         <Field label="Uraian" nama="uraian" nilai={baris?.uraian} wajib petunjuk="mis. Pekerjaan struktur & pondasi" />
       </BarisField>
       <BarisField kolom={3}>
-        <Field label="Satuan" nama="satuan" nilai={baris?.satuan} wajib petunjuk="mis. m², ls, unit" />
         <Field label="Volume" nama="volume" nilai={baris?.volume ?? 0} tipe="number" wajib />
+        <Field label="Satuan" nama="satuan" nilai={baris?.satuan} wajib petunjuk="mis. m², ls, unit" />
         <Field label="Harga Satuan" nama="harga" nilai={baris?.harga ?? 0} tipe="number" satuan="Rp" wajib />
       </BarisField>
     </FormModal>
@@ -181,11 +229,15 @@ export function HapusKategoriOperasional({ id, nama }: { id: string; nama: strin
 }
 
 export function FormBarisOperasional({
-  operasionalItemId,
+  businessPlanId,
+  pilihanKategori,
+  kategoriTerpilih,
   baris,
 }: {
-  operasionalItemId: string;
-  baris?: { id: string; nama: string; nilai: number };
+  businessPlanId: string;
+  pilihanKategori: { id: string; nama: string }[];
+  kategoriTerpilih?: string;
+  baris?: { id: string; nama: string; satuan: string; volume: number; harga: number };
 }) {
   return (
     <FormModal
@@ -202,12 +254,15 @@ export function FormBarisOperasional({
       }
     >
       <input type="hidden" name="id" value={baris?.id ?? ""} />
-      <input type="hidden" name="operasionalItemId" value={operasionalItemId} />
+      <input type="hidden" name="businessPlanId" value={businessPlanId} />
+      <PilihKategori pilihan={pilihanKategori} terpilih={kategoriTerpilih} />
       <BarisField kolom={1}>
-        <Field label="Uraian" nama="nama" nilai={baris?.nama} wajib petunjuk="mis. Gaji, Bonus, THR" />
+        <Field label="Uraian" nama="nama" nilai={baris?.nama} wajib petunjuk="mis. Gaji staf, Komisi agen, Iklan" />
       </BarisField>
-      <BarisField kolom={1}>
-        <Field label="Anggaran" nama="nilai" nilai={baris?.nilai ?? 0} tipe="number" satuan="Rp" wajib />
+      <BarisField kolom={3}>
+        <Field label="Volume" nama="volume" nilai={baris?.volume ?? 0} tipe="number" wajib />
+        <Field label="Satuan" nama="satuan" nilai={baris?.satuan} wajib petunjuk="mis. bulan, ls, orang" />
+        <Field label="Harga Satuan" nama="harga" nilai={baris?.harga ?? 0} tipe="number" satuan="Rp" wajib />
       </BarisField>
     </FormModal>
   );

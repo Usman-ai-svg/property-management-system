@@ -93,7 +93,8 @@ async function unitPembayaran(unitId: string) {
 export async function simpanPembayaranJual(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
   return jalankan(async () => {
     const id = String(form.get("id") ?? "").trim();
-    const uraian = teks(form, "uraian", true);
+    // Keterangan opsional pada form pencairan terpusat; beri default yang informatif.
+    const uraian = String(form.get("uraian") ?? "").trim() || "Pencairan penjualan";
     const nominal = angka(form, "nominal", { min: 1, wajib: true });
 
     const isiTanggal = String(form.get("tanggal") ?? "").trim();

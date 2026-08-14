@@ -690,7 +690,7 @@ async function main() {
         operasional: {
           create: P.bplan.operasional.map((o, i) => ({
             nama: o.kategori, urutan: i,
-            rows: { create: o.rows.map((r, k) => ({ nama: r.nama, nilai: r.v, urutan: k })) },
+            rows: { create: o.rows.map((r, k) => ({ nama: r.nama, satuan: r.sat, volume: r.vol, harga: r.harga, urutan: k })) },
           })),
         },
         cashflow: { create: P.bplan.cashflow.map((c, i) => ({ periode: c.periode, masuk: c.masuk, keluar: c.keluar, urutan: i })) },

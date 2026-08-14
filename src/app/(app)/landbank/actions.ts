@@ -101,14 +101,36 @@ export async function hapusKategoriHpp(_s: HasilAksi | null, form: FormData): Pr
   });
 }
 
-/** Cari businessPlanId dari sebuah kategori HPP, sekaligus periksa izinnya. */
-async function planKategoriHpp(hppItemId: string) {
-  const kategori = await prisma.bpHppItem.findUnique({
-    where: { id: hppItemId }, select: { id: true, nama: true, businessPlanId: true },
+/**
+ * Tentukan kategori HPP tujuan sebuah baris dari form.
+ *
+ * Meniru kolom "Grup" pada RAB: form mengirim `kategori` = id kategori yang
+ * sudah ada, atau sentinel `__baru__` disertai `kategoriBaru`. Kategori baru
+ * dibuat di sini (find-or-create by nama) — jadi tak perlu tombol "Tambah
+ * Kategori" tersendiri, dan sebuah baris bisa dipindah antar kategori hanya
+ * dengan mengganti pilihannya.
+ */
+async function resolveKategoriHpp(form: FormData, businessPlanId: string) {
+  const pilih = teks(form, "kategori", true);
+  if (pilih !== "__baru__") {
+    const k = await prisma.bpHppItem.findUnique({
+      where: { id: pilih }, select: { id: true, nama: true, businessPlanId: true },
+    });
+    if (!k || k.businessPlanId !== businessPlanId) {
+      throw new GagalIzin("Kategori HPP tidak ditemukan pada rencana ini.");
+    }
+    return { id: k.id, nama: k.nama, baru: false };
+  }
+  const nama = teks(form, "kategoriBaru", true);
+  const ada = await prisma.bpHppItem.findFirst({
+    where: { businessPlanId, nama }, select: { id: true, nama: true },
   });
-  if (!kategori) throw new GagalIzin("Kategori HPP tidak ditemukan.");
-  const { plan, pengguna } = await planProyek(kategori.businessPlanId);
-  return { kategori, plan, pengguna };
+  if (ada) return { id: ada.id, nama: ada.nama, baru: false };
+  const urutan = await prisma.bpHppItem.count({ where: { businessPlanId } });
+  const dibuat = await prisma.bpHppItem.create({
+    data: { businessPlanId, nama, urutan }, select: { id: true, nama: true },
+  });
+  return { id: dibuat.id, nama: dibuat.nama, baru: true };
 }
 
 export async function simpanBarisHpp(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
@@ -119,6 +141,9 @@ export async function simpanBarisHpp(_s: HasilAksi | null, form: FormData): Prom
     const volume = angka(form, "volume", { min: 0, wajib: true });
     const harga = angka(form, "harga", { min: 0, wajib: true });
 
+    const { plan, pengguna } = await planProyek(teks(form, "businessPlanId", true));
+    const kat = await resolveKategoriHpp(form, plan.id);
+
     if (id) {
       const lama = await prisma.bpHppRow.findUnique({
         where: { id },
@@ -127,31 +152,30 @@ export async function simpanBarisHpp(_s: HasilAksi | null, form: FormData): Prom
           hppItem: { select: { nama: true, businessPlanId: true } },
         },
       });
-      if (!lama) throw new GagalIzin("Baris HPP tidak ditemukan.");
-      const { plan, pengguna } = await planProyek(lama.hppItem.businessPlanId);
+      if (!lama || lama.hppItem.businessPlanId !== plan.id) throw new GagalIzin("Baris HPP tidak ditemukan.");
 
-      await prisma.bpHppRow.update({ where: { id }, data: { uraian, satuan, volume, harga } });
+      await prisma.bpHppRow.update({ where: { id }, data: { uraian, satuan, volume, harga, hppItemId: kat.id } });
       const jml = await catatDiff({
         pengguna, projectId: plan.projectId,
-        objek: `Business Plan · HPP ${lama.hppItem.nama} · ${lama.uraian}`,
-        sebelum: lama, sesudah: { uraian, satuan, volume, harga },
-        label: { uraian: "Uraian", satuan: "Satuan", volume: "Volume", harga: "Harga" },
+        objek: `Business Plan · HPP · ${lama.uraian}`,
+        sebelum: { kategori: lama.hppItem.nama, uraian: lama.uraian, satuan: lama.satuan, volume: lama.volume, harga: lama.harga },
+        sesudah: { kategori: kat.nama, uraian, satuan, volume, harga },
+        label: { kategori: "Kategori", uraian: "Uraian", satuan: "Satuan", volume: "Volume", harga: "Harga" },
         format: { harga: (v) => rpLog(Number(v)) },
       });
       segarkan(plan.project.kode);
       return jml === 0 ? "Tidak ada yang berubah." : `${jml} perubahan tersimpan.`;
     }
 
-    const { kategori, plan, pengguna } = await planKategoriHpp(teks(form, "hppItemId", true));
-    const urutan = await prisma.bpHppRow.count({ where: { hppItemId: kategori.id } });
+    const urutan = await prisma.bpHppRow.count({ where: { hppItemId: kat.id } });
     await prisma.bpHppRow.create({
-      data: { hppItemId: kategori.id, uraian, satuan, volume, harga, urutan },
+      data: { hppItemId: kat.id, uraian, satuan, volume, harga, urutan },
     });
 
     await catat({
       pengguna, projectId: plan.projectId,
-      objek: `Business Plan · HPP ${kategori.nama}`,
-      aksi: "Tambah baris HPP",
+      objek: `Business Plan · HPP ${kat.nama}`,
+      aksi: kat.baru ? "Tambah baris HPP (kategori baru)" : "Tambah baris HPP",
       ke: `${uraian} — ${volume} ${satuan} × ${rpLog(harga)}`,
     });
     segarkan(plan.project.kode);
@@ -358,56 +382,78 @@ export async function hapusKategoriOperasional(_s: HasilAksi | null, form: FormD
   });
 }
 
-/** Cari businessPlanId dari sebuah kategori operasional, periksa izinnya. */
-async function planKategoriOps(operasionalItemId: string) {
-  const kategori = await prisma.bpOperasionalItem.findUnique({
-    where: { id: operasionalItemId }, select: { id: true, nama: true, businessPlanId: true },
+/**
+ * Tentukan kategori operasional tujuan sebuah baris dari form — sama polanya
+ * dengan `resolveKategoriHpp`. Bila kategori baru dibuat, namanya langsung
+ * menjadi kunci pencocokan biaya operasional yang dicatat (OperationalCost.kategori).
+ */
+async function resolveKategoriOps(form: FormData, businessPlanId: string) {
+  const pilih = teks(form, "kategori", true);
+  if (pilih !== "__baru__") {
+    const k = await prisma.bpOperasionalItem.findUnique({
+      where: { id: pilih }, select: { id: true, nama: true, businessPlanId: true },
+    });
+    if (!k || k.businessPlanId !== businessPlanId) {
+      throw new GagalIzin("Kategori operasional tidak ditemukan pada rencana ini.");
+    }
+    return { id: k.id, nama: k.nama, baru: false };
+  }
+  const nama = teks(form, "kategoriBaru", true);
+  const ada = await prisma.bpOperasionalItem.findFirst({
+    where: { businessPlanId, nama }, select: { id: true, nama: true },
   });
-  if (!kategori) throw new GagalIzin("Kategori operasional tidak ditemukan.");
-  const { plan, pengguna } = await planProyek(kategori.businessPlanId);
-  return { kategori, plan, pengguna };
+  if (ada) return { id: ada.id, nama: ada.nama, baru: false };
+  const urutan = await prisma.bpOperasionalItem.count({ where: { businessPlanId } });
+  const dibuat = await prisma.bpOperasionalItem.create({
+    data: { businessPlanId, nama, urutan }, select: { id: true, nama: true },
+  });
+  return { id: dibuat.id, nama: dibuat.nama, baru: true };
 }
 
 export async function simpanBarisOperasional(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
   return jalankan(async () => {
     const id = String(form.get("id") ?? "").trim();
     const nama = teks(form, "nama", true);
-    const nilai = angka(form, "nilai", { min: 0, wajib: true });
+    const satuan = teks(form, "satuan", true);
+    const volume = angka(form, "volume", { min: 0, wajib: true });
+    const harga = angka(form, "harga", { min: 0, wajib: true });
+
+    const { plan, pengguna } = await planProyek(teks(form, "businessPlanId", true));
+    const kat = await resolveKategoriOps(form, plan.id);
 
     if (id) {
       const lama = await prisma.bpOperasionalRow.findUnique({
         where: { id },
         select: {
-          id: true, nama: true, nilai: true,
+          id: true, nama: true, satuan: true, volume: true, harga: true,
           operasionalItem: { select: { nama: true, businessPlanId: true } },
         },
       });
-      if (!lama) throw new GagalIzin("Baris operasional tidak ditemukan.");
-      const { plan, pengguna } = await planProyek(lama.operasionalItem.businessPlanId);
+      if (!lama || lama.operasionalItem.businessPlanId !== plan.id) throw new GagalIzin("Baris operasional tidak ditemukan.");
 
-      await prisma.bpOperasionalRow.update({ where: { id }, data: { nama, nilai } });
+      await prisma.bpOperasionalRow.update({ where: { id }, data: { nama, satuan, volume, harga, operasionalItemId: kat.id } });
       const jml = await catatDiff({
         pengguna, projectId: plan.projectId,
-        objek: `Business Plan · Operasional ${lama.operasionalItem.nama} · ${lama.nama}`,
-        sebelum: lama, sesudah: { nama, nilai },
-        label: { nama: "Uraian", nilai: "Anggaran" },
-        format: { nilai: (v) => rpLog(Number(v)) },
+        objek: `Business Plan · Operasional · ${lama.nama}`,
+        sebelum: { kategori: lama.operasionalItem.nama, nama: lama.nama, satuan: lama.satuan, volume: lama.volume, harga: lama.harga },
+        sesudah: { kategori: kat.nama, nama, satuan, volume, harga },
+        label: { kategori: "Kategori", nama: "Uraian", satuan: "Satuan", volume: "Volume", harga: "Harga" },
+        format: { harga: (v) => rpLog(Number(v)) },
       });
       segarkan(plan.project.kode);
       return jml === 0 ? "Tidak ada yang berubah." : `${jml} perubahan tersimpan.`;
     }
 
-    const { kategori, plan, pengguna } = await planKategoriOps(teks(form, "operasionalItemId", true));
-    const urutan = await prisma.bpOperasionalRow.count({ where: { operasionalItemId: kategori.id } });
+    const urutan = await prisma.bpOperasionalRow.count({ where: { operasionalItemId: kat.id } });
     await prisma.bpOperasionalRow.create({
-      data: { operasionalItemId: kategori.id, nama, nilai, urutan },
+      data: { operasionalItemId: kat.id, nama, satuan, volume, harga, urutan },
     });
 
     await catat({
       pengguna, projectId: plan.projectId,
-      objek: `Business Plan · Operasional ${kategori.nama}`,
-      aksi: "Tambah baris operasional",
-      ke: `${nama} — ${rpLog(nilai)}`,
+      objek: `Business Plan · Operasional ${kat.nama}`,
+      aksi: kat.baru ? "Tambah baris operasional (kategori baru)" : "Tambah baris operasional",
+      ke: `${nama} — ${volume} ${satuan} × ${rpLog(harga)}`,
     });
     segarkan(plan.project.kode);
   });
@@ -419,7 +465,7 @@ export async function hapusBarisOperasional(_s: HasilAksi | null, form: FormData
     const lama = await prisma.bpOperasionalRow.findUnique({
       where: { id },
       select: {
-        id: true, nama: true, nilai: true,
+        id: true, nama: true, satuan: true, volume: true, harga: true,
         operasionalItem: { select: { nama: true, businessPlanId: true } },
       },
     });
@@ -432,7 +478,7 @@ export async function hapusBarisOperasional(_s: HasilAksi | null, form: FormData
       pengguna, projectId: plan.projectId,
       objek: `Business Plan · Operasional ${lama.operasionalItem.nama}`,
       aksi: "Hapus baris operasional",
-      dari: `${lama.nama} — ${rpLog(lama.nilai)}`,
+      dari: `${lama.nama} — ${lama.volume} ${lama.satuan} × ${rpLog(lama.harga)}`,
       ke: "dihapus",
     });
     segarkan(plan.project.kode);

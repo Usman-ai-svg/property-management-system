@@ -1,10 +1,110 @@
 "use client";
 
-import { useActionState, useEffect, useId, useRef, useState } from "react";
+import { createContext, useActionState, useContext, useEffect, useId, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { AlertTriangle, Pencil, Plus, Trash2, X } from "lucide-react";
+import { AlertTriangle, MoreVertical, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { HasilAksi } from "@/lib/actions/guard";
 import { useToast } from "@/components/toast";
+
+// ---------------------------------------------------------------------------
+// Menu aksi (⋮) — meringkas kolom aksi tabel
+// ---------------------------------------------------------------------------
+
+/**
+ * Konteks "sedang di dalam menu ⋮". Dibaca oleh TombolIkon & TombolHapus supaya
+ * mereka tampil sebagai baris menu berlabel (bukan ikon telanjang) saat berada
+ * di dalam `MenuAksi`. Dengan begitu semua tombol aksi yang sudah ada otomatis
+ * ikut rapi tanpa menyentuh tiap pemakainya.
+ */
+const KonteksMenu = createContext<{ dalamMenu: boolean; tutupMenu?: () => void }>({ dalamMenu: false });
+
+const gayaMenuItem: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 8, width: "100%",
+  background: "none", border: "none", cursor: "pointer", textAlign: "left",
+  padding: "7px 10px", borderRadius: 7, fontSize: 12.5, fontFamily: "inherit",
+  color: "var(--text)", lineHeight: 1.35,
+};
+
+const soroti = {
+  onMouseEnter: (e: React.MouseEvent<HTMLElement>) => (e.currentTarget.style.background = "var(--rona-abu)"),
+  onMouseLeave: (e: React.MouseEvent<HTMLElement>) => (e.currentTarget.style.background = "none"),
+};
+
+/**
+ * Kolom aksi yang diringkas jadi satu tombol ⋮ dengan popover berisi
+ * Ubah/Hapus (dan aksi lain). Popover memakai `position: fixed` supaya tidak
+ * terpotong oleh area gulir tabel; ditutup lewat klik luar, Escape, atau gulir.
+ * Menu SENGAJA dibiarkan terbuka di belakang saat sebuah modal muncul — modal
+ * itu anak dari popover ini, jadi menutup popover akan membuang modalnya.
+ */
+export function MenuAksi({ children }: { children: React.ReactNode }) {
+  const [buka, setBuka] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!buka) return;
+    const tutupLuar = (e: MouseEvent) => {
+      if (ref.current?.contains(e.target as Node) || btnRef.current?.contains(e.target as Node)) return;
+      setBuka(false);
+    };
+    const gulir = () => setBuka(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setBuka(false);
+    document.addEventListener("mousedown", tutupLuar);
+    document.addEventListener("scroll", gulir, true);
+    document.addEventListener("keydown", esc);
+    window.addEventListener("resize", gulir);
+    return () => {
+      document.removeEventListener("mousedown", tutupLuar);
+      document.removeEventListener("scroll", gulir, true);
+      document.removeEventListener("keydown", esc);
+      window.removeEventListener("resize", gulir);
+    };
+  }, [buka]);
+
+  const toggle = () => {
+    if (buka) return setBuka(false);
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 4, left: r.right });
+    setBuka(true);
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={toggle}
+        aria-label="Aksi lainnya"
+        title="Aksi"
+        style={{
+          background: buka ? "var(--rona-abu)" : "none", border: "none", cursor: "pointer",
+          padding: 4, display: "inline-grid", placeItems: "center", color: "var(--muted)", borderRadius: 6,
+        }}
+      >
+        <MoreVertical size={15} />
+      </button>
+      {buka && pos && (
+        <div
+          ref={ref}
+          role="menu"
+          style={{
+            position: "fixed", top: pos.top, left: pos.left, transform: "translateX(-100%)",
+            zIndex: 55, minWidth: 180, maxWidth: 300,
+            background: "var(--card, #fff)", border: "1px solid var(--line)", borderRadius: 10,
+            boxShadow: "0 10px 28px rgba(0,0,0,.16)", padding: 5,
+            display: "flex", flexDirection: "column", gap: 1,
+          }}
+        >
+          <KonteksMenu.Provider value={{ dalamMenu: true, tutupMenu: () => setBuka(false) }}>
+            {children}
+          </KonteksMenu.Provider>
+        </div>
+      )}
+    </>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Kolom isian
@@ -176,6 +276,19 @@ export function TombolIkon({
   judul: string;
   jenis?: "ubah" | "hapus";
 }) {
+  const menu = useContext(KonteksMenu);
+
+  // Di dalam MenuAksi: tampil sebagai baris menu berlabel. Modalnya tetap
+  // dibuka (onClick), menu dibiarkan terbuka di belakang modal.
+  if (menu.dalamMenu) {
+    return (
+      <button type="button" onClick={onClick} style={{ ...gayaMenuItem, color: jenis === "hapus" ? "var(--red)" : "var(--text)" }} {...soroti}>
+        {jenis === "hapus" ? <Trash2 size={13} /> : <Pencil size={13} />}
+        <span>{judul}</span>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -433,6 +546,7 @@ export function TombolHapus({
 }) {
   const [siap, setSiap] = useState(false);
   const [hasil, kirim] = useActionState(aksi, null);
+  const menu = useContext(KonteksMenu);
 
   useEffect(() => {
     if (!siap) return;
@@ -447,18 +561,22 @@ export function TombolHapus({
   }, [hasil]);
 
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+    <span style={{ display: menu.dalamMenu ? "block" : "inline-flex", alignItems: "center", gap: 6 }}>
       {siap ? (
-        <form action={kirim} style={{ display: "inline" }}>
+        <form action={kirim} style={{ display: menu.dalamMenu ? "block" : "inline" }}>
           <input type="hidden" name="id" value={id} />
           <button
             type="submit"
-            style={{
-              background: "var(--red)", color: "#fff", border: "none", borderRadius: 6,
-              fontSize: 11, fontWeight: 600, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit",
-            }}
+            style={
+              menu.dalamMenu
+                ? { ...gayaMenuItem, color: "#fff", background: "var(--red)", fontWeight: 600 }
+                : {
+                    background: "var(--red)", color: "#fff", border: "none", borderRadius: 6,
+                    fontSize: 11, fontWeight: 600, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit",
+                  }
+            }
           >
-            Yakin?
+            {menu.dalamMenu ? `Yakin hapus ${nama}?` : "Yakin?"}
           </button>
         </form>
       ) : (

@@ -49,7 +49,7 @@ export async function dataLandbank(u: Pengguna) {
       select: {
         projectId: true,
         hpp: { select: { rows: { select: { volume: true, harga: true } } } },
-        operasional: { select: { rows: { select: { nilai: true } } } },
+        operasional: { select: { rows: { select: { volume: true, harga: true } } } },
       },
     }),
     prisma.unit.findMany({
@@ -169,7 +169,7 @@ export async function businessPlanProyek(projectId: string) {
           id: true, nama: true, urutan: true,
           rows: {
             orderBy: { urutan: "asc" },
-            select: { id: true, nama: true, nilai: true },
+            select: { id: true, nama: true, satuan: true, volume: true, harga: true },
           },
         },
       },

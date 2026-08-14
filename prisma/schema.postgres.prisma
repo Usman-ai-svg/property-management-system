@@ -7,7 +7,7 @@
 // Yang sudah dikerjakan:
 //   - provider postgresql
 //   - 48 kolom uang jadi Decimal(18, 2)
-//   - 29 kolom Float BUKAN uang dibiarkan (volume, luas, persentase)
+//   - 30 kolom Float BUKAN uang dibiarkan (volume, luas, persentase)
 //   - 60 tabel diberi awalan "pm_" pada @@map yang sudah ada
 //
 // Yang masih harus dikerjakan manusia:
@@ -1087,12 +1087,16 @@ model BpOperasionalItem {
   @@map("pm_bp_operasional_items")
 }
 
-/// Baris rincian sebuah kategori operasional (mis. gaji, bonus, THR).
+/// Baris rincian sebuah kategori operasional, kini ala RAB seperti BpHppRow:
+/// uraian (nama), satuan, volume, harga. Nilai baris = volume × harga;
+/// total kategori = Σ baris. Mis. "Gaji staf · 12 bulan × Rp 20 jt".
 model BpOperasionalRow {
   id                String @id @default(cuid())
   operasionalItemId String
   nama              String
-  nilai             Decimal @db.Decimal(18, 2)
+  satuan            String
+  volume            Float
+  harga             Decimal @db.Decimal(18, 2)
   urutan            Int    @default(0)
 
   operasionalItem BpOperasionalItem @relation(fields: [operasionalItemId], references: [id], onDelete: Cascade)

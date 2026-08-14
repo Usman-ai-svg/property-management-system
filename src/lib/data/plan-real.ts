@@ -68,7 +68,7 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
       },
       operasional: {
         orderBy: { urutan: "asc" },
-        select: { id: true, nama: true, rows: { select: { nilai: true } } },
+        select: { id: true, nama: true, rows: { select: { volume: true, harga: true } } },
       },
     },
   });
@@ -122,7 +122,7 @@ export async function planVsRealisasi(u: Pengguna, kode: string) {
 
   const ops = rencana.operasional.map((o) => ({
     nama: o.nama,
-    plan: o.rows.reduce((s, r) => s + r.nilai, 0),
+    plan: o.rows.reduce((s, r) => s + r.volume * r.harga, 0),
     real: perKategori.get(o.nama) ?? 0,
   }));
 
