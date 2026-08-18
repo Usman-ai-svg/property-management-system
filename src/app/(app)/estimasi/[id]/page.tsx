@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { ambilPengguna, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
-import { detailRabEstimasi, objekProyek, vendorUntukPembanding } from "@/lib/data/estimasi";
+import { detailRabEstimasi, nomorSpkBerikutnya, objekProyek, vendorUntukPembanding } from "@/lib/data/estimasi";
 import { hargaSatuanDb, ringkasEstimasi } from "@/lib/tampilan/estimasi";
 import { rekapPemenang } from "@/lib/calc/tender";
 import { rp, tanggal } from "@/lib/format";
@@ -60,6 +60,9 @@ export default async function DetailRabEstimasi({ params }: { params: Promise<{ 
   const sudahBanding = new Set(vendors.map((v) => v.vendorId));
   const kandidat = semuaVendor.filter((v) => !sudahBanding.has(v.id));
   const objek = finalRab && bolehKontrak ? await objekProyek(estimasi.projectId) : { units: [], sarpras: [] };
+  const nomorSpk = finalRab && bolehKontrak
+    ? await nomorSpkBerikutnya(estimasi.project.kode)
+    : { K: "001", S: "001", tahun: new Date().getFullYear() };
 
   return (
     <div style={{ padding: 24 }}>
@@ -191,6 +194,8 @@ export default async function DetailRabEstimasi({ params }: { params: Promise<{ 
                           jumlahBaris={v.jumlahBaris}
                           nilai={v.total}
                           proyek={objek}
+                          projectKode={estimasi.project.kode}
+                          nomorBerikut={nomorSpk}
                         />
                       )}
                     </div>

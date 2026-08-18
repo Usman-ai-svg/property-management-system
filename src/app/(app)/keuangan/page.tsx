@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
 import { dataKeuangan, komposisi, pemasokUntukPembelian, pintuBayar, WARNA_JENIS } from "@/lib/data/keuangan";
-import { rp, rpRingkas, tanggal } from "@/lib/format";
+import { rp, tanggal } from "@/lib/format";
 import { RvsRAP } from "@/components/charts";
 import { TrenChart } from "@/components/tren-chart";
 import { BarisKpi, Kartu, TabelHead } from "@/components/ui";
@@ -144,7 +144,7 @@ export default async function DashboardKeuangan() {
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div className="num" style={{ fontSize: 12.5 }}>{rpRingkas(e.total)}</div>
+                  <div className="num" style={{ fontSize: 12.5 }}>{rp(e.total)}</div>
                   <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{tanggal(e.tanggal)}</div>
                 </div>
               </div>

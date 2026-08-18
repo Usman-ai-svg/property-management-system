@@ -116,8 +116,7 @@ export default async function ObjekVendorKonstruksi({
             { label: "Unit" },
             { label: "Fase" },
             { label: "Jenis" },
-            { label: "Baris BOQ", rata: "kanan" },
-            bolehHarga && { label: "Nilai BOQ", rata: "kanan" },
+            bolehHarga && { label: "Nilai Kontrak", rata: "kanan" },
             { label: "Progress Vendor", minLebar: 190 },
             { label: "Status" },
           ]}
@@ -138,9 +137,6 @@ export default async function ObjekVendorKonstruksi({
                 </td>
                 <td>{o.fase}</td>
                 <td style={{ color: "var(--muted)" }}>{o.keterangan}</td>
-                <td style={{ textAlign: "right" }}>
-                  {o.baris.length || <span style={{ color: "var(--muted)" }}>—</span>}
-                </td>
                 {bolehHarga && (
                   <td className="num" style={{ textAlign: "right" }}>
                     {nilai ? rp(nilai) : <span style={{ color: "var(--muted)" }}>—</span>}

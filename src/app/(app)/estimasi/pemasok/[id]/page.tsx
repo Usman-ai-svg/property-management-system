@@ -49,12 +49,12 @@ export default async function DetailPemasok({ params }: { params: Promise<{ id: 
         href="/estimasi/pemasok"
         style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--muted)", textDecoration: "none" }}
       >
-        <ArrowLeft size={14} /> Kembali ke Pemasok
+        <ArrowLeft size={14} /> Kembali ke Supplier
       </Link>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, marginTop: 8 }}>
         <div>
-          <div className="eyebrow">Master Proyek · Estimasi RAB · Pemasok</div>
+          <div className="eyebrow">Master Proyek · Estimasi RAB · Supplier</div>
           <h2 className="disp" style={{ margin: "4px 0 0", fontSize: 20 }}>{pemasok.nama}</h2>
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
             <Badge nilai={pemasok.kategori} peta={WARNA_KATEGORI} />
@@ -65,12 +65,24 @@ export default async function DetailPemasok({ params }: { params: Promise<{ id: 
 
       <Kartu atas={16} gaya={{ display: "flex", flexWrap: "wrap", gap: 24, fontSize: 12.5 }}>
         <div>
-          <div style={{ color: "var(--muted)", fontSize: 11 }}>Kontak</div>
-          <div>{pemasok.kontak || "—"}</div>
+          <div style={{ color: "var(--muted)", fontSize: 11 }}>Nama Kontak</div>
+          <div>{pemasok.kontakNama || "—"}</div>
+        </div>
+        <div>
+          <div style={{ color: "var(--muted)", fontSize: 11 }}>No. Telepon</div>
+          <div>{pemasok.kontakTelepon || "—"}</div>
         </div>
         <div>
           <div style={{ color: "var(--muted)", fontSize: 11 }}>Alamat</div>
           <div>{pemasok.alamat || "—"}</div>
+        </div>
+        <div>
+          <div style={{ color: "var(--muted)", fontSize: 11 }}>Kecamatan</div>
+          <div>{pemasok.kecamatan || "—"}</div>
+        </div>
+        <div>
+          <div style={{ color: "var(--muted)", fontSize: 11 }}>Provinsi</div>
+          <div>{pemasok.provinsi || "—"}</div>
         </div>
       </Kartu>
 
@@ -88,7 +100,7 @@ export default async function DetailPemasok({ params }: { params: Promise<{ id: 
         <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
           <div className="eyebrow">Penawaran Harga</div>
           <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>
-            Harga yang pernah ditawarkan pemasok ini atas harga dasar di pustaka.
+            Harga yang pernah ditawarkan supplier ini atas harga dasar di pustaka.
           </div>
         </div>
         <Tabel
@@ -96,7 +108,7 @@ export default async function DetailPemasok({ params }: { params: Promise<{ id: 
             { label: "Harga Dasar", minLebar: 220 }, { label: "Kategori" }, { label: "Harga", rata: "kanan" },
             { label: "Keterangan", minLebar: 160 }, { label: "Tanggal" },
           ]}
-          kosong="Belum ada penawaran dari pemasok ini."
+          kosong="Belum ada penawaran dari supplier ini."
         >
           {pemasok.penawaran.map((t) => (
             <tr key={t.id}>
@@ -123,7 +135,7 @@ export default async function DetailPemasok({ params }: { params: Promise<{ id: 
         (per proyek, dengan alur PO). Di sini hanya ditampilkan riwayatnya.
       </div>
       {pembelian.length === 0 ? (
-        <KartuKosong>Belum ada pembelian dari pemasok ini.</KartuKosong>
+        <KartuKosong>Belum ada pembelian dari supplier ini.</KartuKosong>
       ) : (
         pembelian.map((b) => (
           <Kartu key={b.id} atas={10} padding={0}>

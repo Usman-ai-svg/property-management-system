@@ -28,6 +28,11 @@ export interface AlokasiLike {
 export interface PengeluaranLike {
   total: number;
   alokasi: AlokasiLike[];
+  /**
+   * Dipakai HANYA untuk memilah biaya level proyek (alokasi tanpa unit/sarpras)
+   * ke sisi unit, sarpras, atau umum. Opsional: tanpa peruntukan → dihitung umum.
+   */
+  peruntukan?: string;
 }
 
 /**
@@ -73,8 +78,14 @@ export function alokasiKontrakSarprasTerbayar<
 export interface BiayaLangsung {
   perUnit: Map<string, number>;
   perSarpras: Map<string, number>;
-  /** Biaya yang tidak dibebankan ke unit mana pun: perijinan, pengolahan lahan. */
+  /** Total biaya yang tidak dibebankan ke unit/sarpras mana pun. */
   levelProyek: number;
+  /** Bagian level proyek berperuntukan Unit (belum dialokasi ke unit tertentu). */
+  levelUnit: number;
+  /** Bagian level proyek berperuntukan Prasarana & Sarana. */
+  levelSarpras: number;
+  /** Biaya level proyek umum: perijinan & ormas, pengolahan lahan. */
+  levelUmum: number;
 }
 
 /**
@@ -87,7 +98,11 @@ export interface BiayaLangsung {
 export function biayaLangsung(pengeluaran: PengeluaranLike[]): BiayaLangsung {
   const perUnit = new Map<string, number>();
   const perSarpras = new Map<string, number>();
-  let levelProyek = 0;
+  // Biaya level proyek dipilah menurut peruntukan pengeluarannya: sisi unit,
+  // sisi sarpras, atau umum (perijinan & pengolahan lahan yang bukan keduanya).
+  let levelUnit = 0;
+  let levelSarpras = 0;
+  let levelUmum = 0;
 
   for (const e of pengeluaran) {
     for (const a of e.alokasi) {
@@ -98,13 +113,24 @@ export function biayaLangsung(pengeluaran: PengeluaranLike[]): BiayaLangsung {
           a.infrastructureId,
           (perSarpras.get(a.infrastructureId) ?? 0) + a.nominal,
         );
+      } else if (e.peruntukan === "Prasarana & Sarana") {
+        levelSarpras += a.nominal;
+      } else if (e.peruntukan === "Unit (rumah dijual)") {
+        levelUnit += a.nominal;
       } else {
-        levelProyek += a.nominal;
+        levelUmum += a.nominal;
       }
     }
   }
 
-  return { perUnit, perSarpras, levelProyek };
+  return {
+    perUnit,
+    perSarpras,
+    levelProyek: levelUnit + levelSarpras + levelUmum,
+    levelUnit,
+    levelSarpras,
+    levelUmum,
+  };
 }
 
 /**

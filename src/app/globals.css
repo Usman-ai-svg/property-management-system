@@ -307,6 +307,14 @@ th {
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
+  /*
+   * Header lengket harus MENUTUPI isi tbody saat digulir. Tanpa z-index, elemen
+   * ber-`position` di dalam sel (mis. bar progres `.track`, marker) menang lapis
+   * karena tbody tampil setelah thead di DOM — bar terlihat menembus judul kolom.
+   * z-index 2 mengangkat header di atas isi biasa; kolom beku memakai 3 (thead
+   * .frz) agar sudut kiri-atas tetap paling atas.
+   */
+  z-index: 2;
   background: #fff;
   white-space: nowrap;
 }

@@ -80,12 +80,20 @@ async function isiBoqSpk(contractId: string, K: { nominal: number }) {
   const nilaiPerUnit = K.nominal / cakupan.length;
 
   // TEMPLATE BOQ SPK — satu untuk semua unit ("satu BOQ berlaku untuk tiap unit").
-  // Harga satuan dibulatkan lebih dulu supaya nilai sama persis dengan yang nanti
-  // dibaca aplikasi dari database.
+  // Tiap baris dibulatkan, KECUALI baris terakhir yang menyerap sisa pembulatan
+  // supaya total BOQ per unit sama PERSIS dengan `nilaiPerUnit`. Tanpa ini, sisa
+  // pembulatan tiap baris menumpuk dan "Nilai BOQ Terinci" jadi meleset beberapa
+  // ribu rupiah dari Nilai SPK — padahal keduanya harus sama.
   const template: { id: string; volume: number; hargaSatuan: number }[] = [];
   let urutan = 1;
-  for (const b of BOQ_SPK) {
-    const hargaSatuan = Math.round((nilaiPerUnit * b.bagian) / b.volume);
+  let akum = 0;
+  for (let i = 0; i < BOQ_SPK.length; i++) {
+    const b = BOQ_SPK[i];
+    const terakhir = i === BOQ_SPK.length - 1;
+    const hargaSatuan = terakhir
+      ? (nilaiPerUnit - akum) / b.volume
+      : Math.round((nilaiPerUnit * b.bagian) / b.volume);
+    akum += hargaSatuan * b.volume;
     const t = await prisma.contractBoqItem.create({
       data: { contractId, grup: b.grup, uraian: b.uraian, satuan: b.satuan, volume: b.volume, hargaSatuan, urutan: urutan++ },
     });
@@ -501,7 +509,7 @@ async function isiPembelianDanHutang(projectId: Map<string, string>) {
           peruntukan, jenis: "Material", metode: "Transfer",
           uraian: `${bayar >= total ? "Pembayaran" : "Uang muka"} PO ${po.nomor} — ${po.pemasok}`,
           total: bayar, status: bayar >= total ? "Lunas" : "DP",
-          posHpp: POS_HPP[peruntukan], pic: "Sistem",
+          posHpp: POS_HPP[peruntukan], pic: "Sinta Dewi",
           alokasi: { create: [{ unitId, infrastructureId: null, nominal: bayar }] },
         },
       });
@@ -523,7 +531,7 @@ async function isiPembelianDanHutang(projectId: Map<string, string>) {
         kreditur: h.pemasok, tenggat: tgl(h.tenggat)!,
         uraian: h.uraian, total: h.total,
         status: statusHutang(h.total, cicilan),
-        posHpp: POS_HPP[h.peruntukan as keyof typeof POS_HPP], pic: "Sistem",
+        posHpp: POS_HPP[h.peruntukan as keyof typeof POS_HPP], pic: "Sinta Dewi",
         alokasi: {
           create: [{
             unitId: keSarpras ? null : unitId,
@@ -538,7 +546,7 @@ async function isiPembelianDanHutang(projectId: Map<string, string>) {
       await prisma.hutangCicilan.create({
         data: {
           expenseId: exp.id, tanggal: tgl(h.tglCicilan ?? h.timbul)!,
-          nominal: cicilan, metode: "Transfer", pic: "Sistem",
+          nominal: cicilan, metode: "Transfer", pic: "Sinta Dewi",
         },
       });
       jmlCicilan++;
@@ -988,7 +996,7 @@ async function main() {
           total: r.nominal,
           status: "Lunas",
           posHpp: POS_HPP[peruntukan],
-          pic: "Sistem",
+          pic: "Sinta Dewi",
           alokasi: { create: porsi },
         },
       });

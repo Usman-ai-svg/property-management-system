@@ -10,7 +10,7 @@ import {
 } from "@/lib/tampilan/landbank";
 import { warnaSerapan } from "@/lib/tampilan/plan-realisasi";
 import { hargaAllIn, hargaPpn, m2, pct, periodeBulan, rp, tanggal } from "@/lib/format";
-import { Badge, CardHead, InfoRow, Kartu, TabelHead, Track, WARNA_STATUS } from "@/components/ui";
+import { Badge, CardHead, InfoRow, Kartu, TabelHead, WARNA_STATUS } from "@/components/ui";
 import { MenuAksi } from "@/components/form";
 import { FileRow } from "@/components/file-row";
 import { unggahRevisi } from "../../master/actions";
@@ -47,12 +47,21 @@ function RingkasBar({
   real: number;
   jenis: "rev" | "cost" | "pct";
 }) {
-  const rasio = plan ? real / plan : 0;
+  const rasio = plan ? real / plan : real > 0 ? 1 : 0;
   const baik = jenis === "cost" ? real <= plan : real >= plan;
-  const warna = baik ? "var(--green)" : jenis === "cost" ? "var(--red)" : "var(--amber)";
+  const warnaBaik = baik ? "var(--green)" : jenis === "cost" ? "var(--red)" : "var(--amber)";
   const fmt = (v: number) => (jenis === "pct" ? pct(v, 1) : rp(v));
   const selisih = real - plan;
   const Panah = baik ? ArrowUpRight : ArrowDownRight;
+
+  // Batang diverging: garis nol di tengah. Capaian positif tumbuh ke kanan,
+  // realisasi minus (rugi / margin negatif) tumbuh ke kiri dengan warna merah,
+  // jadi tak lagi tampak sebagai batang kosong. Lebar isi dibatasi ±100% dari
+  // tiap sisi, tetapi label persen selalu memakai nilai capaian sesungguhnya.
+  const minus = rasio < 0;
+  const isi = Math.max(-1, Math.min(1, rasio)); // fraksi lebar setengah-track
+  const warnaIsi = minus ? "var(--red)" : warnaBaik;
+  const pctCapaian = Math.round(rasio * 100);
 
   return (
     <div
@@ -62,7 +71,31 @@ function RingkasBar({
       }}
     >
       <div style={{ fontWeight: 600, fontSize: 13 }}>{label}</div>
-      <Track nilai={Math.min(Math.max(rasio, 0), 1) * 100} warna={warna} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            position: "relative", flex: 1, height: 22,
+            background: "var(--rona-abu)", borderRadius: 6, overflow: "hidden",
+          }}
+        >
+          {/* Garis nol — batas untung/rugi */}
+          <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "var(--line)", opacity: 0.6 }} />
+          {/* Isi capaian: ke kanan bila positif, ke kiri (merah) bila minus */}
+          <div
+            style={{
+              position: "absolute", top: 3, bottom: 3, borderRadius: 4, background: warnaIsi,
+              left: `${50 + Math.min(isi, 0) * 50}%`,
+              width: `${Math.abs(isi) * 50}%`,
+            }}
+          />
+        </div>
+        <span
+          className="num"
+          style={{ width: 52, flexShrink: 0, textAlign: "right", fontSize: 12, fontWeight: 700, color: minus ? "var(--red)" : "var(--text)" }}
+        >
+          {pctCapaian}%
+        </span>
+      </div>
       <div style={{ textAlign: "right", fontSize: 12 }}>
         <div className="num">
           <span style={{ fontWeight: 600 }}>{fmt(real)}</span>

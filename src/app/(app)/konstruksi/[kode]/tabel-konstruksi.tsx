@@ -43,6 +43,7 @@ export type VendorRow = {
   nominal: number;
   objek: number;
   progres: number;
+  status: string;
 };
 
 function BarProgress({ nilai, warna }: { nilai: number; warna: string }) {
@@ -166,7 +167,10 @@ export function TabelVendorKonstruksi({
       kunci={(c) => c.id}
       cari={(c) => `${c.kode} ${c.vendor} ${c.deskripsi}`}
       petunjukCari="Cari SPK / vendor / pekerjaan…"
-      filter={[{ label: "Vendor", ambil: (c) => c.vendor }]}
+      filter={[
+        { label: "Vendor", ambil: (c) => c.vendor },
+        { label: "Status", ambil: (c) => c.status },
+      ]}
       kosong="Tidak ada SPK yang cocok dengan saringan ini."
       kolom={[
         { label: "SPK" },
@@ -175,6 +179,7 @@ export function TabelVendorKonstruksi({
         bolehHarga && { label: "Nilai", rata: "kanan" },
         { label: "Objek", rata: "kanan" },
         { label: "Progress Vendor", minLebar: 190 },
+        { label: "Status" },
       ]}
       baris={(c) => (
         <tr>
@@ -191,6 +196,7 @@ export function TabelVendorKonstruksi({
           {bolehHarga && <td className="num" style={{ textAlign: "right" }}>{rp(c.nominal)}</td>}
           <td style={{ textAlign: "right" }}>{c.objek}</td>
           <td><BarProgress nilai={c.progres} warna="var(--brass)" /></td>
+          <td><Badge nilai={c.status} peta={WARNA_STATUS.vendor} /></td>
         </tr>
       )}
     />

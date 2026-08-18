@@ -21,7 +21,7 @@ export default async function EstimasiRab() {
     ["RAB Estimasi", `${kpi.jumlahRab} dokumen`],
     ["Total Nilai", rpRingkas(kpi.totalNilai)],
     ["Pustaka AHSP", `${kpi.jumlahAnalisa} analisa · ${kpi.jumlahHargaDasar} harga dasar`],
-    ["Pemasok Aktif", String(kpi.pemasokAktif)],
+    ["Supplier Aktif", String(kpi.pemasokAktif)],
   ];
 
   return (

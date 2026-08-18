@@ -68,18 +68,22 @@ export function KartuHutang({ hutang }: { hutang: BarisHutang[] }) {
         ];
       }}
       kosong="Tidak ada hutang berjalan."
+      // Lebar kolom dipatok agar tabel TIDAK bergeser saat baris tersaring
+      // berubah: dengan table-layout auto, lebar kolom dihitung ulang dari
+      // konten (subtotal grup & footer Total) tiap kali filter aktif. Kolom
+      // teks (Uraian/Proyek) dibiarkan membungkus mengisi sisa ruang.
       kolom={[
-        { label: "Uraian", minLebar: 220 },
-        { label: "Proyek" },
-        { label: "Tenggat", rata: "kanan" },
-        { label: "Hutang", rata: "kanan" },
-        { label: "Terbayar", rata: "kanan" },
-        { label: "Sisa", rata: "kanan" },
+        { label: "Uraian", minLebar: 240 },
+        { label: "Proyek", lebar: 160 },
+        { label: "Tenggat", rata: "kanan", lebar: 120 },
+        { label: "Hutang", rata: "kanan", lebar: 150 },
+        { label: "Terbayar", rata: "kanan", lebar: 150 },
+        { label: "Sisa", rata: "kanan", lebar: 150 },
       ]}
       baris={(h) => (
         <tr>
-          <td style={{ fontSize: 12.5 }}>{h.uraian}</td>
-          <td style={{ fontSize: 11.5, color: "var(--muted)" }}>{h.proyek}</td>
+          <td style={{ fontSize: 12.5, whiteSpace: "normal" }}>{h.uraian}</td>
+          <td style={{ fontSize: 11.5, color: "var(--muted)", whiteSpace: "normal" }}>{h.proyek}</td>
           <td
             style={{
               textAlign: "right", fontSize: 11, whiteSpace: "nowrap",

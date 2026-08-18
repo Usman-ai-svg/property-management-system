@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { FileSignature } from "lucide-react";
 import { BarisField, Field, FormModal } from "@/components/form";
-import { Petunjuk } from "@/components/ui";
 import { JENIS_KONTRAK } from "@/lib/domain/enums";
 import { rp } from "@/lib/format";
 import { buatKontrakDariRab } from "../actions";
@@ -12,10 +11,11 @@ type Objek = { id: string; nama: string };
 
 /**
  * Buat SPK dari baris yang dimenangkan seorang vendor pada RAB. Nilai & deskripsi
- * terisi dari baris menang; QS memilih cakupan unit/sarpras & mengunggah SPK.
+ * terisi dari baris menang; QS memilih cakupan unit/sarpras. Kode kontrak
+ * digenerate otomatis; dokumen SPK opsional.
  */
 export function BuatSpkDariMenang({
-  rabEstimasiId, vendorId, namaVendor, jumlahBaris, nilai, proyek,
+  rabEstimasiId, vendorId, namaVendor, jumlahBaris, nilai, proyek, projectKode, nomorBerikut,
 }: {
   rabEstimasiId: string;
   vendorId: string;
@@ -23,6 +23,9 @@ export function BuatSpkDariMenang({
   jumlahBaris: number;
   nilai: number;
   proyek: { units: Objek[]; sarpras: Objek[] };
+  projectKode: string;
+  /** Nomor urut SPK berikutnya (3 digit) per jenis, untuk pratinjau kode. */
+  nomorBerikut: { K: string; S: string; tahun: number };
 }) {
   const [jenis, setJenis] = useState<string>(JENIS_KONTRAK[0]);
   const [cakupan, setCakupan] = useState<string[]>([]);
@@ -30,10 +33,20 @@ export function BuatSpkDariMenang({
   const toggle = (id: string) =>
     setCakupan((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
 
+  const huruf = jenis === "Unit" ? "K" : "S";
+  const urutPreview = huruf === "K" ? nomorBerikut.K : nomorBerikut.S;
+  const kodePreview = `${projectKode}/${huruf}/${nomorBerikut.tahun}/${urutPreview}`;
+
+  // Nilai Kontrak = total baris menang × jumlah objek cakupan. BOQ SPK berlaku
+  // untuk TIAP objek ("satu BOQ per unit"), jadi nilai kontrak ikut jumlah objek
+  // agar "Nilai BOQ Terinci" = "Nilai SPK". Nominal ini ditetapkan ulang di server.
+  const jumlahObjek = cakupan.length;
+  const nominalHitung = Math.round(nilai * jumlahObjek);
+
   return (
     <FormModal
       judul={`Buat SPK — ${namaVendor}`}
-      keterangan={`${jumlahBaris} baris menang · nilai tawaran ${rp(nilai)}. BOQ tersalin otomatis; lengkapi cakupan & unggah SPK.`}
+      keterangan={`${jumlahBaris} baris menang · ${rp(nilai)}.`}
       aksi={buatKontrakDariRab}
       labelSimpan="Buat SPK"
       lebar={640}
@@ -50,7 +63,17 @@ export function BuatSpkDariMenang({
       ))}
 
       <BarisField>
-        <Field label="Kode Kontrak" nama="kode" wajib petunjuk="mis. K7, S3" />
+        <div>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+            Kode Kontrak
+          </label>
+          <div
+            className="inp"
+            style={{ color: "var(--muted)", background: "var(--rona-abu)", display: "flex", alignItems: "center", fontVariantNumeric: "tabular-nums" }}
+          >
+            {kodePreview} · otomatis
+          </div>
+        </div>
         <Field label="Mulai" nama="mulai" tipe="tanggal" />
       </BarisField>
 
@@ -63,13 +86,31 @@ export function BuatSpkDariMenang({
           label="Dokumen SPK"
           nama="spk"
           tipe="berkas"
-          wajib
-          petunjuk="Surat Perintah Kerja. Tersimpan sebagai revisi R1 dan bisa diperbarui dari halaman SPK."
+          petunjuk="Opsional — bisa diunggah nanti dari halaman SPK."
         />
       </BarisField>
 
       <BarisField>
-        <Field label="Nilai Kontrak" nama="nominal" nilai={Math.round(nilai)} tipe="number" satuan="Rp" wajib />
+        <div>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+            Nilai Kontrak
+          </label>
+          <div
+            className="inp"
+            style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 1, minHeight: 40, background: "var(--rona-abu)", fontVariantNumeric: "tabular-nums" }}
+          >
+            {jumlahObjek === 0 ? (
+              <span style={{ color: "var(--muted)", fontSize: 12 }}>— · pilih objek cakupan dulu</span>
+            ) : (
+              <>
+                <span style={{ fontWeight: 600 }}>{rp(nominalHitung)}</span>
+                <span style={{ fontSize: 10.5, color: "var(--muted)" }}>
+                  {rp(Math.round(nilai))} × {jumlahObjek} objek · otomatis
+                </span>
+              </>
+            )}
+          </div>
+        </div>
         <Field label="Retensi" nama="retensiPct" nilai={5} tipe="number" satuan="%" />
       </BarisField>
 
@@ -113,11 +154,6 @@ export function BuatSpkDariMenang({
           </div>
         </div>
       </BarisField>
-
-      <Petunjuk jarak="2px 0 0">
-        Seluruh baris BOQ awalnya ditautkan ke cakupan pertama; pindahkan tiap baris ke objek
-        yang benar lewat Progress Vendor setelah SPK dibuat.
-      </Petunjuk>
     </FormModal>
   );
 }

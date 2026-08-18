@@ -51,14 +51,18 @@ function bacaPemasok(form: FormData) {
   return {
     nama: teks(form, "nama", true),
     kategori: pilihan(form, "kategori", KATEGORI_PEMASOK),
-    kontak: teks(form, "kontak") || "",
+    kontakNama: teks(form, "kontakNama") || "",
+    kontakTelepon: teks(form, "kontakTelepon") || "",
     alamat: teks(form, "alamat") || "",
+    kecamatan: teks(form, "kecamatan") || "",
+    provinsi: teks(form, "provinsi") || "",
     status: pilihan(form, "status", STATUS_PEMASOK),
   };
 }
 
 const LABEL_PEMASOK = {
-  nama: "Nama", kategori: "Kategori", kontak: "Kontak", alamat: "Alamat", status: "Status",
+  nama: "Nama", kategori: "Kategori", kontakNama: "Nama Kontak", kontakTelepon: "No. Telepon",
+  alamat: "Alamat", kecamatan: "Kecamatan", provinsi: "Provinsi", status: "Status",
 };
 
 export async function tambahPemasok(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
@@ -637,6 +641,100 @@ export async function ubahBarisRab(_s: HasilAksi | null, form: FormData): Promis
 }
 
 /**
+ * Simpan SELURUH tabel rincian RAB sekaligus — model sunting inline seperti
+ * tabel RAB di Master Proyek: pengguna menekan "Ubah", menyunting semua sel,
+ * lalu "Simpan". Baris lama diganti seluruhnya dalam satu transaksi.
+ *
+ * Aman melakukan ganti-total karena penyuntingan hanya diizinkan saat
+ * Draft/Ditolak — sebelum ada penawaran/pemenang vendor (itu tahap Final).
+ * Tautan AHSP (`analisaId`) dipertahankan untuk baris yang identitasnya (id)
+ * masih ada, supaya harga dari pustaka tidak putus saat baris cuma digeser.
+ */
+export async function simpanBarisRabEstimasi(rabEstimasiId: string, dataJson: string): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const rab = await prisma.rabEstimasi.findUnique({
+      where: { id: rabEstimasiId },
+      select: {
+        id: true, nomor: true, projectId: true, status: true,
+        project: { select: { kode: true } },
+        items: { select: { id: true, analisaId: true, volume: true, hargaSatuan: true } },
+      },
+    });
+    if (!rab) throw new GagalIzin("RAB Estimasi tidak ditemukan.");
+    const pengguna = await izinkan(IZIN, rab.projectId);
+    pastikanEditable(rab.status, rab.nomor);
+
+    const analisaLama = new Map(rab.items.map((it) => [it.id, it.analisaId]));
+    const baris = bacaBarisRabEstimasi(dataJson, analisaLama);
+    const sebelum = rab.items.reduce((s, it) => s + it.volume * it.hargaSatuan, 0);
+    const sesudah = baris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
+
+    await prisma.$transaction([
+      prisma.rabEstimasiItem.deleteMany({ where: { rabEstimasiId } }),
+      prisma.rabEstimasiItem.createMany({
+        data: baris.map((b, i) => ({
+          rabEstimasiId, analisaId: b.analisaId, grup: b.grup, uraian: b.uraian,
+          satuan: b.satuan, spesifikasi: b.spesifikasi, volume: b.volume, hargaSatuan: b.hargaSatuan, urutan: i,
+        })),
+      }),
+    ]);
+
+    await catat({
+      pengguna, projectId: rab.projectId,
+      objek: `RAB Estimasi ${rab.project.kode} · ${rab.nomor} · Rincian`,
+      aksi: "Ubah baris RAB", dari: rpLog(sebelum), ke: rpLog(sesudah),
+    });
+    segarkanEstimasi(rabEstimasiId);
+  });
+}
+
+interface BarisRabMasuk {
+  grup: string;
+  uraian: string;
+  satuan: string;
+  spesifikasi: string | null;
+  volume: number;
+  hargaSatuan: number;
+  analisaId: string | null;
+}
+
+/** Ratakan kelompok jadi baris siap simpan; pertahankan analisaId lewat id lama. */
+function bacaBarisRabEstimasi(json: string, analisaLama: Map<string, string | null>): BarisRabMasuk[] {
+  let data: {
+    kelompok: { nama: string; items: { id?: string; uraian: string; satuan: string; volume: number; hargaSatuan: number; spesifikasi?: string | null }[] }[];
+  };
+  try {
+    data = JSON.parse(json);
+  } catch {
+    throw new GagalIzin("Data RAB tidak terbaca.");
+  }
+  if (!Array.isArray(data.kelompok) || data.kelompok.length === 0) {
+    throw new GagalIzin("Tabel RAB tidak boleh kosong.");
+  }
+
+  const baris: BarisRabMasuk[] = [];
+  for (const g of data.kelompok) {
+    if (!g.nama?.trim()) throw new GagalIzin("Setiap kelompok pekerjaan harus punya nama.");
+    for (const it of g.items) {
+      if (!it.uraian?.trim()) throw new GagalIzin(`Ada baris tanpa uraian pekerjaan pada kelompok "${g.nama}".`);
+      if (!Number.isFinite(it.volume) || it.volume < 0) throw new GagalIzin(`Volume tidak sah pada "${it.uraian}".`);
+      if (!Number.isFinite(it.hargaSatuan) || it.hargaSatuan < 0) throw new GagalIzin(`Harga satuan tidak sah pada "${it.uraian}".`);
+      baris.push({
+        grup: g.nama.trim(),
+        uraian: it.uraian.trim(),
+        satuan: it.satuan?.trim() || "ls",
+        spesifikasi: it.spesifikasi?.trim() || null,
+        volume: it.volume,
+        hargaSatuan: it.hargaSatuan,
+        analisaId: it.id ? analisaLama.get(it.id) ?? null : null,
+      });
+    }
+  }
+  if (baris.length === 0) throw new GagalIzin("Tabel RAB tidak boleh kosong.");
+  return baris;
+}
+
+/**
  * Tarik ulang harga satuan sebuah baris dari analisa sumbernya (harga AHSP
  * terkini). Dipakai bila harga dasar sudah diperbarui dan QS ingin baris ini
  * ikut memakai harga baru — snapshot memang tidak berubah sendiri.
@@ -953,46 +1051,68 @@ export async function buatKontrakDariRab(_s: HasilAksi | null, form: FormData): 
         ? await prisma.unit.count({ where: { id: { in: cakupan }, projectId: rab.projectId } })
         : await prisma.infrastructure.count({ where: { id: { in: cakupan }, projectId: rab.projectId } });
     if (sah !== cakupan.length) throw new GagalIzin("Ada item cakupan yang bukan milik proyek ini.");
-    const objekAwal = cakupan[0];
-
-    const kode = teks(form, "kode", true).toUpperCase();
-    const bentrok = await prisma.contract.count({ where: { kode } });
-    if (bentrok) throw new GagalIzin(`Kode kontrak "${kode}" sudah dipakai.`);
 
     const mulai = teksOpsional(form, "mulai");
     const tglMulai = mulai ? new Date(mulai) : new Date();
     if (Number.isNaN(tglMulai.getTime())) throw new GagalIzin("Tanggal mulai tidak sah.");
 
+    // Kode kontrak digenerate otomatis: {KODEPROYEK}/{K|S}/{TAHUN}/{urut 3 digit},
+    // bernomor urut per proyek per tahun. K = jenis Unit, S = Sarpras.
+    const awalanKode = `${rab.project.kode}/${jenis === "Unit" ? "K" : "S"}/${tglMulai.getFullYear()}/`;
+    const kodeAda = await prisma.contract.findMany({
+      where: { kode: { startsWith: awalanKode } }, select: { kode: true },
+    });
+    let urut = kodeAda.reduce((m, c) => {
+      const n = parseInt(c.kode.slice(awalanKode.length), 10);
+      return Number.isFinite(n) && n > m ? n : m;
+    }, 0);
+    let kode = "";
+    do {
+      urut += 1;
+      kode = `${awalanKode}${String(urut).padStart(3, "0")}`;
+    } while (await prisma.contract.count({ where: { kode } }));
+
     const totalMenang = menang.reduce((s, m) => s + (m.penawaran[0]?.hargaSatuan ?? 0) * m.volume, 0);
-    const nominal = angka(form, "nominal", { min: 1, wajib: true });
+    // Nilai kontrak = total baris menang × jumlah objek cakupan. Model "satu BOQ
+    // berlaku untuk tiap unit": template BOQ digandakan ke SETIAP objek, jadi nilai
+    // SPK ikut jumlah objek agar "Nilai BOQ Terinci" = "Nilai SPK". Ditetapkan di
+    // server (bukan dari form) supaya konsistensinya terjamin.
+    const nominal = Math.round(totalMenang * cakupan.length);
+    if (nominal <= 0) throw new GagalIzin("Nilai kontrak nol — pastikan baris menang punya harga penawaran.");
     const deskripsi = teksOpsional(form, "deskripsi")?.trim() || `Pemenang RAB ${rab.nomor}`;
 
+    // Dokumen SPK opsional: hanya diproses bila berkas benar-benar diunggah.
     const spk = form.get("spk");
-    if (!(spk instanceof File) || spk.size === 0) throw new GagalIzin("Dokumen SPK wajib diunggah saat membuat kontrak.");
-    const namaFile = bersihkanNamaFile(spk.name);
-    periksaBerkas(namaFile, spk.type, spk.size);
-    const tersimpan = await simpanBerkas(await spk.arrayBuffer(), namaFile);
-
-    const dokumen = await prisma.document.create({
-      data: {
-        kategori: "spk", judul: `SPK ${kode} · ${vendor.nama}`,
-        versions: { create: { revisi: "R1", namaFile, ukuranByte: tersimpan.ukuranByte, objectKey: tersimpan.objectKey, diunggahOlehId: pengguna.id } },
-      },
-    });
+    let docSpkId: string | null = null;
+    let namaFileSpk: string | null = null;
+    if (spk instanceof File && spk.size > 0) {
+      const namaFile = bersihkanNamaFile(spk.name);
+      periksaBerkas(namaFile, spk.type, spk.size);
+      const tersimpan = await simpanBerkas(await spk.arrayBuffer(), namaFile);
+      const dokumen = await prisma.document.create({
+        data: {
+          kategori: "spk", judul: `SPK ${kode} · ${vendor.nama}`,
+          versions: { create: { revisi: "R1", namaFile, ukuranByte: tersimpan.ukuranByte, objectKey: tersimpan.objectKey, diunggahOlehId: pengguna.id } },
+        },
+      });
+      docSpkId = dokumen.id;
+      namaFileSpk = namaFile;
+    }
 
     await prisma.contract.create({
       data: {
         kode, projectId: rab.projectId, vendorId, jenis, deskripsi, nominal,
         retensiPct: angka(form, "retensiPct", { min: 0, max: 100 }),
         jatuhTempoBln: angka(form, "jatuhTempoBln", { min: 0 }),
-        mulai: tglMulai, docSpkId: dokumen.id,
+        mulai: tglMulai, docSpkId,
         ...(jenis === "Unit"
           ? { units: { create: cakupan.map((unitId) => ({ unitId })) } }
           : { infrastructures: { create: cakupan.map((infrastructureId) => ({ infrastructureId })) } }),
+        // Template BOQ level-SPK: satu definisi berlaku untuk semua objek yang
+        // dicakup (units/infrastructures di atas). Override & opname per objek
+        // ditambahkan belakangan lewat ContractBoqUnit, bukan di sini.
         boqItems: {
           create: menang.map((m, i) => ({
-            unitId: jenis === "Unit" ? objekAwal : null,
-            infrastructureId: jenis === "Unit" ? null : objekAwal,
             grup: m.grup, uraian: m.uraian, satuan: m.satuan, volume: m.volume,
             hargaSatuan: m.penawaran[0]?.hargaSatuan ?? 0, urutan: i + 1,
           })),
@@ -1003,7 +1123,7 @@ export async function buatKontrakDariRab(_s: HasilAksi | null, form: FormData): 
     await catat({
       pengguna, projectId: rab.projectId, objek: `Kontrak ${kode} · ${vendor.nama}`,
       aksi: "Buat kontrak dari RAB",
-      ke: `${menang.length} baris dari RAB ${rab.nomor} — ${rpLog(nominal)} (tawaran ${rpLog(totalMenang)}) · SPK ${namaFile}`,
+      ke: `${menang.length} baris dari RAB ${rab.nomor} — ${rpLog(nominal)} (tawaran ${rpLog(totalMenang)})${namaFileSpk ? ` · SPK ${namaFileSpk}` : " · tanpa SPK"}`,
     });
 
     revalidatePath("/vendor");

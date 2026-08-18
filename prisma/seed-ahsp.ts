@@ -17,9 +17,9 @@ import { hargaSatuanAnalisa, type KelompokDasar } from "../src/lib/calc/ahsp";
 
 // --- Pemasok -----------------------------------------------------------------
 const PEMASOK = [
-  { nama: "Toko Bangunan Sejahtera", kategori: "Material", kontak: "0812-1000-2001", alamat: "Jl. Raya Serpong No. 21, Tangerang" },
-  { nama: "CV Mitra Material Utama", kategori: "Material", kontak: "0813-2000-3002", alamat: "Jl. Industri Blok C7, Bekasi" },
-  { nama: "Nusantara Sewa Alat", kategori: "Alat", kontak: "0811-3000-4003", alamat: "Jl. Cakung Cilincing KM 3, Jakarta" },
+  { nama: "Toko Bangunan Sejahtera", kategori: "Material", kontakNama: "Hendra", kontakTelepon: "0812-1000-2001", alamat: "Jl. Raya Serpong No. 21", kecamatan: "Serpong", provinsi: "Banten" },
+  { nama: "CV Mitra Material Utama", kategori: "Material", kontakNama: "Sutrisno", kontakTelepon: "0813-2000-3002", alamat: "Jl. Industri Blok C7", kecamatan: "Bekasi Selatan", provinsi: "Jawa Barat" },
+  { nama: "Nusantara Sewa Alat", kategori: "Alat", kontakNama: "Bpk. Wahyu", kontakTelepon: "0811-3000-4003", alamat: "Jl. Cakung Cilincing KM 3", kecamatan: "Cilincing", provinsi: "DKI Jakarta" },
 ] as const;
 
 // --- Harga dasar (price book) ------------------------------------------------

@@ -1,23 +1,23 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, Search, Star } from "lucide-react";
+import { ChevronDown, Star } from "lucide-react";
 import { Badge } from "@/components/ui";
-import { Tabel } from "@/components/kartu-tabel";
+import { BoqTable, type BarisBoqUI } from "@/components/boq-table";
 import { PanelTabel } from "@/components/panel-tabel";
-import { rekapRabPerGrup, totalRab } from "@/lib/calc/ahsp";
 import { KELOMPOK_AHSP } from "@/lib/domain/templates";
 import { rp, tanggal } from "@/lib/format";
 
 const URUT_KATEGORI_DASAR = ["UPAH", "BAHAN", "ALAT"] as const;
 const URUT_KATEGORI_PEMASOK = ["Material", "Tenaga Kerja", "Alat"] as const;
 import {
-  HapusAnalisa, HapusBarisRab, HapusHargaDasar, HapusPemasok, HapusPenawaran,
-  HapusRabEstimasi, ImporBarisRab, JadikanAcuan, SegarkanHargaBaris, TambahAnalisa, TambahBarisRab,
+  HapusAnalisa, HapusHargaDasar, HapusPemasok, HapusPenawaran,
+  HapusRabEstimasi, ImporBarisRab, JadikanAcuan, TambahAnalisa, TambahBarisRab,
   TambahHargaDasar, TambahPemasok, TambahPenawaranPada, TambahRabEstimasi, UbahAnalisa,
-  UbahBarisRab, UbahHargaDasar, UbahPemasok, type HargaDasarOpsi, type KatalogItem,
+  UbahHargaDasar, UbahPemasok, UbahRabEstimasi, type HargaDasarOpsi, type KatalogItem,
 } from "./editors";
+import { simpanBarisRabEstimasi } from "./actions";
 
 const WARNA_STATUS: Record<string, [string, string]> = {
   Draft: ["var(--rona-amber)", "var(--amber)"],
@@ -64,7 +64,6 @@ export function TabelDaftarRab({
   return (
     <PanelTabel
       judul="Daftar RAB Estimasi"
-      keterangan="Total dihitung dari baris snapshot, tidak berubah saat pustaka AHSP diperbarui."
       aksi={bolehKelola && proyek.length > 0 && <TambahRabEstimasi proyek={proyek} />}
       data={data}
       kunci={(r) => r.id}
@@ -78,7 +77,7 @@ export function TabelDaftarRab({
       kosong="Belum ada RAB Estimasi."
       kolom={[
         { label: "Proyek" }, { label: "Nomor" }, { label: "Nama", minLebar: 240 },
-        { label: "Status" }, { label: "Baris", rata: "kanan" }, { label: "Total Nilai", rata: "kanan" },
+        { label: "Status" }, { label: "Total Nilai", rata: "kanan" },
         { label: "Tanggal" }, bolehKelola && { lebar: 90 },
       ]}
       baris={(r) => (
@@ -89,10 +88,18 @@ export function TabelDaftarRab({
           </td>
           <td>{r.nama}</td>
           <td><Badge nilai={r.status} peta={WARNA_STATUS} /></td>
-          <td style={{ textAlign: "right", color: "var(--muted)" }}>{r.jumlahBaris}</td>
           <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>{rp(r.total)}</td>
           <td style={{ color: "var(--muted)" }}>{tanggal(r.tanggal)}</td>
-          {bolehKelola && <td><HapusRabEstimasi id={r.id} nomor={r.nomor} /></td>}
+          {bolehKelola && (
+            <td>
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                {(r.status === "Draft" || r.status === "Ditolak") && (
+                  <UbahRabEstimasi rab={{ id: r.id, nomor: r.nomor, nama: r.nama, status: r.status }} ikon />
+                )}
+                <HapusRabEstimasi id={r.id} nomor={r.nomor} />
+              </div>
+            </td>
+          )}
         </tr>
       )}
     />
@@ -235,7 +242,7 @@ export function TabelAnalisa({
   return (
     <PanelTabel
       judul="Analisa Harga Satuan"
-      keterangan="Harga satuan dihitung dari komponen, bukan disimpan. Klik jumlah komponen untuk rincian. Baris RAB memakai snapshot-nya."
+      keterangan="Klik jumlah komponen untuk melihat rincian AHSP."
       aksi={bolehKelola && <TambahAnalisa daftarHargaDasar={hargaDasarOpsi} />}
       data={data}
       kunci={(a) => a.id}
@@ -307,7 +314,7 @@ function BarisHargaDasar({
           <button
             type="button"
             onClick={() => setBuka((b) => !b)}
-            title={buka ? "Tutup penawaran" : "Lihat penawaran pemasok"}
+            title={buka ? "Tutup penawaran" : "Lihat penawaran supplier"}
             style={{ background: "none", border: "none", cursor: "pointer", color: "var(--teal)", font: "inherit", display: "inline-flex", alignItems: "center", gap: 3, padding: 0 }}
           >
             {n}
@@ -328,7 +335,7 @@ function BarisHargaDasar({
           <td colSpan={kolomN} style={{ background: "var(--rona-abu)", padding: "8px 16px 12px 32px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--muted)" }}>
-                Penawaran pemasok {n > 0 && `· ${n}`}
+                Penawaran supplier {n > 0 && `· ${n}`}
               </span>
               {bolehKelola && pemasokOpsi.length > 0 && (
                 <TambahPenawaranPada hargaDasarId={h.id} hargaDasarLabel={`${h.kode} · ${h.uraian}`} pemasok={pemasokOpsi} />
@@ -342,7 +349,7 @@ function BarisHargaDasar({
               <table style={{ width: "100%", fontSize: 11.5 }}>
                 <thead>
                   <tr style={{ color: "var(--muted)" }}>
-                    <th style={{ textAlign: "left", fontWeight: 600, padding: "2px 6px" }}>Pemasok</th>
+                    <th style={{ textAlign: "left", fontWeight: 600, padding: "2px 6px" }}>Supplier</th>
                     <th style={{ textAlign: "right", fontWeight: 600, padding: "2px 6px" }}>Harga</th>
                     <th style={{ textAlign: "right", fontWeight: 600, padding: "2px 6px" }}>Selisih vs Acuan</th>
                     <th style={{ textAlign: "left", fontWeight: 600, padding: "2px 6px" }}>Keterangan</th>
@@ -398,7 +405,7 @@ export function TabelHargaDasar({
   return (
     <PanelTabel
       judul="Harga Dasar (Price Book)"
-      keterangan="Harga acuan yang dipakai perhitungan AHSP. Klik jumlah penawaran untuk membandingkan harga pemasok & mengubah acuan."
+      keterangan="Klik jumlah penawaran untuk membandingkan harga supplier & mengubah acuan."
       aksi={bolehKelola && <TambahHargaDasar />}
       data={data}
       kunci={(h) => h.id}
@@ -428,8 +435,11 @@ export interface PemasokRow {
   id: string;
   nama: string;
   kategori: string;
-  kontak: string;
+  kontakNama: string;
+  kontakTelepon: string;
   alamat: string;
+  kecamatan: string;
+  provinsi: string;
   status: string;
   jumlahPenawaran: number;
 }
@@ -437,12 +447,12 @@ export interface PemasokRow {
 export function TabelPemasok({ data, bolehKelola }: { data: PemasokRow[]; bolehKelola: boolean }) {
   return (
     <PanelTabel
-      judul="Pemasok"
+      judul="Supplier"
       keterangan="Sumber harga dasar. Entitas terpisah dari Vendor (kontraktor/SPK)."
       aksi={bolehKelola && <TambahPemasok />}
       data={data}
       kunci={(p) => p.id}
-      cari={(p) => `${p.nama} ${p.kontak} ${p.alamat}`}
+      cari={(p) => `${p.nama} ${p.kontakNama} ${p.kontakTelepon} ${p.alamat} ${p.kecamatan} ${p.provinsi}`}
       petunjukCari="Cari nama, kontak, atau alamat…"
       filter={[
         { label: "Kategori", ambil: (p) => p.kategori, opsi: URUT_KATEGORI_PEMASOK },
@@ -450,9 +460,9 @@ export function TabelPemasok({ data, bolehKelola }: { data: PemasokRow[]; bolehK
       ]}
       grup={(p) => p.kategori}
       urutanGrup={URUT_KATEGORI_PEMASOK}
-      kosong="Belum ada pemasok."
+      kosong="Belum ada supplier."
       kolom={[
-        { label: "Nama", minLebar: 200 }, { label: "Kategori" }, { label: "Kontak" },
+        { label: "Nama", minLebar: 200 }, { label: "Kategori" }, { label: "Kontak", minLebar: 160 },
         { label: "Alamat", minLebar: 220 }, { label: "Status" }, { label: "Penawaran", rata: "kanan" },
         bolehKelola && { lebar: 80 },
       ]}
@@ -462,14 +472,30 @@ export function TabelPemasok({ data, bolehKelola }: { data: PemasokRow[]; bolehK
             <Link href={`/estimasi/pemasok/${p.id}`} style={{ color: "var(--blue)", textDecoration: "none" }}>{p.nama}</Link>
           </td>
           <td><Badge nilai={p.kategori} peta={WARNA_KATEGORI} /></td>
-          <td style={{ color: "var(--muted)" }}>{p.kontak || "—"}</td>
-          <td style={{ color: "var(--muted)", whiteSpace: "normal" }}>{p.alamat || "—"}</td>
+          <td style={{ color: "var(--muted)" }}>
+            {p.kontakNama || p.kontakTelepon ? (
+              <>
+                {p.kontakNama && <div style={{ color: "var(--text)" }}>{p.kontakNama}</div>}
+                {p.kontakTelepon && <div>{p.kontakTelepon}</div>}
+              </>
+            ) : "—"}
+          </td>
+          <td style={{ color: "var(--muted)", whiteSpace: "normal" }}>
+            {p.alamat || p.kecamatan || p.provinsi ? (
+              <>
+                {p.alamat && <div>{p.alamat}</div>}
+                {(p.kecamatan || p.provinsi) && (
+                  <div style={{ fontSize: 11 }}>{[p.kecamatan, p.provinsi].filter(Boolean).join(", ")}</div>
+                )}
+              </>
+            ) : "—"}
+          </td>
           <td><Badge nilai={p.status} peta={WARNA_AKTIF} /></td>
           <td style={{ textAlign: "right", color: "var(--muted)" }}>{p.jumlahPenawaran}</td>
           {bolehKelola && (
             <td>
               <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                <UbahPemasok pemasok={{ id: p.id, nama: p.nama, kategori: p.kategori, kontak: p.kontak, alamat: p.alamat, status: p.status }} />
+                <UbahPemasok pemasok={{ id: p.id, nama: p.nama, kategori: p.kategori, kontakNama: p.kontakNama, kontakTelepon: p.kontakTelepon, alamat: p.alamat, kecamatan: p.kecamatan, provinsi: p.provinsi, status: p.status }} />
                 <HapusPemasok id={p.id} nama={p.nama} />
               </div>
             </td>
@@ -481,7 +507,7 @@ export function TabelPemasok({ data, bolehKelola }: { data: PemasokRow[]; bolehK
 }
 
 // ===========================================================================
-// RINCIAN RAB (halaman /estimasi/[id]) — grup bisa dilipat + cari
+// RINCIAN RAB (halaman /estimasi/[id]) — sunting inline seperti tabel RAB Master
 // ===========================================================================
 
 export interface RincianItem {
@@ -495,6 +521,13 @@ export interface RincianItem {
   hargaSatuan: number;
 }
 
+/**
+ * Rincian pekerjaan RAB Estimasi memakai komponen BoqTable yang sama dengan
+ * tabel RAB di Master Proyek: sunting seluruh tabel sekaligus (Ubah → Simpan),
+ * tanpa cari/filter/lipat grup. Tombol khas Estimasi — "Tambah dari pustaka
+ * AHSP" dan "Impor Excel" — tetap dipasang lewat `aksiTambahan`; tautan AHSP
+ * dipertahankan oleh aksi simpan (lihat simpanBarisRabEstimasi).
+ */
 export function TabelRincianRab({
   rabEstimasiId, bolehKelola, items, katalog,
 }: {
@@ -503,150 +536,21 @@ export function TabelRincianRab({
   items: RincianItem[];
   katalog: KatalogItem[];
 }) {
-  const [q, setQ] = useState("");
-  const [grupPilih, setGrupPilih] = useState<string[]>([]);
-  const [tutup, setTutup] = useState<Record<string, boolean>>({});
-
-  // Grup yang benar-benar ada di baris, diurutkan sesuai KELOMPOK_AHSP (yang tak
-  // terdaftar disusun di belakang) — sumber pilihan filter grup.
-  const grupTersedia = useMemo(() => {
-    const ada = new Set(items.map((it) => it.grup));
-    const baku = (KELOMPOK_AHSP as readonly string[]).filter((g) => ada.has(g));
-    const lain = [...ada].filter((g) => !(KELOMPOK_AHSP as readonly string[]).includes(g)).sort();
-    return [...baku, ...lain];
-  }, [items]);
-
-  const tersaring = useMemo(() => {
-    const kata = q.trim().toLowerCase();
-    return items.filter((it) => {
-      if (grupPilih.length > 0 && !grupPilih.includes(it.grup)) return false;
-      if (kata && !`${it.uraian} ${it.grup} ${it.satuan} ${it.spesifikasi ?? ""}`.toLowerCase().includes(kata)) return false;
-      return true;
-    });
-  }, [items, q, grupPilih]);
-
-  const posisiGrup = (n: string) => {
-    const i = (KELOMPOK_AHSP as readonly string[]).indexOf(n);
-    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
-  };
-  const grup = rekapRabPerGrup(tersaring).sort(
-    (a, b) => posisiGrup(a.nama) - posisiGrup(b.nama) || a.nama.localeCompare(b.nama),
-  );
-  const total = totalRab(tersaring);
+  const baris: BarisBoqUI[] = items.map((it) => ({
+    id: it.id, grup: it.grup, uraian: it.uraian, satuan: it.satuan,
+    volume: it.volume, hargaSatuan: it.hargaSatuan, spesifikasi: it.spesifikasi,
+  }));
 
   return (
-    <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
-      <div
-        style={{
-          padding: "12px 16px", borderBottom: "1px solid var(--line)",
-          display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8,
-        }}
-      >
-        <div>
-          <div className="eyebrow">Rincian Pekerjaan</div>
-          <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>
-            Harga satuan adalah snapshot dari AHSP saat baris ditambahkan. Klik grup untuk melipat.
-          </div>
-        </div>
-        {bolehKelola && (
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <ImporBarisRab rabEstimasiId={rabEstimasiId} />
-            <TambahBarisRab rabEstimasiId={rabEstimasiId} katalog={katalog} />
-          </div>
-        )}
-      </div>
-
-      {items.length > 0 && (
-        <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "var(--rona-abu)", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-          <div style={{ position: "relative", flex: "1 1 220px", minWidth: 180, maxWidth: 320 }}>
-            <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none" }} />
-            <input className="inp" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari pekerjaan…" style={{ paddingLeft: 30 }} />
-          </div>
-          {grupTersedia.length > 1 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-              {grupTersedia.map((g) => {
-                const aktif = grupPilih.includes(g);
-                return (
-                  <button
-                    key={g}
-                    type="button"
-                    className="chip"
-                    onClick={() => setGrupPilih((s) => (aktif ? s.filter((x) => x !== g) : [...s, g]))}
-                    style={{
-                      cursor: "pointer", border: "1px solid " + (aktif ? "var(--teal)" : "var(--line)"),
-                      background: aktif ? "var(--rona-teal2)" : "transparent",
-                      color: aktif ? "var(--teal)" : "var(--text)", fontWeight: aktif ? 600 : 400,
-                    }}
-                  >
-                    {g}
-                  </button>
-                );
-              })}
-              {grupPilih.length > 0 && (
-                <button
-                  type="button"
-                  className="btn-garis"
-                  style={{ fontSize: 11, padding: "5px 10px" }}
-                  onClick={() => setGrupPilih([])}
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      <Tabel
-        kolom={[
-          { label: "Uraian", minLebar: 240 }, { label: "Spesifikasi", minLebar: 130 }, { label: "Satuan" },
-          { label: "Volume", rata: "kanan" }, { label: "Harga Satuan", rata: "kanan" }, { label: "Jumlah", rata: "kanan" },
-          bolehKelola && { lebar: 110 },
-        ]}
-        kosong={q || grupPilih.length > 0 ? "Tidak ada pekerjaan yang cocok dengan saringan." : "Belum ada baris. Tambahkan pekerjaan dari pustaka AHSP."}
-      >
-        {grup.flatMap((g) => {
-          const dilipat = tutup[g.nama];
-          return [
-            <tr key={`g-${g.nama}`} style={{ background: "var(--rona-abu)", cursor: "pointer" }} onClick={() => setTutup((s) => ({ ...s, [g.nama]: !s[g.nama] }))}>
-              <td colSpan={5} style={{ fontWeight: 700, fontSize: 12 }}>
-                <ChevronDown size={13} style={{ verticalAlign: "-2px", marginRight: 4, color: "var(--muted)", transform: dilipat ? "rotate(-90deg)" : "none", transition: "transform .15s" }} />
-                {g.nama}
-              </td>
-              <td className="num" style={{ textAlign: "right", fontWeight: 700, fontSize: 12 }}>{rp(g.total)}</td>
-              {bolehKelola && <td />}
-            </tr>,
-            ...(dilipat
-              ? []
-              : g.items.map((it) => (
-                  <tr key={it.id}>
-                    <td>{it.uraian}</td>
-                    <td style={{ color: "var(--muted)", whiteSpace: "normal" }}>{it.spesifikasi || "—"}</td>
-                    <td style={{ color: "var(--muted)" }}>{it.satuan}</td>
-                    <td style={{ textAlign: "right" }}>{it.volume.toLocaleString("id-ID")}</td>
-                    <td className="num" style={{ textAlign: "right" }}>{rp(it.hargaSatuan)}</td>
-                    <td className="num" style={{ textAlign: "right", fontWeight: 600 }}>{rp(it.volume * it.hargaSatuan)}</td>
-                    {bolehKelola && (
-                      <td>
-                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                          <UbahBarisRab item={{ id: it.id, grup: it.grup, uraian: it.uraian, satuan: it.satuan, spesifikasi: it.spesifikasi, volume: it.volume, hargaSatuan: it.hargaSatuan, adaAnalisa: it.analisaId != null }} />
-                          {it.analisaId != null && <SegarkanHargaBaris id={it.id} />}
-                          <HapusBarisRab id={it.id} uraian={it.uraian} />
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))),
-          ];
-        })}
-        {tersaring.length > 0 && (
-          <tr key="grand" style={{ borderTop: "2px solid var(--line)" }}>
-            <td colSpan={5} style={{ fontWeight: 700, textAlign: "right" }}>Grand Total{q || grupPilih.length > 0 ? " (hasil saring)" : ""}</td>
-            <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>{rp(total)}</td>
-            {bolehKelola && <td />}
-          </tr>
-        )}
-      </Tabel>
-    </div>
+    <BoqTable
+      judul="Rincian Pekerjaan"
+      baris={baris}
+      bolehHarga
+      bolehUbah={bolehKelola}
+      tanpaImporBawaan
+      aksiTambahan={<ImporBarisRab rabEstimasiId={rabEstimasiId} />}
+      aksiSuntingTambahan={(tambah) => <TambahBarisRab katalog={katalog} onTambah={tambah} />}
+      aksiSimpan={(json) => simpanBarisRabEstimasi(rabEstimasiId, json)}
+    />
   );
 }

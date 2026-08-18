@@ -101,8 +101,31 @@ export default async function KeuanganProyek({
   const {
     perUnit: langsungPerUnit,
     perSarpras: langsungPerSarpras,
-    levelProyek,
+    levelUnit,
+    levelSarpras,
+    levelUmum,
   } = biayaLangsung(proyek.expenses);
+
+  // Subtotal tabel (baris SUM). Alokasi kontrak sudah dibagi ke tiap objek, jadi
+  // dijumlahkan langsung dari petanya — bukan dari nilai kontrak utuh.
+  const subUnit = proyek.units.reduce(
+    (a, u) => {
+      const rap = nilaiUnit(u).rap;
+      const langsung = langsungPerUnit.get(u.id) ?? 0;
+      const alokasi = alokasiPerUnit.get(u.id) ?? 0;
+      return { rap: a.rap + rap, langsung: a.langsung + langsung, alokasi: a.alokasi + alokasi };
+    },
+    { rap: 0, langsung: 0, alokasi: 0 },
+  );
+  const subSarpras = proyek.infrastructures.reduce(
+    (a, s) => {
+      const rap = nilaiSarpras(s).rap;
+      const langsung = langsungPerSarpras.get(s.id) ?? 0;
+      const alokasi = alokasiPerSarpras.get(s.id) ?? 0;
+      return { rap: a.rap + rap, langsung: a.langsung + langsung, alokasi: a.alokasi + alokasi };
+    },
+    { rap: 0, langsung: 0, alokasi: 0 },
+  );
 
   const transaksiUntuk = (kunci: { unitId?: string; sarprasId?: string }) =>
     transaksiUntukObjek(proyek.expenses, kunci);
@@ -249,13 +272,45 @@ export default async function KeuanganProyek({
               </tr>
             );
           })}
-          <tr style={{ fontWeight: 700, background: "var(--rona-baris)" }}>
-            <td colSpan={4}>Biaya level proyek (belum dialokasikan ke unit)</td>
-            <td className="num" style={{ textAlign: "right" }} colSpan={3}>{rp(levelProyek)}</td>
-            <td style={{ fontSize: 10.5, fontWeight: 400, color: "var(--muted)", whiteSpace: "normal" }}>
-              perijinan, prasarana, pengolahan lahan
-            </td>
-          </tr>
+          {proyek.units.length > 0 && (
+            <tr style={{ fontWeight: 700, borderTop: "2px solid var(--line)" }}>
+              <td colSpan={3}>Subtotal Unit</td>
+              <td className="num" style={{ textAlign: "right" }}>{rp(subUnit.rap)}</td>
+              <td className="num" style={{ textAlign: "right" }}>{subUnit.langsung ? rp(subUnit.langsung) : "—"}</td>
+              <td className="num" style={{ textAlign: "right" }}>
+                {subUnit.alokasi ? rp(Math.round(subUnit.alokasi)) : "—"}
+              </td>
+              <td className="num" style={{ textAlign: "right" }}>
+                {rp(Math.round(subUnit.langsung + subUnit.alokasi))}
+              </td>
+              <td>
+                {(() => {
+                  const rasio = subUnit.rap ? (subUnit.langsung + subUnit.alokasi) / subUnit.rap : 0;
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <Track
+                        nilai={rasio * 100}
+                        tinggi={9}
+                        warna={rasio > 1 ? "var(--red)" : rasio > 0.9 ? "var(--amber)" : "var(--teal)"}
+                      />
+                      <span style={{ fontSize: 10.5, width: 38, textAlign: "right", color: rasio > 1 ? "var(--red)" : "var(--muted)" }}>
+                        {pct(rasio, 1)}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </td>
+            </tr>
+          )}
+          {levelUnit > 0 && (
+            <tr style={{ fontWeight: 600, background: "var(--rona-baris)" }}>
+              <td colSpan={6} style={{ color: "var(--muted)", whiteSpace: "normal" }}>
+                Biaya level proyek (unit) — berperuntukan unit, belum dialokasikan ke unit tertentu
+              </td>
+              <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>{rp(levelUnit)}</td>
+              <td />
+            </tr>
+          )}
         </Tabel>
       </div>
 
@@ -418,14 +473,13 @@ export default async function KeuanganProyek({
       <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
         <TabelHead
           judul={`Pengeluaran Sarana & Prasarana · ${proyek.infrastructures.length} item`}
-          keterangan="Klik nama item untuk melihat rincian per jenis biaya · progresnya sama dengan yang tampil di modul Konstruksi."
+          keterangan="Klik nama item untuk melihat rincian per jenis biaya."
         />
         <Tabel
           tinggiMaks={380}
           kolom={[
             { label: "Item", minLebar: 150 },
             { label: "Jenis" },
-            { label: "Progres", rata: "kanan" },
             { label: "RAP", rata: "kanan" },
             { label: "Pengeluaran Langsung", rata: "kanan" },
             { label: "Alokasi Kontrak", rata: "kanan" },
@@ -460,7 +514,6 @@ export default async function KeuanganProyek({
                   </div>
                 </td>
                 <td>{s.jenis}</td>
-                <td style={{ textAlign: "right", color: "var(--muted)" }}>{s.progress}%</td>
                 <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>{rp(rap)}</td>
                 <td className="num" style={{ textAlign: "right" }}>{langsung ? rp(langsung) : "—"}</td>
                 <td className="num" style={{ textAlign: "right" }}>
@@ -489,8 +542,66 @@ export default async function KeuanganProyek({
               </tr>
             );
           })}
+          {proyek.infrastructures.length > 0 && (
+            <tr style={{ fontWeight: 700, borderTop: "2px solid var(--line)" }}>
+              <td colSpan={2}>Subtotal Sarana &amp; Prasarana</td>
+              <td className="num" style={{ textAlign: "right" }}>{rp(subSarpras.rap)}</td>
+              <td className="num" style={{ textAlign: "right" }}>{subSarpras.langsung ? rp(subSarpras.langsung) : "—"}</td>
+              <td className="num" style={{ textAlign: "right" }}>
+                {subSarpras.alokasi ? rp(Math.round(subSarpras.alokasi)) : "—"}
+              </td>
+              <td className="num" style={{ textAlign: "right" }}>
+                {rp(Math.round(subSarpras.langsung + subSarpras.alokasi))}
+              </td>
+              <td>
+                {(() => {
+                  const rasio = subSarpras.rap ? (subSarpras.langsung + subSarpras.alokasi) / subSarpras.rap : 0;
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <Track
+                        nilai={rasio * 100}
+                        tinggi={9}
+                        warna={rasio > 1 ? "var(--red)" : rasio > 0.9 ? "var(--amber)" : "var(--teal)"}
+                      />
+                      <span style={{ fontSize: 10.5, width: 38, textAlign: "right", color: rasio > 1 ? "var(--red)" : "var(--muted)" }}>
+                        {pct(rasio, 1)}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </td>
+            </tr>
+          )}
+          {levelSarpras > 0 && (
+            <tr style={{ fontWeight: 600, background: "var(--rona-baris)" }}>
+              <td colSpan={5} style={{ color: "var(--muted)", whiteSpace: "normal" }}>
+                Biaya level proyek (sarpras) — berperuntukan prasarana &amp; sarana, belum dialokasikan ke item tertentu
+              </td>
+              <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>{rp(levelSarpras)}</td>
+              <td />
+            </tr>
+          )}
         </Tabel>
       </div>
+
+      {levelUmum > 0 && (
+        <div
+          className="card"
+          style={{
+            marginTop: 16, padding: "14px 20px", display: "flex",
+            justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <div className="eyebrow">Biaya Level Proyek (Umum)</div>
+            <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2, maxWidth: 620, lineHeight: 1.5 }}>
+              Perijinan &amp; ormas, pengolahan lahan — biaya proyek yang tidak menempel pada unit
+              maupun sarana &amp; prasarana, jadi tidak dibagi ke keduanya.
+            </div>
+          </div>
+          <div className="num" style={{ fontSize: 18, fontWeight: 600 }}>{rp(levelUmum)}</div>
+        </div>
+      )}
 
       {/* ---------- rincian biaya satu item sarpras ---------- */}
       {sarprasRinci &&

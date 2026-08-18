@@ -39,7 +39,7 @@ export type ProyekBayar = {
     nilai: number; terbayar: number; sisa: number; retensi: number; retensiPct: number;
     peruntukan: string; jenisBiaya: string; cakupan: number;
   }[];
-  po: { id: string; label: string; sisa: number; diterima: boolean }[];
+  po: { id: string; label: string; nilai: number; terbayar: number; sisa: number; diterima: boolean }[];
   hutang: {
     id: string; label: string; kreditur: string; sisa: number;
     tenggat: string; jatuhTempo: "lewat" | "dekat" | "aman";
@@ -239,26 +239,45 @@ export function CatatPembayaran({
         </>
       )}
       {sumber === "po" && !kosong && (
-        <BarisField kolom={1}>
-          <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
-              PO Material <span style={{ color: "var(--red)" }}>*</span>
-            </label>
-            <select
-              name="pembelianId"
-              className="inp"
-              value={poId || aktif.po[0].id}
-              onChange={(e) => setPoId(e.target.value)}
-              required
+        <>
+          <BarisField kolom={1}>
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+                PO Material <span style={{ color: "var(--red)" }}>*</span>
+              </label>
+              <select
+                name="pembelianId"
+                className="inp"
+                value={poId || aktif.po[0].id}
+                onChange={(e) => setPoId(e.target.value)}
+                required
+              >
+                {aktif.po.map((b) => (
+                  <option key={b.id} value={b.id}>{b.label}</option>
+                ))}
+              </select>
+            </div>
+          </BarisField>
+
+          {poAktif && (
+            <div
+              style={{
+                display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 18px",
+                padding: "11px 14px", marginBottom: 14,
+                background: "var(--rona-panel)", borderRadius: 8,
+              }}
             >
-              {aktif.po.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.label} — sisa {rp(b.sisa)}{b.diterima ? "" : " · belum diterima"}
-                </option>
-              ))}
-            </select>
-          </div>
-        </BarisField>
+              <InfoNilai label="Nilai PO" nilai={rp(poAktif.nilai)} />
+              <InfoNilai label="Total terbayar" nilai={rp(poAktif.terbayar)} warna="var(--green)" />
+              <InfoNilai label="Sisa pembayaran" nilai={rp(poAktif.sisa)} warna="var(--amber)" />
+              <InfoNilai
+                label="Status barang"
+                nilai={poAktif.diterima ? "Diterima" : "Belum diterima"}
+                warna={poAktif.diterima ? undefined : "var(--red)"}
+              />
+            </div>
+          )}
+        </>
       )}
       {sumber === "hutang" && !kosong && (
         <>
@@ -462,7 +481,7 @@ function KrediturField({ pemasok }: { pemasok: { id: string; nama: string }[] })
           <Link href="/estimasi/pemasok" style={{ color: "var(--teal)", fontWeight: 600 }}>
             Tambah supplier
           </Link>{" "}
-          dulu di laman Pemasok, lalu buka kembali form ini.
+          dulu di laman Supplier, lalu buka kembali form ini.
         </div>
       )}
     </div>

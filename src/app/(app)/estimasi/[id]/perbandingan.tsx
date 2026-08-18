@@ -40,6 +40,7 @@ export interface BarisRabUi {
 const sel = (itemId: string, vendorId: string) => `${itemId}__${vendorId}`;
 const styInput: CSSProperties = { textAlign: "right", padding: "4px 8px", fontSize: 12, width: 118, fontVariantNumeric: "tabular-nums" };
 const RONA_MENANG = "var(--rona-hijau2)";
+const ROMAWI = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
 
 function useKirim(aksi: (s: HasilAksi | null, f: FormData) => Promise<HasilAksi>) {
   const [hasil, kirim] = useActionState(aksi, null);
@@ -165,14 +166,7 @@ export function MatriksPerbandingan({
   return (
     <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
       <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-        <div>
-          <div className="eyebrow">Perbandingan Penawaran Vendor</div>
-          <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2, maxWidth: 580, lineHeight: 1.5 }}>
-            Isikan <strong>total harga per baris</strong>; harga satuan dihitung otomatis. Kolom HPS
-            rahasia — tak ikut template vendor. Angka terendah ditandai hijau. Pemenang ditetapkan{" "}
-            <strong>per grup</strong>: satu vendor mengerjakan seluruh grup.
-          </div>
-        </div>
+        <div className="eyebrow">Perbandingan Penawaran Vendor</div>
         {bisaSunting && (
           <FormPemenang rabEstimasiId={rabEstimasiId} kirim={kirimPemenang} payload={payloadPemenang} aktif={pemenangBerubah} />
         )}
@@ -182,7 +176,8 @@ export function MatriksPerbandingan({
         <table style={{ minWidth: 680 }}>
           <thead>
             <tr>
-              <th style={{ textAlign: "left", minWidth: 230 }}>Uraian</th>
+              <th style={{ width: 34 }}>No.</th>
+              <th style={{ textAlign: "left", minWidth: 230 }}>Uraian Pekerjaan</th>
               <th style={{ textAlign: "right", width: 64 }}>Vol</th>
               <th style={{ textAlign: "left", width: 52 }}>Sat</th>
               <th style={{ textAlign: "right", width: 132 }}>HPS</th>
@@ -204,7 +199,7 @@ export function MatriksPerbandingan({
           </thead>
 
           <tbody>
-            {grup.map((g) => {
+            {grup.map((g, gi) => {
               const dilipat = tutup[g.nama];
               const totalGrupHps = g.list.reduce((s, it) => s + it.hpsHargaSatuan * it.volume, 0);
               const menang = pemenang[g.nama] ?? "";
@@ -215,6 +210,7 @@ export function MatriksPerbandingan({
               return (
                 <Fragment key={g.nama}>
                   <tr style={{ background: "var(--rona-abu)" }}>
+                    <td style={{ fontWeight: 700, verticalAlign: "middle", textAlign: "left" }}>{ROMAWI[gi] ?? gi + 1}</td>
                     <td colSpan={4} style={{ verticalAlign: "middle" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                         <button
@@ -223,7 +219,7 @@ export function MatriksPerbandingan({
                           style={{ background: "none", border: "none", cursor: "pointer", font: "inherit", padding: 0, display: "inline-flex", alignItems: "center", gap: 4, color: "inherit" }}
                         >
                           <ChevronDown size={13} style={{ color: "var(--muted)", transform: dilipat ? "rotate(-90deg)" : "none", transition: "transform .15s" }} />
-                          <span style={{ fontWeight: 700, fontSize: 12 }}>{g.nama}</span>
+                          <span style={{ fontWeight: 700, fontSize: 12, textTransform: "uppercase" }}>{g.nama}</span>
                           <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 11.5 }}>
                             {" · "}{g.list.length} baris · HPS {rp(totalGrupHps)}
                           </span>
@@ -278,10 +274,11 @@ export function MatriksPerbandingan({
                   </tr>
 
                   {!dilipat &&
-                    g.list.map((it) => {
+                    g.list.map((it, ii) => {
                       const min = terendahBaris(it);
                       return (
                         <tr key={it.id}>
+                          <td style={{ color: "var(--muted)", verticalAlign: "top", textAlign: "left" }}>{ii + 1}</td>
                           <td style={{ verticalAlign: "top" }}>{it.uraian}</td>
                           <td style={{ textAlign: "right", verticalAlign: "top" }}>{it.volume.toLocaleString("id-ID")}</td>
                           <td style={{ color: "var(--muted)", verticalAlign: "top" }}>{it.satuan}</td>
@@ -332,7 +329,7 @@ export function MatriksPerbandingan({
 
           <tfoot>
             <tr style={{ borderTop: "2px solid var(--line)" }}>
-              <td colSpan={3} style={{ fontWeight: 700, textAlign: "right" }}>Total</td>
+              <td colSpan={4} style={{ fontWeight: 700, textAlign: "right" }}>TOTAL RAB</td>
               <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>{rp(totalHps)}</td>
               {vendors.map((v) => {
                 const t = totalVendor(v.vendorId);

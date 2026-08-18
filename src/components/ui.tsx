@@ -26,6 +26,12 @@ export const WARNA_STATUS: Record<string, Record<string, [string, string]>> = {
     Sesuai: ["var(--rona-teal2)", "var(--teal)"],
     Over: ["var(--rona-merah)", "var(--red)"],
   },
+  // Status capaian SPK/vendor — diturunkan dari Progress Vendor (%), bukan diinput.
+  vendor: {
+    "Belum Mulai": ["var(--rona-abu)", "var(--muted)"],
+    Berjalan: ["var(--rona-amber)", "var(--amber)"],
+    Selesai: ["var(--rona-hijau2)", "var(--green)"],
+  },
   // Status pembayaran kontrak — diturunkan (lihat statusBayarKontrak), bukan diinput.
   bayar: {
     Belum: ["var(--rona-abu)", "var(--muted)"],

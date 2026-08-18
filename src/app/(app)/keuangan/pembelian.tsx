@@ -207,7 +207,7 @@ export function BuatPO({
     >
       <input type="hidden" name="projectId" value={projectId} />
       <BarisField>
-        <Field label="Pemasok" nama="pemasokId" pilihan={pemasok.map((p) => ({ nilai: p.id, label: `${p.nama} · ${p.kategori}` }))} wajib />
+        <Field label="Supplier" nama="pemasokId" pilihan={pemasok.map((p) => ({ nilai: p.id, label: `${p.nama} · ${p.kategori}` }))} wajib />
         <Field label="No. PO / Nota" nama="nomor" wajib petunjuk="mis. PO-2026-014" />
       </BarisField>
       <BarisField>

@@ -162,7 +162,8 @@ export async function pustakaAhsp() {
     prisma.pemasok.findMany({
       orderBy: { nama: "asc" },
       select: {
-        id: true, nama: true, kategori: true, kontak: true, alamat: true, status: true,
+        id: true, nama: true, kategori: true, kontakNama: true, kontakTelepon: true,
+        alamat: true, kecamatan: true, provinsi: true, status: true,
         _count: { select: { penawaran: true } },
       },
     }),
@@ -199,7 +200,8 @@ export async function detailPemasok(id: string) {
   const pemasok = await prisma.pemasok.findUnique({
     where: { id },
     select: {
-      id: true, nama: true, kategori: true, kontak: true, alamat: true, status: true,
+      id: true, nama: true, kategori: true, kontakNama: true, kontakTelepon: true,
+      alamat: true, kecamatan: true, provinsi: true, status: true,
       penawaran: {
         orderBy: { tanggal: "desc" },
         select: {
@@ -255,4 +257,27 @@ export async function objekProyek(projectId: string) {
     units: units.map((u) => ({ id: u.id, nama: `${u.phase.kode}-${u.nomor} · ${u.unitType.nama}` })),
     sarpras: sarpras.map((s) => ({ id: s.id, nama: `${s.nama} (${s.jenis})` })),
   };
+}
+
+/**
+ * Nomor urut SPK berikutnya (3 digit) untuk kode kontrak {KODE}/{K|S}/{TAHUN}/{urut}.
+ * Dihitung terpisah untuk jenis Unit (K) dan Sarpras (S) — sesuai penomoran di
+ * `buatKontrakDariRab`. Dipakai hanya untuk PRATINJAU di form Buat SPK; nomor
+ * final tetap dikunci ulang saat aksi berjalan agar tak bentrok.
+ */
+export async function nomorSpkBerikutnya(projectKode: string, tahun = new Date().getFullYear()) {
+  const hitung = async (huruf: "K" | "S") => {
+    const awalan = `${projectKode}/${huruf}/${tahun}/`;
+    const ada = await prisma.contract.findMany({
+      where: { kode: { startsWith: awalan } },
+      select: { kode: true },
+    });
+    const urut = ada.reduce((m, c) => {
+      const n = parseInt(c.kode.slice(awalan.length), 10);
+      return Number.isFinite(n) && n > m ? n : m;
+    }, 0);
+    return String(urut + 1).padStart(3, "0");
+  };
+  const [K, S] = await Promise.all([hitung("K"), hitung("S")]);
+  return { K, S, tahun };
 }

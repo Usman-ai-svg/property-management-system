@@ -1321,8 +1321,13 @@ model Pemasok {
   nama     String
   /// Material | Tenaga Kerja | Alat
   kategori String
-  kontak   String @default("")
-  alamat   String @default("")
+  /// Kontak dipecah: nama narahubung + nomor telepon.
+  kontakNama    String @default("")
+  kontakTelepon String @default("")
+  /// Alamat dipecah: alamat jalan + kecamatan + provinsi.
+  alamat    String @default("")
+  kecamatan String @default("")
+  provinsi  String @default("")
   /// Aktif | Nonaktif
   status   String @default("Aktif")
 

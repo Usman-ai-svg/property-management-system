@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useTransition } from "react";
+import { Fragment, useState, useTransition, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { HasilAksi } from "@/lib/actions/guard";
 import { rp } from "@/lib/format";
@@ -69,6 +69,9 @@ export function BoqTable({
   sasaranImpor,
   idImpor,
   aksiImpor,
+  aksiTambahan,
+  aksiSuntingTambahan,
+  tanpaImporBawaan,
 }: {
   judul: string;
   baris: BarisBoqUI[];
@@ -76,13 +79,23 @@ export function BoqTable({
   bolehUbah: boolean;
   /** Menerima seluruh kelompok sebagai JSON dan menyimpannya. */
   aksiSimpan: (dataJson: string) => Promise<HasilAksi>;
-  konteksImpor: string;
+  konteksImpor?: string;
   /** Sasaran dan id untuk impor Excel. */
-  sasaranImpor: "unit" | "kerjaTambah" | "sarpras" | "tipeUnit";
-  idImpor: string;
+  sasaranImpor?: "unit" | "kerjaTambah" | "sarpras" | "tipeUnit";
+  idImpor?: string;
   /** Aksi impor Excel — diterima lewat prop supaya komponen ini tidak
    *  mengimpor dari `app/`. */
-  aksiImpor: (sebelumnya: HasilAksi | null, form: FormData) => Promise<HasilAksi>;
+  aksiImpor?: (sebelumnya: HasilAksi | null, form: FormData) => Promise<HasilAksi>;
+  /** Aksi mandiri di kepala saat TIDAK menyunting, mis. "Impor Excel" (ganti semua). */
+  aksiTambahan?: ReactNode;
+  /**
+   * Aksi yang hanya muncul saat menyunting dan MENYUNTIK baris ke draf, mis.
+   * "Tambah Baris" dari pustaka AHSP. Menerima callback `tambah` agar baris baru
+   * langsung tampil di mode Ubah — bukan lewat tulis-ke-DB yang butuh Simpan dulu.
+   */
+  aksiSuntingTambahan?: (tambah: (rows: BarisBoqUI[]) => void) => ReactNode;
+  /** Sembunyikan tombol Impor Excel bawaan (bila pemanggil punya impornya sendiri). */
+  tanpaImporBawaan?: boolean;
 }) {
   const [sunting, setSunting] = useState(false);
   const [draft, setDraft] = useState<Kelompok[]>(() => kelompokkan(baris));
@@ -117,6 +130,26 @@ export function BoqTable({
       }
     });
 
+  /**
+   * Suntikkan baris baru ke draf yang sedang disunting. Baris digabung ke
+   * kelompok bernama sama bila ada, atau kelompok baru bila belum ada — sehingga
+   * hasil "Tambah Baris" langsung terlihat tanpa harus Simpan lebih dulu.
+   */
+  const tambahBaris = (rows: BarisBoqUI[]) =>
+    setDraft((d) => {
+      const next = d.map((g) => ({ ...g, items: g.items.map((i) => ({ ...i })) }));
+      for (const r of rows) {
+        const nama = r.grup?.trim() || "Kelompok Baru";
+        let g = next.find((x) => x.nama === nama);
+        if (!g) {
+          g = { nama, items: [] };
+          next.push(g);
+        }
+        g.items.push({ ...r, grup: nama });
+      }
+      return next;
+    });
+
   const ubahItem = (gi: number, ii: number, field: keyof BarisBoqUI, nilai: string | number) =>
     setDraft((d) =>
       d.map((g, x) =>
@@ -125,14 +158,16 @@ export function BoqTable({
     );
 
   const isian = (
-    gi: number, ii: number, field: keyof BarisBoqUI, lebar: number, angka?: boolean,
+    gi: number, ii: number, field: keyof BarisBoqUI, angka?: boolean,
   ) => (
     <input
       className="inp"
       type={angka ? "number" : "text"}
       value={String(kelompok[gi].items[ii][field] ?? "")}
       onChange={(e) => ubahItem(gi, ii, field, angka ? Number(e.target.value) || 0 : e.target.value)}
-      style={{ ...sel, width: lebar, textAlign: angka ? "right" : "left" }}
+      // Isian mengisi penuh lebar kolom (yang sudah dikunci colgroup) — bukan
+      // lebar tetap dalam px — agar kolom tak bergeser saat masuk mode Ubah.
+      style={{ ...sel, width: "100%", boxSizing: "border-box", textAlign: angka ? "right" : "left" }}
     />
   );
 
@@ -147,14 +182,21 @@ export function BoqTable({
         <div className="eyebrow">{judul}</div>
         {bolehHarga && bolehUbah && (
           <div style={{ display: "flex", gap: 6 }}>
-            <ModalImpor
-              jenis="BOQ / RAB"
-              konteks={konteksImpor}
-              kolom="Grup · Uraian Pekerjaan · Satuan · Volume · Harga Satuan · Spesifikasi"
-              sasaran={sasaranImpor}
-              id={idImpor}
-              aksiImpor={aksiImpor}
-            />
+            {/* Di luar mode sunting: aksi mandiri (mis. Impor Excel — ganti semua).
+                Dalam mode sunting: tombol tambah baris yang menyuntik ke draf,
+                sejajar dengan tautan "+ Tambah baris" di dalam tabel. */}
+            {!sunting && aksiTambahan}
+            {sunting && aksiSuntingTambahan?.(tambahBaris)}
+            {!tanpaImporBawaan && aksiImpor && sasaranImpor && idImpor && (
+              <ModalImpor
+                jenis="BOQ / RAB"
+                konteks={konteksImpor ?? ""}
+                kolom="Grup · Uraian Pekerjaan · Satuan · Volume · Harga Satuan · Spesifikasi"
+                sasaran={sasaranImpor}
+                id={idImpor}
+                aksiImpor={aksiImpor}
+              />
+            )}
             {sunting && (
               <button type="button" className="btn-garis" style={{ color: "var(--muted)" }} onClick={batal}>
                 Batal
@@ -187,18 +229,31 @@ export function BoqTable({
       )}
 
       <div className="card tablewrap" style={{ maxHeight: 520, overflowY: "auto" }}>
-        <table>
+        {/* table-layout: fixed + colgroup — lebar kolom SAMA di mode lihat & Ubah,
+            supaya kolom tidak bergeser saat sel berubah jadi isian. */}
+        <table style={{ tableLayout: "fixed", minWidth: bolehHarga ? 920 : 660 }}>
+          <colgroup>
+            <col style={{ width: 40 }} />
+            <col />
+            <col style={{ width: 72 }} />
+            <col style={{ width: 56 }} />
+            {bolehHarga && <col style={{ width: 120 }} />}
+            {bolehHarga && <col style={{ width: 120 }} />}
+            <col style={{ width: 72 }} />
+            <col style={{ width: 220 }} />
+            {sunting && <col style={{ width: 40 }} />}
+          </colgroup>
           <thead>
             <tr>
-              <th style={{ width: 34 }}>No.</th>
-              <th style={{ minWidth: 170 }}>Uraian Pekerjaan</th>
+              <th>No.</th>
+              <th>Uraian Pekerjaan</th>
               <th style={{ textAlign: "right" }}>Vol</th>
               <th>Sat</th>
               {bolehHarga && <th style={{ textAlign: "right" }}>Harga Satuan</th>}
               {bolehHarga && <th style={{ textAlign: "right" }}>Subtotal</th>}
               <th style={{ textAlign: "right" }}>Bobot</th>
-              <th style={{ minWidth: 200 }}>Spesifikasi</th>
-              {sunting && <th style={{ width: 34 }} />}
+              <th>Spesifikasi</th>
+              {sunting && <th />}
             </tr>
           </thead>
           <tbody>
@@ -245,14 +300,14 @@ export function BoqTable({
                   return (
                     <tr key={r.id ?? `${gi}-${ii}`}>
                       <td style={{ color: "var(--muted)" }}>{ii + 1}</td>
-                      <td>{sunting ? isian(gi, ii, "uraian", 160) : r.uraian}</td>
+                      <td style={{ whiteSpace: "normal" }}>{sunting ? isian(gi, ii, "uraian") : r.uraian}</td>
                       <td style={{ textAlign: "right" }}>
-                        {sunting ? isian(gi, ii, "volume", 58, true) : r.volume.toLocaleString("id-ID")}
+                        {sunting ? isian(gi, ii, "volume", true) : r.volume.toLocaleString("id-ID")}
                       </td>
-                      <td>{sunting ? isian(gi, ii, "satuan", 44) : r.satuan}</td>
+                      <td>{sunting ? isian(gi, ii, "satuan") : r.satuan}</td>
                       {bolehHarga && (
                         <td style={{ textAlign: "right" }}>
-                          {sunting ? isian(gi, ii, "hargaSatuan", 96, true) : rp(r.hargaSatuan)}
+                          {sunting ? isian(gi, ii, "hargaSatuan", true) : rp(r.hargaSatuan)}
                         </td>
                       )}
                       {bolehHarga && (
@@ -262,7 +317,7 @@ export function BoqTable({
                         {total ? ((sub / total) * 100).toFixed(2) : "0.00"}%
                       </td>
                       <td style={{ whiteSpace: "normal", color: "var(--muted)", lineHeight: 1.45 }}>
-                        {sunting ? isian(gi, ii, "spesifikasi", 200) : r.spesifikasi || "—"}
+                        {sunting ? isian(gi, ii, "spesifikasi") : r.spesifikasi || "—"}
                       </td>
                       {sunting && (
                         <td>

@@ -399,6 +399,10 @@ export async function pintuBayar(u: Pengguna) {
         return {
           id: b.id,
           label: `${b.nomor} · ${b.pemasok.nama}`,
+          // Ringkasan nilai — ditampilkan sebagai info saat PO dipilih, selaras
+          // dengan Pembayaran Kontrak & Bayar Hutang.
+          nilai: total,
+          terbayar,
           sisa: total - terbayar,
           diterima: b.status === "Diterima",
         };

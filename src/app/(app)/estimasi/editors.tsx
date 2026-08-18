@@ -7,6 +7,7 @@ import {
 } from "@/components/form";
 import { Petunjuk } from "@/components/ui";
 import { useToast } from "@/components/toast";
+import type { BarisBoqUI } from "@/components/boq-table";
 import type { HasilAksi } from "@/lib/actions/guard";
 import {
   KATEGORI_HARGA_DASAR, KATEGORI_PEMASOK, STATUS_PEMASOK,
@@ -17,7 +18,7 @@ import { rp } from "@/lib/format";
 import {
   hapusAnalisa, hapusBarisRab, hapusHargaDasar, hapusPemasok, hapusPenawaran,
   hapusRabEstimasi, imporBarisRab, jadikanAcuan, segarkanHargaBaris,
-  simpanAnalisa, tambahBarisRab, tambahHargaDasar, tambahPemasok, tambahPenawaran,
+  simpanAnalisa, tambahHargaDasar, tambahPemasok, tambahPenawaran,
   tambahRabEstimasi, ubahBarisRab, ubahHargaDasar, ubahPemasok, ubahRabEstimasi,
 } from "./actions";
 
@@ -66,8 +67,11 @@ export interface PemasokForm {
   id: string;
   nama: string;
   kategori: string;
-  kontak: string;
+  kontakNama: string;
+  kontakTelepon: string;
   alamat: string;
+  kecamatan: string;
+  provinsi: string;
   status: string;
 }
 
@@ -79,11 +83,18 @@ function IsianPemasok({ nilai }: { nilai?: PemasokForm }) {
         <Field label="Kategori" nama="kategori" nilai={nilai?.kategori ?? KATEGORI_PEMASOK[0]} pilihan={KATEGORI_PEMASOK} />
       </BarisField>
       <BarisField>
-        <Field label="Kontak" nama="kontak" nilai={nilai?.kontak ?? ""} petunjuk="Telepon / narahubung" />
-        <Field label="Status" nama="status" nilai={nilai?.status ?? STATUS_PEMASOK[0]} pilihan={STATUS_PEMASOK} />
+        <Field label="Nama Kontak" nama="kontakNama" nilai={nilai?.kontakNama ?? ""} petunjuk="Nama narahubung" />
+        <Field label="No. Telepon" nama="kontakTelepon" nilai={nilai?.kontakTelepon ?? ""} petunjuk="mis. 0812-xxxx-xxxx" />
       </BarisField>
       <BarisField kolom={1}>
         <Field label="Alamat" nama="alamat" nilai={nilai?.alamat ?? ""} />
+      </BarisField>
+      <BarisField>
+        <Field label="Kecamatan" nama="kecamatan" nilai={nilai?.kecamatan ?? ""} />
+        <Field label="Provinsi" nama="provinsi" nilai={nilai?.provinsi ?? ""} />
+      </BarisField>
+      <BarisField kolom={1}>
+        <Field label="Status" nama="status" nilai={nilai?.status ?? STATUS_PEMASOK[0]} pilihan={STATUS_PEMASOK} />
       </BarisField>
     </>
   );
@@ -92,11 +103,11 @@ function IsianPemasok({ nilai }: { nilai?: PemasokForm }) {
 export function TambahPemasok() {
   return (
     <FormModal
-      judul="Tambah Pemasok"
-      keterangan="Pemasok material, tenaga kerja, atau alat — sumber harga dasar AHSP."
+      judul="Tambah Supplier"
+      keterangan="Supplier material, tenaga kerja, atau alat — sumber harga dasar AHSP."
       aksi={tambahPemasok}
       labelSimpan="Tambah"
-      pemicu={(buka) => <TombolTambah onClick={buka} label="Tambah Pemasok" />}
+      pemicu={(buka) => <TombolTambah onClick={buka} label="Tambah Supplier" />}
     >
       <IsianPemasok />
     </FormModal>
@@ -108,7 +119,7 @@ export function UbahPemasok({ pemasok }: { pemasok: PemasokForm }) {
     <FormModal
       judul={`Ubah ${pemasok.nama}`}
       aksi={ubahPemasok}
-      pemicu={(buka) => <TombolIkon onClick={buka} judul={`Ubah pemasok ${pemasok.nama}`} />}
+      pemicu={(buka) => <TombolIkon onClick={buka} judul={`Ubah supplier ${pemasok.nama}`} />}
     >
       <input type="hidden" name="id" value={pemasok.id} />
       <IsianPemasok nilai={pemasok} />
@@ -117,7 +128,7 @@ export function UbahPemasok({ pemasok }: { pemasok: PemasokForm }) {
 }
 
 export function HapusPemasok({ id, nama }: { id: string; nama: string }) {
-  return <TombolHapus aksi={hapusPemasok} id={id} nama={`pemasok ${nama}`} />;
+  return <TombolHapus aksi={hapusPemasok} id={id} nama={`supplier ${nama}`} />;
 }
 
 // ===========================================================================
@@ -486,12 +497,18 @@ export interface RabForm {
   status: string;
 }
 
-export function UbahRabEstimasi({ rab }: { rab: RabForm }) {
+export function UbahRabEstimasi({ rab, ikon }: { rab: RabForm; ikon?: boolean }) {
   return (
     <FormModal
       judul={`Ubah ${rab.nomor}`}
       aksi={ubahRabEstimasi}
-      pemicu={(buka) => <button type="button" className="pill" onClick={buka}>Ubah info</button>}
+      pemicu={(buka) =>
+        ikon ? (
+          <TombolIkon onClick={buka} judul={`Ubah ${rab.nomor}`} />
+        ) : (
+          <button type="button" className="pill" onClick={buka}>Ubah info</button>
+        )
+      }
     >
       <input type="hidden" name="id" value={rab.id} />
       <BarisField kolom={1}>
@@ -524,7 +541,13 @@ export interface KatalogItem {
  * harga satuannya terisi otomatis (snapshot), lalu mengetik volume. Ada juga
  * mode manual untuk pekerjaan yang belum ada analisanya.
  */
-export function TambahBarisRab({ rabEstimasiId, katalog }: { rabEstimasiId: string; katalog: KatalogItem[] }) {
+export function TambahBarisRab({
+  katalog, onTambah,
+}: {
+  katalog: KatalogItem[];
+  /** Menyuntik baris baru ke draf tabel yang sedang disunting (bukan tulis-ke-DB). */
+  onTambah: (rows: BarisBoqUI[]) => void;
+}) {
   const [mode, setMode] = useState<"katalog" | "manual">(katalog.length > 0 ? "katalog" : "manual");
   const [pilih, setPilih] = useState(katalog[0]?.id ?? "");
   const [volume, setVolume] = useState("");
@@ -532,17 +555,49 @@ export function TambahBarisRab({ rabEstimasiId, katalog }: { rabEstimasiId: stri
   const item = katalog.find((k) => k.id === pilih);
   const jumlah = item && Number(volume) > 0 ? item.hargaSatuan * Number(volume) : 0;
 
+  // Menambah baris ke DRAF tabel (state lokal BoqTable), bukan ke database.
+  // Dengan begitu baris langsung terlihat di mode Ubah; penyimpanan permanen
+  // terjadi saat pengguna menekan "Simpan" pada tabel. Kaitan AHSP (analisaId)
+  // sengaja tidak dibawa — sama seperti tautan "+ Tambah baris" di dalam tabel,
+  // baris jadi snapshot murni (grup/uraian/satuan/harga tetap terisi).
+  const tambahKeDraf = async (_prev: HasilAksi | null, form: FormData): Promise<HasilAksi> => {
+    const vol = Number(String(form.get("volume") ?? "").replace(",", "."));
+    if (!Number.isFinite(vol) || vol < 0) return { ok: false, error: "Volume tidak sah." };
+    const spesifikasi = String(form.get("spesifikasi") ?? "").trim() || null;
+    const analisaId = form.get("analisaId");
+
+    let baris: BarisBoqUI;
+    if (analisaId) {
+      const dipilih = katalog.find((k) => k.id === String(analisaId));
+      if (!dipilih) return { ok: false, error: "Item katalog tidak ditemukan." };
+      baris = {
+        grup: dipilih.kelompok, uraian: dipilih.uraian, satuan: dipilih.satuan,
+        volume: vol, hargaSatuan: dipilih.hargaSatuan, spesifikasi,
+      };
+    } else {
+      const grup = String(form.get("grup") ?? "").trim();
+      const uraian = String(form.get("uraian") ?? "").trim();
+      const satuan = String(form.get("satuan") ?? "").trim();
+      const hargaSatuan = Number(String(form.get("hargaSatuan") ?? "").replace(",", "."));
+      if (!grup || !uraian || !satuan) return { ok: false, error: "Grup, uraian, dan satuan wajib diisi." };
+      if (!Number.isFinite(hargaSatuan) || hargaSatuan < 0) return { ok: false, error: "Harga satuan tidak sah." };
+      baris = { grup, uraian, satuan, volume: vol, hargaSatuan, spesifikasi };
+    }
+
+    onTambah([baris]);
+    setVolume("");
+    return { ok: true, pesan: `Baris "${baris.uraian}" ditambahkan ke draf — tekan Simpan untuk menyimpan.` };
+  };
+
   return (
     <FormModal
       judul="Tambah Baris RAB"
-      keterangan="Pilih pekerjaan dari pustaka AHSP, atau isi manual."
-      aksi={tambahBarisRab}
+      keterangan="Pilih pekerjaan dari pustaka AHSP, atau isi manual. Baris masuk ke draf; tekan Simpan pada tabel untuk menyimpan."
+      aksi={tambahKeDraf}
       labelSimpan="Tambah"
       lebar={640}
       pemicu={(buka) => <TombolTambah onClick={buka} label="Tambah Baris" />}
     >
-      <input type="hidden" name="rabEstimasiId" value={rabEstimasiId} />
-
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
         <button
           type="button"

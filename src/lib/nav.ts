@@ -27,7 +27,7 @@ export const NAV: ItemNav[] = [
     anak: [
       { id: "estimasi-rab", label: "RAB Estimasi", href: "/estimasi", butuhSection: "hargaRabRap" },
       { id: "estimasi-pustaka", label: "Pustaka AHSP", href: "/estimasi/pustaka", butuhSection: "hargaRabRap" },
-      { id: "estimasi-pemasok", label: "Pemasok", href: "/estimasi/pemasok", butuhSection: "hargaRabRap" },
+      { id: "estimasi-pemasok", label: "Supplier", href: "/estimasi/pemasok", butuhSection: "hargaRabRap" },
     ],
   },
   {

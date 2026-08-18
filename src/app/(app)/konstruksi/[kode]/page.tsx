@@ -48,9 +48,12 @@ export default async function ProgresProyek({
     id: s.id, kode: s.kode, nama: s.nama, jenis: s.jenis, volume: s.volume,
     progress: s.progress, status: s.status,
   }));
+  // Status SPK diturunkan dari Progress Vendor (%), selaras dengan status
+  // unit/sarpras yang juga turunan progres — Contract sendiri tak menyimpan status.
+  const statusSpk = (p: number) => (p <= 0 ? "Belum Mulai" : p < 100 ? "Berjalan" : "Selesai");
   const vendorRows = kontrak.map((c) => ({
     id: c.id, kode: c.kode, vendor: c.vendor.nama, deskripsi: c.deskripsi,
-    nominal: c.nominal, objek: c.objek, progres: c.progres,
+    nominal: c.nominal, objek: c.objek, progres: c.progres, status: statusSpk(c.progres),
   }));
 
   // Data laporan meeting — memuat SELURUH unit & sarpras (bukan hasil saringan),

@@ -115,6 +115,21 @@ describe("biayaLangsung", () => {
     assert.equal(hasil.perUnit.get("u1"), 60);
     assert.equal(hasil.perSarpras.get("s1"), 40);
     assert.equal(hasil.levelProyek, 25);
+    // Tanpa peruntukan, biaya level proyek jatuh ke "umum".
+    assert.equal(hasil.levelUmum, 25);
+  });
+
+  it("memilah biaya level proyek ke sisi unit, sarpras, dan umum via peruntukan", () => {
+    const hasil = biayaLangsung([
+      { total: 10, peruntukan: "Unit (rumah dijual)", alokasi: [{ unitId: null, infrastructureId: null, nominal: 10 }] },
+      { total: 20, peruntukan: "Prasarana & Sarana", alokasi: [{ unitId: null, infrastructureId: null, nominal: 20 }] },
+      { total: 30, peruntukan: "Perijinan & Ormas", alokasi: [{ unitId: null, infrastructureId: null, nominal: 30 }] },
+      { total: 40, peruntukan: "Pengolahan Lahan", alokasi: [{ unitId: null, infrastructureId: null, nominal: 40 }] },
+    ]);
+    assert.equal(hasil.levelUnit, 10);
+    assert.equal(hasil.levelSarpras, 20);
+    assert.equal(hasil.levelUmum, 70);
+    assert.equal(hasil.levelProyek, 100);
   });
 
   it("total seluruh pecahan sama dengan total seluruh transaksi", () => {
