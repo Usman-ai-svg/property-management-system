@@ -6,7 +6,7 @@ import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, pilihanOpsional, teks, teksOpsional,
 } from "@/lib/actions/guard";
-import { periksaAlokasi } from "@/lib/calc/keuangan";
+import { bagiRata, periksaAlokasi } from "@/lib/calc/keuangan";
 import { simpanBuktiOpsional } from "@/lib/actions/bukti";
 import { hapusBerkas } from "@/lib/storage";
 import { JENIS_BIAYA_SWAKELOLA, METODE_BAYAR, METODE_TUNAI, PERUNTUKAN_BIAYA, POS_HPP, SASARAN_PERUNTUKAN, STATUS_PEMBELIAN } from "@/lib/domain/enums";
@@ -432,6 +432,83 @@ export async function hapusPengeluaran(_s: HasilAksi | null, form: FormData): Pr
     revalidatePath("/keuangan");
     revalidatePath(`/keuangan/${lama.project.kode}`);
     revalidatePath("/");
+  });
+}
+
+/**
+ * Bagikan biaya level-proyek berperuntukan Unit ke SEMUA unit proyek, rata sama
+ * besar. Dipanggil dari kartu Pengeluaran per Unit.
+ *
+ * Aksi satu arah: begitu tiap biaya menempel ke unit lewat ExpenseAllocation,
+ * bucket "biaya level proyek (unit)" ikut kosong dengan sendirinya — tak ada
+ * flag atau penanda yang perlu disimpan. Hanya menyentuh alokasi yang MASIH
+ * level-proyek (unit & sarpras sama-sama null); alokasi ke unit/sarpras tertentu
+ * pada pengeluaran yang sama dibiarkan. Total tiap pengeluaran tetap utuh —
+ * yang dibagi hanya porsi level-proyeknya — jadi Σ alokasi tetap sama dengan
+ * totalnya.
+ */
+export async function bagikanBiayaUnitRata(
+  _s: HasilAksi | null,
+  form: FormData,
+): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const projectId = teks(form, "projectId", true);
+    const pengguna = await izinkan("keuangan", projectId);
+
+    const proyek = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, kode: true, units: { select: { id: true } } },
+    });
+    if (!proyek) throw new GagalIzin("Proyek tidak ditemukan.");
+    if (proyek.units.length === 0) throw new GagalIzin("Proyek ini belum punya unit.");
+
+    const expenses = await prisma.expense.findMany({
+      where: {
+        projectId,
+        peruntukan: "Unit (rumah dijual)",
+        alokasi: { some: { unitId: null, infrastructureId: null } },
+      },
+      select: {
+        id: true,
+        alokasi: { select: { id: true, unitId: true, infrastructureId: true, nominal: true } },
+      },
+    });
+
+    const unitIds = proyek.units.map((u) => u.id);
+    let jumlahBiaya = 0;
+    let totalDibagi = 0;
+
+    await prisma.$transaction(async (tx) => {
+      for (const e of expenses) {
+        const level = e.alokasi.filter((a) => !a.unitId && !a.infrastructureId);
+        const nilai = level.reduce((s, a) => s + a.nominal, 0);
+        if (nilai <= 0) continue;
+        await tx.expenseAllocation.deleteMany({ where: { id: { in: level.map((a) => a.id) } } });
+        const bagian = bagiRata(nilai, unitIds.length);
+        await tx.expenseAllocation.createMany({
+          data: unitIds.map((unitId, i) => ({ expenseId: e.id, unitId, nominal: bagian[i] ?? 0 })),
+        });
+        jumlahBiaya += 1;
+        totalDibagi += nilai;
+      }
+    });
+
+    if (jumlahBiaya === 0) {
+      throw new GagalIzin("Tidak ada biaya level-proyek (unit) yang bisa dibagikan.");
+    }
+
+    await catat({
+      pengguna, projectId,
+      objek: "Keuangan Proyek · Biaya level proyek (unit)",
+      aksi: "Bagikan biaya ke unit (rata)",
+      ke: `${jumlahBiaya} biaya · ${rpLog(totalDibagi)} dibagi rata ke ${unitIds.length} unit`,
+    });
+
+    revalidatePath("/keuangan");
+    revalidatePath(`/keuangan/${proyek.kode}`);
+    revalidatePath("/");
+
+    return `${rpLog(totalDibagi)} dibagikan rata ke ${unitIds.length} unit.`;
   });
 }
 

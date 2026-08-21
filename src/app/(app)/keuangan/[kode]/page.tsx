@@ -17,6 +17,7 @@ import { RvsRAP } from "@/components/charts";
 import { Badge, Kartu, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { BreakdownKategori } from "../breakdown-kategori";
 import { PanelTransaksi } from "./transaksi";
+import { BagikanKeUnit } from "./bagi-unit";
 import { BuatPO, PanelPembelian } from "../pembelian";
 import { Tabel } from "@/components/kartu-tabel";
 
@@ -302,10 +303,21 @@ export default async function KeuanganProyek({
               </td>
             </tr>
           )}
-          {levelUnit > 0 && (
+          {proyek.units.length > 0 && (
             <tr style={{ fontWeight: 600, background: "var(--rona-baris)" }}>
               <td colSpan={6} style={{ color: "var(--muted)", whiteSpace: "normal" }}>
-                Biaya level proyek (unit) — berperuntukan unit, belum dialokasikan ke unit tertentu
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span>
+                    Biaya level proyek (unit) — berperuntukan unit, belum dialokasikan ke unit tertentu
+                  </span>
+                  {levelUnit > 0 && bolehUbahKeuangan && (
+                    <BagikanKeUnit
+                      projectId={proyek.id}
+                      nilai={levelUnit}
+                      jumlahUnit={proyek.units.length}
+                    />
+                  )}
+                </div>
               </td>
               <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>{rp(levelUnit)}</td>
               <td />
@@ -572,7 +584,7 @@ export default async function KeuanganProyek({
               </td>
             </tr>
           )}
-          {levelSarpras > 0 && (
+          {proyek.infrastructures.length > 0 && (
             <tr style={{ fontWeight: 600, background: "var(--rona-baris)" }}>
               <td colSpan={5} style={{ color: "var(--muted)", whiteSpace: "normal" }}>
                 Biaya level proyek (sarpras) — berperuntukan prasarana &amp; sarana, belum dialokasikan ke item tertentu
@@ -584,24 +596,22 @@ export default async function KeuanganProyek({
         </Tabel>
       </div>
 
-      {levelUmum > 0 && (
-        <div
-          className="card"
-          style={{
-            marginTop: 16, padding: "14px 20px", display: "flex",
-            justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <div className="eyebrow">Biaya Level Proyek (Umum)</div>
-            <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2, maxWidth: 620, lineHeight: 1.5 }}>
-              Perijinan &amp; ormas, pengolahan lahan — biaya proyek yang tidak menempel pada unit
-              maupun sarana &amp; prasarana, jadi tidak dibagi ke keduanya.
-            </div>
+      <div
+        className="card"
+        style={{
+          marginTop: 16, padding: "14px 20px", display: "flex",
+          justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <div className="eyebrow">Biaya Level Proyek (Umum)</div>
+          <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2, maxWidth: 620, lineHeight: 1.5 }}>
+            Perijinan &amp; ormas, pengolahan lahan — biaya proyek yang tidak menempel pada unit
+            maupun sarana &amp; prasarana, jadi tidak dibagi ke keduanya.
           </div>
-          <div className="num" style={{ fontSize: 18, fontWeight: 600 }}>{rp(levelUmum)}</div>
         </div>
-      )}
+        <div className="num" style={{ fontSize: 18, fontWeight: 600 }}>{rp(levelUmum)}</div>
+      </div>
 
       {/* ---------- rincian biaya satu item sarpras ---------- */}
       {sarprasRinci &&
