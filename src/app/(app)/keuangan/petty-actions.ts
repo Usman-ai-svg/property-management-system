@@ -16,8 +16,21 @@ import type { Pengguna } from "@/lib/auth/rbac";
 const BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 const periodeSekarang = (d = new Date()) => `${BULAN[d.getMonth()]} ${d.getFullYear()}`;
 
+/**
+ * Peran sistem yang boleh menembus SEMUA tahap alur petty cash — pintasan
+ * superuser untuk menguji/menjalankan proses ujung-ke-ujung dari satu akun,
+ * tanpa berganti-ganti login. Administrator Sistem memang sudah memegang hak
+ * ubah semua sub-bagian; ini menyelaraskan alur petty cash dengannya.
+ */
+const PERAN_SUPERUSER = "Administrator Sistem";
+
+/** Apakah pengguna adalah superuser yang menembus batas peran petty cash. */
+const superuserPetty = (pengguna: Pengguna): boolean =>
+  pengguna.peranAktif === PERAN_SUPERUSER;
+
 /** Tolak bila peran aktif bukan salah satu yang berhak atas tahap ini. */
 function wajibPeran(pengguna: Pengguna, ...peran: string[]): void {
+  if (superuserPetty(pengguna)) return;
   if (!peran.includes(pengguna.peranAktif)) {
     throw new GagalIzin(
       `Tahap ini hanya untuk peran ${peran.join(" / ")} — Anda sedang berperan "${pengguna.peranAktif}".`,
@@ -174,7 +187,7 @@ export async function catatPengeluaranPetty(_s: HasilAksi | null, form: FormData
     if (!dana.aktif) throw new GagalIzin("Dana ini sudah ditutup.");
 
     const pengguna = await izinkan("pettyCash", dana.projectId);
-    if (pengguna.id !== dana.pemegangId) {
+    if (pengguna.id !== dana.pemegangId && !superuserPetty(pengguna)) {
       throw new GagalIzin("Hanya pemegang dana yang boleh mencatat pengeluaran petty cash-nya.");
     }
 
@@ -236,7 +249,7 @@ export async function ajukanLaporanPetty(_s: HasilAksi | null, form: FormData): 
     const r = await ambilLaporan(reportId);
 
     const pengguna = await izinkan("pettyCash", r.fund.projectId);
-    if (pengguna.id !== r.fund.pemegangId) {
+    if (pengguna.id !== r.fund.pemegangId && !superuserPetty(pengguna)) {
       throw new GagalIzin("Hanya pemegang dana yang boleh mengajukan laporannya.");
     }
     if (!cariTransisi(r.status as (typeof STATUS_PETTY_CASH)[number], "Diajukan")) {

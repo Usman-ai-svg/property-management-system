@@ -13,6 +13,13 @@ import {
   reimburseLaporanPetty, transisiLaporanPetty,
 } from "../petty-actions";
 
+/**
+ * Peran sistem yang menembus semua tahap alur (selaras dengan override di
+ * petty-actions.ts) — supaya tombol tiap tahap tampil untuk menguji proses
+ * ujung-ke-ujung dari satu akun.
+ */
+const SUPERUSER = "Administrator Sistem";
+
 const WARNA_PETTY: Record<string, [string, string]> = {
   Draft: ["var(--rona-abu)", "var(--muted)"],
   Diajukan: ["var(--rona-amber)", "var(--amber)"],
@@ -74,7 +81,8 @@ export function PettyCash({
 }
 
 function DanaBlok({ dana, konteks }: { dana: DanaPettyCash; konteks: Konteks }) {
-  const isPemegang = konteks.id === dana.pemegang.id;
+  const isAdmin = konteks.peranAktif === SUPERUSER;
+  const isPemegang = konteks.id === dana.pemegang.id || isAdmin;
   const saldoMinus = dana.saldo < 0;
 
   return (
@@ -129,11 +137,14 @@ function LaporanBaris({
   const [buka, setBuka] = useState(false);
   const status = laporan.status as StatusPettyCash;
 
-  // Aksi yang boleh dilakukan viewer pada status ini.
+  // Aksi yang boleh dilakukan viewer pada status ini. Administrator Sistem
+  // (superuser) menembus semua tahap agar prosesnya bisa dijalankan dari satu
+  // akun — selaras dengan override di petty-actions.ts.
+  const isAdmin = konteks.peranAktif === SUPERUSER;
   const aksi = transisiDari(status).filter((t) => {
     if (t.oleh === "Pemegang") return isPemegang;
-    if (t.oleh === "Quantity Surveyor") return konteks.peranAktif === "Quantity Surveyor";
-    if (t.oleh === "Head Operation Project") return konteks.peranAktif === "Head Operation Project";
+    if (t.oleh === "Quantity Surveyor") return isAdmin || konteks.peranAktif === "Quantity Surveyor";
+    if (t.oleh === "Head Operation Project") return isAdmin || konteks.peranAktif === "Head Operation Project";
     if (t.oleh === "Finance") return konteks.bolehKeuangan;
     return false;
   });
