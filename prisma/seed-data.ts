@@ -570,10 +570,19 @@ export const PETTY_CASH = [
         ],
       },
       {
-        periode: "Jul 2026", status: "Diajukan", tgl: "18 Jul 2026",
+        // Batch awal Juli — menunjukkan satu bulan bisa memuat lebih dari satu
+        // siklus reimburse (frekuensi 2 minggu–1 bulan).
+        periode: "Jul 2026 (I)", status: "Direimburse", tgl: "10 Jul 2026",
         pengeluaran: [
-          { tgl: "10 Jul 2026", peruntukan: "Unit (rumah dijual)", jenis: "Upah Harian", uraian: "Upah tukang minggu ke-2 Juli", total: 2400000 },
-          { tgl: "14 Jul 2026", peruntukan: "Unit (rumah dijual)", jenis: "Lain-lain proyek", uraian: "Konsumsi lembur pengecoran", total: 650000 },
+          { tgl: "01 Jul 2026", peruntukan: "Unit (rumah dijual)", jenis: "Upah Harian", uraian: "Upah tukang minggu ke-1 Juli", total: 2100000 },
+          { tgl: "07 Jul 2026", peruntukan: "Unit (rumah dijual)", jenis: "Material", uraian: "Cat & kuas finishing", total: 850000 },
+        ],
+      },
+      {
+        periode: "Jul 2026 (II)", status: "Diajukan", tgl: "26 Jul 2026",
+        pengeluaran: [
+          { tgl: "18 Jul 2026", peruntukan: "Unit (rumah dijual)", jenis: "Upah Harian", uraian: "Upah tukang minggu ke-3 Juli", total: 2400000 },
+          { tgl: "24 Jul 2026", peruntukan: "Unit (rumah dijual)", jenis: "Lain-lain proyek", uraian: "Konsumsi lembur pengecoran", total: 650000 },
         ],
       },
       {

@@ -8,13 +8,11 @@ import {
 } from "@/lib/actions/guard";
 import { simpanBuktiOpsional } from "@/lib/actions/bukti";
 import { cariTransisi } from "@/lib/calc/petty-cash";
+import { rentangTanggal } from "@/lib/data/petty-cash";
 import {
   JENIS_BIAYA_SWAKELOLA, PERUNTUKAN_BIAYA, POS_HPP, STATUS_PETTY_CASH,
 } from "@/lib/domain/enums";
 import type { Pengguna } from "@/lib/auth/rbac";
-
-const BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
-const periodeSekarang = (d = new Date()) => `${BULAN[d.getMonth()]} ${d.getFullYear()}`;
 
 /**
  * Peran sistem yang boleh menembus SEMUA tahap alur petty cash — pintasan
@@ -195,21 +193,24 @@ export async function catatPengeluaranPetty(_s: HasilAksi | null, form: FormData
     const jenis = pilihan(form, "jenis", JENIS_BIAYA_SWAKELOLA);
     const uraian = teks(form, "uraian", true);
     const total = angka(form, "total", { min: 1, wajib: true });
-    const { bukti, buktiKey } = await simpanBuktiOpsional(form);
 
     // Laporan Draft = batch berjalan. Paling banyak satu per dana; dibuat bila
-    // belum ada.
+    // belum ada. Labelnya (periode) dibiarkan kosong sampai diajukan, lalu diisi
+    // rentang tanggal pengeluarannya — bukan bulan, karena satu bulan bisa memuat
+    // beberapa batch.
     let draft = await prisma.pettyCashReport.findFirst({
       where: { fundId, status: "Draft" },
       select: { id: true },
     });
     if (!draft) {
       draft = await prisma.pettyCashReport.create({
-        data: { fundId, periode: periodeSekarang(), status: "Draft" },
+        data: { fundId, periode: "", status: "Draft" },
         select: { id: true },
       });
     }
 
+    // Nota tidak dilampirkan per baris: satu PDF gabungan diunggah saat laporan
+    // diajukan (1 pengajuan = 1 dokumen).
     await prisma.expense.create({
       data: {
         projectId: dana.projectId,
@@ -222,8 +223,6 @@ export async function catatPengeluaranPetty(_s: HasilAksi | null, form: FormData
         status: "Lunas",
         pic: pengguna.nama,
         posHpp: POS_HPP[peruntukan],
-        bukti,
-        buktiKey,
         pettyCashReportId: draft.id,
       },
     });
@@ -259,16 +258,29 @@ export async function ajukanLaporanPetty(_s: HasilAksi | null, form: FormData): 
       throw new GagalIzin("Laporan masih kosong — catat pengeluaran dulu sebelum diajukan.");
     }
 
+    // 1 pengajuan = 1 dokumen: PDF nota gabungan wajib diunggah di sini.
+    const { bukti, buktiKey } = await simpanBuktiOpsional(form);
+    if (!buktiKey) {
+      throw new GagalIzin("Nota gabungan (PDF) wajib diunggah saat mengajukan laporan.");
+    }
+
+    // Beri label batch dari rentang tanggal pengeluarannya (bukan bulan).
+    const pengeluaran = await prisma.expense.findMany({
+      where: { pettyCashReportId: reportId },
+      select: { tanggal: true },
+    });
+    const periode = rentangTanggal(pengeluaran) ?? "";
+
     await prisma.pettyCashReport.update({
       where: { id: reportId },
-      data: { status: "Diajukan", diajukanPada: new Date() },
+      data: { status: "Diajukan", diajukanPada: new Date(), bukti, buktiKey, periode },
     });
 
     await catat({
       pengguna, projectId: r.fund.projectId,
       objek: "Petty Cash · Laporan",
       aksi: "Ajukan laporan petty cash",
-      ke: `${r._count.expenses} pengeluaran diajukan`,
+      ke: `${r._count.expenses} pengeluaran diajukan · nota ${bukti}`,
     });
 
     revalidasi(r.fund.project.kode);

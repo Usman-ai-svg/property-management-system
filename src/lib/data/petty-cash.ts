@@ -2,7 +2,22 @@ import { prisma } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { bolehLihat, filterProjectId, type Pengguna } from "@/lib/auth/rbac";
 import { saldoDana, totalLaporan } from "@/lib/calc/petty-cash";
+import { tanggal } from "@/lib/format";
 import type { StatusPettyCash } from "@/lib/domain/enums";
+
+/**
+ * Label sebuah batch dari rentang tanggal pengeluarannya, mis.
+ * "18 Jun 2026 – 02 Jul 2026". Menggantikan penamaan per-bulan: satu bulan
+ * boleh memuat lebih dari satu batch (frekuensi reimburse 2 minggu–1 bulan),
+ * jadi rentang tanggal-lah yang membedakannya. Null bila batch masih kosong.
+ */
+export function rentangTanggal(pengeluaran: { tanggal: Date }[]): string | null {
+  if (pengeluaran.length === 0) return null;
+  const waktu = pengeluaran.map((e) => e.tanggal.getTime());
+  const min = new Date(Math.min(...waktu));
+  const max = new Date(Math.max(...waktu));
+  return min.getTime() === max.getTime() ? tanggal(min) : `${tanggal(min)} – ${tanggal(max)}`;
+}
 
 /** Kolom sebuah dana + mutasi & laporannya — dipakai ulang di dua query. */
 const PILIH_DANA = {
@@ -43,7 +58,11 @@ function olahDana(f: DanaPayload) {
   return {
     ...sisa,
     saldo: saldoDana(f.topUps, laporan.flatMap((l) => l.expenses)),
-    laporan: laporan.map((l) => ({ ...l, total: totalLaporan(l.expenses) })),
+    laporan: laporan.map((l) => ({
+      ...l,
+      total: totalLaporan(l.expenses),
+      rentang: rentangTanggal(l.expenses),
+    })),
     // Laporan Draft = batch berjalan tempat pengeluaran baru menempel; paling
     // banyak satu per dana.
     draftReportId: laporan.find((l) => l.status === "Draft")?.id ?? null,

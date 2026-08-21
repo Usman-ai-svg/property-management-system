@@ -159,22 +159,35 @@ function LaporanBaris({
         >
           <span style={{ fontSize: 11, color: "var(--muted)" }}>{buka ? "▾" : "▸"}</span>
           <Badge nilai={LABEL_STATUS_PETTY[status]} peta={{ [LABEL_STATUS_PETTY[status]]: WARNA_PETTY[status] }} />
-          <span style={{ fontSize: 12, fontWeight: 600 }}>{laporan.periode}</span>
+          <span style={{ fontSize: 12, fontWeight: 600 }}>{laporan.rentang ?? "Batch berjalan"}</span>
           <span style={{ fontSize: 11.5, color: "var(--muted)" }}>· {laporan.expenses.length} pengeluaran</span>
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {laporan.buktiKey && (
+            <a
+              href={`/api/petty-bukti/${laporan.id}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ fontSize: 11, fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
+            >
+              Nota PDF ↗
+            </a>
+          )}
           <span className="num" style={{ fontSize: 13, fontWeight: 700 }}>{rp(laporan.total)}</span>
-          {aksi.map((t) => (
-            <AksiPetty
-              key={t.ke + t.aksi}
-              reportId={laporan.id}
-              ke={t.ke}
-              label={t.aksi}
-              mundur={t.mundur}
-              finance={t.oleh === "Finance"}
-              pemegang={t.oleh === "Pemegang"}
-            />
-          ))}
+          {aksi.map((t) =>
+            t.oleh === "Pemegang" ? (
+              <AjukanLaporan key={t.ke + t.aksi} reportId={laporan.id} />
+            ) : (
+              <AksiPetty
+                key={t.ke + t.aksi}
+                reportId={laporan.id}
+                ke={t.ke}
+                label={t.aksi}
+                mundur={t.mundur}
+                finance={t.oleh === "Finance"}
+              />
+            ),
+          )}
         </div>
       </div>
 
@@ -225,27 +238,23 @@ function AksiPetty({
   label,
   mundur,
   finance,
-  pemegang,
 }: {
   reportId: string;
   ke: string;
   label: string;
   mundur?: boolean;
   finance?: boolean;
-  pemegang?: boolean;
 }) {
-  // Ajukan → ajukanLaporanPetty; reimburse → reimburseLaporanPetty; sisanya
-  // (verifikasi/kembalikan/setujui/tolak) → transisiLaporanPetty dengan target.
-  const aksi =
-    pemegang ? ajukanLaporanPetty
-    : finance ? reimburseLaporanPetty
-    : transisiLaporanPetty;
+  // reimburse → reimburseLaporanPetty; sisanya (verifikasi/kembalikan/setujui/
+  // tolak) → transisiLaporanPetty dengan target. Ajukan punya modalnya sendiri
+  // (AjukanLaporan) karena mewajibkan unggah PDF nota.
+  const aksi = finance ? reimburseLaporanPetty : transisiLaporanPetty;
   const [hasil, kirim] = useActionState<HasilAksi | null, FormData>(aksi, null);
 
   return (
     <form action={kirim} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
       <input type="hidden" name="reportId" value={reportId} />
-      {!pemegang && !finance && <input type="hidden" name="ke" value={ke} />}
+      {!finance && <input type="hidden" name="ke" value={ke} />}
       <button
         type="submit"
         style={{
@@ -264,6 +273,37 @@ function AksiPetty({
     </form>
   );
 }
+
+/**
+ * Ajukan laporan — modal yang MEWAJIBKAN unggah PDF nota gabungan.
+ *
+ * 1 pengajuan = 1 dokumen: seluruh foto nota siklus ini dikumpulkan Supervisor
+ * jadi satu PDF, diunggah di sini. Begitu diajukan, barisnya terkunci.
+ */
+function AjukanLaporan({ reportId }: { reportId: string }) {
+  return (
+    <FormModal
+      judul="Ajukan Laporan Petty Cash"
+      keterangan="Lampirkan satu PDF berisi seluruh foto nota siklus ini. Setelah diajukan, baris pengeluaran terkunci dan diteruskan ke QS."
+      aksi={ajukanLaporanPetty}
+      labelSimpan="Ajukan"
+      lebar={460}
+      pemicu={(buka) => (
+        <button type="button" onClick={buka} style={gayaTombolAksi}>Ajukan</button>
+      )}
+    >
+      <input type="hidden" name="reportId" value={reportId} />
+      <BarisField kolom={1}>
+        <Field label="Nota gabungan (PDF)" nama="berkas" tipe="berkas" wajib />
+      </BarisField>
+    </FormModal>
+  );
+}
+
+const gayaTombolAksi: React.CSSProperties = {
+  background: "var(--teal)", color: "#fff", border: "none", borderRadius: 6,
+  fontSize: 11, fontWeight: 600, padding: "3px 9px", cursor: "pointer", fontFamily: "inherit",
+};
 
 // ---------------------------------------------------------------------------
 // Modal Beri Dana (Finance) & Catat Pengeluaran (pemegang)
@@ -298,7 +338,7 @@ function BeriDana({
         <Field label="Nominal diberikan" nama="nominal" tipe="number" satuan="Rp" wajib />
       </BarisField>
       <BarisField kolom={1}>
-        <Field label="Bukti transfer (opsional)" nama="bukti" tipe="berkas" />
+        <Field label="Bukti transfer (opsional)" nama="berkas" tipe="berkas" />
       </BarisField>
     </FormModal>
   );
@@ -331,10 +371,13 @@ function CatatPengeluaran({ fundId }: { fundId: string }) {
       <BarisField kolom={1}>
         <Field label="Uraian" nama="uraian" wajib />
       </BarisField>
-      <BarisField>
+      <BarisField kolom={1}>
         <Field label="Nominal" nama="total" tipe="number" satuan="Rp" wajib />
-        <Field label="Nota (opsional)" nama="bukti" tipe="berkas" />
       </BarisField>
+      <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>
+        Nota tidak dilampirkan per baris — kumpulkan seluruh foto nota siklus ini jadi
+        satu PDF dan unggah saat menekan <b>Ajukan</b>.
+      </div>
     </FormModal>
   );
 }
