@@ -38,6 +38,10 @@ export const NAV: ItemNav[] = [
     anak: [
       { id: "konstruksi", label: "Konstruksi", href: "/konstruksi", butuhSection: "daftarUnit" },
       { id: "keuangan", label: "Keuangan Proyek", href: "/keuangan", butuhSection: "keuangan" },
+      // Petty cash punya menunya sendiri supaya Supervisor pemegang dana bisa
+      // mengelola dananya tanpa membuka angka keuangan proyek yang tertutup
+      // untuk peran lapangan.
+      { id: "petty", label: "Petty Cash", href: "/petty-cash", butuhSection: "pettyCash" },
       { id: "vendor", label: "Vendor Management", href: "/vendor", butuhSection: "progress" },
       { id: "equipment", label: "Equipment & Asset", href: "/equipment" },
     ],

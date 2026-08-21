@@ -42,6 +42,7 @@ async function ambilLaporan(reportId: string) {
 function revalidasi(kode: string) {
   revalidatePath("/keuangan");
   revalidatePath(`/keuangan/${kode}`);
+  revalidatePath("/petty-cash");
   revalidatePath("/");
 }
 

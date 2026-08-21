@@ -1,59 +1,103 @@
 import { prisma } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
+import { bolehLihat, filterProjectId, type Pengguna } from "@/lib/auth/rbac";
 import { saldoDana, totalLaporan } from "@/lib/calc/petty-cash";
 import type { StatusPettyCash } from "@/lib/domain/enums";
 
+/** Kolom sebuah dana + mutasi & laporannya — dipakai ulang di dua query. */
+const PILIH_DANA = {
+  id: true, plafon: true, aktif: true,
+  pemegang: { select: { id: true, nama: true } },
+  topUps: {
+    orderBy: { tanggal: "asc" as const },
+    select: {
+      id: true, tanggal: true, nominal: true, jenis: true, reportId: true,
+      oleh: { select: { nama: true } },
+    },
+  },
+  laporan: {
+    orderBy: { dibuatPada: "desc" as const },
+    select: {
+      id: true, periode: true, status: true, catatan: true,
+      bukti: true, buktiKey: true,
+      diajukanPada: true, diverifikasiQsPada: true,
+      disetujuiOpsPada: true, direimbursePada: true,
+      expenses: {
+        orderBy: { tanggal: "asc" as const },
+        select: {
+          id: true, tanggal: true, jenis: true, uraian: true, total: true,
+          pic: true, bukti: true, buktiKey: true,
+        },
+      },
+    },
+  },
+} as const;
+
+type DanaPayload = Prisma.PettyCashFundGetPayload<{ select: typeof PILIH_DANA }>;
+
+/** Lengkapi dana mentah dengan saldo & total laporan turunan. */
+function olahDana(f: DanaPayload) {
+  // `laporan` dikeluarkan dari spread supaya versi ber-`total` di bawah
+  // menggantikannya, bukan berpotongan dengannya.
+  const { laporan, ...sisa } = f;
+  return {
+    ...sisa,
+    saldo: saldoDana(f.topUps, laporan.flatMap((l) => l.expenses)),
+    laporan: laporan.map((l) => ({ ...l, total: totalLaporan(l.expenses) })),
+    // Laporan Draft = batch berjalan tempat pengeluaran baru menempel; paling
+    // banyak satu per dana.
+    draftReportId: laporan.find((l) => l.status === "Draft")?.id ?? null,
+  };
+}
+
 /**
  * Seluruh dana petty cash sebuah proyek beserta mutasi, laporan, dan saldo
- * turunannya. Saldo & total laporan dihitung di sini dari data mentah (lewat
- * `saldoDana`/`totalLaporan`) supaya halaman tinggal menggambar.
+ * turunannya. Dipakai kartu Petty Cash di halaman Keuangan Proyek.
  */
 export async function pettyCashProyek(projectId: string) {
   const funds = await prisma.pettyCashFund.findMany({
     where: { projectId },
     orderBy: [{ aktif: "desc" }, { dibuatPada: "asc" }],
-    select: {
-      id: true, plafon: true, aktif: true,
-      pemegang: { select: { id: true, nama: true } },
-      topUps: {
-        orderBy: { tanggal: "asc" },
-        select: {
-          id: true, tanggal: true, nominal: true, jenis: true, reportId: true,
-          oleh: { select: { nama: true } },
-        },
-      },
-      laporan: {
-        orderBy: { dibuatPada: "desc" },
-        select: {
-          id: true, periode: true, status: true, catatan: true,
-          bukti: true, buktiKey: true,
-          diajukanPada: true, diverifikasiQsPada: true,
-          disetujuiOpsPada: true, direimbursePada: true,
-          expenses: {
-            orderBy: { tanggal: "asc" },
-            select: {
-              id: true, tanggal: true, jenis: true, uraian: true, total: true,
-              pic: true, bukti: true, buktiKey: true,
-            },
-          },
-        },
-      },
-    },
+    select: PILIH_DANA,
   });
-
-  return funds.map((f) => {
-    const semuaPengeluaran = f.laporan.flatMap((l) => l.expenses);
-    return {
-      ...f,
-      saldo: saldoDana(f.topUps, semuaPengeluaran),
-      laporan: f.laporan.map((l) => ({ ...l, total: totalLaporan(l.expenses) })),
-      // Laporan Draft = batch berjalan tempat pengeluaran baru menempel; paling
-      // banyak satu per dana.
-      draftReportId: f.laporan.find((l) => l.status === "Draft")?.id ?? null,
-    };
-  });
+  return funds.map((f) => olahDana(f));
 }
 
 export type DanaPettyCash = Awaited<ReturnType<typeof pettyCashProyek>>[number];
+
+/**
+ * Dana petty cash yang relevan bagi seorang pengguna, dikelompokkan per proyek —
+ * isi halaman menu "Petty Cash" tersendiri.
+ *
+ * Peran lapangan (tanpa izin `keuangan`, mis. Supervisor) hanya melihat dana
+ * yang DIPEGANGNYA; peran pengawas keuangan (Finance/QS/Head Ops) melihat semua
+ * dana di proyek yang boleh diaksesnya. Keduanya tetap dibatasi
+ * `filterProjectId`, jadi tak ada dana lintas-proyek yang bocor.
+ */
+export async function pettyCashPengguna(pengguna: Pengguna) {
+  const hanyaMilikSendiri = !bolehLihat(pengguna, "keuangan");
+  const funds = await prisma.pettyCashFund.findMany({
+    where: {
+      ...filterProjectId(pengguna),
+      ...(hanyaMilikSendiri ? { pemegangId: pengguna.id } : {}),
+    },
+    orderBy: [{ project: { kode: "asc" } }, { aktif: "desc" }, { dibuatPada: "asc" }],
+    select: { ...PILIH_DANA, project: { select: { id: true, kode: true, nama: true } } },
+  });
+
+  // Kelompokkan per proyek, pertahankan urutan kemunculan.
+  const grup: { project: { id: string; kode: string; nama: string }; funds: DanaPettyCash[] }[] = [];
+  for (const f of funds) {
+    const { project, ...sisa } = f;
+    let g = grup.find((x) => x.project.id === project.id);
+    if (!g) {
+      g = { project, funds: [] };
+      grup.push(g);
+    }
+    g.funds.push(olahDana(sisa));
+  }
+  return grup;
+}
 
 /**
  * Kandidat pemegang dana: Supervisor yang berhak atas proyek ini (atau semua
