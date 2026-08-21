@@ -55,6 +55,8 @@ model User {
   aksesProyek   UserProjectAccess[]
   auditLogs     AuditLog[]
   dokumenDiuploadOleh DocumentVersion[]
+  pettyCashDipegang PettyCashFund[]
+  pettyCashTopUps   PettyCashTopUp[]
 
   @@map("users")
 }
@@ -225,6 +227,7 @@ model Project {
   pembelian       Pembelian[]
   aksesUser       UserProjectAccess[]
   auditLogs       AuditLog[]
+  pettyCashFunds  PettyCashFund[]
 
   @@map("projects")
 }
@@ -879,14 +882,21 @@ model Expense {
   /// pembayaran ke pemasok = satu Expense yang menunjuk pembelian ini —
   /// pola yang sama dengan `contractId` untuk pembayaran vendor.
   pembelianId String?
+  /// Laporan petty cash (batch pertanggungjawaban) yang membungkus pengeluaran
+  /// ini, bila metode "Petty Cash". Pengeluaran petty cash selalu menempel ke
+  /// satu laporan (Draft = batch berjalan); lewat laporan itulah ia terikat ke
+  /// dana pemegang. Kosong pada pengeluaran non-petty-cash.
+  pettyCashReportId String?
 
   project    Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   contract   Contract?           @relation(fields: [contractId], references: [id])
   pembelian  Pembelian?          @relation(fields: [pembelianId], references: [id])
+  pettyCashReport PettyCashReport? @relation(fields: [pettyCashReportId], references: [id])
   alokasi    ExpenseAllocation[]
   cicilan    HutangCicilan[]
 
   @@index([projectId, tanggal])
+  @@index([pettyCashReportId])
   @@map("expenses")
 }
 
@@ -944,6 +954,87 @@ model ExpenseAllocation {
   @@index([unitId])
   @@index([infrastructureId])
   @@map("expense_allocations")
+}
+
+/// Dana petty cash (imprest float) yang dipegang seorang Supervisor pada satu
+/// proyek.
+///
+/// Saldonya DITURUNKAN, tidak disimpan: `saldo = Σ topUp − Σ pengeluaran`, di
+/// mana pengeluaran = Σ total Expense (metode Petty Cash) di seluruh laporan
+/// dana ini. Saldo BOLEH minus — Supervisor boleh menalangi lebih dulu, lalu
+/// reimburse yang mengembalikannya. `plafon` hanya nilai acuan imprest, BUKAN
+/// batas keras: tidak membatasi pengeluaran maupun reimburse.
+model PettyCashFund {
+  id         String   @id @default(cuid())
+  projectId  String
+  pemegangId String
+  plafon     Float    @default(0)
+  aktif      Boolean  @default(true)
+  dibuatPada DateTime @default(now())
+
+  project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pemegang User              @relation(fields: [pemegangId], references: [id])
+  topUps   PettyCashTopUp[]
+  laporan  PettyCashReport[]
+
+  @@unique([projectId, pemegangId])
+  @@index([projectId])
+  @@map("petty_cash_funds")
+}
+
+/// Penambahan saldo sebuah dana: pemberian awal atau reimburse laporan.
+///
+/// Reimburse menaut ke laporan yang disetujui (`reportId`, satu-ke-satu) dan
+/// nominalnya sama dengan total laporan itu (imprest). Pemberian awal tak
+/// bertaut laporan.
+model PettyCashTopUp {
+  id       String   @id @default(cuid())
+  fundId   String
+  tanggal  DateTime @default(now())
+  nominal  Float
+  /// Awal | Reimburse
+  jenis    String
+  reportId String?  @unique
+  olehId   String
+  bukti    String?
+  buktiKey String?
+
+  fund   PettyCashFund    @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  oleh   User             @relation(fields: [olehId], references: [id])
+  report PettyCashReport? @relation(fields: [reportId], references: [id])
+
+  @@index([fundId])
+  @@map("petty_cash_topups")
+}
+
+/// Rekap batch pengeluaran petty cash untuk satu siklus pertanggungjawaban,
+/// membawa status alur approval Supervisor → QS → Head Ops → Finance.
+///
+/// Tiap dana punya paling banyak SATU laporan berstatus Draft — batch berjalan
+/// tempat pengeluaran baru menempel. Begitu diajukan, barisnya terkunci dan
+/// batch berikutnya memakai laporan Draft yang baru. Bukti nota: satu lampiran
+/// rekap per laporan (bukan per baris).
+model PettyCashReport {
+  id                 String    @id @default(cuid())
+  fundId             String
+  periode            String
+  /// Draft | Diajukan | DiverifikasiQS | Disetujui | Direimburse
+  status             String    @default("Draft")
+  diajukanPada       DateTime?
+  diverifikasiQsPada DateTime?
+  disetujuiOpsPada   DateTime?
+  direimbursePada    DateTime?
+  catatan            String?
+  bukti              String?
+  buktiKey           String?
+  dibuatPada         DateTime  @default(now())
+
+  fund     PettyCashFund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  expenses Expense[]
+  topUp    PettyCashTopUp?
+
+  @@index([fundId])
+  @@map("petty_cash_reports")
 }
 
 /// Biaya operasional perusahaan yang dibebankan ke sebuah proyek.

@@ -199,6 +199,21 @@ export const METODE_TUNAI = METODE_BAYAR.filter(
 export const STATUS_BAYAR = ["Lunas", "DP", "Belum"] as const;
 
 /**
+ * Status alur pertanggungjawaban satu laporan petty cash.
+ *
+ * Draft = batch berjalan (bisa ditambah/kurang pengeluaran). Sejak Diajukan,
+ * baris terkunci. Alur: Draft → Diajukan → DiverifikasiQS → Disetujui →
+ * Direimburse; QS/Head Ops boleh mengembalikan ke Draft. Lihat
+ * `src/lib/calc/petty-cash.ts` untuk transisinya.
+ */
+export const STATUS_PETTY_CASH = [
+  "Draft", "Diajukan", "DiverifikasiQS", "Disetujui", "Direimburse",
+] as const;
+
+/** Jenis penambahan saldo dana petty cash. */
+export const JENIS_TOPUP_PETTY = ["Awal", "Reimburse"] as const;
+
+/**
  * Status peralatan/aset yang DITURUNKAN dari stok dan penggunaan aktif — tidak
  * disimpan di database. "Sebagian" berarti sebagian unit dipakai, sisanya masih
  * tersedia. Lihat `statusAset()` di src/lib/calc/aset.ts.
@@ -240,6 +255,7 @@ export const SECTIONS = [
   "setujuiRab",
   "businessPlan",
   "keuangan",
+  "pettyCash",
   "progress",
   "aset",
   "penyesuaianAset",
@@ -254,6 +270,7 @@ export const SECTION_LABELS: Record<Section, string> = {
   setujuiRab: "Setujui RAB Estimasi",
   businessPlan: "Business Plan / Margin",
   keuangan: "Keuangan Operasional",
+  pettyCash: "Petty Cash",
   progress: "Progress & Kontrak",
   aset: "Equipment & Asset",
   penyesuaianAset: "Penyesuaian Aset",
@@ -362,6 +379,8 @@ export type PeruntukanBiaya = (typeof PERUNTUKAN_BIAYA)[number];
 export type JenisBiaya = (typeof JENIS_BIAYA)[number];
 export type MetodeBayar = (typeof METODE_BAYAR)[number];
 export type StatusBayar = (typeof STATUS_BAYAR)[number];
+export type StatusPettyCash = (typeof STATUS_PETTY_CASH)[number];
+export type JenisTopUpPetty = (typeof JENIS_TOPUP_PETTY)[number];
 export type StatusAset = (typeof STATUS_ASET)[number];
 export type KepemilikanAset = (typeof KEPEMILIKAN_ASET)[number];
 export type JenisAset = (typeof JENIS_ASET)[number];
@@ -404,6 +423,8 @@ export const SEMUA_ENUM = {
   JenisBiaya: JENIS_BIAYA,
   MetodeBayar: METODE_BAYAR,
   StatusBayar: STATUS_BAYAR,
+  StatusPettyCash: STATUS_PETTY_CASH,
+  JenisTopUpPetty: JENIS_TOPUP_PETTY,
   StatusAset: STATUS_ASET,
   KepemilikanAset: KEPEMILIKAN_ASET,
   JenisAset: JENIS_ASET,

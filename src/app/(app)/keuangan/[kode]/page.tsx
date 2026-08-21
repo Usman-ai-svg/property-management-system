@@ -10,6 +10,7 @@ import {
   komposisiObjek, totalDibebankan, transaksiUntukObjek,
 } from "@/lib/tampilan/keuangan-proyek";
 import { nilaiUnit, nilaiSarpras } from "@/lib/data/proyek";
+import { pemegangKandidat, pettyCashProyek } from "@/lib/data/petty-cash";
 import { alokasiKontrak, ringkasKontrak } from "@/lib/calc/keuangan";
 import { jumlahRapKategori, KATEGORI_DARI_JENIS, type KategoriRap } from "@/lib/calc/boq";
 import { pct, rp, tanggal } from "@/lib/format";
@@ -18,6 +19,7 @@ import { Badge, Kartu, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/compon
 import { BreakdownKategori } from "../breakdown-kategori";
 import { PanelTransaksi } from "./transaksi";
 import { BagikanKeUnit } from "./bagi-unit";
+import { PettyCash } from "./petty-cash";
 import { BuatPO, PanelPembelian } from "../pembelian";
 import { Tabel } from "@/components/kartu-tabel";
 
@@ -157,6 +159,16 @@ export default async function KeuanganProyek({
   const pembelian = await pembelianProyek(proyek.id);
   const [pemasokPO, hargaDasarPO] = bolehUbahKeuangan
     ? await Promise.all([pemasokUntukPembelian(), hargaDasarUntukPembelian()])
+    : [[], []];
+
+  // Petty cash — dana talangan lapangan + alur pertanggungjawabannya. Kandidat
+  // pemegang hanya dimuat bila boleh memberi dana (form Beri Dana milik Finance).
+  const bolehLihatPetty = bolehLihat(pengguna, "pettyCash");
+  const [danaPetty, kandidatPetty] = bolehLihatPetty
+    ? await Promise.all([
+        pettyCashProyek(proyek.id),
+        bolehUbahKeuangan ? pemegangKandidat(proyek.id) : Promise.resolve([]),
+      ])
     : [[], []];
 
   return (
@@ -612,6 +624,20 @@ export default async function KeuanganProyek({
         </div>
         <div className="num" style={{ fontSize: 18, fontWeight: 600 }}>{rp(levelUmum)}</div>
       </div>
+
+      {bolehLihatPetty && (
+        <PettyCash
+          projectId={proyek.id}
+          funds={danaPetty}
+          kandidat={kandidatPetty}
+          konteks={{
+            id: pengguna.id,
+            peranAktif: pengguna.peranAktif,
+            bolehKeuangan: bolehUbahKeuangan,
+            bolehPetty: bolehUbah(pengguna, "pettyCash"),
+          }}
+        />
+      )}
 
       {/* ---------- rincian biaya satu item sarpras ---------- */}
       {sarprasRinci &&

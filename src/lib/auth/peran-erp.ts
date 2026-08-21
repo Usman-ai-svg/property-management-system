@@ -60,25 +60,25 @@ export type Tingkat = "tidak" | "lihat" | "ubah";
 export const PETA_PERAN_ERP: Record<string, Partial<Record<Section, Tingkat>>> = {
   director: {
     deskripsi: "ubah", daftarUnit: "ubah", daftarSarpras: "ubah", dokumenTeknis: "ubah",
-    hargaRabRap: "ubah", setujuiRab: "ubah", businessPlan: "ubah", keuangan: "ubah", progress: "ubah",
-    aset: "ubah", penyesuaianAset: "ubah",
+    hargaRabRap: "ubah", setujuiRab: "ubah", businessPlan: "ubah", keuangan: "ubah",
+    pettyCash: "ubah", progress: "ubah", aset: "ubah", penyesuaianAset: "ubah",
   },
   accountant: {
     deskripsi: "lihat", daftarUnit: "lihat", daftarSarpras: "lihat", dokumenTeknis: "lihat",
-    hargaRabRap: "lihat", keuangan: "ubah", progress: "lihat", aset: "lihat",
+    hargaRabRap: "lihat", keuangan: "ubah", pettyCash: "ubah", progress: "lihat", aset: "lihat",
   },
   manager: {
     deskripsi: "lihat", daftarUnit: "ubah", daftarSarpras: "ubah", dokumenTeknis: "ubah",
-    hargaRabRap: "lihat", setujuiRab: "ubah", keuangan: "lihat", progress: "ubah",
+    hargaRabRap: "lihat", setujuiRab: "ubah", keuangan: "lihat", pettyCash: "ubah", progress: "ubah",
     aset: "ubah", penyesuaianAset: "ubah",
   },
   admin: {
     deskripsi: "lihat", daftarUnit: "lihat", daftarSarpras: "lihat", dokumenTeknis: "lihat",
-    hargaRabRap: "lihat", keuangan: "ubah", aset: "lihat",
+    hargaRabRap: "lihat", keuangan: "ubah", pettyCash: "lihat", aset: "lihat",
   },
   staff: {
     deskripsi: "lihat", daftarUnit: "lihat", daftarSarpras: "lihat", dokumenTeknis: "lihat",
-    progress: "ubah", aset: "lihat", penyesuaianAset: "ubah",
+    pettyCash: "ubah", progress: "ubah", aset: "lihat", penyesuaianAset: "ubah",
   },
 };
 

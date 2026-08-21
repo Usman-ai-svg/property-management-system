@@ -35,12 +35,16 @@ approval* rekap sebelum reimburse.
 ### `PettyCashFund` — dana/float per pemegang & proyek
 Saldo berjalan dana petty cash yang dipegang seorang Supervisor pada satu proyek.
 Saldo **diturunkan**, bukan disimpan: `saldo = Σ topUp/reimburse − Σ pengeluaran`.
+Unik per **(proyek, pemegang)** — satu Supervisor boleh memegang dana di beberapa
+proyek sekaligus. Saldo **boleh minus**: Supervisor boleh menalangi pengeluaran
+lebih dulu, dan reimburse yang mengembalikannya (lihat `plafon`).
 
 | kolom | tipe | catatan |
 |---|---|---|
 | id | String @id | |
 | projectId | String | proyek pemilik dana |
 | pemegangId | String | User (Supervisor) pemegang |
+| plafon | Float | nilai acuan dana (imprest). **Bukan** batas keras: tidak membatasi pengeluaran maupun reimburse; hanya menjaga saldo hasil reimburse tak melebihi plafon |
 | dibuatPada | DateTime | |
 | aktif | Boolean | dana ditutup saat penugasan selesai |
 
@@ -73,10 +77,14 @@ pertanggungjawaban, membawa status alur approval.
 | disetujuiOpsPada | DateTime? | oleh Head Operation Project |
 | direimbursePada | DateTime? | oleh Finance (via PettyCashTopUp) |
 | catatan | String? | alasan revisi/tolak |
+| bukti/buktiKey | String? | **satu** lampiran rekap nota untuk seluruh laporan |
 
 - Relasi ke pengeluaran: tambahkan `Expense.pettyCashReportId String?` (opsional).
   Sebuah Expense petty cash boleh belum masuk laporan (draft), lalu ditarik ke
   satu laporan saat diajukan.
+- Bukti nota: **satu lampiran rekap per laporan** (`PettyCashReport.buktiKey`),
+  bukan per baris. `Expense.buktiKey` per baris tetap boleh diisi bila ada, tapi
+  tidak diwajibkan.
 
 ## 4. Status & transisi `PettyCashReport`
 
@@ -90,7 +98,10 @@ Disetujui ─(Finance reimburse)→ Direimburse   [buat PettyCashTopUp jenis=Rei
 - Selama `Draft`, Supervisor bebas menamb/menghapus baris Expense-nya.
 - Mulai `Diajukan`, baris **terkunci** (tak bisa diubah Supervisor) — konsisten
   dengan pola "kunci baris tertaut" yang sudah dipakai di Transaksi.
-- Reimburse menambah saldo `PettyCashFund` sebesar total laporan yang disetujui.
+- Reimburse (imprest) menambah saldo `PettyCashFund` **penuh** sebesar total
+  laporan yang disetujui — mengembalikan saldo ke arah plafon. Tidak dibatasi
+  plafon, kecuali bila saldo dana sudah di atas plafon (kasus tepi: jangan
+  menambah lagi di atas plafon).
 
 ## 5. Izin (RBAC)
 
@@ -113,17 +124,36 @@ ubah yang saat ini `Finance, Admin, Head Operation Office, BOD, ...`).
   dan aksi sesuai peran (Ajukan / Verifikasi / Setujui / Reimburse).
 - **Catat Pembayaran**: sumber baru **"Petty Cash"** (atau Pengeluaran Lain
   dengan metode Petty Cash yang otomatis menaut ke dana pemegang aktif). Nominal
-  divalidasi terhadap **sisa saldo dana**, mirip `sisaMaks` pada PO/kontrak.
+  **tidak** dibatasi sisa saldo/plafon — Supervisor boleh menalangi lebih dulu
+  sehingga saldo bisa menyusut hingga minus; reimburse yang mengembalikannya.
+  (Beda dari `sisaMaks` pada PO/kontrak yang memang membatasi.)
 - **Rincian laporan**: tabel baris Expense (tanggal, keterangan, jenis, nominal,
   nota) + total, tombol transisi status, jejak waktu tiap tahap.
 
-## 7. Pertanyaan terbuka (untuk diskusi)
+## 7. Keputusan final (2026-08-21)
 
-1. Satu Supervisor bisa memegang dana di >1 proyek sekaligus? (asumsi: ya, satu
-   `PettyCashFund` per (proyek, pemegang)).
-2. Reimburse: selalu **penuh** sebesar laporan disetujui (imprest system), atau
-   boleh sebagian?
-3. Perlukah plafon dana (batas maksimum saldo) per Supervisor?
-4. Apakah tahap **QS** dan **Head Ops** dua persetujuan terpisah, atau QS hanya
-   merekap dan satu-satunya persetujuan formal di Head Ops?
-5. Nota per baris (wajib?) vs satu lampiran rekap per laporan.
+1. **Multi-proyek:** ya. Satu `PettyCashFund` unik per **(proyek, pemegang)**;
+   seorang Supervisor boleh memegang beberapa dana di proyek berbeda sekaligus.
+2. **Reimburse:** penuh sebesar laporan yang disetujui (imprest) — mengembalikan
+   saldo ke arah plafon.
+3. **Approval dua tahap:** QS verifikasi → Head Ops setujui → Finance reimburse.
+   Status machine §4 dipakai apa adanya.
+4. **Bukti nota:** satu lampiran rekap per `PettyCashReport`, bukan per baris.
+   `Expense.buktiKey` per baris tetap opsional.
+5. **Plafon:** ada, per dana (`PettyCashFund.plafon`), sebagai nilai acuan
+   imprest — **bukan batas keras**. Tidak membatasi pengeluaran (boleh ditalangi
+   Supervisor, saldo boleh minus) maupun reimburse; hanya menjaga saldo hasil
+   reimburse tidak melampaui plafon.
+
+## 8. Ruang lingkup implementasi (bila lanjut)
+
+- **Skema:** model `PettyCashFund` (+`plafon`), `PettyCashTopUp`, `PettyCashReport`
+  (+`buktiKey`); kolom `Expense.pettyCashReportId`. Regen `schema.postgres.prisma`
+  via `npm run skema:postgres`.
+- **Data:** `keuanganPetty*` di `lib/data/`, penghitung saldo turunan.
+- **Aksi:** beri dana, catat/tarik pengeluaran ke laporan, ajukan, verifikasi QS,
+  setujui Ops, reimburse — masing-masing dengan izin & guard peran.
+- **Izin RBAC:** `pettyCash` (+ turunan verifikasi/persetujuan/reimburse per §5).
+- **UI:** kartu Petty Cash di `keuangan/[kode]`, sumber "Petty Cash" di Catat
+  Pembayaran, halaman rincian laporan + transisi status.
+- **Seed & test:** contoh dana + laporan di 1 proyek; unit test saldo & transisi.

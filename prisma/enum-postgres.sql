@@ -107,6 +107,19 @@ CREATE TYPE pm_status_bayar AS ENUM (
   'Belum'
 );
 
+CREATE TYPE pm_status_petty_cash AS ENUM (
+  'Draft',
+  'Diajukan',
+  'DiverifikasiQS',
+  'Disetujui',
+  'Direimburse'
+);
+
+CREATE TYPE pm_jenis_top_up_petty AS ENUM (
+  'Awal',
+  'Reimburse'
+);
+
 CREATE TYPE pm_status_aset AS ENUM (
   'Tersedia',
   'Sebagian',

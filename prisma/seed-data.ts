@@ -56,6 +56,10 @@ export const ACL_AWAL: Record<string, string[]> = {
   setujuiRab: ["Administrator Sistem", "Komisaris", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor"],
   businessPlan: ["Administrator Sistem", "Komisaris", "BOD", "Business Development"],
   keuangan: ["Administrator Sistem", "BOD", "Business Development", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor", "Admin", "Finance", "Consultant Finance"],
+  // Petty cash menyentuh lapangan sampai keuangan: Supervisor (pemegang dana),
+  // QS (verifikasi) & Head Operation Project (persetujuan) ikut melihat, di
+  // samping garis keuangan yang memberi & mereimburse dana.
+  pettyCash: ["Administrator Sistem", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager", "Supervisor", "Quantity Surveyor", "Admin", "Finance", "Consultant Finance"],
   progress: ["Administrator Sistem", "BOD", "Head Operation Project", "Project Manager", "Supervisor", "Quantity Surveyor", "Arsitek", "Procurement"],
   aset: SEMUA_PERAN,
   penyesuaianAset: SEMUA_PERAN,
@@ -79,6 +83,10 @@ export const ACL_UBAH: Record<string, string[]> = {
   setujuiRab: ["Administrator Sistem", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager"],
   businessPlan: ["Administrator Sistem", "BOD", "Business Development"],
   keuangan: ["Administrator Sistem", "BOD", "Finance", "Admin", "Head Operation Office"],
+  // bolehUbah pettyCash = boleh ikut dalam alur (catat/ajukan/verifikasi/setujui/
+  // reimburse). Tahap mana yang boleh dilakukan tiap peran ditegakkan per nama
+  // peran di dalam action (wajibPeran), bukan di flag datar ini.
+  pettyCash: ["Administrator Sistem", "BOD", "Supervisor", "Quantity Surveyor", "Head Operation Project", "Finance", "Consultant Finance", "Admin"],
   // Quantity Surveyor ikut boleh mengubah karena memantau progres vendor
   // memang tugasnya, sekalipun angkanya diperoleh dari Supervisor di lapangan.
   progress: ["Administrator Sistem", "BOD", "Project Manager", "Supervisor", "Head Operation Project", "Quantity Surveyor"],
@@ -539,6 +547,56 @@ export const BIAYA_OPERASIONAL = [
   { tgl: "18 Mar 2023", proyek: "NT2", kategori: "Pemasaran", uraian: "Pemasaran seluruh masa penjualan", nominal: 498000000, status: "Lunas", pic: "Rudi Hartawan" },
   { tgl: "20 Des 2023", proyek: "NT2", kategori: "Umum & Administrasi", uraian: "Umum & administrasi seluruh masa proyek", nominal: 321000000, status: "Lunas", pic: "Rina Safitri" },
   { tgl: "20 Des 2023", proyek: "NT2", kategori: "Bunga & Pajak", uraian: "Bunga & pajak seluruh masa proyek", nominal: 476000000, status: "Lunas", pic: "Sinta Dewi" },
+];
+
+/**
+ * Dana petty cash contoh + laporan pertanggungjawabannya.
+ *
+ * Satu Supervisor (Agus Pratama) memegang dana di dua proyek yang memang jadi
+ * jangkauannya (NT4 & GN2). Laporannya sengaja tersebar di semua status supaya
+ * tiap tahap alur kelihatan di demo. Pengeluaran dicatat dengan metode "Petty
+ * Cash"; `oleh` (Sinta Dewi, Finance) yang memberi & mereimburse dana.
+ */
+export const PETTY_CASH = [
+  {
+    proyek: "GN2", pemegang: "Agus Pratama", oleh: "Sinta Dewi",
+    plafon: 5000000, awal: 5000000, awalTgl: "05 Jun 2026",
+    laporan: [
+      {
+        periode: "Jun 2026", status: "Direimburse", tgl: "30 Jun 2026",
+        pengeluaran: [
+          { tgl: "12 Jun 2026", peruntukan: "Unit (rumah dijual)", jenis: "Upah Harian", uraian: "Upah tukang minggu ke-2 Juni", total: 1800000 },
+          { tgl: "20 Jun 2026", peruntukan: "Unit (rumah dijual)", jenis: "Material", uraian: "Paku, kawat bendrat & consumable", total: 1100000 },
+        ],
+      },
+      {
+        periode: "Jul 2026", status: "Diajukan", tgl: "18 Jul 2026",
+        pengeluaran: [
+          { tgl: "10 Jul 2026", peruntukan: "Unit (rumah dijual)", jenis: "Upah Harian", uraian: "Upah tukang minggu ke-2 Juli", total: 2400000 },
+          { tgl: "14 Jul 2026", peruntukan: "Unit (rumah dijual)", jenis: "Lain-lain proyek", uraian: "Konsumsi lembur pengecoran", total: 650000 },
+        ],
+      },
+      {
+        periode: "Agu 2026", status: "Draft", tgl: "12 Agu 2026",
+        pengeluaran: [
+          { tgl: "12 Agu 2026", peruntukan: "Unit (rumah dijual)", jenis: "Material", uraian: "Semen & pasir tambahan finishing", total: 900000 },
+        ],
+      },
+    ],
+  },
+  {
+    proyek: "NT4", pemegang: "Agus Pratama", oleh: "Sinta Dewi",
+    plafon: 3000000, awal: 3000000, awalTgl: "03 Jul 2026",
+    laporan: [
+      {
+        periode: "Jul 2026", status: "DiverifikasiQS", tgl: "16 Jul 2026",
+        pengeluaran: [
+          { tgl: "08 Jul 2026", peruntukan: "Prasarana & Sarana", jenis: "Upah Harian", uraian: "Upah paving jalan cluster", total: 1500000 },
+          { tgl: "13 Jul 2026", peruntukan: "Prasarana & Sarana", jenis: "Material", uraian: "Semen & pasir pasang paving", total: 700000 },
+        ],
+      },
+    ],
+  },
 ];
 
 /** Warna kategori pada diagram donat dan penanda jenis biaya. */

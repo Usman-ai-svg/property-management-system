@@ -21,8 +21,8 @@ import { statusBangunSarpras, statusBangunUnit } from "../src/lib/calc/status-ba
 import { seedAhsp } from "./seed-ahsp";
 import {
   ACL_AWAL, ACL_UBAH, ASET, ASET_KENDARAAN, BIAYA_OPERASIONAL, BIAYA_UMUM, KERJA_TAMBAH,
-  KONTRAK, LOG_AWAL, PENGGUNAAN, PORSI_BIAYA_SARPRAS, PORSI_BIAYA_UNIT, POS_HPP, PROYEK,
-  ROLE_GRUP, SARPRAS, SEMUA_PERAN, SERVIS, TIPE_UNIT, USERS, VENDOR, type Dok, tgl,
+  KONTRAK, LOG_AWAL, PENGGUNAAN, PETTY_CASH, PORSI_BIAYA_SARPRAS, PORSI_BIAYA_UNIT, POS_HPP,
+  PROYEK, ROLE_GRUP, SARPRAS, SEMUA_PERAN, SERVIS, TIPE_UNIT, USERS, VENDOR, type Dok, tgl,
 } from "./seed-data";
 
 const prisma = new PrismaClient({
@@ -1191,6 +1191,69 @@ async function main() {
     });
   }
   console.log(`  ${LOG_AWAL.length} entri log perubahan`);
+
+  // ---------------------------------------------------------------------
+  // 11. PETTY CASH — dana talangan lapangan + alur pertanggungjawaban
+  // ---------------------------------------------------------------------
+  //
+  // Satu Supervisor (Agus Pratama) memegang dana di dua proyek. Laporannya
+  // sengaja tersebar di semua status supaya tiap tahap alur (Draft → Diajukan →
+  // DiverifikasiQS → Disetujui → Direimburse) kelihatan di demo. Saldo tidak
+  // disimpan — dihitung dari topUp − pengeluaran saat halaman digambar.
+  let jmlPetty = 0;
+  for (const D of PETTY_CASH) {
+    const pid = projectId.get(D.proyek);
+    const pemegangId = userId.get(D.pemegang);
+    const olehId = userId.get(D.oleh);
+    if (!pid || !pemegangId || !olehId) continue;
+
+    const dana = await prisma.pettyCashFund.create({
+      data: { projectId: pid, pemegangId, plafon: D.plafon, dibuatPada: tgl(D.awalTgl)! },
+    });
+    await prisma.pettyCashTopUp.create({
+      data: { fundId: dana.id, tanggal: tgl(D.awalTgl)!, nominal: D.awal, jenis: "Awal", olehId },
+    });
+
+    for (const L of D.laporan) {
+      const waktu = tgl(L.tgl ?? D.awalTgl)!;
+      const total = L.pengeluaran.reduce((s, e) => s + e.total, 0);
+      const report = await prisma.pettyCashReport.create({
+        data: {
+          fundId: dana.id, periode: L.periode, status: L.status, dibuatPada: waktu,
+          // Cap waktu tiap tahap yang sudah dilewati status ini.
+          diajukanPada: L.status !== "Draft" ? waktu : null,
+          diverifikasiQsPada:
+            ["DiverifikasiQS", "Disetujui", "Direimburse"].includes(L.status) ? waktu : null,
+          disetujuiOpsPada: ["Disetujui", "Direimburse"].includes(L.status) ? waktu : null,
+          direimbursePada: L.status === "Direimburse" ? waktu : null,
+        },
+      });
+
+      for (const E of L.pengeluaran) {
+        await prisma.expense.create({
+          data: {
+            projectId: pid, tanggal: tgl(E.tgl)!,
+            peruntukan: E.peruntukan, jenis: E.jenis, metode: "Petty Cash",
+            uraian: E.uraian, total: E.total, status: "Lunas", pic: D.pemegang,
+            posHpp: POS_HPP[E.peruntukan as keyof typeof POS_HPP],
+            pettyCashReportId: report.id,
+          },
+        });
+        jmlPetty++;
+      }
+
+      // Laporan yang sudah direimburse mengembalikan saldo penuh (imprest).
+      if (L.status === "Direimburse") {
+        await prisma.pettyCashTopUp.create({
+          data: {
+            fundId: dana.id, tanggal: waktu, nominal: total, jenis: "Reimburse",
+            reportId: report.id, olehId,
+          },
+        });
+      }
+    }
+  }
+  console.log(`  ${PETTY_CASH.length} dana petty cash, ${jmlPetty} pengeluaran petty cash`);
 
   // ---------------------------------------------------------------------
   // Ringkasan
