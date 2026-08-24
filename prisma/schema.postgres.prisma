@@ -6,9 +6,9 @@
 //
 // Yang sudah dikerjakan:
 //   - provider postgresql
-//   - 50 kolom uang jadi Decimal(18, 2)
-//   - 30 kolom Float BUKAN uang dibiarkan (volume, luas, persentase)
-//   - 63 tabel diberi awalan "pm_" pada @@map yang sudah ada
+//   - 51 kolom uang jadi Decimal(18, 2)
+//   - 31 kolom Float BUKAN uang dibiarkan (volume, luas, persentase)
+//   - 64 tabel diberi awalan "pm_" pada @@map yang sudah ada
 //
 // Yang masih harus dikerjakan manusia:
 //   - Enum masih bertipe String. Daftar nilai sahnya ada di bawah sebagai
@@ -413,6 +413,7 @@ model Unit {
   progressRecords ProgressRecord[]
   contractUnits  ContractUnit[]
   boqSpk         ContractBoqUnit[]
+  voItems        ContractVoItem[]
   alokasiBiaya   ExpenseAllocation[]
   penerimaan     SalesPayment[]
   bpOmzet        BpOmzetUnit?
@@ -603,6 +604,7 @@ model Infrastructure {
   progressRecords ProgressRecord[]
   contractItems   ContractInfrastructure[]
   boqSpk          ContractBoqUnit[]
+  voItems         ContractVoItem[]
   alokasiBiaya    ExpenseAllocation[]
 
   @@map("pm_infrastructures")
@@ -695,6 +697,10 @@ model Contract {
   /// Lama masa pemeliharaan (bulan)
   jatuhTempoBln  Int   @default(0)
   mulai          DateTime
+  /// Tanggal pekerjaan dinyatakan selesai. Jadi ANCHOR jatuh tempo retensi:
+  /// retensi dilepas `jatuhTempoBln` bulan setelah tanggal ini. Null = belum
+  /// ditandai selesai (jatuh tempo retensi jatuh kembali ke tanggal pelunasan).
+  tanggalSelesai DateTime?
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   vendor  Vendor  @relation(fields: [vendorId], references: [id])
@@ -840,14 +846,56 @@ model VariationOrder {
   nomor      String
   tanggal    DateTime
   uraian     String
+  /// Nilai VO = TURUNAN dari Σ baris `items` (bukan diketik). Disimpan sebagai
+  /// snapshot supaya ringkasan kontrak tak perlu memuat seluruh baris VO.
   nominal    Decimal @db.Decimal(18, 2)
   /// Diajukan | Disetujui | Ditolak
   status     String   @default("Diajukan")
 
-  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contract Contract         @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  items    ContractVoItem[]
 
   @@index([contractId])
   @@map("pm_variation_orders")
+}
+
+/// Baris pekerjaan sebuah Variation Order, melekat ke SATU objek (unit/sarpras).
+///
+/// Berbeda dari `ContractBoqItem` (template yang berlaku untuk SEMUA objek):
+/// baris VO adalah tambahan/pengurangan spesifik objek. Hanya baris dari VO
+/// berstatus "Disetujui" yang ikut menghitung Nilai BOQ Terinci & opname —
+/// inilah yang membuat Nilai BOQ Terinci selalu sama dengan Nilai Kontrak
+/// (nilai kontrak = BOQ pokok + baris VO disetujui). `hargaSatuan` boleh negatif
+/// untuk pekerjaan kurang.
+model ContractVoItem {
+  id   String @id @default(cuid())
+  voId String
+
+  /// Objek yang dikerjakan. Tepat satu yang terisi.
+  unitId           String?
+  infrastructureId String?
+
+  grup        String
+  uraian      String
+  satuan      String
+  volume      Float
+  hargaSatuan Decimal @db.Decimal(18, 2)
+
+  /// Opname per objek (Progress Vendor), 0–100. Sejajar dengan ContractBoqUnit.
+  progress         Int       @default(0)
+  progressLalu     Int       @default(0)
+  progressLaluPada DateTime?
+
+  urutan Int @default(0)
+
+  vo             VariationOrder  @relation(fields: [voId], references: [id], onDelete: Cascade)
+  unit           Unit?           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  infrastructure Infrastructure? @relation(fields: [infrastructureId], references: [id], onDelete: Cascade)
+
+  @@index([voId])
+  @@index([unitId])
+  @@index([infrastructureId])
+  @@map("pm_contract_vo_items")
 }
 
 // =============================================================================

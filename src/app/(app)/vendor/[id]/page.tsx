@@ -1,25 +1,19 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { ambilPengguna, bolehLihat, bolehUbah, filterProyek } from "@/lib/auth/rbac";
+import { ambilPengguna, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { proyekUntukKontrak as ambilProyekUntukKontrak, vendorDetail } from "@/lib/data/vendor";
-import { ringkasKontrak, statusBayarKontrak } from "@/lib/calc/keuangan";
+import { jatuhTempo, jatuhTempoRetensi, ringkasKontrak, statusBayarKontrak } from "@/lib/calc/keuangan";
+import { progresSpk } from "@/lib/calc/kontrak-boq";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Badge, Kartu, KartuKosong, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
-import { HapusPembayaran, TambahPembayaran, TambahVo } from "./editors";
+import { BatalSelesai, HapusPembayaran, HapusVo, StatusVo, TambahPembayaran, TambahVo, TandaiSelesai } from "./editors";
 import { HapusKontrak, TambahKontrak, UbahKontrak } from "../editors-vendor";
 import { Tabel } from "@/components/kartu-tabel";
 
-const TAB = [
-  ["kontrak", "Kontrak"],
-  ["bayar", "Pembayaran"],
-] as const;
-
 export default async function DetailVendor({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
 }) {
   const pengguna = await ambilPengguna();
   if (!pengguna) redirect("/login");
@@ -33,8 +27,6 @@ export default async function DetailVendor({
   }
 
   const { id } = await params;
-  const { tab = "kontrak" } = await searchParams;
-  const tabAktif = TAB.some(([t]) => t === tab) ? tab : "kontrak";
 
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
   const bolehUbahKontrak = bolehUbah(pengguna, "progress");
@@ -103,321 +95,384 @@ export default async function DetailVendor({
           gap: 12, flexWrap: "wrap", marginBottom: 16,
         }}
       >
-        <div className="tabbar" style={{ marginBottom: 0 }}>
-          {TAB.map(([id2, label]) => (
-            <Link key={id2} href={`?tab=${id2}`} className={"tab" + (tabAktif === id2 ? " active" : "")}>
-              {label}
-            </Link>
-          ))}
+        <div className="disp" style={{ fontWeight: 700, fontSize: 15 }}>
+          Kontrak &amp; Pembayaran
         </div>
-        {tabAktif === "kontrak" && bolehUbahKontrak && (
+        {bolehUbahKontrak && (
           <TambahKontrak vendorId={vendor.id} namaVendor={vendor.nama} proyek={proyekUntukKontrak} />
         )}
       </div>
 
-      {/* ================= KONTRAK ================= */}
-      {tabAktif === "kontrak" &&
-        (vendor.contracts.length === 0 ? (
-          <KartuKosong>
-            Vendor ini belum punya kontrak pada proyek yang dapat Anda akses.
-          </KartuKosong>
-        ) : (
-          [...perProyek.entries()].map(([kodeProyek, daftar]) => {
-            const ringkas = daftar.map(ringkasKontrak);
-            const nilaiProyek = ringkas.reduce((s, r) => s + r.nilaiEfektif, 0);
-            const terbayarProyek = ringkas.reduce((s, r) => s + r.terbayar, 0);
+      {vendor.contracts.length === 0 ? (
+        <KartuKosong>
+          Vendor ini belum punya kontrak pada proyek yang dapat Anda akses.
+        </KartuKosong>
+      ) : (
+        [...perProyek.entries()].map(([kodeProyek, daftar]) => {
+          const ringkas = daftar.map(ringkasKontrak);
+          const nilaiProyek = ringkas.reduce((s, r) => s + r.nilaiEfektif, 0);
+          const terbayarProyek = ringkas.reduce((s, r) => s + r.terbayar, 0);
 
-            return (
-              <div key={kodeProyek} style={{ marginBottom: 20 }}>
-                <div
-                  style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    flexWrap: "wrap", gap: 8, padding: "8px 0 10px",
-                    borderBottom: "2px solid var(--line)", marginBottom: 12,
-                  }}
-                >
-                  <div className="disp" style={{ fontWeight: 700, fontSize: 15 }}>
-                    {daftar[0].project.nama}
-                    <span style={{ fontWeight: 400, color: "var(--muted)", fontSize: 12.5 }}>
-                      {" "}· {daftar.length} kontrak
-                    </span>
-                  </div>
-                  {bolehHarga && (
-                    <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                      Nilai <b className="num" style={{ color: "var(--text)" }}>{rp(nilaiProyek)}</b> ·
-                      terbayar <b className="num" style={{ color: "var(--green)" }}>{rp(terbayarProyek)}</b>
-                    </div>
-                  )}
+          return (
+            <div key={kodeProyek} style={{ marginBottom: 20 }}>
+              <div
+                style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  flexWrap: "wrap", gap: 8, padding: "8px 0 10px",
+                  borderBottom: "2px solid var(--line)", marginBottom: 12,
+                }}
+              >
+                <div className="disp" style={{ fontWeight: 700, fontSize: 15 }}>
+                  {daftar[0].project.nama}
+                  <span style={{ fontWeight: 400, color: "var(--muted)", fontSize: 12.5 }}>
+                    {" "}· {daftar.length} kontrak
+                  </span>
                 </div>
+                {bolehHarga && (
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                    Nilai <b className="num" style={{ color: "var(--text)" }}>{rp(nilaiProyek)}</b> ·
+                    terbayar <b className="num" style={{ color: "var(--green)" }}>{rp(terbayarProyek)}</b>
+                  </div>
+                )}
+              </div>
 
-                {daftar.map((k) => {
-                  const r = ringkasKontrak(k);
-                  const statusBayar = statusBayarKontrak(k);
-                  const objek =
-                    k.jenis === "Unit"
-                      ? k.units.map((x) => `${x.unit.phase.kode}-${x.unit.nomor}`).join(", ")
-                      : k.infrastructures.map((x) => x.infrastructure.nama).join(", ");
-                  const adaOverride = k.units.some((x) => x.nilaiOverride != null);
+              {daftar.map((k) => {
+                const r = ringkasKontrak(k);
+                const statusBayar = statusBayarKontrak(k);
+                const objek =
+                  k.jenis === "Unit"
+                    ? k.units.map((x) => `${x.unit.phase.kode}-${x.unit.nomor}`).join(", ")
+                    : k.infrastructures.map((x) => x.infrastructure.nama).join(", ");
+                const adaOverride = k.units.some((x) => x.nilaiOverride != null);
 
-                  return (
-                    <div key={k.id} className="card" style={{ padding: "18px 20px", marginBottom: 14 }}>
-                      <div
-                        style={{
-                          display: "flex", justifyContent: "space-between",
-                          alignItems: "flex-start", flexWrap: "wrap", gap: 8,
-                        }}
-                      >
-                        <div>
-                          <Link
-                            href={`/vendor/${vendor.id}/kontrak/${k.kode}`}
-                            className="disp"
-                            style={{
-                              fontWeight: 600, fontSize: 15,
-                              color: "var(--teal)", textDecoration: "none",
-                            }}
-                          >
-                            {k.deskripsi}
-                          </Link>
-                          <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                            {k.kode} · {k.project.kode} ·{" "}
-                            {k.jenis === "Unit" ? `${k.units.length} unit` : "Sarpras"} · mulai{" "}
-                            {tanggal(k.mulai)}
-                          </div>
-                          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>
-                            Klik nama pekerjaan untuk membuka rincian BOQ dan opname progresnya.
-                          </div>
+                // Reminder retensi: jatuh tempo = tanggal selesai + masa pemeliharaan.
+                const jtRetensi = jatuhTempoRetensi(k);
+                const urgensiRetensi = jtRetensi ? jatuhTempo(jtRetensi, new Date(), 30) : "aman";
+
+                // Progress Vendor SPK — dasar tombol "Tandai Selesai" (aktif di 100%).
+                const objekIds = [
+                  ...k.units.map((x) => x.unit.id),
+                  ...k.infrastructures.map((x) => x.infrastructure.id),
+                ];
+                const voItemsDisetujui = k.variationOrders
+                  .filter((v) => v.status === "Disetujui")
+                  .flatMap((v) => v.items);
+                const progresSpkKontrak = progresSpk(k.boqItems, k.boqUnit, objekIds, voItemsDisetujui);
+
+                // Objek pilihan untuk baris VO (unit/sarpras cakupan kontrak ini).
+                const objekVo = [
+                  ...k.units.map((x) => ({
+                    nilai: `unit:${x.unit.id}`,
+                    label: `Unit ${x.unit.phase.kode}-${x.unit.nomor}`,
+                  })),
+                  ...k.infrastructures.map((x) => ({
+                    nilai: `sarpras:${x.infrastructure.id}`,
+                    label: x.infrastructure.nama,
+                  })),
+                ];
+
+                return (
+                  <div key={k.id} className="card" style={{ padding: "18px 20px", marginBottom: 14 }}>
+                    <div
+                      style={{
+                        display: "flex", justifyContent: "space-between",
+                        alignItems: "flex-start", flexWrap: "wrap", gap: 8,
+                      }}
+                    >
+                      <div>
+                        <Link
+                          href={`/vendor/${vendor.id}/kontrak/${encodeURIComponent(k.kode)}`}
+                          className="disp"
+                          style={{
+                            fontWeight: 600, fontSize: 15,
+                            color: "var(--teal)", textDecoration: "none",
+                          }}
+                        >
+                          {k.deskripsi}
+                        </Link>
+                        <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                          {k.kode} · {k.project.kode} ·{" "}
+                          {k.jenis === "Unit" ? `${k.units.length} unit` : "Sarpras"} · mulai{" "}
+                          {tanggal(k.mulai)}
+                          {k.tanggalSelesai ? ` · selesai ${tanggal(k.tanggalSelesai)}` : ""}
                         </div>
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <Badge nilai={statusBayar} peta={WARNA_STATUS.bayar} />
-                          <span
-                            className="chip"
-                            style={{
-                              background: adaOverride ? "var(--rona-amber)" : "var(--rona-abu)",
-                              color: adaOverride ? "var(--amber)" : "var(--muted)",
-                            }}
-                          >
-                            {k.jenis === "Unit" ? (adaOverride ? "Override manual" : "Bagi rata") : "Sarpras"}
-                          </span>
-                          {bolehUbahKontrak && (
-                            <>
-                              <UbahKontrak
-                                kontrak={{
-                                  id: k.id, kode: k.kode, deskripsi: k.deskripsi,
-                                  jenisBiaya: k.jenisBiaya,
-                                  nominal: k.nominal, retensiPct: k.retensiPct,
-                                  jatuhTempoBln: k.jatuhTempoBln,
-                                  mulai: k.mulai.toISOString().slice(0, 10),
-                                }}
-                              />
-                              <HapusKontrak id={k.id} kode={k.kode} />
-                            </>
-                          )}
+                        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>
+                          Klik nama pekerjaan untuk membuka rincian BOQ dan opname progresnya.
                         </div>
-                      </div>
-
-                      {bolehHarga && (
-                        <>
-                          <div className="grid grid4" style={{ margin: "14px 0", gap: 12 }}>
-                            {(
-                              [
-                                ["NILAI KONTRAK AWAL", rp(r.nilaiAwal), "var(--ink)"],
-                                [
-                                  "VARIATION ORDER",
-                                  r.voDisetujui === 0 ? "—" : `${r.voDisetujui > 0 ? "+" : ""}${rp(r.voDisetujui)}`,
-                                  r.voDisetujui > 0 ? "var(--amber)" : r.voDisetujui < 0 ? "var(--teal)" : "var(--muted)",
-                                ],
-                                ["NILAI KONTRAK AKHIR", rp(r.nilaiEfektif), "var(--ink)"],
-                                ["TERBAYAR", rp(r.terbayar), "var(--green)"],
-                                ["BELUM TERBAYAR", rp(r.sisa), "var(--amber)"],
-                              ] as [string, string, string][]
-                            ).map(([label, nilai, warna]) => (
-                              <div key={label}>
-                                <div style={{ fontSize: 10, color: "var(--muted)", letterSpacing: 1 }}>{label}</div>
-                                <div className="num" style={{ color: warna }}>{nilai}</div>
-                              </div>
-                            ))}
-                          </div>
-
-                          <Track
-                            nilai={r.nilaiEfektif ? (r.terbayar / r.nilaiEfektif) * 100 : 0}
-                            tinggi={10}
-                            warna="var(--green)"
-                          />
+                        {!k.tanggalSelesai && k.boqItems.length > 0 && (
                           <div
                             style={{
-                              display: "flex", justifyContent: "space-between", marginTop: 6,
-                              fontSize: 11, color: "var(--muted)", flexWrap: "wrap", gap: 6,
+                              fontSize: 11, marginTop: 3,
+                              color: progresSpkKontrak === 100 ? "var(--green)" : "var(--muted)",
                             }}
                           >
-                            <span>{pct(r.persenTerbayar, 1)} terbayar dari nilai akhir</span>
-                            {k.retensiPct > 0 && (
-                              <span>
-                                Retensi {k.retensiPct}% = {rp(r.retensi)} · jatuh tempo {k.jatuhTempoBln} bln
-                                setelah pelunasan
-                              </span>
-                            )}
+                            Progress Vendor SPK: <b>{progresSpkKontrak}%</b>
+                            {progresSpkKontrak < 100 && " · tombol Tandai Selesai aktif saat mencapai 100%"}
                           </div>
-                        </>
-                      )}
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                        {k.tanggalSelesai ? (
+                          <span
+                            className="chip"
+                            style={{ background: "var(--rona-hijau2)", color: "var(--green)" }}
+                          >
+                            Selesai {tanggal(k.tanggalSelesai)}
+                          </span>
+                        ) : (
+                          progresSpkKontrak === 100 && bolehUbahKontrak && <TandaiSelesai id={k.id} />
+                        )}
+                        <Badge nilai={statusBayar} peta={WARNA_STATUS.bayar} />
+                        <span
+                          className="chip"
+                          style={{
+                            background: adaOverride ? "var(--rona-amber)" : "var(--rona-abu)",
+                            color: adaOverride ? "var(--amber)" : "var(--muted)",
+                          }}
+                        >
+                          {k.jenis === "Unit" ? (adaOverride ? "Override manual" : "Bagi rata") : "Sarpras"}
+                        </span>
+                        {bolehUbahKontrak && (
+                          <>
+                            {k.tanggalSelesai && <BatalSelesai id={k.id} />}
+                            <UbahKontrak
+                              kontrak={{
+                                id: k.id, kode: k.kode, deskripsi: k.deskripsi,
+                                jenisBiaya: k.jenisBiaya,
+                                nominal: k.nominal, retensiPct: k.retensiPct,
+                                jatuhTempoBln: k.jatuhTempoBln,
+                                mulai: k.mulai.toISOString().slice(0, 10),
+                                tanggalSelesai: k.tanggalSelesai
+                                  ? k.tanggalSelesai.toISOString().slice(0, 10)
+                                  : "",
+                                adaBoq: k.boqItems.length > 0,
+                              }}
+                            />
+                            <HapusKontrak id={k.id} kode={k.kode} />
+                          </>
+                        )}
+                      </div>
+                    </div>
 
-                      {/* --- variation order --- */}
-                      <div style={{ borderTop: "1px solid var(--line)", marginTop: 14, paddingTop: 10 }}>
+                    {bolehHarga && (
+                      <>
+                        <div className="grid grid4" style={{ margin: "14px 0", gap: 12 }}>
+                          {(
+                            [
+                              ["NILAI KONTRAK AWAL", rp(r.nilaiAwal), "var(--ink)"],
+                              [
+                                "VARIATION ORDER",
+                                r.voDisetujui === 0 ? "—" : `${r.voDisetujui > 0 ? "+" : ""}${rp(r.voDisetujui)}`,
+                                r.voDisetujui > 0 ? "var(--amber)" : r.voDisetujui < 0 ? "var(--teal)" : "var(--muted)",
+                              ],
+                              ["NILAI KONTRAK AKHIR", rp(r.nilaiEfektif), "var(--ink)"],
+                              ["TERBAYAR", rp(r.terbayar), "var(--green)"],
+                              ["BELUM TERBAYAR", rp(r.sisa), "var(--amber)"],
+                            ] as [string, string, string][]
+                          ).map(([label, nilai, warna]) => (
+                            <div key={label}>
+                              <div style={{ fontSize: 10, color: "var(--muted)", letterSpacing: 1 }}>{label}</div>
+                              <div className="num" style={{ color: warna }}>{nilai}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <Track
+                          nilai={r.nilaiEfektif ? (r.terbayar / r.nilaiEfektif) * 100 : 0}
+                          tinggi={10}
+                          warna="var(--green)"
+                        />
+                        <div
+                          style={{
+                            display: "flex", justifyContent: "space-between", marginTop: 6,
+                            fontSize: 11, color: "var(--muted)", flexWrap: "wrap", gap: 6,
+                          }}
+                        >
+                          <span>{pct(r.persenTerbayar, 1)} terbayar dari nilai akhir</span>
+                          {k.retensiPct > 0 && (
+                            <span
+                              style={{
+                                color:
+                                  urgensiRetensi === "lewat"
+                                    ? "var(--red)"
+                                    : urgensiRetensi === "dekat"
+                                      ? "var(--amber)"
+                                      : "var(--muted)",
+                                fontWeight: urgensiRetensi === "aman" ? 400 : 600,
+                              }}
+                            >
+                              Retensi {k.retensiPct}% = {rp(r.retensi)} ·{" "}
+                              {jtRetensi
+                                ? `jatuh tempo ${tanggal(jtRetensi)}${
+                                    urgensiRetensi === "lewat"
+                                      ? " — sudah jatuh tempo, lepas retensi"
+                                      : urgensiRetensi === "dekat"
+                                        ? " — segera jatuh tempo"
+                                        : ""
+                                  }`
+                                : `${k.jatuhTempoBln} bln setelah tanggal selesai (belum ditandai selesai)`}
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* --- variation order --- */}
+                    <div style={{ borderTop: "1px solid var(--line)", marginTop: 14, paddingTop: 10 }}>
+                      <div
+                        style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          marginBottom: 6, flexWrap: "wrap", gap: 8,
+                        }}
+                      >
+                        <div className="eyebrow">Variation Order · {k.variationOrders.length} addendum</div>
+                        {bolehUbahKontrak && <TambahVo contractId={k.id} objek={objekVo} />}
+                      </div>
+
+                      {k.variationOrders.length === 0 ? (
+                        <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                          Belum ada pekerjaan tambah atau kurang.
+                        </div>
+                      ) : (
+                        <Tabel
+                          kolom={[
+                            { label: "No.", lebar: 60 },
+                            { label: "Tanggal", lebar: 110 },
+                            { label: "Uraian" },
+                            bolehHarga && { label: "Nominal", rata: "kanan" },
+                            { label: "Status", lebar: 92 },
+                            bolehUbahKontrak && { label: "", lebar: 120 },
+                          ]}
+                        >
+                          {k.variationOrders.map((v) => (
+                            <tr key={v.id}>
+                              <td style={{ fontWeight: 600 }}>{v.nomor}</td>
+                              <td style={{ color: "var(--muted)" }}>{tanggal(v.tanggal)}</td>
+                              <td style={{ whiteSpace: "normal" }}>
+                                {v.uraian}
+                                <span style={{ color: "var(--muted)", fontSize: 11 }}> · {v.items.length} baris</span>
+                              </td>
+                              {bolehHarga && (
+                                <td
+                                  className="num"
+                                  style={{
+                                    textAlign: "right",
+                                    color: v.nominal >= 0 ? "var(--amber)" : "var(--teal)",
+                                  }}
+                                >
+                                  {v.nominal >= 0 ? "+" : "−"}
+                                  {rp(Math.abs(v.nominal))}
+                                </td>
+                              )}
+                              <td>
+                                <span
+                                  className="chip"
+                                  style={{
+                                    background: v.status === "Disetujui" ? "var(--rona-hijau2)" : "var(--rona-amber)",
+                                    color: v.status === "Disetujui" ? "var(--green)" : "var(--amber)",
+                                  }}
+                                >
+                                  {v.status}
+                                </span>
+                              </td>
+                              {bolehUbahKontrak && (
+                                <td>
+                                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                    <StatusVo id={v.id} status={v.status} />
+                                    <HapusVo id={v.id} nomor={v.nomor} />
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                          {bolehHarga && r.voDiajukan !== 0 && (
+                            <tr>
+                              <td colSpan={3} style={{ color: "var(--muted)" }}>
+                                Menunggu persetujuan (belum masuk nilai akhir)
+                              </td>
+                              <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
+                                {r.voDiajukan >= 0 ? "+" : "−"}
+                                {rp(Math.abs(r.voDiajukan))}
+                              </td>
+                              <td />
+                              {bolehUbahKontrak && <td />}
+                            </tr>
+                          )}
+                        </Tabel>
+                      )}
+                    </div>
+
+                    <div style={{ borderTop: "1px solid var(--line)", marginTop: 12, paddingTop: 10 }}>
+                      <div className="eyebrow" style={{ marginBottom: 6 }}>Objek pekerjaan</div>
+                      <div style={{ fontSize: 12.5 }}>{objek || "—"}</div>
+                    </div>
+
+                    {/* --- pembayaran (digabung dari tab Pembayaran) --- */}
+                    {bolehHarga && (
+                      <div style={{ borderTop: "1px solid var(--line)", marginTop: 12, paddingTop: 10 }}>
                         <div
                           style={{
                             display: "flex", justifyContent: "space-between", alignItems: "center",
-                            marginBottom: 6, flexWrap: "wrap", gap: 8,
+                            marginBottom: 8, flexWrap: "wrap", gap: 8,
                           }}
                         >
-                          <div className="eyebrow">Variation Order · {k.variationOrders.length} addendum</div>
-                          {bolehUbahKontrak && <TambahVo contractId={k.id} />}
+                          <div className="eyebrow">
+                            Pembayaran · {rp(r.terbayar)} dari {rp(r.nilaiEfektif)}
+                          </div>
+                          {bolehBayar && r.sisa > 0 && (
+                            <TambahPembayaran
+                              contractId={k.id}
+                              sisa={r.sisa}
+                              peruntukan={k.jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana"}
+                              jenisBiaya={k.jenisBiaya}
+                              cakupan={k.units.length + k.infrastructures.length}
+                            />
+                          )}
                         </div>
 
-                        {k.variationOrders.length === 0 ? (
-                          <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                            Belum ada pekerjaan tambah atau kurang.
-                          </div>
+                        {k.expenses.length === 0 ? (
+                          <div style={{ fontSize: 12, color: "var(--muted)" }}>Belum ada pembayaran.</div>
                         ) : (
                           <Tabel
                             kolom={[
-                              { label: "No.", lebar: 60 },
                               { label: "Tanggal", lebar: 110 },
                               { label: "Uraian" },
-                              bolehHarga && { label: "Nominal", rata: "kanan" },
-                              { label: "Status", lebar: 92 },
+                              { label: "Nominal", rata: "kanan" },
+                              { label: "Kumulatif", rata: "kanan" },
+                              bolehBayar && { label: "", lebar: 70 },
                             ]}
                           >
-                            {k.variationOrders.map((v) => (
-                              <tr key={v.id}>
-                                <td style={{ fontWeight: 600 }}>{v.nomor}</td>
-                                <td style={{ color: "var(--muted)" }}>{tanggal(v.tanggal)}</td>
-                                <td style={{ whiteSpace: "normal" }}>{v.uraian}</td>
-                                {bolehHarga && (
-                                  <td
-                                    className="num"
-                                    style={{
-                                      textAlign: "right",
-                                      color: v.nominal >= 0 ? "var(--amber)" : "var(--teal)",
-                                    }}
-                                  >
-                                    {v.nominal >= 0 ? "+" : "−"}
-                                    {rp(Math.abs(v.nominal))}
+                            {k.expenses.map((p, i) => {
+                              const kumulatif = k.expenses
+                                .slice(0, i + 1)
+                                .reduce((s, x) => s + x.total, 0);
+                              return (
+                                <tr key={p.id}>
+                                  <td style={{ color: "var(--muted)" }}>{tanggal(p.tanggal)}</td>
+                                  <td style={{ whiteSpace: "normal" }}>{p.uraian}</td>
+                                  <td className="num" style={{ textAlign: "right" }}>{rp(p.total)}</td>
+                                  <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
+                                    {rp(kumulatif)}
                                   </td>
-                                )}
-                                <td>
-                                  <span
-                                    className="chip"
-                                    style={{
-                                      background: v.status === "Disetujui" ? "var(--rona-hijau2)" : "var(--rona-amber)",
-                                      color: v.status === "Disetujui" ? "var(--green)" : "var(--amber)",
-                                    }}
-                                  >
-                                    {v.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                            {bolehHarga && r.voDiajukan !== 0 && (
-                              <tr>
-                                <td colSpan={3} style={{ color: "var(--muted)" }}>
-                                  Menunggu persetujuan (belum masuk nilai akhir)
-                                </td>
-                                <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
-                                  {r.voDiajukan >= 0 ? "+" : "−"}
-                                  {rp(Math.abs(r.voDiajukan))}
-                                </td>
-                                <td />
-                              </tr>
-                            )}
+                                  {bolehBayar && (
+                                    <td style={{ textAlign: "right" }}>
+                                      <HapusPembayaran id={p.id} />
+                                    </td>
+                                  )}
+                                </tr>
+                              );
+                            })}
                           </Tabel>
                         )}
                       </div>
-
-                      <div style={{ borderTop: "1px solid var(--line)", marginTop: 12, paddingTop: 10 }}>
-                        <div className="eyebrow" style={{ marginBottom: 6 }}>Objek pekerjaan</div>
-                        <div style={{ fontSize: 12.5 }}>{objek || "—"}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })
-        ))}
-
-      {/* ================= PEMBAYARAN ================= */}
-      {tabAktif === "bayar" &&
-        (!bolehHarga ? (
-          <Terbatas apa="Riwayat pembayaran" />
-        ) : vendor.contracts.length === 0 ? (
-          <KartuKosong>
-            Belum ada kontrak.
-          </KartuKosong>
-        ) : (
-          vendor.contracts.map((k) => {
-            const r = ringkasKontrak(k);
-            return (
-              <div key={k.id} className="card" style={{ padding: "16px 20px", marginBottom: 14 }}>
-                <div
-                  style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    flexWrap: "wrap", gap: 8, marginBottom: 10,
-                  }}
-                >
-                  <div>
-                    <div className="disp" style={{ fontWeight: 600, fontSize: 14.5 }}>{k.deskripsi}</div>
-                    <div style={{ fontSize: 11.5, color: "var(--muted)" }}>
-                      {k.kode} · {k.project.kode} · {rp(r.terbayar)} dari {rp(r.nilaiEfektif)}
-                    </div>
+                    )}
                   </div>
-                  {bolehBayar && r.sisa > 0 && (
-                    <TambahPembayaran
-                      contractId={k.id}
-                      sisa={r.sisa}
-                      peruntukan={k.jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana"}
-                      jenisBiaya={k.jenisBiaya}
-                      cakupan={k.units.length + k.infrastructures.length}
-                    />
-                  )}
-                </div>
-
-                {k.expenses.length === 0 ? (
-                  <div style={{ fontSize: 12, color: "var(--muted)" }}>Belum ada pembayaran.</div>
-                ) : (
-                  <Tabel
-                    kolom={[
-                      { label: "Tanggal", lebar: 110 },
-                      { label: "Uraian" },
-                      { label: "Nominal", rata: "kanan" },
-                      { label: "Kumulatif", rata: "kanan" },
-                      bolehBayar && { label: "", lebar: 70 },
-                    ]}
-                  >
-                    {k.expenses.map((p, i) => {
-                      const kumulatif = k.expenses
-                        .slice(0, i + 1)
-                        .reduce((s, x) => s + x.total, 0);
-                      return (
-                        <tr key={p.id}>
-                          <td style={{ color: "var(--muted)" }}>{tanggal(p.tanggal)}</td>
-                          <td style={{ whiteSpace: "normal" }}>{p.uraian}</td>
-                          <td className="num" style={{ textAlign: "right" }}>{rp(p.total)}</td>
-                          <td className="num" style={{ textAlign: "right", color: "var(--muted)" }}>
-                            {rp(kumulatif)}
-                          </td>
-                          {bolehBayar && (
-                            <td style={{ textAlign: "right" }}>
-                              <HapusPembayaran id={p.id} />
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </Tabel>
-                )}
-              </div>
-            );
-          })
-        ))}
+                );
+              })}
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }

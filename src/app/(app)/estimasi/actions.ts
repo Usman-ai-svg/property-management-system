@@ -11,6 +11,7 @@ import {
   JENIS_KONTRAK, KATEGORI_HARGA_DASAR, KATEGORI_PEMASOK, STATUS_PEMASOK,
 } from "@/lib/domain/enums";
 import { hargaSatuanDb } from "@/lib/tampilan/estimasi";
+import { nomorKontrakBaru } from "@/lib/data/vendor";
 import { bacaBoqDariExcel } from "@/lib/impor-excel";
 import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
 
@@ -1056,21 +1057,8 @@ export async function buatKontrakDariRab(_s: HasilAksi | null, form: FormData): 
     const tglMulai = mulai ? new Date(mulai) : new Date();
     if (Number.isNaN(tglMulai.getTime())) throw new GagalIzin("Tanggal mulai tidak sah.");
 
-    // Kode kontrak digenerate otomatis: {KODEPROYEK}/{K|S}/{TAHUN}/{urut 3 digit},
-    // bernomor urut per proyek per tahun. K = jenis Unit, S = Sarpras.
-    const awalanKode = `${rab.project.kode}/${jenis === "Unit" ? "K" : "S"}/${tglMulai.getFullYear()}/`;
-    const kodeAda = await prisma.contract.findMany({
-      where: { kode: { startsWith: awalanKode } }, select: { kode: true },
-    });
-    let urut = kodeAda.reduce((m, c) => {
-      const n = parseInt(c.kode.slice(awalanKode.length), 10);
-      return Number.isFinite(n) && n > m ? n : m;
-    }, 0);
-    let kode = "";
-    do {
-      urut += 1;
-      kode = `${awalanKode}${String(urut).padStart(3, "0")}`;
-    } while (await prisma.contract.count({ where: { kode } }));
+    // Kode kontrak digenerate otomatis sesuai standar {PROYEK}/{K|S}/{TAHUN}/{urut}.
+    const kode = await nomorKontrakBaru(rab.project.kode, jenis, tglMulai.getFullYear());
 
     const totalMenang = menang.reduce((s, m) => s + (m.penawaran[0]?.hargaSatuan ?? 0) * m.volume, 0);
     // Nilai kontrak = total baris menang × jumlah objek cakupan. Model "satu BOQ

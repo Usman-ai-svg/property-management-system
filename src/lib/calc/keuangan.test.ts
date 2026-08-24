@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  alokasiKontrak, bagiRata, periksaAlokasi, ringkasKontrak, statusBayarKontrak, statusSerapan,
+  alokasiKontrak, bagiRata, jatuhTempoRetensi, periksaAlokasi, ringkasKontrak, statusBayarKontrak, statusSerapan,
   totalVoDisetujui, alokasiPembayaran,
 } from "./keuangan";
 
@@ -64,6 +64,26 @@ describe("statusBayarKontrak", () => {
       "DP",
     );
     assert.equal(statusBayarKontrak({ ...tanpa, expenses: [bayar(100_000_000, "2026-01-10")] }), "Lunas");
+  });
+
+  it("dengan tanggal selesai, jatuh tempo retensi dihitung sejak SELESAI, bukan pelunasan", () => {
+    // Pokok lunas 2026-01-10 (jatuh tempo lama = 2026-04-10). Tapi pekerjaan baru
+    // ditandai selesai 2026-06-01 → jatuh tempo = 2026-09-01.
+    const k = { ...dasar, tanggalSelesai: "2026-06-01", expenses: [bayar(95_000_000, "2026-01-10")] };
+    assert.equal(statusBayarKontrak(k, new Date("2026-05-01")), "Retensi"); // lama sudah lewat, baru belum
+    assert.equal(statusBayarKontrak(k, new Date("2026-09-15")), "Retensi Jatuh Tempo");
+  });
+});
+
+describe("jatuhTempoRetensi", () => {
+  it("tanggal selesai + masa pemeliharaan", () => {
+    const d = jatuhTempoRetensi({ tanggalSelesai: "2026-06-01", jatuhTempoBln: 3, retensiPct: 5 });
+    assert.equal(d?.toISOString().slice(0, 10), "2026-09-01");
+  });
+
+  it("null bila belum ditandai selesai atau tanpa retensi", () => {
+    assert.equal(jatuhTempoRetensi({ tanggalSelesai: null, jatuhTempoBln: 3, retensiPct: 5 }), null);
+    assert.equal(jatuhTempoRetensi({ tanggalSelesai: "2026-06-01", jatuhTempoBln: 3, retensiPct: 0 }), null);
   });
 });
 

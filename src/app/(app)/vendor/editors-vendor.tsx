@@ -87,6 +87,10 @@ export interface KontrakForm {
   retensiPct: number;
   jatuhTempoBln: number;
   mulai: string;
+  /** ISO yyyy-mm-dd, atau string kosong bila belum ditandai selesai. */
+  tanggalSelesai: string;
+  /** true bila SPK sudah punya baris BOQ — nilai kontrak lalu mengikuti BOQ. */
+  adaBoq: boolean;
 }
 
 /**
@@ -131,7 +135,7 @@ export function TambahKontrak({
         <input key={id} type="hidden" name="cakupanId" value={id} />
       ))}
 
-      <BarisField>
+      <BarisField kolom={1}>
         <div>
           <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
             Proyek <span style={{ color: "var(--red)" }}>*</span>
@@ -148,8 +152,12 @@ export function TambahKontrak({
             ))}
           </select>
         </div>
-        <Field label="Kode Kontrak" nama="kode" wajib petunjuk="mis. K6, S7" />
       </BarisField>
+      <Petunjuk>
+        Kode SPK dibuat otomatis sesuai standar penomoran{" "}
+        <b>{`{PROYEK}/{K|S}/{TAHUN}/{urut}`}</b> — mis. {kodeProyek || "NT4"}/
+        {jenis === "Unit" ? "K" : "S"}/{new Date().getFullYear()}/001.
+      </Petunjuk>
 
       <BarisField kolom={1}>
         <Field label="Deskripsi Pekerjaan" nama="deskripsi" wajib />
@@ -179,6 +187,10 @@ export function TambahKontrak({
         <Field label="Nilai Kontrak" nama="nominal" tipe="number" satuan="Rp" wajib />
         <Field label="Mulai" nama="mulai" tipe="tanggal" />
       </BarisField>
+      <Petunjuk>
+        Nilai kontrak ini bersifat sementara: begitu BOQ terinci SPK diisi, Nilai
+        SPK mengikuti BOQ (nilai per objek × jumlah objek) secara otomatis.
+      </Petunjuk>
 
       <BarisField>
         <Field label="Retensi" nama="retensiPct" nilai={5} tipe="number" satuan="%" />
@@ -264,6 +276,22 @@ export function UbahKontrak({ kontrak }: { kontrak: KontrakForm }) {
         <Field label="Retensi" nama="retensiPct" nilai={kontrak.retensiPct} tipe="number" satuan="%" />
         <Field label="Masa Pemeliharaan" nama="jatuhTempoBln" nilai={kontrak.jatuhTempoBln} tipe="number" satuan="bulan" />
       </BarisField>
+      <BarisField kolom={1}>
+        <Field
+          label="Tanggal Selesai"
+          nama="tanggalSelesai"
+          nilai={kontrak.tanggalSelesai}
+          tipe="tanggal"
+          petunjuk="Diisi saat pekerjaan dinyatakan selesai. Retensi jatuh tempo dihitung sejak tanggal ini + masa pemeliharaan."
+        />
+      </BarisField>
+      {kontrak.adaBoq && (
+        <Petunjuk>
+          Nilai kontrak SPK ini mengikuti BOQ terinci (nilai per objek × jumlah
+          objek) dan disetel ulang otomatis tiap kali BOQ berubah — koreksi manual
+          di sini hanya bertahan sampai baris BOQ berikutnya disunting.
+        </Petunjuk>
+      )}
       <Petunjuk>
         Menaikkan nilai kontrak di sini berbeda dari Variation Order: VO menyimpan
         riwayat pekerjaan tambah/kurang, sedangkan ini mengoreksi nilai awalnya.

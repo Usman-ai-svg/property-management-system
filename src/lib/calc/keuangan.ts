@@ -104,6 +104,28 @@ export type StatusBayarKontrak = "Belum" | "DP" | "Retensi" | "Retensi Jatuh Tem
 export interface KontrakStatusLike extends KontrakLike {
   jatuhTempoBln: number;
   expenses: { total: number; tanggal: Date | string }[];
+  /** Tanggal pekerjaan dinyatakan selesai — anchor jatuh tempo retensi. */
+  tanggalSelesai?: Date | string | null;
+}
+
+/**
+ * Tanggal jatuh tempo retensi = tanggal selesai + masa pemeliharaan (bulan).
+ *
+ * Retensi ditahan sampai masa pemeliharaan berlalu terhitung sejak pekerjaan
+ * DINYATAKAN SELESAI — bukan sejak pelunasan. Mengembalikan null bila kontrak
+ * belum ditandai selesai atau tidak menahan retensi (retensiPct 0), yaitu saat
+ * tidak ada yang perlu diingatkan.
+ */
+export function jatuhTempoRetensi(k: {
+  tanggalSelesai?: Date | string | null;
+  jatuhTempoBln: number;
+  retensiPct: number;
+}): Date | null {
+  if (!k.tanggalSelesai || k.retensiPct <= 0) return null;
+  const d = new Date(k.tanggalSelesai);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setMonth(d.getMonth() + k.jatuhTempoBln);
+  return d;
 }
 
 /**
@@ -127,11 +149,15 @@ export function statusBayarKontrak(k: KontrakStatusLike, kini: Date = new Date()
   const pokok = nilaiEfektif - retensi;
   if (terbayar < pokok) return "DP";
 
-  // Pokok lunas, hanya retensi tersisa. Jatuh tempo dihitung dari tanggal
-  // pembayaran yang pertama kali membuat akumulasi mencapai titik pokok.
-  const tglPokokLunas = tanggalCapaiAmbang(k.expenses, pokok);
-  if (tglPokokLunas) {
-    const jatuh = new Date(tglPokokLunas);
+  // Pokok lunas, hanya retensi tersisa. Jatuh tempo dihitung dari TANGGAL
+  // SELESAI bila kontrak sudah ditandai selesai; bila belum, jatuh kembali ke
+  // tanggal pembayaran yang pertama kali membuat akumulasi mencapai titik pokok
+  // (perilaku lama, agar data tanpa tanggal selesai tetap terlayani).
+  const anchor = k.tanggalSelesai
+    ? new Date(k.tanggalSelesai)
+    : tanggalCapaiAmbang(k.expenses, pokok);
+  if (anchor && !Number.isNaN(anchor.getTime())) {
+    const jatuh = new Date(anchor);
     jatuh.setMonth(jatuh.getMonth() + k.jatuhTempoBln);
     if (kini >= jatuh) return "Retensi Jatuh Tempo";
   }

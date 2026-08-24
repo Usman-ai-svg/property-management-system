@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat } from "@/lib/audit";
 import { angka, GagalIzin, HasilAksi, izinkan, jalankan, teks } from "@/lib/actions/guard";
-import { periksaBarisBoqSpk } from "@/lib/calc/kontrak-boq";
+import { nilaiBoqSeluruhObjek, periksaBarisBoqSpk } from "@/lib/calc/kontrak-boq";
 import { bacaBoqDariExcel } from "@/lib/impor-excel";
 import { mingguBaru } from "@/lib/calc/hari-kerja";
 
@@ -73,6 +73,39 @@ function teksOverride(form: FormData, nama: string): string | null {
   return isi === "" ? null : isi;
 }
 
+/**
+ * Selaraskan `Contract.nominal` dengan nilai BOQ terinci terkini.
+ *
+ * Definisi "Nilai SPK = BOQ per-objek × jumlah objek": selama SPK punya baris
+ * BOQ, nominal DITURUNKAN dari BOQ (Σ objek × Σ baris efektif) — bukan angka
+ * beku yang bisa melenceng saat BOQ disunting. Bila belum ada baris BOQ,
+ * nominal dibiarkan sesuai input manual (fallback). Dipanggil tiap kali BOQ
+ * template atau override berubah, sebelum revalidate.
+ */
+async function sinkronNominalBoq(contractId: string) {
+  const k = await prisma.contract.findUnique({
+    where: { id: contractId },
+    select: {
+      boqItems: { select: { id: true, volume: true, hargaSatuan: true } },
+      boqUnit: {
+        select: {
+          boqItemId: true, unitId: true, infrastructureId: true,
+          volume: true, hargaSatuan: true,
+        },
+      },
+      units: { select: { unitId: true } },
+      infrastructures: { select: { infrastructureId: true } },
+    },
+  });
+  if (!k || k.boqItems.length === 0) return; // belum ada BOQ → biarkan nominal manual
+  const objekIds = [
+    ...k.units.map((u) => u.unitId),
+    ...k.infrastructures.map((s) => s.infrastructureId),
+  ];
+  const total = Math.round(nilaiBoqSeluruhObjek(k.boqItems, k.boqUnit, objekIds));
+  await prisma.contract.update({ where: { id: contractId }, data: { nominal: total } });
+}
+
 /** Segarkan seluruh halaman yang menampilkan BOQ/progres SPK ini. */
 function segarkan(kontrak: Kontrak) {
   revalidatePath(`/vendor/${kontrak.vendorId}`);
@@ -117,6 +150,7 @@ export async function tambahBarisBoqSpk(_s: HasilAksi | null, form: FormData): P
       pengguna, projectId: kontrak.projectId, objek: `SPK ${kontrak.kode}`,
       aksi: "Tambah baris BOQ template", ke: `${baris.uraian} — ${baris.volume} ${baris.satuan}`,
     });
+    await sinkronNominalBoq(kontrak.id);
     segarkan(kontrak);
   });
 }
@@ -149,6 +183,7 @@ export async function ubahBarisBoqSpk(_s: HasilAksi | null, form: FormData): Pro
       pengguna, projectId: kontrak.projectId, objek: `SPK ${kontrak.kode} · ${baru.uraian}`,
       aksi: "Ubah baris BOQ template",
     });
+    await sinkronNominalBoq(kontrak.id);
     segarkan(kontrak);
   });
 }
@@ -171,6 +206,7 @@ export async function hapusBarisBoqSpk(_s: HasilAksi | null, form: FormData): Pr
       pengguna, projectId: kontrak.projectId, objek: `SPK ${kontrak.kode}`,
       aksi: "Hapus baris BOQ template", dari: baris.uraian,
     });
+    await sinkronNominalBoq(kontrak.id);
     segarkan(kontrak);
   });
 }
@@ -206,6 +242,7 @@ export async function imporBoqSpk(_s: HasilAksi | null, form: FormData): Promise
       pengguna, projectId: kontrak.projectId, objek: `SPK ${kontrak.kode}`,
       aksi: "Impor BOQ template dari Excel", ke: `${rows.length} baris`,
     });
+    await sinkronNominalBoq(kontrak.id);
     segarkan(kontrak);
     return `${rows.length} baris pekerjaan diimpor sebagai template SPK.`;
   });
@@ -264,6 +301,7 @@ export async function ubahOverrideBoq(_s: HasilAksi | null, form: FormData): Pro
       pengguna, projectId: kontrak.projectId, objek: `SPK ${kontrak.kode} · ${override.uraian ?? template.uraian}`,
       aksi: "Sesuaikan BOQ per objek",
     });
+    await sinkronNominalBoq(kontrak.id);
     segarkan(kontrak);
   });
 }
@@ -298,6 +336,7 @@ export async function resetOverrideBoq(_s: HasilAksi | null, form: FormData): Pr
       pengguna, projectId: kontrak.projectId, objek: `SPK ${kontrak.kode}`,
       aksi: "Samakan baris BOQ ke template",
     });
+    await sinkronNominalBoq(kontrak.id);
     segarkan(kontrak);
   });
 }
@@ -324,17 +363,24 @@ export async function simpanProgresBoqSpk(_s: HasilAksi | null, form: FormData):
       throw new GagalIzin("Data progres tidak lengkap. Muat ulang halaman lalu coba lagi.");
     }
 
-    // Baris template yang sah untuk kontrak ini + override objek yang sudah ada.
-    const [template, override] = await Promise.all([
+    // Baris template + override objek + baris VO DISETUJUI objek ini. Opname bisa
+    // menyentuh dua tabel: baris template → ContractBoqUnit, baris VO (id "vo:…")
+    // → ContractVoItem (baris konkret yang selalu ada).
+    const [template, override, voItems] = await Promise.all([
       prisma.contractBoqItem.findMany({ where: { contractId }, select: { id: true, uraian: true } }),
       prisma.contractBoqUnit.findMany({
         where: { contractId, ...(unitId ? { unitId } : { infrastructureId }) },
         select: { id: true, boqItemId: true, progress: true, progressLalu: true, progressLaluPada: true },
       }),
+      prisma.contractVoItem.findMany({
+        where: { vo: { contractId, status: "Disetujui" }, ...(unitId ? { unitId } : { infrastructureId }) },
+        select: { id: true, uraian: true, progress: true, progressLalu: true, progressLaluPada: true },
+      }),
     ]);
     const sahId = new Set(template.map((t) => t.id));
     const petaOverride = new Map(override.map((o) => [o.boqItemId, o]));
     const petaUraian = new Map(template.map((t) => [t.id, t.uraian]));
+    const petaVo = new Map(voItems.map((v) => [v.id, v]));
 
     const sekarang = new Date();
     const buat: {
@@ -343,16 +389,37 @@ export async function simpanProgresBoqSpk(_s: HasilAksi | null, form: FormData):
     const ubah: {
       id: string; progress: number; progressLalu: number; progressLaluPada: Date;
     }[] = [];
+    const ubahVo: {
+      id: string; progress: number; progressLalu: number; progressLaluPada: Date;
+    }[] = [];
 
     for (let i = 0; i < ids.length; i++) {
-      const boqItemId = ids[i];
-      if (!sahId.has(boqItemId)) continue; // form tertinggal versi lama → abaikan
+      const rawId = ids[i];
+      const isVo = rawId.startsWith("vo:");
+      const realId = isVo ? rawId.slice(3) : rawId;
       const p = nilai[i];
+
+      if (isVo) {
+        const lama = petaVo.get(realId);
+        if (!lama) continue; // baris VO tak sah / bukan objek ini → abaikan
+        if (!Number.isFinite(p) || p < 0 || p > 100) {
+          throw new GagalIzin(`Progres "${lama.uraian}" harus di antara 0 dan 100 persen.`);
+        }
+        const bulat = Math.round(p);
+        if (bulat === lama.progress) continue;
+        const baru = mingguBaru(lama.progressLaluPada ?? null, sekarang);
+        const progressLalu = baru ? lama.progress : lama.progressLalu;
+        const progressLaluPada = baru ? sekarang : (lama.progressLaluPada ?? sekarang);
+        ubahVo.push({ id: lama.id, progress: bulat, progressLalu, progressLaluPada });
+        continue;
+      }
+
+      if (!sahId.has(realId)) continue; // form tertinggal versi lama → abaikan
       if (!Number.isFinite(p) || p < 0 || p > 100) {
-        throw new GagalIzin(`Progres "${petaUraian.get(boqItemId) ?? "baris"}" harus di antara 0 dan 100 persen.`);
+        throw new GagalIzin(`Progres "${petaUraian.get(realId) ?? "baris"}" harus di antara 0 dan 100 persen.`);
       }
       const bulat = Math.round(p);
-      const lama = petaOverride.get(boqItemId);
+      const lama = petaOverride.get(realId);
       const progresLama = lama?.progress ?? 0;
       if (bulat === progresLama) continue;
 
@@ -360,10 +427,11 @@ export async function simpanProgresBoqSpk(_s: HasilAksi | null, form: FormData):
       const progressLalu = baru ? progresLama : (lama?.progressLalu ?? 0);
       const progressLaluPada = baru ? sekarang : (lama?.progressLaluPada ?? sekarang);
       if (lama) ubah.push({ id: lama.id, progress: bulat, progressLalu, progressLaluPada });
-      else buat.push({ boqItemId, progress: bulat, progressLalu, progressLaluPada });
+      else buat.push({ boqItemId: realId, progress: bulat, progressLalu, progressLaluPada });
     }
 
-    if (buat.length === 0 && ubah.length === 0) return "Tidak ada progres yang berubah.";
+    const totalUbah = buat.length + ubah.length + ubahVo.length;
+    if (totalUbah === 0) return "Tidak ada progres yang berubah.";
 
     await prisma.$transaction([
       ...ubah.map((u) =>
@@ -380,13 +448,19 @@ export async function simpanProgresBoqSpk(_s: HasilAksi | null, form: FormData):
           },
         }),
       ),
+      ...ubahVo.map((u) =>
+        prisma.contractVoItem.update({
+          where: { id: u.id },
+          data: { progress: u.progress, progressLalu: u.progressLalu, progressLaluPada: u.progressLaluPada },
+        }),
+      ),
     ]);
 
     await catat({
       pengguna, projectId: kontrak.projectId, objek: `SPK ${kontrak.kode}`,
-      aksi: "Opname progres BOQ", ke: `${buat.length + ubah.length} baris diperbarui`,
+      aksi: "Opname progres BOQ", ke: `${totalUbah} baris diperbarui`,
     });
     segarkan(kontrak);
-    return `${buat.length + ubah.length} baris tersimpan.`;
+    return `${totalUbah} baris tersimpan.`;
   });
 }

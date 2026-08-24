@@ -69,49 +69,67 @@ const BOQ_SPK = [
  * Yang berbeda hanyalah arah datanya. Setelah ini, angka barislah yang
  * sungguhan dan angka unit yang jadi turunan — bukan sebaliknya.
  */
-async function isiBoqSpk(contractId: string, K: { nominal: number }) {
-  const cakupan = await prisma.contractUnit.findMany({
-    where: { contractId },
-    select: { unit: { select: { id: true, progress: true } } },
-  });
-  if (cakupan.length === 0) return;
+async function isiBoqSpk(contractId: string, K: { nominal: number; jenis: string }) {
+  // Objek cakupan = unit ATAU sarpras (satu kontrak satu jenis lingkup).
+  const [cakupanUnit, cakupanSarpras] = await Promise.all([
+    prisma.contractUnit.findMany({
+      where: { contractId }, select: { unit: { select: { id: true, progress: true } } },
+    }),
+    prisma.contractInfrastructure.findMany({
+      where: { contractId }, select: { infrastructure: { select: { id: true, progress: true } } },
+    }),
+  ]);
+  const objek = [
+    ...cakupanUnit.map((c) => ({ jenis: "unit" as const, id: c.unit.id, progress: c.unit.progress })),
+    ...cakupanSarpras.map((c) => ({ jenis: "sarpras" as const, id: c.infrastructure.id, progress: c.infrastructure.progress })),
+  ];
+  if (objek.length === 0) return;
 
-  // Nilai SPK dibagi rata ke seluruh unit, lalu dipecah menurut bobot pekerjaan.
-  const nilaiPerUnit = K.nominal / cakupan.length;
+  // Nilai SPK dibagi rata ke seluruh objek, lalu dipecah menurut bobot pekerjaan.
+  const nilaiPerObjek = K.nominal / objek.length;
 
-  // TEMPLATE BOQ SPK — satu untuk semua unit ("satu BOQ berlaku untuk tiap unit").
-  // Tiap baris dibulatkan, KECUALI baris terakhir yang menyerap sisa pembulatan
-  // supaya total BOQ per unit sama PERSIS dengan `nilaiPerUnit`. Tanpa ini, sisa
-  // pembulatan tiap baris menumpuk dan "Nilai BOQ Terinci" jadi meleset beberapa
-  // ribu rupiah dari Nilai SPK — padahal keduanya harus sama.
+  // TEMPLATE BOQ SPK — satu untuk semua objek ("satu BOQ berlaku untuk tiap unit").
+  // Unit dirinci menurut BOQ_SPK; sarpras dibuat satu baris borongan lump-sum
+  // (pekerjaan sarana & prasarana tak dirinci per item pada demo ini). Tiap baris
+  // dibulatkan KECUALI baris terakhir yang menyerap sisa pembulatan, supaya total
+  // BOQ per objek sama PERSIS dengan `nilaiPerObjek` — Nilai BOQ Terinci = Nilai SPK.
   const template: { id: string; volume: number; hargaSatuan: number }[] = [];
-  let urutan = 1;
-  let akum = 0;
-  for (let i = 0; i < BOQ_SPK.length; i++) {
-    const b = BOQ_SPK[i];
-    const terakhir = i === BOQ_SPK.length - 1;
-    const hargaSatuan = terakhir
-      ? (nilaiPerUnit - akum) / b.volume
-      : Math.round((nilaiPerUnit * b.bagian) / b.volume);
-    akum += hargaSatuan * b.volume;
+  if (K.jenis === "Unit") {
+    let urutan = 1;
+    let akum = 0;
+    for (let i = 0; i < BOQ_SPK.length; i++) {
+      const b = BOQ_SPK[i];
+      const terakhir = i === BOQ_SPK.length - 1;
+      const hargaSatuan = terakhir
+        ? (nilaiPerObjek - akum) / b.volume
+        : Math.round((nilaiPerObjek * b.bagian) / b.volume);
+      akum += hargaSatuan * b.volume;
+      const t = await prisma.contractBoqItem.create({
+        data: { contractId, grup: b.grup, uraian: b.uraian, satuan: b.satuan, volume: b.volume, hargaSatuan, urutan: urutan++ },
+      });
+      template.push({ id: t.id, volume: b.volume, hargaSatuan });
+    }
+  } else {
     const t = await prisma.contractBoqItem.create({
-      data: { contractId, grup: b.grup, uraian: b.uraian, satuan: b.satuan, volume: b.volume, hargaSatuan, urutan: urutan++ },
+      data: { contractId, grup: "Pekerjaan", uraian: "Pekerjaan borongan sarana & prasarana", satuan: "ls", volume: 1, hargaSatuan: nilaiPerObjek, urutan: 1 },
     });
-    template.push({ id: t.id, volume: b.volume, hargaSatuan });
+    template.push({ id: t.id, volume: 1, hargaSatuan: nilaiPerObjek });
   }
   const totalNilai = template.reduce((s, t) => s + t.volume * t.hargaSatuan, 0);
 
-  // Opname per unit → ContractBoqUnit.progress (tanpa override definisi).
-  for (const { unit } of cakupan) {
+  // Opname per objek → ContractBoqUnit.progress (tanpa override definisi).
+  for (const o of objek) {
     // Vendor borongan struktur biasanya berjalan lebih dulu daripada rata-rata
-    // pekerjaan unit — finishing dan MEP menyusul belakangan. Progres SPK
+    // pekerjaan objek — finishing dan MEP menyusul belakangan. Progres SPK
     // karena itu sengaja dibuat lebih maju daripada progres konstruksi, supaya
     // data demo memperlihatkan bahwa keduanya memang angka yang BERBEDA.
-    const majuVendor = Math.min(100, Math.round(unit.progress * 1.3));
+    const majuVendor = Math.min(100, Math.round(o.progress * 1.3));
     const sasaran = totalNilai * (majuVendor / 100);
 
     let terkumpul = 0;
-    const opname: { contractId: string; boqItemId: string; unitId: string; progress: number }[] = [];
+    const opname: {
+      contractId: string; boqItemId: string; unitId: string | null; infrastructureId: string | null; progress: number;
+    }[] = [];
     for (const t of template) {
       const nilaiBaris = t.volume * t.hargaSatuan;
       // Isi baris ini sebanyak sisa sasaran yang masih bisa ditampungnya.
@@ -119,7 +137,14 @@ async function isiBoqSpk(contractId: string, K: { nominal: number }) {
       terkumpul += nilaiBaris;
       const progress = Math.round(fraksi * 100);
       // Baris progres 0 dibiarkan tak ber-record — efektifnya tetap 0 (ikut template).
-      if (progress > 0) opname.push({ contractId, boqItemId: t.id, unitId: unit.id, progress });
+      if (progress > 0) {
+        opname.push({
+          contractId, boqItemId: t.id,
+          unitId: o.jenis === "unit" ? o.id : null,
+          infrastructureId: o.jenis === "sarpras" ? o.id : null,
+          progress,
+        });
+      }
     }
     if (opname.length > 0) await prisma.contractBoqUnit.createMany({ data: opname });
   }
@@ -936,13 +961,39 @@ async function main() {
     vendorId.set(V.nama, v.id);
   }
 
+  // Nomor kontrak mengikuti standar {PROYEK}/{K|S}/{TAHUN}/{urut} — bernomor
+  // per proyek per tahun, urut sesuai urutan array. Kode di seed-data hanya
+  // label internal; kode DB dibuat di sini agar seragam dengan jalur aplikasi.
+  const urutKontrak = new Map<string, number>();
   for (const K of KONTRAK) {
+    const tahunKontrak = tgl(K.mulai)!.getFullYear();
+    const hurufKontrak = K.jenis === "Unit" ? "K" : "S";
+    const kunciNomor = `${K.proyek}/${hurufKontrak}/${tahunKontrak}`;
+    const nomorUrut = (urutKontrak.get(kunciNomor) ?? 0) + 1;
+    urutKontrak.set(kunciNomor, nomorUrut);
+    const kode = `${K.proyek}/${hurufKontrak}/${tahunKontrak}/${String(nomorUrut).padStart(3, "0")}`;
+
     const c = await prisma.contract.create({
       data: {
-        kode: K.kode, projectId: projectId.get(K.proyek)!, vendorId: vendorId.get(K.vendor)!,
+        kode, projectId: projectId.get(K.proyek)!, vendorId: vendorId.get(K.vendor)!,
         jenis: K.jenis, jenisBiaya: K.jenisBiaya, deskripsi: K.deskripsi, nominal: K.nominal,
         retensiPct: K.retensiPct, jatuhTempoBln: K.jatuhTempoBln, mulai: tgl(K.mulai)!,
-        variationOrders: { create: (K.vo ?? []).map((v) => ({ nomor: v.no, tanggal: tgl(v.tgl)!, uraian: v.uraian, nominal: v.nominal, status: v.status })) },
+        // VO kini ber-baris per objek; nominal = Σ (volume × harga) baris-barisnya.
+        variationOrders: {
+          create: (K.vo ?? []).map((v) => {
+            const items = (v.items ?? []).map((it, i) => ({
+              unitId: K.jenis === "Unit" ? (unitId.get(it.objek) ?? null) : null,
+              infrastructureId: K.jenis === "Sarpras" ? (infraId.get(it.objek) ?? null) : null,
+              grup: "VO", uraian: it.uraian, satuan: it.satuan,
+              volume: it.volume, hargaSatuan: it.harga, urutan: i + 1,
+            }));
+            const nominal = Math.round(items.reduce((s, it) => s + it.volume * it.hargaSatuan, 0));
+            return {
+              nomor: v.no, tanggal: tgl(v.tgl)!, uraian: v.uraian, nominal, status: v.status,
+              items: { create: items },
+            };
+          }),
+        },
       },
     });
 
@@ -992,7 +1043,7 @@ async function main() {
           peruntukan,
           jenis: K.jenisBiaya,
           metode: "Transfer",
-          uraian: `${r.uraian} — ${K.kode} ${K.vendor}`,
+          uraian: `${r.uraian} — ${kode} ${K.vendor}`,
           total: r.nominal,
           status: "Lunas",
           posHpp: POS_HPP[peruntukan],

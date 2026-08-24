@@ -10,6 +10,8 @@ import {
 import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
 import { simpanBuktiOpsional } from "@/lib/actions/bukti";
 import { alokasiPembayaran, periksaAlokasi } from "@/lib/calc/keuangan";
+import { progresSpk } from "@/lib/calc/kontrak-boq";
+import { nomorKontrakBaru } from "@/lib/data/vendor";
 import { JENIS_BIAYA_KONTRAK, JENIS_KONTRAK, METODE_TUNAI, POS_HPP, STATUS_VENDOR, STATUS_VO } from "@/lib/domain/enums";
 
 /**
@@ -29,6 +31,8 @@ export async function tambahVo(_s: HasilAksi | null, form: FormData): Promise<Ha
         id: true, kode: true, deskripsi: true, projectId: true,
         project: { select: { kode: true } },
         vendor: { select: { id: true, nama: true } },
+        units: { select: { unitId: true } },
+        infrastructures: { select: { infrastructureId: true } },
         _count: { select: { variationOrders: true } },
       },
     });
@@ -36,27 +40,136 @@ export async function tambahVo(_s: HasilAksi | null, form: FormData): Promise<Ha
 
     const pengguna = await izinkan("progress", kontrak.projectId);
 
-    const nominal = angka(form, "nominal", { wajib: true });
-    if (nominal === 0) throw new GagalIzin("Nominal VO tidak boleh nol.");
+    const uraianVo = teks(form, "uraian", true);
+    const status = pilihan(form, "status", STATUS_VO);
+
+    // Baris pekerjaan VO — array sejajar per indeks. Objek "unit:<id>"/"sarpras:<id>".
+    // Berbeda dari BOQ template: tiap baris VO melekat ke SATU objek, jadi VO ikut
+    // masuk Nilai BOQ Terinci objek itu (dan nilai kontrak tetap sama dgn BOQ).
+    const objek = form.getAll("itemObjek").map(String);
+    const grup = form.getAll("itemGrup").map(String);
+    const uraian = form.getAll("itemUraian").map(String);
+    const satuan = form.getAll("itemSatuan").map(String);
+    const volume = form.getAll("itemVolume").map((v) => Number(String(v)));
+    const harga = form.getAll("itemHarga").map((v) => Number(String(v)));
+
+    const unitSet = new Set(kontrak.units.map((u) => u.unitId));
+    const infraSet = new Set(kontrak.infrastructures.map((s) => s.infrastructureId));
+
+    const items: {
+      unitId: string | null; infrastructureId: string | null;
+      grup: string; uraian: string; satuan: string; volume: number; hargaSatuan: number; urutan: number;
+    }[] = [];
+    for (let i = 0; i < objek.length; i++) {
+      const ob = (objek[i] ?? "").trim();
+      const ur = (uraian[i] ?? "").trim();
+      if (!ob && !ur) continue; // baris kosong diabaikan
+      const pisah = ob.indexOf(":");
+      const jenisOb = pisah >= 0 ? ob.slice(0, pisah) : "";
+      const objId = pisah >= 0 ? ob.slice(pisah + 1) : "";
+      const unitId = jenisOb === "unit" ? objId : null;
+      const infrastructureId = jenisOb === "sarpras" ? objId : null;
+      if (unitId && !unitSet.has(unitId)) throw new GagalIzin("Ada baris VO untuk unit di luar cakupan kontrak.");
+      if (infrastructureId && !infraSet.has(infrastructureId)) throw new GagalIzin("Ada baris VO untuk sarpras di luar cakupan kontrak.");
+      if (!unitId && !infrastructureId) throw new GagalIzin("Setiap baris VO harus memilih objek (unit/sarpras).");
+      if (ur === "") throw new GagalIzin("Uraian baris VO tidak boleh kosong.");
+      const vol = volume[i];
+      const hrg = harga[i];
+      if (!Number.isFinite(vol) || vol <= 0) throw new GagalIzin(`Volume baris "${ur}" harus lebih dari nol.`);
+      if (!Number.isFinite(hrg) || hrg === 0) {
+        throw new GagalIzin(`Harga satuan baris "${ur}" tidak boleh nol (pakai negatif untuk pekerjaan kurang).`);
+      }
+      items.push({
+        unitId, infrastructureId,
+        grup: (grup[i] ?? "").trim() || "VO",
+        uraian: ur, satuan: (satuan[i] ?? "").trim() || "ls",
+        volume: vol, hargaSatuan: hrg, urutan: i + 1,
+      });
+    }
+
+    if (items.length === 0) throw new GagalIzin("Tambahkan minimal satu baris pekerjaan VO.");
+
+    // Nominal VO = TURUNAN dari baris-barisnya (bisa negatif untuk pekerjaan kurang).
+    const nominal = Math.round(items.reduce((s, it) => s + it.volume * it.hargaSatuan, 0));
+    if (nominal === 0) throw new GagalIzin("Total nilai VO nol — periksa baris tambah/kurang.");
 
     const nomor = `VO-${String(kontrak._count.variationOrders + 1).padStart(2, "0")}`;
-    const status = pilihan(form, "status", STATUS_VO);
-    const uraian = teks(form, "uraian", true);
 
     await prisma.variationOrder.create({
-      data: { contractId, nomor, tanggal: new Date(), uraian, nominal, status },
+      data: {
+        contractId, nomor, tanggal: new Date(), uraian: uraianVo, nominal, status,
+        items: { create: items },
+      },
     });
 
     await catat({
       pengguna, projectId: kontrak.projectId,
       objek: `Kontrak ${kontrak.kode} · ${kontrak.vendor.nama}`,
       aksi: "Tambah Variation Order",
-      ke: `${nomor} — ${uraian} · ${nominal >= 0 ? "+" : "−"}${rpLog(Math.abs(nominal))} (${status})`,
+      ke: `${nomor} — ${uraianVo} · ${items.length} baris · ${nominal >= 0 ? "+" : "−"}${rpLog(Math.abs(nominal))} (${status})`,
     });
 
     revalidatePath(`/vendor/${kontrak.vendor.id}`);
     revalidatePath("/vendor");
     revalidatePath(`/keuangan/${kontrak.project.kode}`);
+    return `${nomor} dibuat — ${items.length} baris (${nominal >= 0 ? "+" : "−"}Rp ${Math.abs(nominal).toLocaleString("id-ID")}).`;
+  });
+}
+
+/** Hapus sebuah Variation Order beserta seluruh baris pekerjaannya. */
+export async function hapusVo(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = String(form.get("id") ?? "");
+    const vo = await prisma.variationOrder.findUnique({
+      where: { id },
+      select: {
+        id: true, nomor: true,
+        contract: { select: { projectId: true, vendorId: true, kode: true, project: { select: { kode: true } } } },
+      },
+    });
+    if (!vo) return;
+    const pengguna = await izinkan("progress", vo.contract.projectId);
+
+    await prisma.variationOrder.delete({ where: { id } });
+    await catat({
+      pengguna, projectId: vo.contract.projectId,
+      objek: `Kontrak ${vo.contract.kode}`, aksi: "Hapus Variation Order", dari: vo.nomor, ke: "dihapus",
+    });
+    revalidatePath(`/vendor/${vo.contract.vendorId}`);
+    revalidatePath("/vendor");
+    revalidatePath(`/keuangan/${vo.contract.project.kode}`);
+  });
+}
+
+/**
+ * Ubah status VO (Diajukan/Disetujui/Ditolak). Hanya VO "Disetujui" yang baris
+ * pekerjaannya ikut menghitung Nilai BOQ Terinci & opname — jadi menyetujui VO =
+ * memasukkan baris-barisnya ke nilai kontrak.
+ */
+export async function ubahStatusVo(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = String(form.get("id") ?? "");
+    const status = pilihan(form, "status", STATUS_VO);
+    const vo = await prisma.variationOrder.findUnique({
+      where: { id },
+      select: {
+        id: true, nomor: true, status: true,
+        contract: { select: { projectId: true, vendorId: true, kode: true, project: { select: { kode: true } } } },
+      },
+    });
+    if (!vo) throw new GagalIzin("VO tidak ditemukan.");
+    const pengguna = await izinkan("progress", vo.contract.projectId);
+    if (vo.status === status) return "Status tidak berubah.";
+
+    await prisma.variationOrder.update({ where: { id }, data: { status } });
+    await catat({
+      pengguna, projectId: vo.contract.projectId,
+      objek: `Kontrak ${vo.contract.kode} · ${vo.nomor}`, aksi: "Ubah status VO", dari: vo.status, ke: status,
+    });
+    revalidatePath(`/vendor/${vo.contract.vendorId}`);
+    revalidatePath("/vendor");
+    revalidatePath(`/keuangan/${vo.contract.project.kode}`);
+    return `${vo.nomor} → ${status}.`;
   });
 }
 
@@ -391,11 +504,11 @@ export async function tambahKontrak(_s: HasilAksi | null, form: FormData): Promi
       throw new GagalIzin(`Vendor "${vendor.nama}" berstatus Nonaktif — aktifkan dulu sebelum membuat kontrak.`);
     }
 
-    const kode = teks(form, "kode", true).toUpperCase();
-    const bentrok = await prisma.contract.count({ where: { kode } });
-    if (bentrok) throw new GagalIzin(`Kode kontrak "${kode}" sudah dipakai.`);
-
     const { jenis, cakupan, data } = await bacaKontrak(form, projectId);
+
+    // Kode SPK dibuat otomatis sesuai standar {PROYEK}/{K|S}/{TAHUN}/{urut} —
+    // tidak lagi diketik bebas, supaya seluruh kontrak seragam penomorannya.
+    const kode = await nomorKontrakBaru(kodeProyek.toUpperCase(), jenis, data.mulai.getFullYear());
 
     // Kontrak tidak sah tanpa SPK, jadi berkasnya diminta di formulir yang
     // sama — bukan diunggah belakangan, yang membuka celah kontrak berjalan
@@ -465,7 +578,7 @@ export async function ubahKontrak(_s: HasilAksi | null, form: FormData): Promise
       select: {
         id: true, kode: true, projectId: true, vendorId: true, jenis: true,
         jenisBiaya: true, deskripsi: true, nominal: true, retensiPct: true,
-        jatuhTempoBln: true, mulai: true,
+        jatuhTempoBln: true, mulai: true, tanggalSelesai: true,
         project: { select: { kode: true } },
       },
     });
@@ -477,6 +590,14 @@ export async function ubahKontrak(_s: HasilAksi | null, form: FormData): Promise
     const tgl = mulai ? new Date(mulai) : lama.mulai;
     if (Number.isNaN(tgl.getTime())) throw new GagalIzin("Tanggal mulai tidak sah.");
 
+    // Tanggal selesai boleh dikosongkan (= belum ditandai selesai → null).
+    const selesaiStr = String(form.get("tanggalSelesai") ?? "").trim();
+    let tglSelesai: Date | null = null;
+    if (selesaiStr) {
+      tglSelesai = new Date(selesaiStr);
+      if (Number.isNaN(tglSelesai.getTime())) throw new GagalIzin("Tanggal selesai tidak sah.");
+    }
+
     const data = {
       jenisBiaya: pilihan(form, "jenisBiaya", JENIS_BIAYA_KONTRAK),
       deskripsi: teks(form, "deskripsi", true),
@@ -484,6 +605,7 @@ export async function ubahKontrak(_s: HasilAksi | null, form: FormData): Promise
       retensiPct: angka(form, "retensiPct", { min: 0, max: 100 }),
       jatuhTempoBln: angka(form, "jatuhTempoBln", { min: 0 }),
       mulai: tgl,
+      tanggalSelesai: tglSelesai,
     };
 
     await prisma.contract.update({ where: { id }, data });
@@ -496,6 +618,7 @@ export async function ubahKontrak(_s: HasilAksi | null, form: FormData): Promise
       label: {
         jenisBiaya: "Jenis biaya", deskripsi: "Deskripsi", nominal: "Nilai kontrak",
         retensiPct: "Retensi", jatuhTempoBln: "Masa pemeliharaan", mulai: "Mulai",
+        tanggalSelesai: "Tanggal selesai",
       },
       format: { nominal: (v) => rpLog(Number(v)) },
     });
@@ -505,6 +628,89 @@ export async function ubahKontrak(_s: HasilAksi | null, form: FormData): Promise
     revalidatePath(`/keuangan/${lama.project.kode}`);
     if (jml === 0) return "Tidak ada yang berubah.";
     return `${jml} perubahan tersimpan.`;
+  });
+}
+
+/**
+ * Tandai kontrak selesai — menyetel `tanggalSelesai` (anchor jatuh tempo retensi).
+ *
+ * Hanya boleh saat Progress Vendor SPK sudah 100%, sesuai aturan bahwa penandaan
+ * selesai baru "tergenerate" ketika pekerjaan benar-benar rampung. Tanggalnya
+ * boleh dipilih (default hari ini) untuk mencatat tanggal serah terima riil.
+ */
+export async function tandaiSelesai(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = teks(form, "id", true);
+    const kontrak = await prisma.contract.findUnique({
+      where: { id },
+      select: {
+        id: true, kode: true, projectId: true, vendorId: true,
+        boqItems: { select: { id: true, volume: true, hargaSatuan: true } },
+        boqUnit: {
+          select: {
+            boqItemId: true, unitId: true, infrastructureId: true,
+            volume: true, hargaSatuan: true, progress: true,
+          },
+        },
+        units: { select: { unitId: true } },
+        infrastructures: { select: { infrastructureId: true } },
+        variationOrders: {
+          where: { status: "Disetujui" },
+          select: { items: { select: { unitId: true, infrastructureId: true, volume: true, hargaSatuan: true, progress: true } } },
+        },
+      },
+    });
+    if (!kontrak) throw new GagalIzin("Kontrak tidak ditemukan.");
+    const pengguna = await izinkan("progress", kontrak.projectId);
+
+    const objekIds = [
+      ...kontrak.units.map((u) => u.unitId),
+      ...kontrak.infrastructures.map((s) => s.infrastructureId),
+    ];
+    const voItems = kontrak.variationOrders.flatMap((v) => v.items);
+    const progres = progresSpk(kontrak.boqItems, kontrak.boqUnit, objekIds, voItems);
+    if (progres < 100) {
+      throw new GagalIzin(
+        "Kontrak baru bisa ditandai selesai setelah Progress Vendor SPK mencapai 100%.",
+      );
+    }
+
+    const tglStr = String(form.get("tanggalSelesai") ?? "").trim();
+    const tgl = tglStr ? new Date(tglStr) : new Date();
+    if (Number.isNaN(tgl.getTime())) throw new GagalIzin("Tanggal selesai tidak sah.");
+
+    await prisma.contract.update({ where: { id }, data: { tanggalSelesai: tgl } });
+    await catat({
+      pengguna, projectId: kontrak.projectId, objek: `Kontrak ${kontrak.kode}`,
+      aksi: "Tandai selesai", ke: tgl.toISOString().slice(0, 10),
+    });
+
+    revalidatePath("/vendor");
+    revalidatePath(`/vendor/${kontrak.vendorId}`);
+    return `Kontrak ${kontrak.kode} ditandai selesai ${tgl.toISOString().slice(0, 10)}.`;
+  });
+}
+
+/** Batalkan tanda selesai — mengosongkan `tanggalSelesai`. */
+export async function batalSelesai(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
+  return jalankan(async () => {
+    const id = teks(form, "id", true);
+    const kontrak = await prisma.contract.findUnique({
+      where: { id },
+      select: { id: true, kode: true, projectId: true, vendorId: true },
+    });
+    if (!kontrak) throw new GagalIzin("Kontrak tidak ditemukan.");
+    const pengguna = await izinkan("progress", kontrak.projectId);
+
+    await prisma.contract.update({ where: { id }, data: { tanggalSelesai: null } });
+    await catat({
+      pengguna, projectId: kontrak.projectId, objek: `Kontrak ${kontrak.kode}`,
+      aksi: "Batalkan tanda selesai",
+    });
+
+    revalidatePath("/vendor");
+    revalidatePath(`/vendor/${kontrak.vendorId}`);
+    return "Tanda selesai dibatalkan.";
   });
 }
 

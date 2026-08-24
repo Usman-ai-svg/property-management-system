@@ -2,8 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { kontrakDetail, petaOverrideBoq } from "@/lib/data/vendor";
-import { barisEfektif, nilaiTerpasang, progresTertimbang } from "@/lib/calc/kontrak-boq";
-import { ringkasKontrak } from "@/lib/calc/keuangan";
+import { barisEfektif, barisVoEfektif, nilaiTerpasang, progresTertimbang, type BarisEfektif } from "@/lib/calc/kontrak-boq";
+import { jatuhTempo, jatuhTempoRetensi, ringkasKontrak } from "@/lib/calc/keuangan";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Tabel } from "@/components/kartu-tabel";
 import { FileRow } from "@/components/file-row";
@@ -11,6 +11,7 @@ import { unggahRevisi } from "../../../../master/actions";
 import { Badge, Kartu, Petunjuk, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { RingkasOpname } from "@/components/opname-spk";
 import { HapusBarisBoq, ImporBoqSpk, TambahBarisBoq, UbahBarisBoq } from "./editors-boq";
+import { BatalSelesai, TandaiSelesai } from "../../editors";
 
 /**
  * Detail satu SPK — ringkasan kontrak.
@@ -48,10 +49,29 @@ export default async function DetailKontrak({
 
   const ringkas = ringkasKontrak(kontrak);
 
-  // Baris efektif tiap objek = template SPK ⊕ override objeknya.
+  // Reminder retensi: jatuh tempo = tanggal selesai + masa pemeliharaan.
+  const jtRetensi = jatuhTempoRetensi(kontrak);
+  const urgensiRetensi = jtRetensi ? jatuhTempo(jtRetensi, new Date(), 30) : "aman";
+
+  // Baris efektif tiap objek = template SPK ⊕ override objeknya + baris VO
+  // DISETUJUI objek itu. Baris VO ikut menghitung nilai & progres, sehingga
+  // Nilai BOQ Terinci selalu sama dengan Nilai Kontrak (yang sudah termasuk VO).
   const peta = petaOverrideBoq(kontrak.boqUnit);
-  const efektifObjek = (objId: string) =>
-    kontrak.boqItems.map((t) => barisEfektif(t, peta.get(`${t.id}:${objId}`)));
+  const voPerObjek = new Map<string, BarisEfektif[]>();
+  for (const vo of kontrak.variationOrders) {
+    if (vo.status !== "Disetujui") continue;
+    for (const it of vo.items) {
+      const objId = it.unitId ?? it.infrastructureId;
+      if (!objId) continue;
+      const arr = voPerObjek.get(objId) ?? [];
+      arr.push(barisVoEfektif({ ...it, voNomor: vo.nomor }));
+      voPerObjek.set(objId, arr);
+    }
+  }
+  const efektifObjek = (objId: string) => [
+    ...kontrak.boqItems.map((t) => barisEfektif(t, peta.get(`${t.id}:${objId}`))),
+    ...(voPerObjek.get(objId) ?? []),
+  ];
 
   const objekUnit = kontrak.units.map(({ unit }) => ({
     kunci: `unit_${unit.id}`,
@@ -75,6 +95,8 @@ export default async function DetailKontrak({
   const semuaBaris = semuaObjek.flatMap((o) => o.baris);
   const nilaiBoq = semuaBaris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
   const terpasang = nilaiTerpasang(semuaBaris);
+  // Progress Vendor SPK keseluruhan — dasar tombol "Tandai Selesai" (aktif 100%).
+  const progresKontrak = semuaBaris.length ? progresTertimbang(semuaBaris) : 0;
 
   const template = kontrak.boqItems;
   const adaTemplate = template.length > 0;
@@ -98,6 +120,26 @@ export default async function DetailKontrak({
         ← Kembali ke {kontrak.vendor.nama}
       </Link>
 
+      {/* ---------- status selesai ---------- */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+        {kontrak.tanggalSelesai ? (
+          <>
+            <span className="chip" style={{ background: "var(--rona-hijau2)", color: "var(--green)" }}>
+              Selesai {tanggal(kontrak.tanggalSelesai)}
+            </span>
+            {bolehUbahProgres && <BatalSelesai id={kontrak.id} />}
+          </>
+        ) : (
+          <span style={{ fontSize: 12, color: progresKontrak === 100 ? "var(--green)" : "var(--muted)" }}>
+            Progress Vendor SPK: <b>{progresKontrak}%</b>
+            {progresKontrak < 100 && " · Tandai Selesai aktif saat 100%"}
+          </span>
+        )}
+        {!kontrak.tanggalSelesai && progresKontrak === 100 && bolehUbahProgres && (
+          <TandaiSelesai id={kontrak.id} />
+        )}
+      </div>
+
       {/* ---------- Deskripsi SPK ---------- */}
       <Kartu padding="14px 18px" bawah={16}>
         <div className="eyebrow" style={{ marginBottom: 10 }}>Deskripsi SPK</div>
@@ -111,6 +153,10 @@ export default async function DetailKontrak({
             nilai={objekLabel.length ? `${objekLabel.length} · ${objekLabel.join(", ")}` : "—"}
           />
           <Info label="Tanggal kontrak" nilai={tanggal(kontrak.mulai)} />
+          <Info
+            label="Tanggal selesai"
+            nilai={kontrak.tanggalSelesai ? tanggal(kontrak.tanggalSelesai) : "Belum ditandai selesai"}
+          />
           {bolehHarga && <Info label="Nilai kontrak" nilai={rp(kontrak.nominal)} />}
           {bolehHarga && ringkas.voDisetujui > 0 && (
             <Info label="Nilai efektif (+ VO)" nilai={rp(ringkas.nilaiEfektif)} />
@@ -120,7 +166,16 @@ export default async function DetailKontrak({
               label="Retensi"
               nilai={
                 kontrak.retensiPct > 0
-                  ? `${kontrak.retensiPct}% · ${rp(ringkas.retensi)} (jatuh tempo ${kontrak.jatuhTempoBln} bln setelah pelunasan)`
+                  ? `${kontrak.retensiPct}% · ${rp(ringkas.retensi)}` +
+                    (jtRetensi
+                      ? ` (jatuh tempo ${tanggal(jtRetensi)}${
+                          urgensiRetensi === "lewat"
+                            ? " — sudah jatuh tempo"
+                            : urgensiRetensi === "dekat"
+                              ? " — segera"
+                              : ""
+                        })`
+                      : ` (jatuh tempo ${kontrak.jatuhTempoBln} bln setelah tanggal selesai)`)
                   : "—"
               }
             />
@@ -161,7 +216,6 @@ export default async function DetailKontrak({
             { label: "Unit" },
             { label: "Fase" },
             { label: "Jenis" },
-            { label: "Baris BOQ", rata: "kanan" },
             bolehHarga && { label: "Nilai BOQ", rata: "kanan" },
             { label: "Progres", minLebar: 170 },
             { label: "Status" },
@@ -170,7 +224,9 @@ export default async function DetailKontrak({
         >
           {semuaObjek.map((o) => {
             const nilai = o.baris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
-            const progres = o.baris.length ? progresTertimbang(o.baris) : o.progresTersimpan;
+            // Progres objek dalam SPK diturunkan MURNI dari BOQ SPK ini — bukan
+            // dari Unit.progress (agregat lintas SPK). Belum ada baris/opname → 0%.
+            const progres = progresTertimbang(o.baris);
             return (
               <tr key={o.kunci}>
                 <td style={{ fontWeight: 600 }}>
@@ -183,9 +239,6 @@ export default async function DetailKontrak({
                 </td>
                 <td>{o.fase}</td>
                 <td style={{ color: "var(--muted)" }}>{o.keterangan}</td>
-                <td style={{ textAlign: "right" }}>
-                  {o.baris.length || <span style={{ color: "var(--muted)" }}>—</span>}
-                </td>
                 {bolehHarga && (
                   <td className="num" style={{ textAlign: "right" }}>
                     {nilai ? rp(nilai) : <span style={{ color: "var(--muted)" }}>—</span>}

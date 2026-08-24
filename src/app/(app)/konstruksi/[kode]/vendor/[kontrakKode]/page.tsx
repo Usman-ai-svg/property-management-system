@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
 import { kontrakDetail, petaOverrideBoq } from "@/lib/data/vendor";
-import { barisEfektif, nilaiTerpasang, progresTertimbang } from "@/lib/calc/kontrak-boq";
+import { barisEfektif, barisVoEfektif, nilaiTerpasang, progresTertimbang, type BarisEfektif } from "@/lib/calc/kontrak-boq";
 import { ringkasKontrak } from "@/lib/calc/keuangan";
 import { rp } from "@/lib/format";
 import { Badge, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
@@ -50,10 +50,24 @@ export default async function ObjekVendorKonstruksi({
 
   const ringkas = ringkasKontrak(kontrak);
 
-  // Baris efektif tiap objek = template SPK ⊕ override objeknya.
+  // Baris efektif tiap objek = template SPK ⊕ override objeknya + baris VO
+  // DISETUJUI objek itu (agar Nilai BOQ Terinci = Nilai Kontrak termasuk VO).
   const peta = petaOverrideBoq(kontrak.boqUnit);
-  const efektifObjek = (objId: string) =>
-    kontrak.boqItems.map((t) => barisEfektif(t, peta.get(`${t.id}:${objId}`)));
+  const voPerObjek = new Map<string, BarisEfektif[]>();
+  for (const vo of kontrak.variationOrders) {
+    if (vo.status !== "Disetujui") continue;
+    for (const it of vo.items) {
+      const objId = it.unitId ?? it.infrastructureId;
+      if (!objId) continue;
+      const arr = voPerObjek.get(objId) ?? [];
+      arr.push(barisVoEfektif({ ...it, voNomor: vo.nomor }));
+      voPerObjek.set(objId, arr);
+    }
+  }
+  const efektifObjek = (objId: string) => [
+    ...kontrak.boqItems.map((t) => barisEfektif(t, peta.get(`${t.id}:${objId}`))),
+    ...(voPerObjek.get(objId) ?? []),
+  ];
 
   const objekUnit = kontrak.units.map(({ unit }) => ({
     jenis: "unit" as const,

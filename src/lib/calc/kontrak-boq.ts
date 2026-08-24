@@ -52,7 +52,8 @@ export interface OverrideBoq {
 
 /** Baris BOQ efektif untuk satu objek: template dilebur dengan override-nya. */
 export interface BarisEfektif {
-  /** id baris TEMPLATE (bukan id override) — kunci opname & override. */
+  /** id baris TEMPLATE (bukan id override) — kunci opname & override.
+   * Untuk baris VO diberi awalan "vo:" supaya opname mengarah ke ContractVoItem. */
   boqItemId: string;
   grup: string;
   uraian: string;
@@ -62,6 +63,39 @@ export interface BarisEfektif {
   progress: number;
   /** true bila ada satu saja nilai definisi yang di-override untuk objek ini. */
   disesuaikan: boolean;
+  /** Nomor VO asal baris ini (mis. "VO-01"); null/undefined untuk baris pokok. */
+  voNomor?: string | null;
+}
+
+/** Baris VO satu objek — sudah "efektif" (tak perlu lebur template). */
+export interface VoItemBoq {
+  id: string;
+  voNomor: string;
+  unitId?: string | null;
+  infrastructureId?: string | null;
+  grup: string;
+  uraian: string;
+  satuan: string;
+  volume: number;
+  hargaSatuan: number;
+  progress: number;
+  progressLalu?: number;
+  progressLaluPada?: Date | null;
+}
+
+/** Ubah baris VO menjadi BarisEfektif untuk digabung dengan baris template. */
+export function barisVoEfektif(vo: VoItemBoq): BarisEfektif {
+  return {
+    boqItemId: `vo:${vo.id}`,
+    grup: vo.grup,
+    uraian: vo.uraian,
+    satuan: vo.satuan,
+    volume: vo.volume,
+    hargaSatuan: vo.hargaSatuan,
+    progress: vo.progress,
+    disesuaikan: false,
+    voNomor: vo.voNomor,
+  };
 }
 
 /**
@@ -154,6 +188,83 @@ function kelompokLalu(
   const hasil = new Map<string, number>();
   for (const [kunci, daftar] of kelompok) hasil.set(kunci, progresTertimbang(daftar));
   return hasil;
+}
+
+/**
+ * Nilai BOQ terinci SELURUH objek sebuah SPK — dasar "Nilai SPK".
+ *
+ * Model "satu BOQ berlaku untuk tiap unit": tiap objek (unit/sarpras) mewarisi
+ * baris template, nilainya boleh di-override per objek. Nilai SPK adalah
+ * penjumlahan nilai seluruh objek — Σ objek × Σ baris efektif — bukan nilai satu
+ * template saja. Itulah definisi "3 unit × Rp20jt = Rp60jt": template Rp20jt
+ * berlaku untuk tiap unit, jadi Nilai SPK ikut jumlah objek.
+ *
+ * Mengembalikan 0 bila belum ada baris template atau belum ada objek — pemanggil
+ * memakai ini untuk memutuskan tetap memakai nilai manual (fallback).
+ */
+export function nilaiBoqSeluruhObjek(
+  template: { id: string; volume: number; hargaSatuan: number }[],
+  override: {
+    boqItemId: string; unitId: string | null; infrastructureId: string | null;
+    volume: number | null; hargaSatuan: number | null;
+  }[],
+  objekIds: string[],
+): number {
+  if (template.length === 0 || objekIds.length === 0) return 0;
+  const peta = new Map(
+    override.map((o) => [`${o.boqItemId}:${o.unitId ?? o.infrastructureId}`, o]),
+  );
+  let total = 0;
+  for (const objId of objekIds) {
+    for (const t of template) {
+      const o = peta.get(`${t.id}:${objId}`);
+      total += (o?.volume ?? t.volume) * (o?.hargaSatuan ?? t.hargaSatuan);
+    }
+  }
+  return total;
+}
+
+/**
+ * Progress Vendor sebuah SPK: progres tertimbang nilai seluruh baris efektif
+ * dari semua objek yang dicakup. 0–100. Dasar tombol "Tandai Selesai" (aktif
+ * saat mencapai 100%). Objek/baris yang belum diopname berkontribusi 0%.
+ */
+export function progresSpk(
+  template: { id: string; volume: number; hargaSatuan: number }[],
+  override: {
+    boqItemId: string; unitId: string | null; infrastructureId: string | null;
+    volume: number | null; hargaSatuan: number | null; progress: number;
+  }[],
+  objekIds: string[],
+  /** Baris VO yang SUDAH DISETUJUI (semua objek) — ikut menimbang progres. */
+  voItems: {
+    unitId?: string | null; infrastructureId?: string | null;
+    volume: number; hargaSatuan: number; progress: number;
+  }[] = [],
+): number {
+  if (objekIds.length === 0) return 0;
+  const objekSet = new Set(objekIds);
+  const peta = new Map(
+    override.map((o) => [`${o.boqItemId}:${o.unitId ?? o.infrastructureId}`, o]),
+  );
+  const baris: BarisBoqSpk[] = [];
+  for (const objId of objekIds) {
+    for (const t of template) {
+      const o = peta.get(`${t.id}:${objId}`);
+      baris.push({
+        volume: o?.volume ?? t.volume,
+        hargaSatuan: o?.hargaSatuan ?? t.hargaSatuan,
+        progress: o?.progress ?? 0,
+      });
+    }
+  }
+  for (const v of voItems) {
+    const objId = v.unitId ?? v.infrastructureId;
+    if (!objId || !objekSet.has(objId)) continue;
+    baris.push({ volume: v.volume, hargaSatuan: v.hargaSatuan, progress: v.progress });
+  }
+  if (baris.length === 0) return 0;
+  return progresTertimbang(baris);
 }
 
 /**

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { bolehLihat, filterProyek, type Pengguna } from "@/lib/auth/rbac";
 import { komposisi, keuanganPerProyek } from "@/lib/data/keuangan";
 import { luasTotal } from "@/lib/tampilan/landbank";
-import { ringkasKontrak } from "@/lib/calc/keuangan";
+import { ringkasKontrak, statusBayarKontrak } from "@/lib/calc/keuangan";
 import { m2, pct, rpRingkas } from "@/lib/format";
 import type { RingkasProyek } from "@/lib/data/ringkasan";
 
@@ -200,18 +200,26 @@ async function grupVendor(u: Pengguna): Promise<GrupKpi> {
         select: {
           nominal: true,
           retensiPct: true,
-          expenses: { select: { total: true } },
+          jatuhTempoBln: true,
+          tanggalSelesai: true,
+          expenses: { select: { total: true, tanggal: true } },
           variationOrders: { select: { nominal: true, status: true } },
         },
       },
     },
   });
 
-  const kontrak = vendor.flatMap((v) => v.contracts).map(ringkasKontrak);
+  const semuaKontrak = vendor.flatMap((v) => v.contracts);
+  const kontrak = semuaKontrak.map(ringkasKontrak);
   const berjalan = kontrak.filter((r) => r.terbayar < r.nilaiEfektif).length;
   const nilai = kontrak.reduce((s, r) => s + r.nilaiEfektif, 0);
   const terbayar = kontrak.reduce((s, r) => s + r.terbayar, 0);
   const aktif = vendor.filter((v) => v.status === "Aktif").length;
+  // Retensi yang sudah jatuh tempo (masa pemeliharaan sejak tanggal selesai
+  // berlalu) tapi belum dilepas — perlu segera dibayarkan ke vendor.
+  const retensiJatuhTempo = semuaKontrak.filter(
+    (k) => statusBayarKontrak(k) === "Retensi Jatuh Tempo",
+  ).length;
 
   return {
     id: "vendor",
@@ -221,18 +229,18 @@ async function grupVendor(u: Pengguna): Promise<GrupKpi> {
       { label: "Vendor Aktif", nilai: String(aktif), catatan: `dari ${vendor.length} vendor terdaftar` },
       { label: "Kontrak Berjalan", nilai: `${berjalan} / ${kontrak.length}`, catatan: "belum lunas" },
       {
-        label: "Nilai Kontrak",
-        nilai: bolehHarga ? rpRingkas(nilai) : "—",
-        catatan: bolehHarga ? "termasuk VO disetujui" : "tidak tersedia untuk peran ini",
+        label: "Retensi Jatuh Tempo",
+        nilai: String(retensiJatuhTempo),
+        catatan: retensiJatuhTempo ? "perlu segera dilepas" : "tidak ada yang jatuh tempo",
       },
       {
-        label: "Belum Terbayar",
-        nilai: bolehHarga ? rpRingkas(nilai - terbayar) : "—",
+        label: "Nilai Kontrak",
+        nilai: bolehHarga ? rpRingkas(nilai) : "—",
         catatan: !bolehHarga
           ? "tidak tersedia untuk peran ini"
           : nilai
-            ? `${pct(1 - terbayar / nilai, 0)} dari nilai kontrak`
-            : undefined,
+            ? `belum terbayar ${rpRingkas(nilai - terbayar)}`
+            : "termasuk VO disetujui",
       },
     ],
   };

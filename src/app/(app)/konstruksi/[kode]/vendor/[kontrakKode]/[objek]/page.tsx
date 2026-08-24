@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { kontrakDetail, petaOverrideBoq } from "@/lib/data/vendor";
-import { barisEfektif } from "@/lib/calc/kontrak-boq";
+import { barisEfektif, barisVoEfektif } from "@/lib/calc/kontrak-boq";
 import { susunOpname } from "@/lib/calc/opname";
 import { Terbatas } from "@/components/ui";
 import { TabelOpnameSpk, type ObjekOpname } from "@/components/opname-spk";
@@ -61,12 +61,22 @@ export default async function OpnameVendorKonstruksi({
   const keterangan = unit ? unit.unitType.nama : sarpras!.jenis;
   const objId = unit ? unit.id : sarpras!.id;
 
-  // Baris efektif objek ini: template SPK dilebur dengan override objeknya.
+  // Baris efektif objek ini: template SPK ⊕ override objeknya, DITAMBAH baris VO
+  // disetujui objek ini (id "vo:…" agar opname mengarah ke ContractVoItem).
   const peta = petaOverrideBoq(kontrak.boqUnit);
-  const efektif = kontrak.boqItems.map((t) => {
-    const o = peta.get(`${t.id}:${objId}`);
-    return { ...barisEfektif(t, o), progressLalu: o?.progressLalu ?? 0 };
-  });
+  const efektif = [
+    ...kontrak.boqItems.map((t) => {
+      const o = peta.get(`${t.id}:${objId}`);
+      return { ...barisEfektif(t, o), progressLalu: o?.progressLalu ?? 0 };
+    }),
+    ...kontrak.variationOrders
+      .filter((v) => v.status === "Disetujui")
+      .flatMap((v) =>
+        v.items
+          .filter((it) => (it.unitId ?? it.infrastructureId) === objId)
+          .map((it) => ({ ...barisVoEfektif({ ...it, voNomor: v.nomor }), progressLalu: it.progressLalu ?? 0 })),
+      ),
+  ];
 
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
   const bolehUbahProgres = bolehUbah(pengguna, "progress");

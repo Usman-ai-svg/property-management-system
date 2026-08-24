@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  barisVoEfektif,
+  nilaiBoqSeluruhObjek,
   nilaiTerpasang,
   periksaBarisBoqSpk,
   progresPerSarpras,
   progresPerUnit,
+  progresSpk,
   progresTertimbang,
 } from "./kontrak-boq";
 
@@ -151,5 +154,47 @@ describe("periksaBarisBoqSpk", () => {
 
   it("meloloskan volume nol — pekerjaan bisa saja dibatalkan lewat VO", () => {
     assert.equal(periksaBarisBoqSpk({ ...sah, volume: 0 }), null);
+  });
+});
+
+describe("VO masuk BOQ terinci (rekonsiliasi nilai kontrak)", () => {
+  // Pokok: 2 unit × Rp10jt/unit = Rp20jt.
+  const template = [{ id: "T1", volume: 1, hargaSatuan: 10_000_000 }];
+  const objekIds = ["U1", "U2"];
+
+  it("Nilai BOQ pokok = template × jumlah objek (tanpa VO)", () => {
+    assert.equal(nilaiBoqSeluruhObjek(template, [], objekIds), 20_000_000);
+  });
+
+  it("baris VO menambah Nilai BOQ Terinci sehingga = nilai kontrak (pokok + VO)", () => {
+    // VO tambah kuda-kuda Rp2jt di U1, dan kurang Rp0,5jt di U2.
+    const voItems = [
+      barisVoEfektif({ id: "V1", voNomor: "VO-01", unitId: "U1", grup: "VO", uraian: "Kuda-kuda", satuan: "unit", volume: 1, hargaSatuan: 2_000_000, progress: 0 }),
+      barisVoEfektif({ id: "V2", voNomor: "VO-01", unitId: "U2", grup: "VO", uraian: "Kurang lisplank", satuan: "ls", volume: 1, hargaSatuan: -500_000, progress: 0 }),
+    ];
+    const pokok = nilaiBoqSeluruhObjek(template, [], objekIds);
+    const nilaiVo = voItems.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
+    // Nilai kontrak efektif = pokok + Σ VO disetujui.
+    const nilaiEfektif = pokok + nilaiVo;
+    // Nilai BOQ Terinci yang ditampilkan = Σ seluruh baris (pokok + VO).
+    const semuaBaris = [
+      ...objekIds.flatMap(() => template.map((t) => ({ volume: t.volume, hargaSatuan: t.hargaSatuan }))),
+      ...voItems,
+    ];
+    const nilaiBoqTerinci = semuaBaris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
+    assert.equal(nilaiBoqTerinci, nilaiEfektif);
+    assert.equal(nilaiBoqTerinci, 21_500_000);
+  });
+
+  it("baris VO ber-awalan 'vo:' pada id opname supaya mengarah ke ContractVoItem", () => {
+    const b = barisVoEfektif({ id: "V9", voNomor: "VO-02", unitId: "U1", grup: "VO", uraian: "x", satuan: "ls", volume: 1, hargaSatuan: 1, progress: 0 });
+    assert.equal(b.boqItemId, "vo:V9");
+    assert.equal(b.voNomor, "VO-02");
+  });
+
+  it("progresSpk ikut menimbang baris VO disetujui", () => {
+    // Pokok Rp20jt (0%), VO Rp20jt (100%) → tertimbang 50%.
+    const voItems = [{ unitId: "U1", volume: 1, hargaSatuan: 20_000_000, progress: 100 }];
+    assert.equal(progresSpk(template, [], objekIds, voItems), 50);
   });
 });
