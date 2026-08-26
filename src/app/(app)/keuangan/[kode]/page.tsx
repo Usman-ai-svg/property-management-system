@@ -214,6 +214,9 @@ export default async function KeuanganProyek({
         <BreakdownKategori jenis={kompJenis} peruntukan={kompPeruntukan} ukuran={130} />
       </div>
 
+      {/* ---------- anggaran per kategori (RAP vs realisasi) ---------- */}
+      <KartuAnggaranKategori data={anggaranKategori} />
+
       {/* ---------- pengeluaran per unit ---------- */}
       <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
         <TabelHead
@@ -823,9 +826,6 @@ export default async function KeuanganProyek({
           namaPengguna={pengguna.nama}
         />
       </div>
-
-      {/* ---------- anggaran per kategori (RAP vs realisasi) ---------- */}
-      <KartuAnggaranKategori data={anggaranKategori} />
 
       {/* ---------- transaksi ---------- */}
       <PanelTransaksi
