@@ -16,14 +16,20 @@
     }
   }
   * { box-sizing: border-box; }
+  /* Tiga ukuran saja, berjarak cukup untuk terbaca sebagai tingkatan:
+     28 / 17.5 / 14. Catatan memakai ukuran teks isi dan dibedakan oleh warna,
+     bukan oleh ukuran — dua ukuran yang berselisih setengah piksel hanya
+     terlihat seperti ketidaksengajaan. */
   body {
-    margin: 0; padding: 32px 20px; background: var(--latar); color: var(--tinta);
-    font: 15px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+    margin: 0; padding: 40px 20px; background: var(--latar); color: var(--tinta);
+    font: 14px/1.65 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   }
-  main { max-width: 820px; margin: 0 auto; }
-  h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.01em; }
-  h2 { font-size: 15px; margin: 0 0 12px; letter-spacing: -0.005em; }
-  .sub { color: var(--redup); margin: 0 0 28px; }
+  main { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 28px; font-weight: 650; margin: 0 0 8px; letter-spacing: -0.02em; }
+  h2 {
+    font-size: 17.5px; font-weight: 600; margin: 0 0 14px; letter-spacing: -0.01em;
+  }
+  .sub { color: var(--redup); margin: 0 0 30px; max-width: 62ch; }
   section {
     background: var(--kertas); border: 1px solid var(--garis); border-radius: 10px;
     padding: 18px 20px; margin-bottom: 16px;
@@ -36,16 +42,19 @@
   .baris span:first-child { color: var(--redup); }
   .nilai { font-variant-numeric: tabular-nums; font-weight: 600; }
   code, pre {
-    font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 13px;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12.5px;
   }
   pre {
     background: var(--kode); border: 1px solid var(--garis); border-radius: 8px;
     padding: 14px; overflow-x: auto; margin: 0;
   }
+  /* Catatan dibedakan oleh permukaan dan warna teks, bukan oleh batang aksen
+     di sisi kiri: batang itu menarik perhatian tanpa menyampaikan apa pun. */
   .catatan {
-    border-left: 3px solid var(--awas); padding-left: 12px; margin-top: 14px;
-    color: var(--redup); font-size: 13.5px;
+    background: var(--kode); border-radius: 8px; padding: 12px 14px;
+    margin-top: 16px; color: var(--redup);
   }
+  .catatan strong { color: var(--tinta); }
   .ok { color: var(--aksen); font-weight: 600; }
   .tolak { color: var(--awas); font-weight: 600; }
 </style>
