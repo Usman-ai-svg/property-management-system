@@ -1,0 +1,36 @@
+{
+  // Pemancaran lapisan murni menjadi ESM biasa yang bisa dimuat <script type="module">
+  // langsung, tanpa bundler dan tanpa framework. Dipakai oleh
+  // `npm run bangun:portabel` — lihat scripts/bangun-portabel.mjs.
+  //
+  // Sengaja TIDAK memakai tsconfig.json utama: yang itu `noEmit` dan menyapu
+  // seluruh proyek termasuk React dan Next.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "noEmit": false,
+    "declaration": true,
+    "removeComments": false,
+    "rootDir": "src/lib",
+    "outDir": "portabel",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": [
+    "src/lib/calc/**/*.ts",
+    "src/lib/domain/**/*.ts",
+    "src/lib/tampilan/**/*.ts",
+    "src/lib/adaptor/**/*.ts",
+    // Dua berkas murni di akar src/lib. `format.ts` memuat cara menulis angka
+    // rupiah, persen, dan tanggal beserta tarif PPN 11% dan all-in 10% — hal
+    // yang paling sering ditulis ulang dari layar dan paling mudah keliru.
+    // `nav.ts` memuat struktur menu beserta sub-bagian hak aksesnya.
+    "src/lib/format.ts",
+    "src/lib/nav.ts"
+  ],
+  "exclude": ["**/*.test.ts"]
+}

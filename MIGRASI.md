@@ -7,9 +7,11 @@ kodenya: apa yang bisa dipindahkan apa adanya, apa yang harus ditulis ulang,
 dan mana bagian yang kalau salah dipindahkan akan diam-diam menghasilkan
 angka yang keliru.
 
-Ditulis dengan asumsi ERP tujuan memakai Next.js/React. Bila ternyata bukan,
-bagian [Kalau ERP-nya bukan Next.js](#kalau-erp-nya-bukan-nextjs) menjelaskan
-apa yang berubah.
+ERP tujuan sudah diketahui bentuknya: **satu index.html, vanilla JS, dan
+Supabase RPC** — tanpa React, tanpa Next.js, tanpa bundler. Dokumen ini ditulis
+untuk kenyataan itu. Bagian [Menyerap ke ERP vanilla JS](#menyerap-ke-erp-vanilla-js)
+adalah titik masuknya; sisa dokumen menjelaskan aturan yang harus ikut pindah
+apa pun kerangkanya.
 
 ---
 
@@ -182,7 +184,7 @@ dan ikut pindah; mesinnya diganti.
 | Aturan (ikut pindah) | Mesin sekarang | Mesin di ERP |
 |---|---|---|
 | `identitas.ts` — bentuk `Pengguna` | `jose` JWT di cookie | Supabase Auth + `profiles` |
-| `berkas-aturan.ts` — jenis, ukuran, nama, kunci objek | `storage.ts` (disk) | Supabase Storage |
+| `berkas-aturan.ts` — jenis, ukuran, nama, kunci objek | `storage/` (disk **atau** Google Drive) | Google Drive |
 | `tabel-aturan.ts` — baris judul, sinonim kolom, angka, validasi | `impor-excel.ts` (ExcelJS) | SheetJS di browser |
 
 **Identitas.** Seluruh aplikasi membaca pengguna lewat satu fungsi,
@@ -195,6 +197,45 @@ halaman kosong tanpa penjelasan.
 berkas, batas ukuran, dan pembersihan nama. `bersihkanNamaFile()` sekarang
 juga mengenali pemisah gaya Windows — berkas diunggah dari dua jenis mesin,
 sementara `path.basename` di server hanya mengenali salah satu.
+
+### Berkas besar: Google Drive, bukan object storage berbayar
+
+Berkas `.skp` pada proyek ini berukuran **24–38 MB**. Ribuan berkas sebesar itu
+menjadi tagihan terbesar jauh sebelum sisa data proyek digabung sekalipun
+mendekatinya — karena itu berkas besar ditaruh di Google Drive, di kuota
+organisasi yang memang sudah dibayar.
+
+Mesinnya dipilih lewat satu variabel:
+
+```bash
+STORAGE_ENGINE="lokal"   # bawaan — demo jalan tanpa kredensial apa pun
+STORAGE_ENGINE="gdrive"  # butuh GDRIVE_CLIENT_EMAIL / _PRIVATE_KEY / _FOLDER_ID
+```
+
+Tiga hal yang perlu diketahui sebelum menyentuhnya:
+
+**Kunci berkas Drive diberi awalan `gdrive:`, dan pembacaan mengikuti awalan
+itu — bukan mesin yang sedang dikonfigurasi.** Akibatnya berkas yang telanjur
+tersimpan di disk tetap terbaca setelah organisasi pindah ke Drive, dan
+peralihannya tidak perlu sekali jalan. Kalau routing mengikuti konfigurasi,
+hari peralihan berubah menjadi migrasi besar yang harus berhasil seluruhnya,
+dan setiap dokumen lama menjadi tautan mati sampai selesai.
+
+**Masuknya lewat service account, bukan OAuth pengguna.** Berkas milik
+organisasi, bukan milik orang yang kebetulan mengunggahnya, dan tidak boleh
+ikut hilang saat orang itu keluar dari perusahaan.
+
+**Unggahan memakai protokol resumable, bukan multipart.** Pada ukuran .skp,
+satu putus jaringan di tengah berarti mengulang 38 MB dari nol. Resumable juga
+mengumumkan ukuran lebih dulu, sehingga penolakan kuota datang sebelum satu
+byte pun terkirim.
+
+> Kesalahan penyiapan yang paling sering: folder tujuan belum dibagikan ke
+> alamat service account sebagai Editor. Drive menjawab 403, dan pesan
+> galatnya di `gdrive.ts` sengaja menyebut hal ini secara langsung.
+
+Protokolnya bertes tanpa kredensial Google — `fetch` dan jamnya disuntik,
+lihat `src/lib/storage/gdrive.test.ts`.
 
 **Excel.** ERP sudah memuat SheetJS 0.18. Yang perlu ditulis ulang hanya
 `kisiDariExcel()`: `XLSX.utils.sheet_to_json(sheet, { header: 1 })`
@@ -646,21 +687,70 @@ Data demo tidak perlu ikut. `prisma/seed.ts` hanya untuk peragaan.
 
 ---
 
-## Kalau ERP-nya bukan Next.js
+## Menyerap ke ERP vanilla JS
 
-Yang tetap terpakai tanpa perubahan: skema Prisma, `src/lib/calc/`,
-`src/lib/domain/`, dan berkas tesnya. Itu sekitar 1.291 baris aturan bisnis
-plus 42 model data — bagian yang paling mahal untuk dibuat ulang dan paling
-berbahaya kalau ditulis ulang dari layar.
+ERP memakai satu index.html + vanilla JS + Supabase RPC. Yang berikut ini sudah
+disiapkan supaya penyerapannya tidak dimulai dari nol.
 
-Yang harus ditulis ulang: seluruh `src/app/` dan `src/components/`. Pola
-penegakan hak akses di bagian 4 tetap berlaku apa pun frameworknya, dan
-`rbac.ts` bisa dijadikan acuan meski kodenya tidak dipakai langsung.
+### Aturan bisnis sebagai ESM siap-browser
 
-Yang perlu diperhatikan: Server Actions tidak punya padanan langsung di luar
-Next.js. Setiap aksi di `src/app/(app)/**/actions.ts` perlu menjadi endpoint
-API, dengan urutan yang sama seperti sekarang — periksa hak akses lebih dulu,
-lalu validasi, lalu simpan, lalu catat ke audit log.
+```bash
+npm run bangun:portabel
+```
+
+Perintah itu memancarkan lapisan murni menjadi `portabel/` — **26 modul, 199
+ekspor** — berupa `.js` biasa yang bisa langsung ditulis di `<script
+type="module">`, tanpa bundler dan tanpa langkah kompilasi:
+
+```html
+<script type="module">
+  import { totalBaris } from "./portabel/calc/boq.js";
+  import { rp, PPN_RATE } from "./portabel/format.js";
+</script>
+```
+
+Isinya `calc/`, `domain/`, `tampilan/`, `adaptor/`, ditambah `format.ts`
+(rupiah, persen, tanggal, tarif PPN 11% dan all-in 10%) dan `nav.ts` (struktur
+menu beserta sub-bagiannya). Berkas `.d.ts` ikut dipancarkan, jadi editor tetap
+memberi bantuan tipe meski dipanggil dari JavaScript biasa.
+
+`tsc` saja tidak cukup untuk ini: sumbernya memakai impor tanpa ekstensi dan
+beberapa alias `@/lib/...`, yang sah di TypeScript tetapi tidak bisa dimuat
+browser. `scripts/bangun-portabel.mjs` menulis ulang keduanya, lalu memeriksa
+hasilnya dan meng-import setiap modul untuk membuktikan semuanya berdiri
+sendiri — membangun tanpa memeriksa hanya memindahkan kegagalan ke browser
+orang lain.
+
+### Halaman acuan
+
+`contoh-erp/index.html` adalah halaman kecil yang berjalan sungguhan: ia
+mengimpor modul portabel, menghitung nilai BOQ, PPN, kategori RAP, status
+hutang, dan menegakkan invarian pembebanan — semuanya dari aturan asli, tidak
+ada rumus yang disalin ulang. Sajikan dari akar repo, mis.
+`python -m http.server 8080`, lalu buka `/contoh-erp/`.
+
+`contoh-erp/rpc.js` adalah pemanggil Supabase RPC tanpa pustaka apa pun —
+cukup `fetch` bawaan. Ia membedakan penolakan izin (`42501`) dari galat lain,
+supaya tampilan bisa berkata "Anda tidak berhak" alih-alih "terjadi
+kesalahan".
+
+### Yang tetap harus ditulis ulang
+
+Seluruh `src/app/` (13.576 baris) dan `src/components/` (2.930 baris). Itu
+perakitan halaman, dan ERP punya kerangkanya sendiri.
+
+Server Actions tidak punya padanan langsung. Setiap aksi di
+`src/app/(app)/**/actions.ts` menjadi fungsi RPC Postgres — daftar lengkap 77
+aksi beserta izin dan usulan namanya ada di `KONTRAK-RPC.md`. Urutannya tidak
+boleh berubah: periksa hak akses lebih dulu, lalu validasi, lalu simpan, lalu
+catat ke audit log.
+
+> **Yang paling mudah keliru di arsitektur ini.** Di Next.js, kode yang
+> memeriksa izin kebetulan berjalan di server. Di vanilla JS tidak ada
+> "kebetulan" itu — semua yang Anda tulis berjalan di browser dan bisa dipanggil
+> siapa pun lewat devtools. Pemeriksaan izin harus berada di dalam fungsi
+> Postgres (`SECURITY DEFINER`, periksa di baris pertama). Menyembunyikan
+> tombol adalah kenyamanan tampilan, bukan penjagaan.
 
 ---
 

@@ -172,3 +172,39 @@ describe("penjaga halaman tidak menyentuh Prisma", () => {
     assert.ok(jumlah >= 25, `hanya ${jumlah} halaman/rute ditemukan`);
   });
 });
+
+/**
+ * PENJAGA BERKAS PORTABEL DI AKAR src/lib.
+ *
+ * `format.ts` dan `nav.ts` tidak berada di dalam empat folder lapisan murni,
+ * tetapi ikut dipancarkan oleh `npm run bangun:portabel` karena keduanya murni
+ * dan justru paling dibutuhkan UI: cara menulis rupiah, persen, dan tanggal,
+ * tarif PPN 11% & all-in 10%, serta struktur menu beserta sub-bagian hak
+ * aksesnya.
+ *
+ * Karena letaknya di luar folder yang disapu penjaga di atas, satu impor
+ * Prisma di sini tidak akan tertangkap oleh siapa pun — dan pemancarannya baru
+ * gagal belakangan, jauh dari sebabnya. Karena itu keduanya disebut eksplisit.
+ */
+const BERKAS_PORTABEL = ["src/lib/format.ts", "src/lib/nav.ts"];
+
+describe("kemurnian berkas portabel di akar src/lib", () => {
+  for (const berkas of BERKAS_PORTABEL) {
+    it(`${berkas} tetap bisa dipancarkan ke ESM polos`, () => {
+      const pelanggaran = moduleDiimpor(readFileSync(berkas, "utf8"))
+        .map((m) => {
+          const larangan = TERLARANG.find((l) => l.pola.test(m));
+          return larangan ? `${m} (${larangan.alasan})` : null;
+        })
+        .filter((x): x is string => x !== null);
+
+      assert.deepEqual(
+        pelanggaran,
+        [],
+        `${berkas} mengimpor ${pelanggaran.join(", ")}. Berkas ini ikut ` +
+          "dipancarkan ke portabel/ untuk dipakai vanilla JS di ERP — " +
+          "pindahkan bagian yang butuh framework ke pemanggilnya.",
+      );
+    });
+  }
+});

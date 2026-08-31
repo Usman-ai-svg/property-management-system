@@ -19,7 +19,8 @@
     "skema:postgres": "tsx scripts/skema-postgres.mjs",
     "repro:slash": "tsx scripts/repro-slash.ts",
     "cek:endpoint": "tsx scripts/cek-endpoint-pindahan.ts",
-    "cek:bukti": "tsx scripts/cek-bukti-pindahan.ts"
+    "cek:bukti": "tsx scripts/cek-bukti-pindahan.ts",
+    "bangun:portabel": "node scripts/bangun-portabel.mjs"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.0",

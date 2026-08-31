@@ -31,3 +31,6 @@ src/generated/
 
 # Berkas unggahan. Isinya milik pengguna, bukan bagian dari kode.
 storage/
+
+# Lapisan portabel hasil pancaran — dibangun ulang oleh `npm run bangun:portabel`.
+portabel/
