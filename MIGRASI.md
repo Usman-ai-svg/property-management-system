@@ -50,7 +50,11 @@ lapisan di atasnya.
 ### Aturan: halaman tidak boleh menyentuh Prisma
 
 Seluruh `page.tsx` dan `route.ts` **tidak mengimpor `@/lib/db`**. Setiap
-pengambilan data lewat fungsi bernama di `src/lib/data/`. Periksa dengan:
+pengambilan data lewat fungsi bernama di `src/lib/data/`.
+
+Aturan ini dijaga tes — `src/lib/lapisan.test.ts`, blok *penjaga halaman tidak
+menyentuh Prisma* — jadi `npm test` akan gagal sambil menyebut berkasnya bila
+ada yang melanggar. Untuk pemeriksaan cepat tanpa menjalankan tes:
 
 ```bash
 grep -rl 'from "@/lib/db"' src/app --include='page.tsx' --include='route.ts'
@@ -58,6 +62,12 @@ grep -rl 'from "@/lib/db"' src/app --include='page.tsx' --include='route.ts'
 
 Keluaran kosong berarti aturannya masih utuh. Bila ada yang muncul, turunkan
 query-nya ke `src/lib/data/` sebelum melanjutkan.
+
+> Penjaganya baru ditambahkan setelah aturan ini sempat luntur: lima berkas
+> — dua rute bukti, rute ekspor Excel, rute template penawaran, dan halaman
+> rincian tipe unit — sudah memegang query Prisma sendiri padahal dokumen ini
+> menjanjikan sebaliknya. Selama aturannya hanya tertulis di sini beserta
+> perintah grep untuk memeriksanya sendiri, tidak ada yang menjalankannya.
 
 Gunanya untuk migrasi: saat modul ini diserap ERP, **hanya `src/lib/data/`
 yang berganti isi** — dari `prisma.*` menjadi pemanggilan RPC Supabase.

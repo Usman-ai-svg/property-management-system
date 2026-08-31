@@ -1,7 +1,7 @@
-import { bacaSegmen, kodeProyekDari, segmen } from "@/lib/adaptor/rute";
+import { kodeProyekDari, segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { detailTipeUnit } from "@/lib/data/proyek";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { Badge, CardHead, InfoRow, Kartu, Terbatas } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
@@ -9,12 +9,6 @@ import { KATEGORI_EKSTENSI } from "@/lib/storage";
 import { unggahRevisi } from "../../../actions";
 import { AksiTipeUnit } from "../../editors";
 import { TabelBoqTipe, TabelRapTipe } from "./editors";
-
-const pilihVersi = {
-  select: { id: true, revisi: true, namaFile: true, ukuranByte: true, objectKey: true, diunggahPada: true },
-  orderBy: { diunggahPada: "desc" as const },
-};
-const pilihDokumen = { select: { id: true, kategori: true, versions: pilihVersi } };
 
 export default async function RincianTipeUnit({
   params,
@@ -32,38 +26,7 @@ export default async function RincianTipeUnit({
   const ubahTeknis = bolehUbah(pengguna, "dokumenTeknis");
   const bolehDokumen = bolehLihat(pengguna, "dokumenTeknis");
 
-  const tipe = await prisma.unitType.findFirst({
-    where: { kode: bacaSegmen(tipeKode).toUpperCase(), project: { kode: kodeProyek } },
-    select: {
-      id: true, kode: true, nama: true, luasBangunan: true, luasTanah: true,
-      rapUpahVolume: true, rapUpahHarga: true, projectId: true,
-      project: { select: { kode: true, nama: true } },
-      _count: { select: { units: true } },
-      docModel3d: pilihDokumen,
-      docGambarKerjaPdf: pilihDokumen,
-      docGambarKerjaDwg: pilihDokumen,
-      docRender: pilihDokumen,
-      docSpek: pilihDokumen,
-      ...(bolehHarga
-        ? {
-            boqItems: {
-              orderBy: { urutan: "asc" as const },
-              select: {
-                id: true, grup: true, uraian: true, satuan: true,
-                volume: true, hargaSatuan: true, spesifikasi: true,
-              },
-            },
-            rapItems: {
-              orderBy: { urutan: "asc" as const },
-              select: {
-                id: true, grup: true, kategori: true, nama: true, satuan: true,
-                volume: true, hargaSatuan: true, keterangan: true,
-              },
-            },
-          }
-        : {}),
-    },
-  });
+  const tipe = await detailTipeUnit(tipeKode, kodeProyek, bolehHarga);
 
   if (!tipe || tipe.project.kode !== kodeProyek) notFound();
   if (!bolehAksesProyek(pengguna, tipe.projectId)) notFound();

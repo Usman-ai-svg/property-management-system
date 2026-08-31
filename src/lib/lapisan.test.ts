@@ -114,3 +114,61 @@ describe("penjaga lapisan pengambilan data", () => {
     assert.deepEqual(pelanggaran, []);
   });
 });
+
+/** Seluruh page.tsx dan route.ts di bawah sebuah folder, rekursif. */
+function berkasHalaman(dir: string): string[] {
+  const hasil: string[] = [];
+  for (const nama of readdirSync(dir)) {
+    const jalur = join(dir, nama);
+    if (statSync(jalur).isDirectory()) hasil.push(...berkasHalaman(jalur));
+    else if (nama === "page.tsx" || nama === "route.ts") hasil.push(jalur);
+  }
+  return hasil;
+}
+
+/**
+ * PENJAGA HALAMAN TIDAK MENYENTUH PRISMA.
+ *
+ * MIGRASI.md menjanjikan bahwa saat modul ini diserap ERP, hanya
+ * `src/lib/data/` yang berganti isi — dari `prisma.*` menjadi pemanggilan RPC —
+ * sementara halaman tidak perlu tahu sumber datanya berubah. Janji itu hanya
+ * berlaku selama tidak ada halaman yang memegang query-nya sendiri.
+ *
+ * Sebelum tes ini ada, aturannya cuma tertulis di dokumen beserta perintah grep
+ * untuk memeriksanya sendiri — dan memang luntur: lima berkas sempat mengimpor
+ * `@/lib/db` langsung. Yang dijaga tes bertahan, yang hanya ditulis di dokumen
+ * tidak. Karena itu pemeriksaannya sekarang di sini.
+ *
+ * `*actions.ts` sengaja TIDAK ikut diperiksa: itu lapisan perubahan data yang
+ * nantinya menjadi RPC penulisan, dan memang masih memanggil Prisma.
+ */
+describe("penjaga halaman tidak menyentuh Prisma", () => {
+  it("tidak ada page.tsx / route.ts yang mengimpor @/lib/db", () => {
+    const pelanggaran: string[] = [];
+    for (const berkas of berkasHalaman("src/app")) {
+      for (const m of moduleDiimpor(readFileSync(berkas, "utf8"))) {
+        if (m === "@/lib/db") pelanggaran.push(berkas);
+      }
+    }
+
+    assert.deepEqual(
+      pelanggaran,
+      [],
+      "Berkas berikut memegang query Prisma sendiri:\n  " +
+        pelanggaran.join("\n  ") +
+        "\nTurunkan query-nya ke src/lib/data/ dan panggil lewat fungsi bernama. " +
+        "Perhatikan blok `...(bolehHarga ? … : {})` di dalam select — itu " +
+        "penegakan hak akses, bukan kerapian; ia harus ikut pindah utuh.",
+    );
+  });
+
+  it("penjaganya benar-benar menangkap impor Prisma", () => {
+    const buruk = `import { prisma } from "@/lib/db";\n`;
+    assert.ok(moduleDiimpor(buruk).includes("@/lib/db"));
+  });
+
+  it("memeriksa jumlah berkas yang masuk akal", () => {
+    const jumlah = berkasHalaman("src/app").length;
+    assert.ok(jumlah >= 25, `hanya ${jumlah} halaman/rute ditemukan`);
+  });
+});

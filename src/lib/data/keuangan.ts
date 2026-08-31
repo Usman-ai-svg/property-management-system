@@ -448,3 +448,18 @@ export async function kontrakUntukAlokasi(projectId: string) {
   ]);
   return { kontrakUnit, kontrakSarpras };
 }
+
+/**
+ * Berkas bukti sebuah pengeluaran — nama tampilan, kunci penyimpanan, dan
+ * proyek pemiliknya.
+ *
+ * `projectId` ikut diambil karena pemanggilnya wajib memeriksa akses proyek
+ * sebelum mengirim isi berkas; tanpa itu tautan bukti bisa diteruskan ke siapa
+ * pun yang punya izin keuangan di proyek lain.
+ */
+export async function buktiPengeluaran(id: string) {
+  return prisma.expense.findUnique({
+    where: { id },
+    select: { projectId: true, bukti: true, buktiKey: true },
+  });
+}

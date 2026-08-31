@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
-import {
-  excelBoq, excelRap, type BarisBoqEks, type BarisRapEks,
-} from "@/lib/ekspor-excel";
+import { dataTabelEkspor } from "@/lib/data/ekspor";
+import { excelBoq, excelRap } from "@/lib/ekspor-excel";
 
 /**
  * Ekspor isi tabel BOQ/RAB atau RAP sebuah unit, kerja tambah, sarpras, atau
@@ -14,74 +12,6 @@ import {
  * berhak atas "hargaRabRap", dan berhak atas proyek pemilik objeknya. Objek di
  * luar jangkauan dijawab 404 — bukan 403 — agar keberadaannya tidak bocor.
  */
-
-const pilihBoq = {
-  orderBy: { urutan: "asc" as const },
-  select: { grup: true, uraian: true, satuan: true, volume: true, hargaSatuan: true, spesifikasi: true },
-};
-const pilihRap = {
-  orderBy: { urutan: "asc" as const },
-  select: { grup: true, nama: true, satuan: true, volume: true, hargaSatuan: true, keterangan: true },
-};
-
-interface DataTabel {
-  projectId: string;
-  label: string;
-  boq: BarisBoqEks[];
-  rap: BarisRapEks[];
-  upah: number;
-}
-
-/** Ambil baris tabel + info pemilik sesuai sasaran, atau null bila tak ada. */
-async function ambilData(sasaran: string, id: string): Promise<DataTabel | null> {
-  if (sasaran === "unit") {
-    const u = await prisma.unit.findUnique({
-      where: { id },
-      select: {
-        projectId: true, kode: true, rapUpahVolume: true, rapUpahHarga: true,
-        boqItems: pilihBoq, rapItems: pilihRap,
-      },
-    });
-    if (!u) return null;
-    return { projectId: u.projectId, label: `Unit ${u.kode}`, boq: u.boqItems, rap: u.rapItems, upah: u.rapUpahVolume * u.rapUpahHarga };
-  }
-  if (sasaran === "kerjaTambah") {
-    const k = await prisma.customWork.findUnique({
-      where: { id },
-      select: {
-        judul: true, rapUpahVolume: true, rapUpahHarga: true,
-        unit: { select: { projectId: true } },
-        boqItems: pilihBoq, rapItems: pilihRap,
-      },
-    });
-    if (!k) return null;
-    return { projectId: k.unit.projectId, label: `Kerja Tambah ${k.judul}`, boq: k.boqItems, rap: k.rapItems, upah: k.rapUpahVolume * k.rapUpahHarga };
-  }
-  if (sasaran === "sarpras") {
-    const s = await prisma.infrastructure.findUnique({
-      where: { id },
-      select: {
-        projectId: true, kode: true, rapUpahVolume: true, rapUpahHarga: true,
-        boqItems: pilihBoq, rapItems: pilihRap,
-      },
-    });
-    if (!s) return null;
-    return { projectId: s.projectId, label: `Sarpras ${s.kode}`, boq: s.boqItems, rap: s.rapItems, upah: s.rapUpahVolume * s.rapUpahHarga };
-  }
-  if (sasaran === "tipeUnit") {
-    const t = await prisma.unitType.findUnique({
-      where: { id },
-      select: {
-        projectId: true, kode: true, rapUpahVolume: true, rapUpahHarga: true,
-        boqItems: pilihBoq, rapItems: pilihRap,
-      },
-    });
-    if (!t) return null;
-    return { projectId: t.projectId, label: `Tipe ${t.kode}`, boq: t.boqItems, rap: t.rapItems, upah: t.rapUpahVolume * t.rapUpahHarga };
-  }
-  return null;
-}
-
 export async function GET(req: Request, { params }: { params: Promise<{ jenis: string }> }) {
   const pengguna = await ambilPengguna();
   if (!pengguna) return new NextResponse("Tidak terautentikasi.", { status: 401 });
@@ -98,7 +28,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ jenis: s
     return new NextResponse(`Jenis "${jenis}" tidak dikenal.`, { status: 404 });
   }
 
-  const data = await ambilData(sasaran, id);
+  const data = await dataTabelEkspor(sasaran, id);
   // Objek tak ditemukan maupun di luar akses dijawab sama — 404 — agar
   // keberadaannya tidak bisa disimpulkan dari beda pesan.
   if (!data || !bolehAksesProyek(pengguna, data.projectId)) {

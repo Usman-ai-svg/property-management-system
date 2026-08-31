@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { buktiPengeluaran } from "@/lib/data/keuangan";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
 import { bacaBerkas, tipeDari } from "@/lib/storage";
 
@@ -24,10 +24,7 @@ export async function GET(
 
   const { id } = await params;
 
-  const expense = await prisma.expense.findUnique({
-    where: { id },
-    select: { projectId: true, bukti: true, buktiKey: true },
-  });
+  const expense = await buktiPengeluaran(id);
 
   if (!expense) return new NextResponse("Pengeluaran tidak ditemukan.", { status: 404 });
   if (!expense.buktiKey) {

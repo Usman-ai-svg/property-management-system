@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { buktiLaporanPetty } from "@/lib/data/petty-cash";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
 import { bacaBerkas, tipeDari } from "@/lib/storage";
 
@@ -26,10 +26,7 @@ export async function GET(
 
   const { id } = await params;
 
-  const laporan = await prisma.pettyCashReport.findUnique({
-    where: { id },
-    select: { bukti: true, buktiKey: true, fund: { select: { projectId: true } } },
-  });
+  const laporan = await buktiLaporanPetty(id);
 
   if (!laporan) return new NextResponse("Laporan tidak ditemukan.", { status: 404 });
   if (!laporan.buktiKey) {

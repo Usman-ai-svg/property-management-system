@@ -157,3 +157,14 @@ export async function laporanPetty(reportId: string) {
   if (!r) return null;
   return { ...r, status: r.status as StatusPettyCash, total: totalLaporan(r.expenses) };
 }
+
+/**
+ * Berkas nota gabungan sebuah laporan petty cash, beserta proyek pemilik
+ * dananya untuk pemeriksaan akses di pemanggil.
+ */
+export async function buktiLaporanPetty(id: string) {
+  return prisma.pettyCashReport.findUnique({
+    where: { id },
+    select: { bukti: true, buktiKey: true, fund: { select: { projectId: true } } },
+  });
+}

@@ -281,3 +281,24 @@ export async function nomorSpkBerikutnya(projectKode: string, tahun = new Date()
   const [K, S] = await Promise.all([hitung("K"), hitung("S")]);
   return { K, S, tahun };
 }
+
+/**
+ * Isi sebuah RAB estimasi untuk membentuk template BOQ penawaran vendor.
+ *
+ * Hanya volume yang ikut, tanpa harga satuan: templatenya dikirim ke vendor
+ * pembanding, jadi HPS memang tidak boleh ada di dalamnya. `projectId` ikut
+ * untuk pemeriksaan akses proyek di pemanggil.
+ */
+export async function rabUntukTemplatePenawaran(id: string) {
+  return prisma.rabEstimasi.findUnique({
+    where: { id },
+    select: {
+      nomor: true, nama: true, projectId: true,
+      project: { select: { kode: true, nama: true } },
+      items: {
+        orderBy: { urutan: "asc" },
+        select: { grup: true, uraian: true, satuan: true, volume: true },
+      },
+    },
+  });
+}

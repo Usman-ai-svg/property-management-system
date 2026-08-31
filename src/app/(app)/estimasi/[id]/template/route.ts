@@ -1,5 +1,5 @@
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
-import { prisma } from "@/lib/db";
+import { rabUntukTemplatePenawaran } from "@/lib/data/estimasi";
 import { excelTemplatePenawaran } from "@/lib/ekspor-excel";
 
 /**
@@ -15,17 +15,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!pengguna) return new Response("Sesi berakhir.", { status: 401 });
   if (!bolehLihat(pengguna, "hargaRabRap")) return new Response("Akses ditolak.", { status: 403 });
 
-  const rab = await prisma.rabEstimasi.findUnique({
-    where: { id },
-    select: {
-      nomor: true, nama: true, projectId: true,
-      project: { select: { kode: true, nama: true } },
-      items: {
-        orderBy: { urutan: "asc" },
-        select: { grup: true, uraian: true, satuan: true, volume: true },
-      },
-    },
-  });
+  const rab = await rabUntukTemplatePenawaran(id);
   if (!rab) return new Response("RAB tidak ditemukan.", { status: 404 });
   if (!bolehAksesProyek(pengguna, rab.projectId)) return new Response("Akses ditolak.", { status: 403 });
 

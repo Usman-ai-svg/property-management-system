@@ -486,3 +486,48 @@ export async function riwayatObjek(u: Pengguna, projectId: string, namaObjek: st
     },
   });
 }
+
+/**
+ * Satu tipe unit beserta dokumen teknis dan BOQ/RAP masternya.
+ *
+ * Kode tipe dicari dalam lingkup proyeknya — kode tipe hanya unik per proyek,
+ * jadi mencarinya global akan menyerempet tipe bernama sama milik proyek lain.
+ */
+export async function detailTipeUnit(
+  tipeKode: string,
+  kodeProyek: string,
+  bolehHarga: boolean,
+) {
+  return prisma.unitType.findFirst({
+    where: { kode: bacaSegmen(tipeKode).toUpperCase(), project: { kode: kodeProyek } },
+    select: {
+      id: true, kode: true, nama: true, luasBangunan: true, luasTanah: true,
+      rapUpahVolume: true, rapUpahHarga: true, projectId: true,
+      project: { select: { kode: true, nama: true } },
+      _count: { select: { units: true } },
+      docModel3d: pilihDokumen,
+      docGambarKerjaPdf: pilihDokumen,
+      docGambarKerjaDwg: pilihDokumen,
+      docRender: pilihDokumen,
+      docSpek: pilihDokumen,
+      ...(bolehHarga
+        ? {
+            boqItems: {
+              orderBy: { urutan: "asc" as const },
+              select: {
+                id: true, grup: true, uraian: true, satuan: true,
+                volume: true, hargaSatuan: true, spesifikasi: true,
+              },
+            },
+            rapItems: {
+              orderBy: { urutan: "asc" as const },
+              select: {
+                id: true, grup: true, kategori: true, nama: true, satuan: true,
+                volume: true, hargaSatuan: true, keterangan: true,
+              },
+            },
+          }
+        : {}),
+    },
+  });
+}
