@@ -30,7 +30,9 @@ next-env.d.ts
 src/generated/
 
 # Berkas unggahan. Isinya milik pengguna, bukan bagian dari kode.
-storage/
+# Dijangkarkan ke akar: tanpa garis miring di depan, pola ini juga menelan
+# src/lib/storage/ — yang berisi KODE dan harus ikut masuk repo.
+/storage/
 
 # Lapisan portabel hasil pancaran — dibangun ulang oleh `npm run bangun:portabel`.
-portabel/
+/portabel/
