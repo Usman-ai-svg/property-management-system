@@ -1,3 +1,4 @@
+import { bacaSegmen } from "@/lib/adaptor/rute";
 import { prisma } from "@/lib/db";
 import { filterProyek, type Pengguna } from "@/lib/auth/rbac";
 import { barisEfektif, progresTertimbang } from "@/lib/calc/kontrak-boq";
@@ -140,7 +141,7 @@ export async function isiKonstruksiProyek(
 /** Satu unit beserta BOQ Master-nya, untuk halaman opname konstruksi. */
 export async function unitKonstruksi(unitKode: string) {
   const unit = await prisma.unit.findUnique({
-    where: { kode: decodeURIComponent(unitKode).toUpperCase() },
+    where: { kode: bacaSegmen(unitKode).toUpperCase() },
     select: {
       id: true, kode: true, nomor: true, progress: true,
       statusJual: true, tanggalSerahTerima: true,
@@ -248,7 +249,7 @@ export async function vendorKonstruksiProyek(projectId: string) {
 /** Satu item sarpras beserta BOQ Master-nya. */
 export async function sarprasKonstruksi(kodeSarpras: string) {
   const item = await prisma.infrastructure.findUnique({
-    where: { kode: decodeURIComponent(kodeSarpras).toUpperCase() },
+    where: { kode: bacaSegmen(kodeSarpras).toUpperCase() },
     select: {
       id: true, kode: true, nama: true, jenis: true, volume: true,
       progress: true, projectId: true,

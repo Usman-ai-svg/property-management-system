@@ -1,3 +1,4 @@
+import { bacaSegmen } from "@/lib/adaptor/rute";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { bolehAksesProyek, bolehLihat, filterProyek, type Pengguna } from "@/lib/auth/rbac";
@@ -312,7 +313,7 @@ export function nilaiSarpras(s: {
 /** Satu unit beserta tipe, dokumen teknis, kerja tambah, dan BOQ/RAP-nya. */
 export async function detailUnit(unitKode: string, bolehHarga: boolean) {
   const unit = await prisma.unit.findUnique({
-    where: { kode: decodeURIComponent(unitKode).toUpperCase() },
+    where: { kode: bacaSegmen(unitKode).toUpperCase() },
     select: {
       id: true, kode: true, nomor: true, luasTanah: true, projectId: true,
       phaseId: true, unitTypeId: true,
@@ -398,7 +399,7 @@ export async function detailUnit(unitKode: string, bolehHarga: boolean) {
 /** Satu item sarpras beserta dokumen teknis dan BOQ/RAP-nya. */
 export async function detailSarpras(kodeSarpras: string, bolehHarga: boolean) {
   const item = await prisma.infrastructure.findUnique({
-    where: { kode: decodeURIComponent(kodeSarpras).toUpperCase() },
+    where: { kode: bacaSegmen(kodeSarpras).toUpperCase() },
     select: {
       id: true, kode: true, nama: true, jenis: true, volume: true,
       status: true, progress: true, projectId: true,

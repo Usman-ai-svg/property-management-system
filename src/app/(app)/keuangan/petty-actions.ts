@@ -1,5 +1,6 @@
 "use server";
 
+import { segmen } from "@/lib/adaptor/rute";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat, rpLog } from "@/lib/audit";
@@ -52,7 +53,7 @@ async function ambilLaporan(reportId: string) {
 
 function revalidasi(kode: string) {
   revalidatePath("/keuangan");
-  revalidatePath(`/keuangan/${kode}`);
+  revalidatePath(`/keuangan/${segmen(kode)}`);
   revalidatePath("/petty-cash");
   revalidatePath("/");
 }

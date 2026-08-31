@@ -1,3 +1,4 @@
+import { kodeProyekDari, segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
@@ -22,12 +23,12 @@ export default async function RincianSarpras({
   if (!pengguna) redirect("/login");
 
   const { kode, kodeSarpras } = await params;
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
 
   if (!bolehLihat(pengguna, "daftarSarpras")) {
     return (
       <div style={{ padding: 24 }}>
-        <Link href={`/master/${kodeProyek}`} style={{ fontSize: 12.5, color: "var(--muted)", textDecoration: "none" }}>
+        <Link href={`/master/${segmen(kodeProyek)}`} style={{ fontSize: 12.5, color: "var(--muted)", textDecoration: "none" }}>
           ← {kodeProyek}
         </Link>
         <div style={{ marginTop: 16 }}>
@@ -70,7 +71,7 @@ export default async function RincianSarpras({
       <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10 }}>
         <Link href="/master" style={{ color: "inherit", textDecoration: "none" }}>Master Proyek</Link>
         {" / "}
-        <Link href={`/master/${kodeProyek}`} style={{ color: "inherit", textDecoration: "none" }}>
+        <Link href={`/master/${segmen(kodeProyek)}`} style={{ color: "inherit", textDecoration: "none" }}>
           {item.project.nama}
         </Link>
         {" / "}

@@ -1,5 +1,6 @@
 "use client";
 
+import { segmen } from "@/lib/adaptor/rute";
 import Link from "next/link";
 import { PanelTabel } from "@/components/panel-tabel";
 import { Badge, WARNA_STATUS } from "@/components/ui";
@@ -77,7 +78,7 @@ export function TabelSarpras({
         <tr>
           <td>
             <Link
-              href={`/master/${kodeProyek}/sarpras/${encodeURIComponent(s.kode)}`}
+              href={`/master/${segmen(kodeProyek)}/sarpras/${encodeURIComponent(s.kode)}`}
               style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
             >
               {s.nama}

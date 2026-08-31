@@ -1,3 +1,4 @@
+import { kodeProyekDari, segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
@@ -22,7 +23,7 @@ export default async function LaporanKonstruksi({
   if (!pengguna) redirect("/login");
 
   const { kode } = await params;
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
 
   const proyek = await proyekKonstruksi(kodeProyek);
   if (!proyek) notFound();
@@ -64,7 +65,7 @@ export default async function LaporanKonstruksi({
         style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}
       >
         <Link
-          href={`/konstruksi/${kodeProyek}`}
+          href={`/konstruksi/${segmen(kodeProyek)}`}
           style={{ fontSize: 12.5, color: "var(--muted)", textDecoration: "none" }}
         >
           ← Kembali ke {proyek.nama}

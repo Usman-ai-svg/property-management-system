@@ -1,3 +1,4 @@
+import { segmen } from "@/lib/adaptor/rute";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
@@ -89,7 +90,7 @@ export default async function DashboardKeuangan() {
               <tr key={p.id}>
                 <td>
                   <Link
-                    href={`/keuangan/${p.kode}`}
+                    href={`/keuangan/${segmen(p.kode)}`}
                     style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
                   >
                     {p.nama}

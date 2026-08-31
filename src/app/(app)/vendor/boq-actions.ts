@@ -1,5 +1,6 @@
 "use server";
 
+import { segmen } from "@/lib/adaptor/rute";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat } from "@/lib/audit";
@@ -109,10 +110,10 @@ async function sinkronNominalBoq(contractId: string) {
 /** Segarkan seluruh halaman yang menampilkan BOQ/progres SPK ini. */
 function segarkan(kontrak: Kontrak) {
   revalidatePath(`/vendor/${kontrak.vendorId}`);
-  revalidatePath(`/vendor/${kontrak.vendorId}/kontrak/${kontrak.kode}`);
-  revalidatePath(`/konstruksi/${kontrak.project.kode}`);
-  revalidatePath(`/master/${kontrak.project.kode}`);
-  revalidatePath(`/keuangan/${kontrak.project.kode}`);
+  revalidatePath(`/vendor/${kontrak.vendorId}/kontrak/${segmen(kontrak.kode)}`);
+  revalidatePath(`/konstruksi/${segmen(kontrak.project.kode)}`);
+  revalidatePath(`/master/${segmen(kontrak.project.kode)}`);
+  revalidatePath(`/keuangan/${segmen(kontrak.project.kode)}`);
   revalidatePath("/");
 }
 

@@ -1,5 +1,6 @@
 "use server";
 
+import { segmen } from "@/lib/adaptor/rute";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
@@ -189,7 +190,7 @@ export async function catatPengeluaran(_s: HasilAksi | null, form: FormData): Pr
     });
 
     revalidatePath("/keuangan");
-    revalidatePath(`/keuangan/${proyek.kode}`);
+    revalidatePath(`/keuangan/${segmen(proyek.kode)}`);
     revalidatePath("/");
 
     if (alokasi.length > 1) {
@@ -316,7 +317,7 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
     });
 
     revalidatePath("/keuangan");
-    revalidatePath(`/keuangan/${lama.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(lama.project.kode)}`);
     revalidatePath("/");
 
     if (jml === 0) return "Tidak ada yang berubah.";
@@ -430,7 +431,7 @@ export async function hapusPengeluaran(_s: HasilAksi | null, form: FormData): Pr
     });
 
     revalidatePath("/keuangan");
-    revalidatePath(`/keuangan/${lama.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(lama.project.kode)}`);
     revalidatePath("/");
   });
 }
@@ -505,7 +506,7 @@ export async function bagikanBiayaUnitRata(
     });
 
     revalidatePath("/keuangan");
-    revalidatePath(`/keuangan/${proyek.kode}`);
+    revalidatePath(`/keuangan/${segmen(proyek.kode)}`);
     revalidatePath("/");
 
     return `${rpLog(totalDibagi)} dibagikan rata ke ${unitIds.length} unit.`;
@@ -539,7 +540,7 @@ const [PO_DRAFT, PO_DITERIMA] = STATUS_PEMBELIAN;
 
 function segarkanPembelian(kodeProyek: string, pemasokId: string) {
   revalidatePath("/keuangan");
-  revalidatePath(`/keuangan/${kodeProyek}`);
+  revalidatePath(`/keuangan/${segmen(kodeProyek)}`);
   // Halaman Pemasok (Estimasi) menampilkan riwayat pembelian secara read-only.
   revalidatePath(`/estimasi/pemasok/${pemasokId}`);
   revalidatePath("/estimasi/pemasok");
@@ -866,7 +867,7 @@ export async function bayarHutang(_s: HasilAksi | null, form: FormData): Promise
     });
 
     revalidatePath("/keuangan");
-    revalidatePath(`/keuangan/${hutang.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(hutang.project.kode)}`);
     revalidatePath("/");
     return sisa - bayar <= 0
       ? "Cicilan tercatat — hutang lunas."
@@ -900,7 +901,7 @@ export async function hapusCicilanHutang(_s: HasilAksi | null, form: FormData): 
       aksi: "Hapus cicilan hutang", dari: rpLog(lama.nominal),
     });
     revalidatePath("/keuangan");
-    revalidatePath(`/keuangan/${lama.expense.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(lama.expense.project.kode)}`);
     revalidatePath("/");
   });
 }

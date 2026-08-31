@@ -1,5 +1,6 @@
 "use server";
 
+import { segmen } from "@/lib/adaptor/rute";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
@@ -111,7 +112,7 @@ export async function tambahVo(_s: HasilAksi | null, form: FormData): Promise<Ha
 
     revalidatePath(`/vendor/${kontrak.vendor.id}`);
     revalidatePath("/vendor");
-    revalidatePath(`/keuangan/${kontrak.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(kontrak.project.kode)}`);
     return `${nomor} dibuat — ${items.length} baris (${nominal >= 0 ? "+" : "−"}Rp ${Math.abs(nominal).toLocaleString("id-ID")}).`;
   });
 }
@@ -137,7 +138,7 @@ export async function hapusVo(_s: HasilAksi | null, form: FormData): Promise<Has
     });
     revalidatePath(`/vendor/${vo.contract.vendorId}`);
     revalidatePath("/vendor");
-    revalidatePath(`/keuangan/${vo.contract.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(vo.contract.project.kode)}`);
   });
 }
 
@@ -168,7 +169,7 @@ export async function ubahStatusVo(_s: HasilAksi | null, form: FormData): Promis
     });
     revalidatePath(`/vendor/${vo.contract.vendorId}`);
     revalidatePath("/vendor");
-    revalidatePath(`/keuangan/${vo.contract.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(vo.contract.project.kode)}`);
     return `${vo.nomor} → ${status}.`;
   });
 }
@@ -269,7 +270,7 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
 
     revalidatePath(`/vendor/${kontrak.vendor.id}`);
     revalidatePath("/vendor");
-    revalidatePath(`/keuangan/${kontrak.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(kontrak.project.kode)}`);
   });
 }
 
@@ -316,7 +317,7 @@ export async function hapusPembayaran(_s: HasilAksi | null, form: FormData): Pro
 
     revalidatePath(`/vendor/${lama.contract.vendorId}`);
     revalidatePath("/vendor");
-    revalidatePath(`/keuangan/${lama.contract.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(lama.contract.project.kode)}`);
   });
 }
 
@@ -560,7 +561,7 @@ export async function tambahKontrak(_s: HasilAksi | null, form: FormData): Promi
 
     revalidatePath("/vendor");
     revalidatePath(`/vendor/${vendorId}`);
-    revalidatePath(`/keuangan/${kodeProyek.toUpperCase()}`);
+    revalidatePath(`/keuangan/${segmen(kodeProyek.toUpperCase())}`);
   });
 }
 
@@ -625,7 +626,7 @@ export async function ubahKontrak(_s: HasilAksi | null, form: FormData): Promise
 
     revalidatePath("/vendor");
     revalidatePath(`/vendor/${lama.vendorId}`);
-    revalidatePath(`/keuangan/${lama.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(lama.project.kode)}`);
     if (jml === 0) return "Tidak ada yang berubah.";
     return `${jml} perubahan tersimpan.`;
   });
@@ -755,6 +756,6 @@ export async function hapusKontrak(_s: HasilAksi | null, form: FormData): Promis
 
     revalidatePath("/vendor");
     revalidatePath(`/vendor/${lama.vendorId}`);
-    revalidatePath(`/keuangan/${lama.project.kode}`);
+    revalidatePath(`/keuangan/${segmen(lama.project.kode)}`);
   });
 }

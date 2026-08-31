@@ -1,5 +1,6 @@
 "use client";
 
+import { segmen } from "@/lib/adaptor/rute";
 import Link from "next/link";
 import { Badge, Track, WARNA_STATUS } from "@/components/ui";
 import { PanelTabel } from "@/components/panel-tabel";
@@ -82,7 +83,7 @@ export function TabelUnitKonstruksi({ kodeProyek, data }: { kodeProyek: string; 
         <tr>
           <td>
             <Link
-              href={`/konstruksi/${kodeProyek}/unit/${encodeURIComponent(u.kode)}`}
+              href={`/konstruksi/${segmen(kodeProyek)}/unit/${encodeURIComponent(u.kode)}`}
               style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
             >
               {u.nomor}
@@ -136,7 +137,7 @@ export function TabelSarprasKonstruksi({ kodeProyek, data }: { kodeProyek: strin
         <tr>
           <td>
             <Link
-              href={`/konstruksi/${kodeProyek}/sarpras/${encodeURIComponent(s.kode)}`}
+              href={`/konstruksi/${segmen(kodeProyek)}/sarpras/${encodeURIComponent(s.kode)}`}
               style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
             >
               {s.nama}
@@ -185,7 +186,7 @@ export function TabelVendorKonstruksi({
         <tr>
           <td>
             <Link
-              href={`/konstruksi/${kodeProyek}/vendor/${encodeURIComponent(c.kode)}`}
+              href={`/konstruksi/${segmen(kodeProyek)}/vendor/${encodeURIComponent(c.kode)}`}
               style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "none" }}
             >
               {c.kode}

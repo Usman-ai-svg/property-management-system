@@ -1,3 +1,4 @@
+import { kodeProyekDari, segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
@@ -20,7 +21,7 @@ export default async function OpnameUnit({
   if (!pengguna) redirect("/login");
 
   const { kode, unitKode } = await params;
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
 
   const unit = await unitKonstruksi(unitKode);
 
@@ -39,7 +40,7 @@ export default async function OpnameUnit({
   if (!bolehProgres) {
     return (
       <div style={{ padding: 24 }}>
-        <Link href={`/konstruksi/${kodeProyek}`} style={{ fontSize: 12.5, color: "var(--muted)", textDecoration: "none" }}>
+        <Link href={`/konstruksi/${segmen(kodeProyek)}`} style={{ fontSize: 12.5, color: "var(--muted)", textDecoration: "none" }}>
           ← {unit.project.nama}
         </Link>
         <div style={{ marginTop: 16 }}>
@@ -68,7 +69,7 @@ export default async function OpnameUnit({
       <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10 }}>
         <Link href="/konstruksi" style={{ color: "inherit", textDecoration: "none" }}>Konstruksi</Link>
         {" / "}
-        <Link href={`/konstruksi/${kodeProyek}`} style={{ color: "inherit", textDecoration: "none" }}>
+        <Link href={`/konstruksi/${segmen(kodeProyek)}`} style={{ color: "inherit", textDecoration: "none" }}>
           {unit.project.nama}
         </Link>
         {" / "}
@@ -77,7 +78,7 @@ export default async function OpnameUnit({
 
       <div style={{ marginBottom: 12 }}>
         <NavObjek
-          basis={`/konstruksi/${kodeProyek}/unit`}
+          basis={`/konstruksi/${segmen(kodeProyek)}/unit`}
           sekarang={unit.kode}
           daftar={opsiUnit}
           ariaLabel="Pilih unit"

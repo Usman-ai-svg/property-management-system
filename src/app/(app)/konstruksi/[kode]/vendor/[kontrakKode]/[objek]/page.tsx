@@ -1,3 +1,4 @@
+import { bacaSegmen, kodeProyekDari, segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
@@ -26,12 +27,12 @@ export default async function OpnameVendorKonstruksi({
   if (!pengguna) redirect("/login");
 
   const { kode, kontrakKode, objek } = await params;
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
 
   if (!bolehLihat(pengguna, "progress")) {
     return (
       <div style={{ padding: 24 }}>
-        <Link href={`/konstruksi/${kodeProyek}`} style={{ fontSize: 12.5, color: "var(--muted)", textDecoration: "none" }}>
+        <Link href={`/konstruksi/${segmen(kodeProyek)}`} style={{ fontSize: 12.5, color: "var(--muted)", textDecoration: "none" }}>
           ← Konstruksi
         </Link>
         <div style={{ marginTop: 16 }}>
@@ -47,9 +48,9 @@ export default async function OpnameVendorKonstruksi({
   if (kontrak.project.kode !== kodeProyek) notFound();
 
   // objek = "unit_<id>" | "sarpras_<id>" — pisah pada pemisah pertama.
-  const pisah = decodeURIComponent(objek).indexOf("_");
-  const jenis = pisah >= 0 ? decodeURIComponent(objek).slice(0, pisah) : "";
-  const objekId = pisah >= 0 ? decodeURIComponent(objek).slice(pisah + 1) : "";
+  const pisah = bacaSegmen(objek).indexOf("_");
+  const jenis = pisah >= 0 ? bacaSegmen(objek).slice(0, pisah) : "";
+  const objekId = pisah >= 0 ? bacaSegmen(objek).slice(pisah + 1) : "";
 
   const unit = jenis === "unit" ? kontrak.units.find(({ unit }) => unit.id === objekId)?.unit : undefined;
   const sarpras =
@@ -126,11 +127,11 @@ export default async function OpnameVendorKonstruksi({
       <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
         <Link href="/konstruksi" style={{ color: "inherit", textDecoration: "none" }}>Konstruksi</Link>
         {" / "}
-        <Link href={`/konstruksi/${kodeProyek}`} style={{ color: "inherit", textDecoration: "none" }}>
+        <Link href={`/konstruksi/${segmen(kodeProyek)}`} style={{ color: "inherit", textDecoration: "none" }}>
           {kontrak.project.nama}
         </Link>
         {" / "}
-        <Link href={`/konstruksi/${kodeProyek}/vendor/${encodeURIComponent(kontrak.kode)}`} style={{ color: "inherit", textDecoration: "none" }}>
+        <Link href={`/konstruksi/${segmen(kodeProyek)}/vendor/${encodeURIComponent(kontrak.kode)}`} style={{ color: "inherit", textDecoration: "none" }}>
           {kontrak.kode}
         </Link>
         {" / "}
@@ -139,7 +140,7 @@ export default async function OpnameVendorKonstruksi({
 
       <div style={{ marginBottom: 12 }}>
         <NavObjek
-          basis={`/konstruksi/${kodeProyek}/vendor/${encodeURIComponent(kontrak.kode)}`}
+          basis={`/konstruksi/${segmen(kodeProyek)}/vendor/${segmen(kontrak.kode)}`}
           sekarang={`${jenis}_${objekId}`}
           daftar={opsiObjek}
           ariaLabel="Pilih objek dalam SPK"

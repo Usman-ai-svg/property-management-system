@@ -1,3 +1,4 @@
+import { kodeProyekDari } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
@@ -19,7 +20,7 @@ export default async function ProgresProyek({
   if (!pengguna) redirect("/login");
 
   const { kode } = await params;
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
 
   const proyek = await proyekKonstruksi(kodeProyek);
   if (!proyek) notFound();

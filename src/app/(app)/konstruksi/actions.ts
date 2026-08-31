@@ -1,5 +1,6 @@
 "use server";
 
+import { segmen } from "@/lib/adaptor/rute";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat } from "@/lib/audit";
@@ -73,8 +74,8 @@ export async function ubahProgresUnit(_s: HasilAksi | null, form: FormData): Pro
       dari: `${unit.progress}%`, ke: `${progress}%`,
     });
 
-    revalidatePath(`/konstruksi/${unit.project.kode}`);
-    revalidatePath(`/master/${unit.project.kode}`);
+    revalidatePath(`/konstruksi/${segmen(unit.project.kode)}`);
+    revalidatePath(`/master/${segmen(unit.project.kode)}`);
     revalidatePath("/");
   });
 }
@@ -124,8 +125,8 @@ export async function ubahProgresSarpras(_s: HasilAksi | null, form: FormData): 
       dari: `${item.progress}%`, ke: `${progress}%`,
     });
 
-    revalidatePath(`/konstruksi/${item.project.kode}`);
-    revalidatePath(`/master/${item.project.kode}`);
+    revalidatePath(`/konstruksi/${segmen(item.project.kode)}`);
+    revalidatePath(`/master/${segmen(item.project.kode)}`);
     revalidatePath("/");
   });
 }
@@ -172,8 +173,8 @@ export async function simpanOpnameUnit(
       ke: berubah ? `${berubah.ke}%` : `${jml} baris diperbarui`,
     });
 
-    revalidatePath(`/konstruksi/${unit.project.kode}`);
-    revalidatePath(`/master/${unit.project.kode}`);
+    revalidatePath(`/konstruksi/${segmen(unit.project.kode)}`);
+    revalidatePath(`/master/${segmen(unit.project.kode)}`);
     revalidatePath("/");
 
     return berubah
@@ -213,8 +214,8 @@ export async function simpanOpnameSarpras(
       ke: berubah ? `${berubah.ke}%` : `${jml} baris diperbarui`,
     });
 
-    revalidatePath(`/konstruksi/${item.project.kode}`);
-    revalidatePath(`/master/${item.project.kode}`);
+    revalidatePath(`/konstruksi/${segmen(item.project.kode)}`);
+    revalidatePath(`/master/${segmen(item.project.kode)}`);
     revalidatePath("/");
 
     return berubah

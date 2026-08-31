@@ -1,5 +1,6 @@
 "use server";
 
+import { segmen } from "@/lib/adaptor/rute";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
@@ -31,7 +32,7 @@ async function planProyek(businessPlanId: string) {
 }
 
 function segarkan(kodeProyek: string) {
-  revalidatePath(`/landbank/${kodeProyek}`);
+  revalidatePath(`/landbank/${segmen(kodeProyek)}`);
   // Mencakup pula tab Plan vs Realisasi yang kini hidup di dalam /landbank.
   revalidatePath("/landbank");
 }

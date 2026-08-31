@@ -1,3 +1,4 @@
+import { kodeProyekDari, segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
@@ -35,7 +36,7 @@ export default async function KeuanganProyek({
 
   const { kode } = await params;
   const { unit: unitDipilih, sarpras: sarprasDipilih } = await searchParams;
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
 
   if (!bolehLihat(pengguna, "keuangan")) {
     return (
@@ -142,7 +143,7 @@ export default async function KeuanganProyek({
   const sarprasRinci = sarprasDipilih
     ? proyek.infrastructures.find((s) => s.kode === sarprasDipilih.toUpperCase())
     : undefined;
-  const alamatDasar = `/keuangan/${proyek.kode}`;
+  const alamatDasar = `/keuangan/${segmen(proyek.kode)}`;
 
   const bolehUbahKeuangan = bolehUbah(pengguna, "keuangan");
   const pilihanUnit = proyek.units.map((u) => ({

@@ -16,7 +16,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "node scripts/hapus-db.mjs && prisma db push && prisma generate && prisma db seed",
     "db:studio": "prisma studio",
-    "skema:postgres": "tsx scripts/skema-postgres.mjs"
+    "skema:postgres": "tsx scripts/skema-postgres.mjs",
+    "repro:slash": "tsx scripts/repro-slash.ts"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.0",

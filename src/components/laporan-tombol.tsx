@@ -1,5 +1,6 @@
 "use client";
 
+import { segmen } from "@/lib/adaptor/rute";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FileText, Printer, X } from "lucide-react";
@@ -65,7 +66,7 @@ export function TombolLaporan({
               <div className="disp" style={{ fontWeight: 700, fontSize: 15 }}>Laporan Progres — Meeting</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <Link
-                  href={`/konstruksi/${kodeProyek}/laporan`}
+                  href={`/konstruksi/${segmen(kodeProyek)}/laporan`}
                   target="_blank"
                   className="btn-garis"
                   style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}

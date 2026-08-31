@@ -1,3 +1,4 @@
+import { kodeProyekDari, segmen } from "@/lib/adaptor/rute";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ExternalLink, MapPin } from "lucide-react";
@@ -27,7 +28,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
   if (!pengguna) redirect("/login");
 
   const { kode } = await params;
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
   const { proyek, unit, sarpras, bolehHarga, bolehUnit, bolehSarpras, bolehDokumen } =
     await detailProyek(pengguna, kodeProyek);
 
@@ -322,7 +323,7 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
               <tr key={t.id}>
                 <td>
                   <Link
-                    href={`/master/${kodeProyek}/tipe/${encodeURIComponent(t.kode)}`}
+                    href={`/master/${segmen(kodeProyek)}/tipe/${encodeURIComponent(t.kode)}`}
                     style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
                   >
                     {t.nama}

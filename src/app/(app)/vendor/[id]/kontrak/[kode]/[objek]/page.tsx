@@ -1,3 +1,4 @@
+import { bacaSegmen, segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
@@ -39,9 +40,9 @@ export default async function DetailObjekSpk({
   if (kontrak.vendor.id !== vendorId) notFound();
 
   // objek = "unit_<id>" | "sarpras_<id>" — pisah pada pemisah pertama.
-  const pisah = decodeURIComponent(objek).indexOf("_");
-  const jenis = pisah >= 0 ? decodeURIComponent(objek).slice(0, pisah) : "";
-  const objekId = pisah >= 0 ? decodeURIComponent(objek).slice(pisah + 1) : "";
+  const pisah = bacaSegmen(objek).indexOf("_");
+  const jenis = pisah >= 0 ? bacaSegmen(objek).slice(0, pisah) : "";
+  const objekId = pisah >= 0 ? bacaSegmen(objek).slice(pisah + 1) : "";
 
   const unit = jenis === "unit" ? kontrak.units.find(({ unit }) => unit.id === objekId)?.unit : undefined;
   const sarpras =
@@ -118,7 +119,7 @@ export default async function DetailObjekSpk({
         nilainya berbeda ({bolehHarga ? "volume/harga" : "volume"}/uraian). Opname
         progres vendor diisi di{" "}
         <Link
-          href={`/konstruksi/${kontrak.project.kode}/vendor/${encodeURIComponent(kontrak.kode)}/${jenis}_${objekId}`}
+          href={`/konstruksi/${segmen(kontrak.project.kode)}/vendor/${encodeURIComponent(kontrak.kode)}/${jenis}_${objekId}`}
           style={{ color: "var(--teal)", fontWeight: 600 }}
         >
           Konstruksi › Progress Vendor

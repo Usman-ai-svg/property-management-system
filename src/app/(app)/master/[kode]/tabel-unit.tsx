@@ -1,5 +1,6 @@
 "use client";
 
+import { segmen } from "@/lib/adaptor/rute";
 import Link from "next/link";
 import { PanelTabel } from "@/components/panel-tabel";
 import { Badge, WARNA_STATUS } from "@/components/ui";
@@ -95,7 +96,7 @@ export function TabelUnit({
         <tr>
           <td>
             <Link
-              href={`/master/${kodeProyek}/unit/${encodeURIComponent(u.kode)}`}
+              href={`/master/${segmen(kodeProyek)}/unit/${encodeURIComponent(u.kode)}`}
               style={{ fontWeight: 600, color: "var(--teal)", textDecoration: "none" }}
             >
               {u.nomor}

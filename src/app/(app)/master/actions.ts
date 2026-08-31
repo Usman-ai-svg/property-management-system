@@ -1,5 +1,6 @@
 "use server";
 
+import { segmen } from "@/lib/adaptor/rute";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -24,7 +25,7 @@ import { statusBangunSarpras, statusBangunUnit } from "@/lib/calc/status-bangun"
 
 /** Segarkan halaman proyek dan ringkasan setelah perubahan. */
 function segarkan(kode: string) {
-  revalidatePath(`/master/${kode}`);
+  revalidatePath(`/master/${segmen(kode)}`);
   revalidatePath("/master");
   revalidatePath("/");
 }
@@ -200,7 +201,7 @@ export async function simpanFase(_s: HasilAksi | null, form: FormData): Promise<
         label: { kode: "Kode fase", nama: "Nama fase", urutan: "Urutan" },
       });
 
-      revalidatePath(`/master/${lama.project.kode}`);
+      revalidatePath(`/master/${segmen(lama.project.kode)}`);
       return jml === 0 ? "Tidak ada yang berubah." : `${jml} perubahan tersimpan.`;
     }
 
@@ -226,7 +227,7 @@ export async function simpanFase(_s: HasilAksi | null, form: FormData): Promise<
       ke: kode,
     });
 
-    revalidatePath(`/master/${proyek.kode}`);
+    revalidatePath(`/master/${segmen(proyek.kode)}`);
   });
 }
 
@@ -263,7 +264,7 @@ export async function hapusFase(_s: HasilAksi | null, form: FormData): Promise<H
       ke: "dihapus",
     });
 
-    revalidatePath(`/master/${lama.project.kode}`);
+    revalidatePath(`/master/${segmen(lama.project.kode)}`);
   });
 }
 
@@ -312,7 +313,7 @@ export async function aturJumlahFase(_s: HasilAksi | null, form: FormData): Prom
       aksi: "Atur jumlah fase", dari: `${kini} fase`, ke: `${jumlah} fase`,
     });
 
-    revalidatePath(`/master/${proyek.kode}`);
+    revalidatePath(`/master/${segmen(proyek.kode)}`);
     return `Jumlah fase kini ${jumlah} (F1–F${jumlah}).`;
   });
 }
@@ -974,9 +975,9 @@ export async function hapusUnitPaksa(_s: HasilAksi | null, form: FormData): Prom
       dari: `${unit.kode} · progres ${unit.progress}%`, ke: "dihapus permanen",
     });
 
-    revalidatePath(`/master/${unit.project.kode}`);
+    revalidatePath(`/master/${segmen(unit.project.kode)}`);
     revalidatePath("/");
-    redirect(`/master/${unit.project.kode}`);
+    redirect(`/master/${segmen(unit.project.kode)}`);
   });
 }
 
@@ -1377,8 +1378,8 @@ export async function hapusSarprasPaksa(_s: HasilAksi | null, form: FormData): P
       dari: `${s.kode} · progres ${s.progress}%`, ke: "dihapus permanen",
     });
 
-    revalidatePath(`/master/${s.project.kode}`);
+    revalidatePath(`/master/${segmen(s.project.kode)}`);
     revalidatePath("/");
-    redirect(`/master/${s.project.kode}`);
+    redirect(`/master/${segmen(s.project.kode)}`);
   });
 }

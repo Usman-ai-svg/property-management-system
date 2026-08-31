@@ -1,3 +1,4 @@
+import { kodeProyekDari, segmen } from "@/lib/adaptor/rute";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ambilPengguna, bolehAksesProyek, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
@@ -26,7 +27,7 @@ export default async function RincianUnit({
   if (!pengguna) redirect("/login");
 
   const { kode, unitKode } = await params;
-  const kodeProyek = kode.toUpperCase();
+  const kodeProyek = kodeProyekDari(kode);
 
   const bolehHarga = bolehLihat(pengguna, "hargaRabRap");
   const ubahHarga = bolehUbah(pengguna, "hargaRabRap");
@@ -79,7 +80,7 @@ export default async function RincianUnit({
       <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10 }}>
         <Link href="/master" style={{ color: "inherit", textDecoration: "none" }}>Master Proyek</Link>
         {" / "}
-        <Link href={`/master/${kodeProyek}`} style={{ color: "inherit", textDecoration: "none" }}>
+        <Link href={`/master/${segmen(kodeProyek)}`} style={{ color: "inherit", textDecoration: "none" }}>
           {unit.project.nama}
         </Link>
         {" / "}
