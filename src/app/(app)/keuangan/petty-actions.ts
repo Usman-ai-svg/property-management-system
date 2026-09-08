@@ -5,13 +5,18 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat, rpLog } from "@/lib/audit";
 import {
-  angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
+  angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional, wajibLolos,
 } from "@/lib/actions/guard";
 import { simpanBuktiOpsional } from "@/lib/actions/bukti";
 import { cariTransisi, totalLaporan } from "@/lib/calc/petty-cash";
+import {
+  periksaAjukanLaporanPetty, periksaBeriDanaPetty, periksaCatatPengeluaranPetty,
+  periksaReimburseLaporanPetty, periksaTransisiLaporanPetty,
+} from "@/lib/kontrak/petty-cash";
 import { rentangTanggal } from "@/lib/data/petty-cash";
 import {
   JENIS_BIAYA_SWAKELOLA, PERUNTUKAN_BIAYA, POS_HPP, STATUS_PETTY_CASH,
+  type PeruntukanBiaya, type StatusPettyCash,
 } from "@/lib/domain/enums";
 import type { Pengguna } from "@/lib/auth/rbac";
 
@@ -83,10 +88,17 @@ export async function beriDanaPetty(_s: HasilAksi | null, form: FormData): Promi
       },
       select: { id: true, nama: true },
     });
+    const masukan = {
+      projectId,
+      pemegangId,
+      plafon: angka(form, "plafon", { wajib: true }),
+      nominal: angka(form, "nominal", { wajib: true }),
+      keterangan: null,
+    };
+    wajibLolos(periksaBeriDanaPetty(masukan, { pemegangSah: Boolean(pemegang) }));
     if (!pemegang) throw new GagalIzin("Pemegang dana harus seorang Supervisor yang aktif.");
 
-    const plafon = angka(form, "plafon", { min: 0, wajib: true });
-    const nominal = angka(form, "nominal", { min: 1, wajib: true });
+    const { plafon, nominal } = masukan;
     const { bukti, buktiKey } = await simpanBuktiOpsional(form);
 
     const dana = await prisma.pettyCashFund.upsert({
@@ -131,11 +143,10 @@ export async function reimburseLaporanPetty(_s: HasilAksi | null, form: FormData
     if (!r) throw new GagalIzin("Laporan petty cash tidak ditemukan.");
 
     const pengguna = await izinkan("keuangan", r.fund.projectId);
-    const transisi = cariTransisi(r.status as (typeof STATUS_PETTY_CASH)[number], "Direimburse");
-    if (!transisi) throw new GagalIzin("Laporan ini belum disetujui, jadi belum bisa direimburse.");
-
     const total = totalLaporan(r.expenses);
-    if (total <= 0) throw new GagalIzin("Laporan kosong — tak ada yang perlu direimburse.");
+    wajibLolos(
+      periksaReimburseLaporanPetty({ reportId }, { status: r.status as StatusPettyCash, total }),
+    );
 
     const { bukti, buktiKey } = await simpanBuktiOpsional(form);
 
@@ -183,17 +194,23 @@ export async function catatPengeluaranPetty(_s: HasilAksi | null, form: FormData
       },
     });
     if (!dana) throw new GagalIzin("Dana petty cash tidak ditemukan.");
-    if (!dana.aktif) throw new GagalIzin("Dana ini sudah ditutup.");
 
     const pengguna = await izinkan("pettyCash", dana.projectId);
-    if (pengguna.id !== dana.pemegangId && !superuserPetty(pengguna)) {
-      throw new GagalIzin("Hanya pemegang dana yang boleh mencatat pengeluaran petty cash-nya.");
-    }
 
-    const peruntukan = pilihan(form, "peruntukan", PERUNTUKAN_BIAYA);
-    const jenis = pilihan(form, "jenis", JENIS_BIAYA_SWAKELOLA);
-    const uraian = teks(form, "uraian", true);
-    const total = angka(form, "total", { min: 1, wajib: true });
+    const masukan = {
+      fundId,
+      peruntukan: teks(form, "peruntukan", true),
+      jenis: teks(form, "jenis", true),
+      uraian: teks(form, "uraian", true),
+      total: angka(form, "total", { wajib: true }),
+    };
+    wajibLolos(
+      periksaCatatPengeluaranPetty(masukan, {
+        danaAktif: dana.aktif,
+        pelakuPemegang: pengguna.id === dana.pemegangId || superuserPetty(pengguna),
+      }),
+    );
+    const { peruntukan, jenis, uraian, total } = masukan;
 
     // Laporan Draft = batch berjalan. Paling banyak satu per dana; dibuat bila
     // belum ada. Labelnya (periode) dibiarkan kosong sampai diajukan, lalu diisi
@@ -223,7 +240,7 @@ export async function catatPengeluaranPetty(_s: HasilAksi | null, form: FormData
         total,
         status: "Lunas",
         pic: pengguna.nama,
-        posHpp: POS_HPP[peruntukan],
+        posHpp: POS_HPP[peruntukan as PeruntukanBiaya],
         pettyCashReportId: draft.id,
       },
     });
@@ -249,21 +266,20 @@ export async function ajukanLaporanPetty(_s: HasilAksi | null, form: FormData): 
     const r = await ambilLaporan(reportId);
 
     const pengguna = await izinkan("pettyCash", r.fund.projectId);
-    if (pengguna.id !== r.fund.pemegangId && !superuserPetty(pengguna)) {
-      throw new GagalIzin("Hanya pemegang dana yang boleh mengajukan laporannya.");
-    }
-    if (!cariTransisi(r.status as (typeof STATUS_PETTY_CASH)[number], "Diajukan")) {
-      throw new GagalIzin("Laporan ini bukan Draft, jadi tidak bisa diajukan.");
-    }
-    if (r._count.expenses === 0) {
-      throw new GagalIzin("Laporan masih kosong — catat pengeluaran dulu sebelum diajukan.");
-    }
 
     // 1 pengajuan = 1 dokumen: PDF nota gabungan wajib diunggah di sini.
     const { bukti, buktiKey } = await simpanBuktiOpsional(form);
-    if (!buktiKey) {
-      throw new GagalIzin("Nota gabungan (PDF) wajib diunggah saat mengajukan laporan.");
-    }
+    wajibLolos(
+      periksaAjukanLaporanPetty(
+        { reportId },
+        {
+          status: r.status as StatusPettyCash,
+          pelakuPemegang: pengguna.id === r.fund.pemegangId || superuserPetty(pengguna),
+          jumlahPengeluaran: r._count.expenses,
+          adaNota: Boolean(buktiKey),
+        },
+      ),
+    );
 
     // Beri label batch dari rentang tanggal pengeluarannya (bukan bulan).
     const pengeluaran = await prisma.expense.findMany({
@@ -304,11 +320,18 @@ export async function transisiLaporanPetty(_s: HasilAksi | null, form: FormData)
     const catatan = teksOpsional(form, "catatan");
     const r = await ambilLaporan(reportId);
 
-    const transisi = cariTransisi(r.status as (typeof STATUS_PETTY_CASH)[number], ke);
+    const transisi = cariTransisi(r.status as StatusPettyCash, ke);
+    wajibLolos(
+      periksaTransisiLaporanPetty(
+        { reportId, ke },
+        {
+          status: r.status as StatusPettyCash,
+          tahapVerifikasi:
+            transisi?.oleh === "Quantity Surveyor" || transisi?.oleh === "Head Operation Project",
+        },
+      ),
+    );
     if (!transisi) throw new GagalIzin(`Transisi ${r.status} → ${ke} tidak sah.`);
-    if (transisi.oleh !== "Quantity Surveyor" && transisi.oleh !== "Head Operation Project") {
-      throw new GagalIzin("Transisi ini bukan wewenang tahap verifikasi/persetujuan.");
-    }
 
     const pengguna = await izinkan("pettyCash", r.fund.projectId);
     wajibPeran(pengguna, transisi.oleh);

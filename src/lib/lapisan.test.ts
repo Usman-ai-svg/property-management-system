@@ -27,6 +27,10 @@ const LAPISAN_MURNI = [
   // (`@/lib/format` tetap sama) dan supaya bisa jadi namespace tersendiri di
   // bundel ERP.
   "src/lib/format",
+  // Lapisan keenam: kontrak masukan tiap aksi tulis. Justru inilah yang paling
+  // harus tetap murni — fungsi `periksa*` di dalamnya akan disalin apa adanya
+  // menjadi validasi di dalam RPC Postgres, dan tesnya jadi acuan mengujinya.
+  "src/lib/kontrak",
 ];
 
 /** Yang tidak boleh diimpor dari lapisan murni. */

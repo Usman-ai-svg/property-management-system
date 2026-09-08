@@ -57,6 +57,17 @@ export async function jalankan(fn: () => Promise<string | void>): Promise<HasilA
   }
 }
 
+/**
+ * Tolak permintaan bila kontraknya tidak lolos.
+ *
+ * Jembatan antara lapisan kontrak yang murni (mengembalikan pesan atau null)
+ * dan aksi yang melempar. Dipisah supaya tiap aksi cukup satu baris:
+ * `wajibLolos(periksaX(masukan))`.
+ */
+export function wajibLolos(galat: string | null): void {
+  if (galat) throw new GagalIzin(galat);
+}
+
 /** Cari projectId dari kode proyek, sekaligus memastikan proyeknya ada. */
 export async function idProyekDariKode(kode: string): Promise<string> {
   const p = await prisma.project.findUnique({ where: { kode }, select: { id: true } });
