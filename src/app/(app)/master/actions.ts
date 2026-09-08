@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
-  angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
+  angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional, wajibLolos,
 } from "@/lib/actions/guard";
 
 /**
@@ -20,6 +20,9 @@ import { bersihkanNamaFile, periksaBerkas, periksaBerkasKategori, simpanBerkas }
 import {
   JENIS_HAK_ATAS_TANAH, JENIS_SARPRAS, STATUS_JUAL, STATUS_PROYEK,
 } from "@/lib/domain/enums";
+import {
+  periksaAturJumlahFase, periksaKodeProyek, periksaUbahLegalitas, uraikanPin,
+} from "@/lib/kontrak/master";
 import {
   buatBoqDariTemplate, buatRapDariTemplate, hargaJualAcuan, hitungUpahRap,
   perluPeringatanLuasBangunan, rabAcuan, totalBaris,
@@ -54,12 +57,8 @@ export async function tambahProyek(_s: HasilAksi | null, form: FormData): Promis
     const pengguna = await izinkan("deskripsi");
 
     const kode = teks(form, "kode", true).toUpperCase();
-    if (!/^[A-Z0-9]{2,8}$/.test(kode)) {
-      throw new GagalIzin("Kode proyek hanya boleh huruf dan angka, 2–8 karakter.");
-    }
-
     const bentrok = await prisma.project.count({ where: { kode } });
-    if (bentrok) throw new GagalIzin(`Kode proyek "${kode}" sudah dipakai.`);
+    wajibLolos(periksaKodeProyek(kode, bentrok > 0));
 
     const nama = teks(form, "nama", true);
     const kodeFase = (teks(form, "kodeFase") || "F1").toUpperCase();
@@ -280,8 +279,8 @@ export async function hapusFase(_s: HasilAksi | null, form: FormData): Promise<H
 export async function aturJumlahFase(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
   return jalankan(async () => {
     const projectId = teks(form, "projectId", true);
-    const jumlah = angka(form, "jumlah", { min: 1, wajib: true });
-    if (jumlah > 50) throw new GagalIzin("Jumlah fase terlalu banyak (maksimal 50).");
+    const jumlah = angka(form, "jumlah", { wajib: true });
+    wajibLolos(periksaAturJumlahFase({ projectId, jumlah }));
 
     const pengguna = await izinkan("deskripsi", projectId);
     const proyek = await prisma.project.findUnique({ where: { id: projectId }, select: { kode: true } });
@@ -340,11 +339,10 @@ export async function ubahLokasiProyek(_s: HasilAksi | null, form: FormData): Pr
     let pinLat = lama.pinLat;
     let pinLng = lama.pinLng;
     if (pin !== null) {
-      const bagian = pin.split(",").map((x) => Number(x.trim()));
-      if (bagian.length !== 2 || bagian.some((n) => !Number.isFinite(n))) {
-        throw new GagalIzin('Pin lokasi harus berupa "lintang, bujur", mis. -6.4021, 106.7532');
-      }
-      [pinLat, pinLng] = bagian;
+      const hasil = uraikanPin(pin);
+      if (typeof hasil === "string") throw new GagalIzin(hasil);
+      pinLat = hasil.lat;
+      pinLng = hasil.lng;
     }
 
     const baru = {
@@ -492,16 +490,17 @@ export async function ubahLegalitas(_s: HasilAksi | null, form: FormData): Promi
     }
 
     const sah = baris.filter((b) => b.nib?.trim());
-    if (sah.length === 0) throw new GagalIzin("Isi minimal satu NIB.");
-
-    for (const b of sah) {
-      if (!JENIS_HAK_ATAS_TANAH.includes(b.jenisHak as (typeof JENIS_HAK_ATAS_TANAH)[number])) {
-        throw new GagalIzin(`Jenis hak atas tanah "${b.jenisHak}" pada NIB ${b.nib} tidak sah.`);
-      }
-      if (!b.nomorHak?.trim()) {
-        throw new GagalIzin(`Nomor hak atas tanah pada NIB ${b.nib} wajib diisi.`);
-      }
-    }
+    wajibLolos(
+      periksaUbahLegalitas({
+        projectId: proyek.id,
+        baris: sah.map((b) => ({
+          nib: String(b.nib ?? ""),
+          jenisHak: String(b.jenisHak ?? ""),
+          nomorHak: String(b.nomorHak ?? ""),
+          luas: Number(b.luas ?? 0),
+        })),
+      }),
+    );
 
     const idDikirim = new Set(sah.map((b) => b.id).filter(Boolean));
     const dihapus = proyek.legalitas.filter((l) => !idDikirim.has(l.id));

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
-  angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
+  angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional, wajibLolos,
 } from "@/lib/actions/guard";
 import {
   JENIS_KONTRAK, KATEGORI_HARGA_DASAR, KATEGORI_PEMASOK, STATUS_PEMASOK,
@@ -16,6 +16,12 @@ import { bacaBoqDariExcel } from "@/lib/impor-excel";
 import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
 import { totalBaris } from "@/lib/calc/boq";
 import { nilaiKontrakDariMenang } from "@/lib/calc/tender";
+import {
+  periksaAjukanRab, periksaHapusAnalisa, periksaHapusHargaDasar, periksaHapusPemasok,
+  periksaHargaDasar, periksaPemasok, periksaRabDapatDiubah, periksaSetujuiRab,
+  periksaSimpanAnalisa, periksaSimpanTabelRab, periksaTambahPenawaran,
+  periksaTambahRabEstimasi, periksaTolakRab,
+} from "@/lib/kontrak/estimasi";
 
 /**
  * Lapisan perubahan data modul Estimasi RAB.
@@ -29,11 +35,14 @@ import { nilaiKontrakDariMenang } from "@/lib/calc/tender";
 const IZIN = "hargaRabRap" as const;
 const IZIN_SETUJU = "setujuiRab" as const;
 
-/** RAB hanya boleh diubah isinya saat Draft atau Ditolak (belum/berhenti diajukan). */
+/**
+ * RAB hanya boleh diubah isinya saat Draft atau Ditolak.
+ *
+ * Aturannya sendiri milik `kontrak/estimasi.ts`; di sini cuma dibungkus jadi
+ * lemparan supaya pemanggilnya tetap satu baris.
+ */
 function pastikanEditable(status: string, nomor: string) {
-  if (status !== "Draft" && status !== "Ditolak") {
-    throw new GagalIzin(`RAB ${nomor} berstatus ${status} — hanya bisa diubah saat Draft atau Ditolak.`);
-  }
+  wajibLolos(periksaRabDapatDiubah(status, nomor));
 }
 
 function segarkanPustaka() {
@@ -72,6 +81,7 @@ export async function tambahPemasok(_s: HasilAksi | null, form: FormData): Promi
   return jalankan(async () => {
     const pengguna = await izinkan(IZIN);
     const data = bacaPemasok(form);
+    wajibLolos(periksaPemasok(data));
     await prisma.pemasok.create({ data });
     await catat({ pengguna, objek: `Pemasok ${data.nama}`, aksi: "Tambah pemasok", ke: data.kategori });
     segarkanPustaka();
@@ -105,11 +115,9 @@ export async function hapusPemasok(_s: HasilAksi | null, form: FormData): Promis
     if (!lama) return;
     const pengguna = await izinkan(IZIN);
 
-    if (lama._count.penawaran > 0) {
-      throw new GagalIzin(
-        `Pemasok "${lama.nama}" masih punya ${lama._count.penawaran} penawaran harga. Hapus penawarannya lebih dulu.`,
-      );
-    }
+    wajibLolos(
+      periksaHapusPemasok({ id }, { jumlahPenawaran: lama._count.penawaran, nama: lama.nama }),
+    );
     await prisma.pemasok.delete({ where: { id } });
     await catat({ pengguna, objek: `Pemasok ${lama.nama}`, aksi: "Hapus pemasok", dari: lama.nama });
     segarkanPustaka();
@@ -125,15 +133,14 @@ export async function tambahHargaDasar(_s: HasilAksi | null, form: FormData): Pr
     const pengguna = await izinkan(IZIN);
     const kode = teks(form, "kode", true).toUpperCase();
     const bentrok = await prisma.hargaDasar.count({ where: { kode } });
-    if (bentrok) throw new GagalIzin(`Kode harga dasar "${kode}" sudah dipakai.`);
-
     const data = {
       kode,
-      kategori: pilihan(form, "kategori", KATEGORI_HARGA_DASAR),
+      kategori: teks(form, "kategori", true),
       uraian: teks(form, "uraian", true),
       satuan: teks(form, "satuan", true),
       hargaAcuan: angka(form, "hargaAcuan", { min: 0 }),
     };
+    wajibLolos(periksaHargaDasar(data, { kodeBentrok: bentrok > 0 }));
     await prisma.hargaDasar.create({ data });
     await catat({
       pengguna, objek: `Harga dasar ${kode}`, aksi: "Tambah harga dasar",
@@ -187,11 +194,9 @@ export async function hapusHargaDasar(_s: HasilAksi | null, form: FormData): Pro
     if (!lama) return;
     const pengguna = await izinkan(IZIN);
 
-    if (lama._count.komponen > 0) {
-      throw new GagalIzin(
-        `Harga dasar ${lama.kode} masih dipakai ${lama._count.komponen} komponen analisa. Lepaskan dari analisanya lebih dulu.`,
-      );
-    }
+    wajibLolos(
+      periksaHapusHargaDasar({ id }, { jumlahPemakaian: lama._count.komponen, kode: lama.kode }),
+    );
     // Penawaran ikut terhapus (onDelete: Cascade).
     await prisma.hargaDasar.delete({ where: { id } });
     await catat({ pengguna, objek: `Harga dasar ${lama.kode}`, aksi: "Hapus harga dasar", dari: lama.uraian });
@@ -212,8 +217,9 @@ export async function tambahPenawaran(_s: HasilAksi | null, form: FormData): Pro
     if (!hd) throw new GagalIzin("Harga dasar tidak ditemukan.");
     if (!pmk) throw new GagalIzin("Pemasok tidak ditemukan.");
 
-    const harga = angka(form, "harga", { min: 0, wajib: true });
+    const harga = angka(form, "harga", { wajib: true });
     const keterangan = teksOpsional(form, "keterangan");
+    wajibLolos(periksaTambahPenawaran({ hargaDasarId, pemasokId, harga, keterangan }));
     const jadikanAcuan = String(form.get("jadikanAcuan") ?? "") === "on";
 
     await prisma.penawaranPemasok.create({
@@ -299,13 +305,6 @@ async function bacaKomponen(form: FormData): Promise<KomponenIsian[]> {
     .filter((b) => b.hargaDasarId?.trim())
     .map((b) => ({ hargaDasarId: String(b.hargaDasarId), koefisien: Number(b.koefisien) }));
 
-  if (sah.length === 0) throw new GagalIzin("Analisa harus punya minimal satu komponen.");
-  for (const k of sah) {
-    if (!Number.isFinite(k.koefisien) || k.koefisien <= 0) {
-      throw new GagalIzin("Setiap koefisien komponen harus berupa angka lebih dari nol.");
-    }
-  }
-
   // Pastikan seluruh harga dasar yang dirujuk memang ada.
   const idUnik = [...new Set(sah.map((k) => k.hargaDasarId))];
   const ada = await prisma.hargaDasar.count({ where: { id: { in: idUnik } } });
@@ -332,10 +331,11 @@ export async function simpanAnalisa(_s: HasilAksi | null, form: FormData): Promi
     if (id) {
       const lama = await prisma.analisaHarga.findUnique({ where: { id }, select: { id: true, kode: true } });
       if (!lama) throw new GagalIzin("Analisa tidak ditemukan.");
-      if (kode !== lama.kode) {
-        const bentrok = await prisma.analisaHarga.count({ where: { kode } });
-        if (bentrok) throw new GagalIzin(`Kode analisa "${kode}" sudah dipakai.`);
-      }
+      const bentrokUbah =
+        kode !== lama.kode && (await prisma.analisaHarga.count({ where: { kode } })) > 0;
+      wajibLolos(
+        periksaSimpanAnalisa({ id, ...data, komponen }, { kodeBentrok: bentrokUbah }),
+      );
 
       // Komponen ditulis ulang seluruhnya: lebih sederhana dan tak ada risiko
       // baris yatim. Baris RAB yang memakai analisa ini tidak terpengaruh —
@@ -353,7 +353,7 @@ export async function simpanAnalisa(_s: HasilAksi | null, form: FormData): Promi
     }
 
     const bentrok = await prisma.analisaHarga.count({ where: { kode } });
-    if (bentrok) throw new GagalIzin(`Kode analisa "${kode}" sudah dipakai.`);
+    wajibLolos(periksaSimpanAnalisa({ id: null, ...data, komponen }, { kodeBentrok: bentrok > 0 }));
 
     await prisma.analisaHarga.create({
       data: { ...data, komponen: { create: komponen.map((k, i) => ({ ...k, urutan: i })) } },
@@ -372,6 +372,7 @@ export async function hapusAnalisa(_s: HasilAksi | null, form: FormData): Promis
     });
     if (!lama) return;
     const pengguna = await izinkan(IZIN);
+    wajibLolos(periksaHapusAnalisa({ id }, { jumlahPemakaian: 0, kode: lama.kode }));
 
     // Baris RAB yang memakai analisa ini tidak ikut hilang — relasinya opsional,
     // jadi Prisma hanya melepas rujukannya (analisaId → null). Harga snapshot-nya
@@ -408,6 +409,7 @@ export async function tambahRabEstimasi(_s: HasilAksi | null, form: FormData): P
     }
 
     const nama = teks(form, "nama", true);
+    wajibLolos(periksaTambahRabEstimasi({ projectId, nama }));
 
     const dibuat = await prisma.rabEstimasi.create({
       data: { projectId, nomor, nama, status: "Draft" },
@@ -487,10 +489,12 @@ export async function ajukanRab(_s: HasilAksi | null, form: FormData): Promise<H
   return jalankan(async () => {
     const rab = await rabUntukStatus(teks(form, "id", true));
     const pengguna = await izinkan(IZIN, rab.projectId);
-    if (rab.status !== "Draft" && rab.status !== "Ditolak") {
-      throw new GagalIzin(`RAB ${rab.nomor} berstatus ${rab.status} — tak bisa diajukan.`);
-    }
-    if (rab._count.items === 0) throw new GagalIzin("RAB belum punya baris pekerjaan.");
+    wajibLolos(
+      periksaAjukanRab(
+        { id: rab.id },
+        { status: rab.status, nomor: rab.nomor, jumlahBaris: rab._count.items },
+      ),
+    );
 
     await prisma.rabEstimasi.update({
       where: { id: rab.id },
@@ -510,9 +514,7 @@ export async function setujuiRab(_s: HasilAksi | null, form: FormData): Promise<
   return jalankan(async () => {
     const rab = await rabUntukStatus(teks(form, "id", true));
     const pengguna = await izinkan(IZIN_SETUJU, rab.projectId);
-    if (rab.status !== "Diajukan") {
-      throw new GagalIzin(`RAB ${rab.nomor} berstatus ${rab.status} — hanya yang Diajukan bisa disetujui.`);
-    }
+    wajibLolos(periksaSetujuiRab({ id: rab.id }, { status: rab.status, nomor: rab.nomor }));
     await prisma.rabEstimasi.update({
       where: { id: rab.id },
       data: { status: "Final", diputusPada: new Date(), diputusOleh: pengguna.nama, catatanTolak: null },
@@ -531,10 +533,8 @@ export async function tolakRab(_s: HasilAksi | null, form: FormData): Promise<Ha
   return jalankan(async () => {
     const rab = await rabUntukStatus(teks(form, "id", true));
     const pengguna = await izinkan(IZIN_SETUJU, rab.projectId);
-    if (rab.status !== "Diajukan") {
-      throw new GagalIzin(`RAB ${rab.nomor} berstatus ${rab.status} — hanya yang Diajukan bisa ditolak.`);
-    }
     const catatan = teks(form, "catatan", true);
+    wajibLolos(periksaTolakRab({ id: rab.id, catatan }, { status: rab.status, nomor: rab.nomor }));
     await prisma.rabEstimasi.update({
       where: { id: rab.id },
       data: { status: "Ditolak", diputusPada: new Date(), diputusOleh: pengguna.nama, catatanTolak: catatan },
@@ -711,15 +711,16 @@ function bacaBarisRabEstimasi(json: string, analisaLama: Map<string, string | nu
   } catch {
     throw new GagalIzin("Data RAB tidak terbaca.");
   }
-  if (!Array.isArray(data.kelompok) || data.kelompok.length === 0) {
-    throw new GagalIzin("Tabel RAB tidak boleh kosong.");
-  }
+  wajibLolos(
+    periksaSimpanTabelRab(
+      Array.isArray(data.kelompok) ? data.kelompok : [],
+      { status: "Draft", nomor: "" },
+    ),
+  );
 
   const baris: BarisRabMasuk[] = [];
   for (const g of data.kelompok) {
-    if (!g.nama?.trim()) throw new GagalIzin("Setiap kelompok pekerjaan harus punya nama.");
     for (const it of g.items) {
-      if (!it.uraian?.trim()) throw new GagalIzin(`Ada baris tanpa uraian pekerjaan pada kelompok "${g.nama}".`);
       if (!Number.isFinite(it.volume) || it.volume < 0) throw new GagalIzin(`Volume tidak sah pada "${it.uraian}".`);
       if (!Number.isFinite(it.hargaSatuan) || it.hargaSatuan < 0) throw new GagalIzin(`Harga satuan tidak sah pada "${it.uraian}".`);
       baris.push({
