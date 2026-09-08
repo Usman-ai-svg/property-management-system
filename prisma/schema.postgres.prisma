@@ -380,9 +380,10 @@ model Unit {
   /// Luas tanah unit ini — bisa berbeda dari tipe standar (kavling sudut, dll)
   luasTanah  Float
 
-  /// NILAI TURUNAN (cache) — Belum Terbangun | Progress | Terbangun | Masa Garansi
-  /// | Selesai. Tidak diinput manual; disimpulkan dari progress + statusJual +
-  /// tanggalSerahTerima (lihat statusBangunUnit di src/lib/calc/status-bangun.ts).
+  /// Belum Terbangun | Progress | Terbangun | Masa Garansi | Selesai
+  /// NILAI TURUNAN (cache). Tidak diinput manual; disimpulkan dari progress +
+  /// statusJual + tanggalSerahTerima (lihat statusBangunUnit di
+  /// src/lib/calc/status-bangun.ts).
   /// Ditulis ulang tiap kali salah satu masukannya berubah; tampilan tetap
   /// menghitung ulang agar transisi Masa Garansi → Selesai (3 bulan) tidak basi.
   statusPembangunan String @default("Belum Terbangun")
@@ -580,8 +581,9 @@ model Infrastructure {
   jenis     String
   /// Volume beserta satuannya, mis. "3.400 m²" atau "51 sambungan"
   volume    String
-  /// NILAI TURUNAN (cache) dari progress: Belum Terbangun | Progress | Selesai.
-  /// Lihat statusBangunSarpras di src/lib/calc/status-bangun.ts.
+  /// Belum Terbangun | Progress | Selesai
+  /// NILAI TURUNAN (cache) dari progress. Lihat statusBangunSarpras di
+  /// src/lib/calc/status-bangun.ts.
   status    String @default("Belum Terbangun")
   progress  Int    @default(0)
   rab       Decimal @db.Decimal(18, 2)
@@ -685,7 +687,9 @@ model Contract {
   vendorId  String
   /// Unit | Sarpras — LINGKUP kontrak (ke mana biayanya dibebankan).
   jenis     String
-  /// Jenis biaya kontrak (JENIS_BIAYA), mis. Kontraktor / Upah Borongan / Subkon.
+  /// Kontraktor | Upah Borongan | Subkon
+  /// Himpunan bagian JENIS_BIAYA yang sah untuk pekerjaan yang di-outsource
+  /// (JENIS_BIAYA_KONTRAK di src/lib/domain/enums.ts).
   /// Diwariskan ke setiap pembayaran kontrak ini sebagai jenis biaya Expense-nya,
   /// supaya donut "Breakdown Kategori" tidak menyamaratakan semua jadi borongan.
   jenisBiaya String @default("Upah Borongan")
@@ -919,9 +923,13 @@ model Expense {
   tanggal   DateTime
   /// Unit (rumah dijual) | Prasarana & Sarana | Perijinan & Ormas | Pengolahan Lahan
   peruntukan String
-  /// Upah Borongan | Material | Subkon | Upah Harian | Lain-lain proyek
+  /// Kontraktor | Upah Borongan | Upah Harian | Material | Subkon | Lain-lain proyek
+  /// "Kontraktor" hanya lahir dari pembayaran SPK, tak pernah dari pengeluaran
+  /// swakelola — lihat JENIS_BIAYA_SWAKELOLA di src/lib/domain/enums.ts.
   jenis      String
-  /// Transfer | Petty Cash | Tunai langsung
+  /// Transfer | Petty Cash | Tunai langsung | Hutang
+  /// "Hutang" berarti biaya sudah timbul tapi kas BELUM keluar; pelunasannya
+  /// lewat HutangCicilan. Hanya sah pada pencatatan pengeluaran manual.
   metode     String
   uraian     String
   total      Decimal @db.Decimal(18, 2)
@@ -981,7 +989,9 @@ model HutangCicilan {
   expenseId String
   tanggal   DateTime
   nominal   Decimal @db.Decimal(18, 2)
-  /// Cara kas keluar untuk cicilan ini — hanya metode tunai (bukan "Hutang").
+  /// Transfer | Petty Cash | Tunai langsung
+  /// Cara kas keluar untuk cicilan ini — hanya metode tunai (METODE_TUNAI),
+  /// karena "Hutang" justru yang sedang dilunasi di sini.
   metode    String
   bukti     String?
   buktiKey  String?
@@ -1669,7 +1679,8 @@ model Pembelian {
   pemasokId  String
   projectId  String
   nomor      String
-  /// Alur PO: Draft (diterbitkan) | Diterima (barang fisik datang). Pembayaran
+  /// Draft | Diterima
+  /// Alur PO: Draft = diterbitkan, Diterima = barang fisik datang. Pembayaran
   /// LEPAS dari status ini (DP boleh sebelum Diterima). "Lunas" tak disimpan —
   /// turunan Σ pembayaran ≥ total.
   status     String   @default("Draft")
