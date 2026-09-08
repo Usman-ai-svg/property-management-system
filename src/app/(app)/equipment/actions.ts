@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
-  angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
+  angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional, wajibLolos,
 } from "@/lib/actions/guard";
 import {
   JENIS_ASET, JENIS_PENYESUAIAN_ASET, KEPEMILIKAN_ASET, STATUS_PENGGUNAAN,
 } from "@/lib/domain/enums";
 import { terapkanPenyesuaian, unitTersedia } from "@/lib/calc/aset";
+import { periksaAset, periksaCatatServis, periksaTambahPenggunaan } from "@/lib/kontrak/equipment";
 
 /**
  * Pengelolaan peralatan & aset.
@@ -83,9 +84,16 @@ export async function tambahAset(_s: HasilAksi | null, form: FormData): Promise<
     const kode = teks(form, "kode", true).toUpperCase();
 
     const bentrok = await prisma.equipment.count({ where: { kode } });
-    if (bentrok) throw new GagalIzin(`Kode "${kode}" sudah dipakai aset lain.`);
-
     const data = await bacaAset(form);
+    wajibLolos(
+      periksaAset(
+        {
+          id: null, kode, nama: data.nama, jenis: data.jenis, kategori: data.kategori,
+          kepemilikan: data.kepemilikan, jumlah: data.jumlah, vendorId: data.vendorId ?? null,
+        },
+        { kodeBentrok: bentrok > 0 },
+      ),
+    );
     await prisma.equipment.create({ data: { ...data, kode } });
 
     await catat({
@@ -250,10 +258,16 @@ export async function catatServis(_s: HasilAksi | null, form: FormData): Promise
 
     const tanggal = tanggalOpsional(form, "tanggal") ?? new Date();
     const servisBerikut = tanggalOpsional(form, "servisBerikut");
-    if (servisBerikut && servisBerikut < tanggal) {
-      throw new GagalIzin("Jadwal servis berikutnya tidak boleh lebih awal daripada tanggal servis.");
-    }
     const biaya = angka(form, "biaya", { min: 0 });
+    wajibLolos(
+      periksaCatatServis({
+        assetId: equipmentId,
+        tanggal: tanggal.toISOString(),
+        berikutnya: servisBerikut ? servisBerikut.toISOString() : null,
+        biaya,
+        catatan: null,
+      }),
+    );
     const catatan = teksOpsional(form, "catatan");
 
     await prisma.$transaction([
@@ -312,9 +326,7 @@ export async function tambahPenggunaan(_s: HasilAksi | null, form: FormData): Pr
     const jumlah = Math.trunc(angka(form, "jumlah", { min: 1, wajib: true }));
     const tanggalMulai = tanggalOpsional(form, "tanggalMulai") ?? new Date();
     const tanggalSelesai = tanggalOpsional(form, "tanggalSelesai");
-    if (tanggalSelesai && tanggalSelesai < tanggalMulai) {
-      throw new GagalIzin("Tanggal selesai tidak boleh lebih awal daripada tanggal mulai.");
-    }
+
     const tarif = angka(form, "tarif", { min: 0 });
     const penanggungJawab = teksOpsional(form, "penanggungJawab");
     const catatan = teksOpsional(form, "catatan");
@@ -327,6 +339,17 @@ export async function tambahPenggunaan(_s: HasilAksi | null, form: FormData): Pr
         _sum: { jumlah: true },
       });
       const tersedia = unitTersedia(aset, dipakai._sum.jumlah ?? 0);
+      wajibLolos(
+        periksaTambahPenggunaan(
+          {
+            assetId: equipmentId, projectId, jumlah,
+            mulai: tanggalMulai.toISOString(),
+            selesai: tanggalSelesai ? tanggalSelesai.toISOString() : null,
+            penanggungJawab, catatan,
+          },
+          { tersedia, kode: aset.kode },
+        ),
+      );
       if (jumlah > tersedia) {
         throw new GagalIzin(
           `Hanya ${tersedia} ${aset.satuan} ${aset.kode} yang tersedia; ` +

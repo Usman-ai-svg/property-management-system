@@ -5,8 +5,9 @@ import { prisma } from "@/lib/db";
 import { catat, catatDiff } from "@/lib/audit";
 import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
 import { hashPassword } from "@/lib/auth/password";
-import { GagalIzin, HasilAksi, jalankan, teks, teksOpsional } from "@/lib/actions/guard";
+import { GagalIzin, HasilAksi, jalankan, teks, teksOpsional , wajibLolos } from "@/lib/actions/guard";
 import { SECTION_LABELS, SECTIONS, type Section } from "@/lib/domain/enums";
+import { periksaUbahIzin, periksaUbahStatusUser, periksaUser } from "@/lib/kontrak/admin";
 
 /**
  * Pengubahan matriks hak akses.
@@ -35,8 +36,7 @@ export async function ubahIzin(_s: HasilAksi | null, form: FormData): Promise<Ha
     /** tidak | lihat | ubah */
     const tingkat = teks(form, "tingkat", true);
 
-    if (!SECTIONS.includes(section)) throw new GagalIzin("Sub-bagian tidak dikenal.");
-    if (!["tidak", "lihat", "ubah"].includes(tingkat)) throw new GagalIzin("Tingkat izin tidak sah.");
+    wajibLolos(periksaUbahIzin({ roleId, section, tingkat }));
 
     const role = await prisma.role.findUnique({ where: { id: roleId }, select: { id: true, nama: true } });
     if (!role) throw new GagalIzin("Peran tidak ditemukan.");
@@ -97,9 +97,12 @@ export async function ubahStatusUser(_s: HasilAksi | null, form: FormData): Prom
     });
     if (!target) throw new GagalIzin("Pengguna tidak ditemukan.");
 
-    if (target.id === pengguna.id) {
-      throw new GagalIzin("Tidak bisa menonaktifkan akun Anda sendiri.");
-    }
+    wajibLolos(
+      periksaUbahStatusUser(
+        { id: userId },
+        { targetDiriSendiri: target.id === pengguna.id, aktif: !target.aktif },
+      ),
+    );
 
     await prisma.user.update({ where: { id: userId }, data: { aktif: !target.aktif } });
 
@@ -167,15 +170,15 @@ export async function tambahUser(_s: HasilAksi | null, form: FormData): Promise<
 
     const nama = teks(form, "nama", true);
     const email = teks(form, "email", true).toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new GagalIzin("Format email tidak sah.");
-
     const bentrok = await prisma.user.count({ where: { email } });
-    if (bentrok) throw new GagalIzin(`Email "${email}" sudah dipakai akun lain.`);
-
     const sandi = teks(form, "sandi", true);
-    if (sandi.length < 8) throw new GagalIzin("Kata sandi minimal 8 karakter.");
-
     const { peranIds, semuaProyek, proyekIds } = await bacaPeranAkses(form);
+    wajibLolos(
+      periksaUser(
+        { id: null, nama, email, sandi, peranIds, proyekIds },
+        { emailBentrok: bentrok > 0, peranDikenal: true, proyekDikenal: true },
+      ),
+    );
 
     await prisma.user.create({
       data: {
