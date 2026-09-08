@@ -4,13 +4,16 @@ import { segmen } from "@/lib/adaptor/rute";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat } from "@/lib/audit";
-import { angka, GagalIzin, HasilAksi, izinkan, jalankan, teks } from "@/lib/actions/guard";
+import {
+  angka, GagalIzin, HasilAksi, izinkan, jalankan, teks, wajibLolos,
+} from "@/lib/actions/guard";
 import {
   hitungUlangProgresSarpras,
   hitungUlangProgresUnit,
 } from "@/lib/data/progres-konstruksi";
 import { mingguBaru } from "@/lib/calc/hari-kerja";
 import { bulatkanProgres, progresSah } from "@/lib/calc/opname";
+import { periksaSimpanOpname, periksaUbahProgresManual } from "@/lib/kontrak/konstruksi";
 import { statusBangunSarpras, statusBangunUnit } from "@/lib/calc/status-bangun";
 
 /**
@@ -43,12 +46,15 @@ export async function ubahProgresUnit(_s: HasilAksi | null, form: FormData): Pro
     // ditimpa satu angka dari sini. Tombolnya memang sudah disembunyikan di
     // halaman unit, tetapi menyembunyikan tombol bukan penegakan — aksi ini
     // bisa dipanggil langsung.
-    if (await prisma.unitBoqItem.count({ where: { unitId: id } })) {
-      throw new GagalIzin(
-        "Progres unit ini dihitung dari BOQ Master Proyek. Isi lewat tabel opname " +
-          "di halaman unit, karena angka manual akan tertulis ulang pada opname berikutnya.",
-      );
-    }
+    wajibLolos(
+      periksaUbahProgresManual(
+        { id, progress },
+        {
+          punyaBoq: (await prisma.unitBoqItem.count({ where: { unitId: id } })) > 0,
+          sebutan: "unit",
+        },
+      ),
+    );
 
     if (progress === unit.progress) return "Progres tidak berubah.";
 
@@ -98,12 +104,16 @@ export async function ubahProgresSarpras(_s: HasilAksi | null, form: FormData): 
     const pengguna = await izinkan("progress", item.projectId);
 
     // Sama seperti unit: yang BOQ-nya sudah tersusun diopname per baris.
-    if (await prisma.infrastructureBoqItem.count({ where: { infrastructureId: id } })) {
-      throw new GagalIzin(
-        "Progres item ini dihitung dari BOQ Master Proyek. Isi lewat tabel opname " +
-          "di halaman item, karena angka manual akan tertulis ulang pada opname berikutnya.",
-      );
-    }
+    wajibLolos(
+      periksaUbahProgresManual(
+        { id, progress },
+        {
+          punyaBoq:
+            (await prisma.infrastructureBoqItem.count({ where: { infrastructureId: id } })) > 0,
+          sebutan: "item",
+        },
+      ),
+    );
 
     if (progress === item.progress) return "Progres tidak berubah.";
 
@@ -239,9 +249,13 @@ async function simpanBarisOpname(
 ): Promise<number> {
   const ids = form.getAll("barisId").map(String);
   const nilai = form.getAll("barisProgress").map((v) => Number(String(v)));
-  if (ids.length !== nilai.length) {
-    throw new GagalIzin("Data opname tidak lengkap. Muat ulang halaman lalu coba lagi.");
-  }
+  wajibLolos(
+    periksaSimpanOpname(
+      { objekId, baris: ids.map((id, i) => ({ id, persen: nilai[i] })) },
+      { kirimanLengkap: ids.length === nilai.length },
+      () => "baris",
+    ),
+  );
 
   const sebelum =
     jenis === "unit"

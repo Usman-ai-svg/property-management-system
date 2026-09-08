@@ -4,8 +4,14 @@ import { segmen } from "@/lib/adaptor/rute";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat } from "@/lib/audit";
-import { angka, GagalIzin, HasilAksi, izinkan, jalankan, teks } from "@/lib/actions/guard";
-import { nilaiBoqSeluruhObjek, periksaBarisBoqSpk } from "@/lib/calc/kontrak-boq";
+import {
+  angka, GagalIzin, HasilAksi, izinkan, jalankan, teks, wajibLolos,
+} from "@/lib/actions/guard";
+import { nilaiBoqSeluruhObjek } from "@/lib/calc/kontrak-boq";
+import {
+  periksaImporBoqSpk, periksaTambahBarisBoqSpk, periksaUbahBarisBoqSpk,
+  periksaUbahOverrideBoq,
+} from "@/lib/kontrak/boq-spk";
 import { bacaBoqDariExcel } from "@/lib/impor-excel";
 import { mingguBaru } from "@/lib/calc/hari-kerja";
 import { bulatkanProgres, progresSah } from "@/lib/calc/opname";
@@ -136,8 +142,7 @@ export async function tambahBarisBoqSpk(_s: HasilAksi | null, form: FormData): P
       volume: angka(form, "volume"),
       hargaSatuan: angka(form, "hargaSatuan"),
     };
-    const galat = periksaBarisBoqSpk(baris);
-    if (galat) throw new GagalIzin(galat);
+    wajibLolos(periksaTambahBarisBoqSpk({ contractId, ...baris }));
 
     const terakhir = await prisma.contractBoqItem.findFirst({
       where: { contractId },
@@ -176,8 +181,7 @@ export async function ubahBarisBoqSpk(_s: HasilAksi | null, form: FormData): Pro
       volume: angka(form, "volume"),
       hargaSatuan: angka(form, "hargaSatuan"),
     };
-    const galat = periksaBarisBoqSpk(baru);
-    if (galat) throw new GagalIzin(galat);
+    wajibLolos(periksaUbahBarisBoqSpk({ id, ...baru }));
 
     await prisma.contractBoqItem.update({ where: { id }, data: baru });
 
@@ -224,11 +228,9 @@ export async function imporBoqSpk(_s: HasilAksi | null, form: FormData): Promise
     const pengguna = await izinkan("progress", kontrak.projectId);
 
     const berkas = form.get("berkas");
-    if (!(berkas instanceof File) || berkas.size === 0) {
-      throw new GagalIzin("Pilih berkas Excel lebih dulu.");
-    }
-    const rows = await bacaBoqDariExcel(await berkas.arrayBuffer());
-    if (rows.length === 0) throw new GagalIzin("Tidak ada baris pekerjaan yang terbaca.");
+    const adaBerkas = berkas instanceof File && berkas.size > 0;
+    const rows = adaBerkas ? await bacaBoqDariExcel(await (berkas as File).arrayBuffer()) : [];
+    wajibLolos(periksaImporBoqSpk({ contractId }, { adaBerkas, jumlahBaris: rows.length }));
 
     await prisma.$transaction([
       prisma.contractBoqItem.deleteMany({ where: { contractId } }),
@@ -273,7 +275,8 @@ export async function ubahOverrideBoq(_s: HasilAksi | null, form: FormData): Pro
     if (!template) throw new GagalIzin("Baris BOQ tidak ditemukan.");
     const kontrak = await ambilKontrak(template.contractId);
     const pengguna = await izinkan("progress", kontrak.projectId);
-    const { unitId, infrastructureId } = bacaObjek(kontrak, teks(form, "objek", true));
+    const objek = teks(form, "objek", true);
+    const { unitId, infrastructureId } = bacaObjek(kontrak, objek);
 
     const override = {
       grup: teksOverride(form, "grup"),
@@ -283,12 +286,7 @@ export async function ubahOverrideBoq(_s: HasilAksi | null, form: FormData): Pro
       hargaSatuan: angkaOpsional(form, "hargaSatuan"),
     };
     // Validasi hanya bila nilai diisi (yang kosong = ikut template).
-    const galat = periksaBarisBoqSpk({
-      uraian: override.uraian ?? undefined,
-      volume: override.volume ?? 0,
-      hargaSatuan: override.hargaSatuan ?? 0,
-    });
-    if (galat) throw new GagalIzin(galat);
+    wajibLolos(periksaUbahOverrideBoq({ boqItemId, objek, ...override }));
 
     const ada = await cariOverride(boqItemId, unitId, infrastructureId);
     if (ada) {

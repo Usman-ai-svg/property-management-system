@@ -6,7 +6,10 @@ import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import { totalPenerimaan } from "@/lib/tampilan/landbank";
 import {
-  angka, GagalIzin, HasilAksi, izinkan, jalankan, teks, teksOpsional,
+  periksaCatatBiayaOperasional, periksaSimpanPembayaranJual,
+} from "@/lib/kontrak/plan-real";
+import {
+  angka, GagalIzin, HasilAksi, izinkan, jalankan, teks, teksOpsional, wajibLolos,
 } from "@/lib/actions/guard";
 
 /**
@@ -35,17 +38,15 @@ export async function catatBiayaOperasional(
     if (!proyek) throw new GagalIzin("Proyek tidak ditemukan.");
 
     const posSah = proyek.businessPlan?.operasional.map((o) => o.nama) ?? [];
-    if (posSah.length === 0) {
-      throw new GagalIzin("Proyek ini belum punya pos biaya operasional pada business plan-nya.");
-    }
-
-    const kategori = teks(form, "kategori", true);
-    if (!posSah.includes(kategori)) {
-      throw new GagalIzin(`Pos "${kategori}" tidak ada pada business plan proyek ini.`);
-    }
-
-    const nominal = angka(form, "nominal", { min: 1, wajib: true });
-    const uraian = teks(form, "uraian", true);
+    const masukan = {
+      projectId,
+      kategori: teks(form, "kategori", true),
+      nominal: angka(form, "nominal", { wajib: true }),
+      uraian: teks(form, "uraian", true),
+      tanggal: null,
+    };
+    wajibLolos(periksaCatatBiayaOperasional(masukan, { posBusinessPlan: posSah }));
+    const { kategori, nominal, uraian } = masukan;
 
     await prisma.operationalCost.create({
       data: {
@@ -97,11 +98,18 @@ export async function simpanPembayaranJual(_s: HasilAksi | null, form: FormData)
     const id = String(form.get("id") ?? "").trim();
     // Keterangan opsional pada form pencairan terpusat; beri default yang informatif.
     const uraian = String(form.get("uraian") ?? "").trim() || "Pencairan penjualan";
-    const nominal = angka(form, "nominal", { min: 1, wajib: true });
-
+    const nominal = angka(form, "nominal", { wajib: true });
     const isiTanggal = String(form.get("tanggal") ?? "").trim();
+    wajibLolos(
+      periksaSimpanPembayaranJual({
+        id: id || null,
+        unitId: String(form.get("unitId") ?? "").trim() || "(dari baris lama)",
+        nominal,
+        tanggal: isiTanggal || new Date().toISOString(),
+        keterangan: uraian,
+      }),
+    );
     const tanggal = isiTanggal ? new Date(isiTanggal) : new Date();
-    if (Number.isNaN(tanggal.getTime())) throw new GagalIzin("Tanggal pembayaran tidak sah.");
 
     if (id) {
       const lama = await prisma.salesPayment.findUnique({

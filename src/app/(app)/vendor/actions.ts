@@ -6,12 +6,17 @@ import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
   angka, GagalIzin, HasilAksi, idProyekDariKode, izinkan, jalankan, pilihan, pilihanOpsional,
-  teks,
+  teks, wajibLolos,
 } from "@/lib/actions/guard";
 import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
 import { simpanBuktiOpsional } from "@/lib/actions/bukti";
 import { alokasiPembayaran, periksaAlokasi, totalTerbayar, totalVoDisetujui } from "@/lib/calc/keuangan";
 import { nominalVo, progresSpk } from "@/lib/calc/kontrak-boq";
+import {
+  periksaHapusPembayaranKontrak, periksaHapusVendor, periksaNilaiVo,
+  periksaPembayaranKontrak, periksaTambahVo, periksaTandaiSelesai, periksaUbahStatusVo,
+  periksaIsiKontrak, periksaTambahKontrak, periksaVendor, type MasukanKontrak,
+} from "@/lib/kontrak/vendor";
 import { nomorKontrakBaru } from "@/lib/data/vendor";
 import {
   JENIS_BIAYA_KONTRAK, JENIS_KONTRAK, METODE_TUNAI, peruntukanDariJenisKontrak, POS_HPP, STATUS_VENDOR,
@@ -73,16 +78,8 @@ export async function tambahVo(_s: HasilAksi | null, form: FormData): Promise<Ha
       const objId = pisah >= 0 ? ob.slice(pisah + 1) : "";
       const unitId = jenisOb === "unit" ? objId : null;
       const infrastructureId = jenisOb === "sarpras" ? objId : null;
-      if (unitId && !unitSet.has(unitId)) throw new GagalIzin("Ada baris VO untuk unit di luar cakupan kontrak.");
-      if (infrastructureId && !infraSet.has(infrastructureId)) throw new GagalIzin("Ada baris VO untuk sarpras di luar cakupan kontrak.");
-      if (!unitId && !infrastructureId) throw new GagalIzin("Setiap baris VO harus memilih objek (unit/sarpras).");
-      if (ur === "") throw new GagalIzin("Uraian baris VO tidak boleh kosong.");
       const vol = volume[i];
       const hrg = harga[i];
-      if (!Number.isFinite(vol) || vol <= 0) throw new GagalIzin(`Volume baris "${ur}" harus lebih dari nol.`);
-      if (!Number.isFinite(hrg) || hrg === 0) {
-        throw new GagalIzin(`Harga satuan baris "${ur}" tidak boleh nol (pakai negatif untuk pekerjaan kurang).`);
-      }
       items.push({
         unitId, infrastructureId,
         grup: (grup[i] ?? "").trim() || "VO",
@@ -91,11 +88,19 @@ export async function tambahVo(_s: HasilAksi | null, form: FormData): Promise<Ha
       });
     }
 
-    if (items.length === 0) throw new GagalIzin("Tambahkan minimal satu baris pekerjaan VO.");
+    wajibLolos(
+      periksaTambahVo(
+        { contractId, uraian: uraianVo, status, items },
+        {
+          unitCakupan: [...unitSet].filter((x): x is string => Boolean(x)),
+          sarprasCakupan: [...infraSet].filter((x): x is string => Boolean(x)),
+        },
+      ),
+    );
 
     // Nominal VO = TURUNAN dari baris-barisnya (bisa negatif untuk pekerjaan kurang).
     const nominal = nominalVo(items);
-    if (nominal === 0) throw new GagalIzin("Total nilai VO nol — periksa baris tambah/kurang.");
+    wajibLolos(periksaNilaiVo(nominal));
 
     const nomor = `VO-${String(kontrak._count.variationOrders + 1).padStart(2, "0")}`;
 
@@ -152,8 +157,9 @@ export async function hapusVo(_s: HasilAksi | null, form: FormData): Promise<Has
  */
 export async function ubahStatusVo(_s: HasilAksi | null, form: FormData): Promise<HasilAksi> {
   return jalankan(async () => {
-    const id = String(form.get("id") ?? "");
-    const status = pilihan(form, "status", STATUS_VO);
+    const id = teks(form, "id", true);
+    const status = teks(form, "status", true);
+    wajibLolos(periksaUbahStatusVo({ id, status }));
     const vo = await prisma.variationOrder.findUnique({
       where: { id },
       select: {
@@ -210,12 +216,12 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
     // kontrak borongan jauh lebih sulit ditarik kembali daripada dicegah.
     const nilaiEfektif = kontrak.nominal + totalVoDisetujui(kontrak.variationOrders);
     const sudah = totalTerbayar(kontrak);
-
-    if (sudah + nominal > nilaiEfektif) {
-      throw new GagalIzin(
-        `Pembayaran melebihi nilai kontrak. Sisa yang bisa dibayar: ${rpLog(nilaiEfektif - sudah)}.`,
-      );
-    }
+    wajibLolos(
+      periksaPembayaranKontrak(
+        { contractId, nominal, uraian, metode, tanggal: null },
+        { nilaiEfektif, sudahTerbayar: sudah },
+      ),
+    );
 
     // Pembayaran vendor DISIMPAN SEBAGAI PENGELUARAN, bukan tabel tersendiri.
     // Dengan begitu satu pembayaran hanya punya satu catatan: ia muncul di
@@ -300,7 +306,8 @@ export async function hapusPembayaran(_s: HasilAksi | null, form: FormData): Pro
       },
     });
     if (!lama) return;
-    if (!lama.contractId || !lama.contract) {
+    wajibLolos(periksaHapusPembayaranKontrak({ id }, { contractId: lama.contractId }));
+    if (!lama.contract) {
       throw new GagalIzin("Pengeluaran ini bukan pembayaran kontrak.");
     }
 
@@ -352,7 +359,7 @@ export async function tambahVendor(_s: HasilAksi | null, form: FormData): Promis
     const data = bacaVendor(form);
 
     const bentrok = await prisma.vendor.count({ where: { nama: data.nama } });
-    if (bentrok) throw new GagalIzin(`Vendor bernama "${data.nama}" sudah terdaftar.`);
+    wajibLolos(periksaVendor(data, { namaBentrok: bentrok > 0 }, new Date().getFullYear()));
 
     await prisma.vendor.create({ data });
 
@@ -421,12 +428,12 @@ export async function hapusVendor(_s: HasilAksi | null, form: FormData): Promise
     const pengguna = await izinkan("progress");
 
     const { contracts, rabPembanding, equipmentSewa } = lama._count;
-    if (contracts + rabPembanding + equipmentSewa > 0) {
-      throw new GagalIzin(
-        `Vendor "${lama.nama}" masih terkait ${contracts} kontrak, ${rabPembanding} perbandingan RAB, ` +
-          `dan ${equipmentSewa} alat sewa. Ubah statusnya menjadi Nonaktif alih-alih menghapusnya.`,
-      );
-    }
+    wajibLolos(
+      periksaHapusVendor({ id }, {
+        jumlahKontrak: contracts + rabPembanding + equipmentSewa,
+        nama: lama.nama,
+      }),
+    );
 
     await prisma.vendor.delete({ where: { id } });
 
@@ -457,9 +464,6 @@ export async function hapusVendor(_s: HasilAksi | null, form: FormData): Promise
 async function bacaKontrak(form: FormData, projectId: string) {
   const jenis = pilihan(form, "jenis", JENIS_KONTRAK);
   const mulai = String(form.get("mulai") ?? "").trim();
-  const tgl = mulai ? new Date(mulai) : new Date();
-  if (Number.isNaN(tgl.getTime())) throw new GagalIzin("Tanggal mulai tidak sah.");
-
   const cakupan = [
     ...new Set(form.getAll("cakupanId").map((v) => String(v).trim()).filter(Boolean)),
   ];
@@ -474,17 +478,29 @@ async function bacaKontrak(form: FormData, projectId: string) {
     }
   }
 
+  const isi: MasukanKontrak = {
+    jenis,
+    deskripsi: teks(form, "deskripsi", true),
+    jenisBiaya: teks(form, "jenisBiaya", true),
+    mulai: mulai || null,
+    retensiPct: angka(form, "retensiPct", { min: 0, max: 100 }),
+    jatuhTempoBln: angka(form, "jatuhTempoBln", { min: 0 }),
+    cakupan,
+  };
+  wajibLolos(periksaIsiKontrak(isi));
+
   return {
     jenis,
     cakupan,
+    isi,
     data: {
       jenis,
-      jenisBiaya: pilihan(form, "jenisBiaya", JENIS_BIAYA_KONTRAK),
-      deskripsi: teks(form, "deskripsi", true),
+      jenisBiaya: isi.jenisBiaya,
+      deskripsi: isi.deskripsi,
       nominal: angka(form, "nominal", { min: 1, wajib: true }),
-      retensiPct: angka(form, "retensiPct", { min: 0, max: 100 }),
-      jatuhTempoBln: angka(form, "jatuhTempoBln", { min: 0 }),
-      mulai: tgl,
+      retensiPct: isi.retensiPct,
+      jatuhTempoBln: isi.jatuhTempoBln,
+      mulai: mulai ? new Date(mulai) : new Date(),
     },
   };
 }
@@ -505,7 +521,7 @@ export async function tambahKontrak(_s: HasilAksi | null, form: FormData): Promi
       throw new GagalIzin(`Vendor "${vendor.nama}" berstatus Nonaktif — aktifkan dulu sebelum membuat kontrak.`);
     }
 
-    const { jenis, cakupan, data } = await bacaKontrak(form, projectId);
+    const { jenis, cakupan, data, isi } = await bacaKontrak(form, projectId);
 
     // Kode SPK dibuat otomatis sesuai standar {PROYEK}/{K|S}/{TAHUN}/{urut} —
     // tidak lagi diketik bebas, supaya seluruh kontrak seragam penomorannya.
@@ -515,6 +531,13 @@ export async function tambahKontrak(_s: HasilAksi | null, form: FormData): Promi
     // sama — bukan diunggah belakangan, yang membuka celah kontrak berjalan
     // tanpa dasar tertulis.
     const spk = form.get("spk");
+    wajibLolos(
+      periksaTambahKontrak(isi, {
+        statusVendor: vendor.status,
+        namaVendor: vendor.nama,
+        adaDokumen: spk instanceof File && spk.size > 0,
+      }),
+    );
     if (!(spk instanceof File) || spk.size === 0) {
       throw new GagalIzin("Dokumen SPK wajib diunggah saat membuat kontrak.");
     }
@@ -645,7 +668,7 @@ export async function tandaiSelesai(_s: HasilAksi | null, form: FormData): Promi
     const kontrak = await prisma.contract.findUnique({
       where: { id },
       select: {
-        id: true, kode: true, projectId: true, vendorId: true,
+        id: true, kode: true, projectId: true, vendorId: true, tanggalSelesai: true,
         boqItems: { select: { id: true, volume: true, hargaSatuan: true } },
         boqUnit: {
           select: {
@@ -670,15 +693,14 @@ export async function tandaiSelesai(_s: HasilAksi | null, form: FormData): Promi
     ];
     const voItems = kontrak.variationOrders.flatMap((v) => v.items);
     const progres = progresSpk(kontrak.boqItems, kontrak.boqUnit, objekIds, voItems);
-    if (progres < 100) {
-      throw new GagalIzin(
-        "Kontrak baru bisa ditandai selesai setelah Progress Vendor SPK mencapai 100%.",
-      );
-    }
-
     const tglStr = String(form.get("tanggalSelesai") ?? "").trim();
+    wajibLolos(
+      periksaTandaiSelesai(
+        { id, tanggalSelesai: tglStr || null },
+        { progres, sudahSelesai: Boolean(kontrak.tanggalSelesai) },
+      ),
+    );
     const tgl = tglStr ? new Date(tglStr) : new Date();
-    if (Number.isNaN(tgl.getTime())) throw new GagalIzin("Tanggal selesai tidak sah.");
 
     await prisma.contract.update({ where: { id }, data: { tanggalSelesai: tgl } });
     await catat({
