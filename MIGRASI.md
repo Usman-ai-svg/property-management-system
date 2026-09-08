@@ -22,19 +22,25 @@ daftar ini, semakin mudah dipindahkan.
 
 | Lapisan | Lokasi | Baris | Bergantung pada |
 |---|---|---:|---|
-| Aturan hitung | `src/lib/calc/` | 908 | tidak ada — TypeScript murni |
-| Enum & template | `src/lib/domain/` | 387 | tidak ada — TypeScript murni |
-| Penyusun angka halaman | `src/lib/tampilan/` | 493 | tidak ada — TypeScript murni |
-| Aturan adaptor | `src/lib/adaptor/` | 489 | tidak ada — TypeScript murni |
-| Pengambilan data | `src/lib/data/` | 1.958 | Prisma |
-| Hak akses | `src/lib/auth/` | 544 | Prisma, `jose`, cookie Next.js |
-| Komponen tampilan | `src/components/` | 2.930 | React |
-| Halaman & aksi | `src/app/(app)/` | 13.576 | Next.js App Router |
+| Aturan hitung | `src/lib/calc/` | 2.170 | tidak ada — TypeScript murni |
+| Enum & template | `src/lib/domain/` | 749 | tidak ada — TypeScript murni |
+| Penyusun angka halaman | `src/lib/tampilan/` | 1.205 | tidak ada — TypeScript murni |
+| Aturan adaptor | `src/lib/adaptor/` | 757 | tidak ada — TypeScript murni |
+| Kontrak masukan aksi | `src/lib/kontrak/` | 2.647 | tidak ada — TypeScript murni |
+| Format angka & tanggal | `src/lib/format/` | 80 | tidak ada — TypeScript murni |
+| Pengambilan data | `src/lib/data/` | 3.174 | Prisma |
+| Hak akses | `src/lib/auth/` | 552 | Prisma, `jose`, cookie Next.js |
+| Komponen tampilan | `src/components/` | 4.483 | React |
+| Halaman & aksi | `src/app/(app)/` | 23.381 | Next.js App Router |
 
-Empat lapisan teratas — 2.277 baris — **tidak mengimpor apa pun dari
-framework maupun dari Prisma**. Keempatnya bisa disalin ke ERP tanpa
-perubahan sebaris pun, dan itu memang disengaja sejak awal: di situlah
-seluruh rumus bisnis berada.
+Enam lapisan teratas — **7.608 baris** — tidak mengimpor apa pun dari framework
+maupun dari Prisma, dan itu dijaga tes (`src/lib/lapisan.test.ts`). Keenamnya
+bisa disalin ke ERP tanpa perubahan sebaris pun: di situlah seluruh rumus
+bisnis, aturan enum, penyusunan angka layar, dan validasi masukan berada.
+
+Dua di antaranya lahir dari pekerjaan penyiapan migrasi ini: `kontrak/` (tipe
+masukan + validasi murni tiap aksi tulis, Kelompok B) dan `format/` yang
+dinaikkan jadi lapisan resmi (A3).
 
 Sifat ini gampang rusak tanpa terasa — satu `import` yang praktis hari ini
 membuat seluruh berkas tidak bisa dipindah tahun depan. Karena itu ada
@@ -344,7 +350,7 @@ ada sama sekali, dan apakah tabel `User`/`Role` kita dipakai atau digantikan
 
 ## 2. Model data
 
-Skema ada di `prisma/schema.prisma`, 43 model. Ini bagian yang paling
+Skema ada di `prisma/schema.prisma`, 64 model. Ini bagian yang paling
 bernilai dan paling tahan lama — kalaupun seluruh tampilan ditulis ulang,
 struktur data ini yang menentukan sistemnya benar atau tidak.
 
@@ -740,8 +746,10 @@ Seluruh `src/app/` (13.576 baris) dan `src/components/` (2.930 baris). Itu
 perakitan halaman, dan ERP punya kerangkanya sendiri.
 
 Server Actions tidak punya padanan langsung. Setiap aksi di
-`src/app/(app)/**/actions.ts` menjadi fungsi RPC Postgres — daftar lengkap 77
-aksi beserta izin dan usulan namanya ada di `KONTRAK-RPC.md`. Urutannya tidak
+`src/app/(app)/**/actions.ts` menjadi fungsi RPC Postgres — daftar lengkap
+**135 aksi** beserta izin, invarian, jejak audit, dan usulan namanya ada di
+`KONTRAK-RPC.md`; setelah peleburan jadi 93 RPC. Invarian yang harus ditegakkan
+di sisi server didaftar terpisah di `docs/invarian.md`. Urutannya tidak
 boleh berubah: periksa hak akses lebih dulu, lalu validasi, lalu simpan, lalu
 catat ke audit log.
 

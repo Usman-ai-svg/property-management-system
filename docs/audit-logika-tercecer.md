@@ -271,3 +271,13 @@ lapisan murni ia tumbuh menjadi fungsi bernama beserta penjelasan dan tesnya.
 **Ukuran yang sebenarnya penting bukan jumlah baris, melainkan bahwa tiap
 aturan bisnis sekarang hanya punya satu tempat tinggal** — dan itulah yang
 membuat penulisan ulang tampilan di ERP jadi pekerjaan mekanis.
+
+---
+
+## Catatan lanjutan (Kelompok B)
+
+Beberapa temuan A1 yang berupa aturan di dalam Server Action kini punya rumah
+kedua: `src/lib/kontrak/`. A2 memindahkan **perhitungannya**; Kelompok B
+memindahkan **validasinya**. Contoh paling jelas A1-25 dan A1-26 — total PO
+dan nominal VO kini dihitung di `calc/`, sementara syarat "tak melebihi sisa"
+dan "nilai VO bukan nol" ada di `kontrak/`.
