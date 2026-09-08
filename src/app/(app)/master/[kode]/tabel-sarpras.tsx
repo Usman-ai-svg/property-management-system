@@ -7,6 +7,7 @@ import { Badge, WARNA_STATUS } from "@/components/ui";
 import { rp } from "@/lib/format";
 import { JENIS_SARPRAS, STATUS_SARPRAS } from "@/lib/domain/enums";
 import { AksiSarpras } from "./editors";
+import { totalKolomRabRap } from "@/lib/tampilan/master";
 
 export interface BarisSarpras {
   id: string;
@@ -64,10 +65,10 @@ export function TabelSarpras({
               <tr style={{ fontWeight: 700, borderTop: "2px solid var(--line)", background: "var(--rona-baris)" }}>
                 <td colSpan={4}>TOTAL</td>
                 <td className="num" style={{ textAlign: "right", color: "var(--brass)" }}>
-                  {rp(rows.reduce((s, x) => s + (x.rab ?? 0), 0))}
+                  {rp(totalKolomRabRap(rows).rab)}
                 </td>
                 <td className="num" style={{ textAlign: "right", color: "var(--brass)" }}>
-                  {rp(rows.reduce((s, x) => s + (x.rap ?? 0), 0))}
+                  {rp(totalKolomRabRap(rows).rap)}
                 </td>
                 {ubahSarprasData && <td />}
               </tr>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Check, FileText, X } from "lucide-react";
 import { ambilPengguna, bolehLihat } from "@/lib/auth/rbac";
 import { dataLandbank } from "@/lib/data/landbank";
-import { rataRasioEfektif, susunBarisLandbank } from "@/lib/tampilan/landbank";
+import { rataRasioEfektif, susunBarisLandbank, totalLandbank } from "@/lib/tampilan/landbank";
 import { m2, pct, rp } from "@/lib/format";
 import { Badge, TabelHead, Track, WARNA_STATUS } from "@/components/ui";
 import { Tabel } from "@/components/kartu-tabel";
@@ -20,11 +20,12 @@ export default async function Landbank() {
   const { proyek, rencana } = await dataLandbank(pengguna);
 
   const baris = susunBarisLandbank(proyek, rencana);
+  const totalLb = totalLandbank(baris, bolehHarga);
 
   const kpi: [string, string][] = [
     ["Total Proyek", String(baris.length)],
-    ["Total Luas Lahan", m2(baris.reduce((s, p) => s + p.luasTotal, 0))],
-    ["Total Biaya Perolehan", bolehHarga ? rp(baris.reduce((s, p) => s + p.perolehan, 0)) : "—"],
+    ["Total Luas Lahan", m2(totalLb.luas)],
+    ["Total Biaya Perolehan", bolehHarga ? rp(totalLb.perolehan) : "—"],
     [
       "Rata Kavling Efektif",
       baris.length ? pct(rataRasioEfektif(baris), 1) : "—",

@@ -12,6 +12,7 @@ import { Badge, Kartu, Petunjuk, TabelHead, Terbatas, Track, WARNA_STATUS } from
 import { RingkasOpname } from "@/components/opname-spk";
 import { HapusBarisBoq, ImporBoqSpk, TambahBarisBoq, UbahBarisBoq } from "./editors-boq";
 import { BatalSelesai, TandaiSelesai } from "../../editors";
+import { totalBaris } from "@/lib/calc/boq";
 
 /**
  * Detail satu SPK — ringkasan kontrak.
@@ -93,14 +94,14 @@ export default async function DetailKontrak({
   }));
   const semuaObjek = [...objekUnit, ...objekSarpras];
   const semuaBaris = semuaObjek.flatMap((o) => o.baris);
-  const nilaiBoq = semuaBaris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
+  const nilaiBoq = totalBaris(semuaBaris);
   const terpasang = nilaiTerpasang(semuaBaris);
   // Progress Vendor SPK keseluruhan — dasar tombol "Tandai Selesai" (aktif 100%).
   const progresKontrak = semuaBaris.length ? progresTertimbang(semuaBaris) : 0;
 
   const template = kontrak.boqItems;
   const adaTemplate = template.length > 0;
-  const nilaiTemplate = template.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
+  const nilaiTemplate = totalBaris(template);
 
   // Objek yang dikontrakkan, untuk baris "Unit terkontrak" pada Deskripsi SPK.
   const objekLabel = semuaObjek.map((o) => (o.fase !== "—" ? `${o.fase}-${o.unit}` : o.unit));
@@ -223,7 +224,7 @@ export default async function DetailKontrak({
           kosong="SPK ini belum mencakup unit atau sarana & prasarana mana pun."
         >
           {semuaObjek.map((o) => {
-            const nilai = o.baris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
+            const nilai = totalBaris(o.baris);
             // Progres objek dalam SPK diturunkan MURNI dari BOQ SPK ini — bukan
             // dari Unit.progress (agregat lintas SPK). Belum ada baris/opname → 0%.
             const progres = progresTertimbang(o.baris);

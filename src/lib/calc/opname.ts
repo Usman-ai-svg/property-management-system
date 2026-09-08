@@ -55,7 +55,17 @@ export interface BarisOpnameTerisi extends BarisOpnameInput {
   progressLalu: number;
 }
 
-const jepit = (n: number) => (Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0);
+/**
+ * Jepit sebuah angka progres ke rentang sah 0–100.
+ *
+ * Nilai bukan-angka jadi 0, bukan NaN yang menular ke seluruh penjumlahan.
+ * Diekspor karena form opname perlu menjepit ketikan pengguna dengan aturan
+ * yang sama persis — dulu tiap komponen menuliskannya sendiri.
+ */
+export const jepitProgres = (n: number) =>
+  Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
+
+const jepit = jepitProgres;
 
 /**
  * Susun laporan opname dari baris pekerjaan yang progresnya sudah diisi.
@@ -126,6 +136,40 @@ export function ringkasOpname(rows: BarisOpname[]) {
   );
 }
 
+/** Ringkasan sebuah form opname yang sedang diisi. */
+export interface RingkasOpnamePersen {
+  /** Nilai seluruh baris: Σ volume × harga satuan. */
+  total: number;
+  /** Nilai yang sudah terpasang menurut persen tiap baris. */
+  terpasang: number;
+  /** Terpasang terhadap total, dalam persen. Total nol menghasilkan nol. */
+  persen: number;
+}
+
+/**
+ * Ringkasan nilai sebuah opname dari persen per baris yang sedang diketik.
+ *
+ * Berbeda dari `ringkasOpname`, yang meringkas laporan jadi. Ini untuk form
+ * yang belum tersimpan: penggunanya mengetik persen tiap baris, dan angka di
+ * bawah tabel harus ikut bergerak. Rumusnya dulu disalin utuh di dua komponen
+ * (opname BOQ unit dan opname SPK vendor), keduanya tanpa tes.
+ *
+ * `persenBaris` mengembalikan capaian sebuah baris (0–100); nilai di luar
+ * rentang dijepit, jadi ketikan "150" tidak membuat nilai terpasang melebihi
+ * nilai kontrak.
+ */
+export function ringkasOpnamePersen<T extends { volume: number; hargaSatuan: number }>(
+  baris: T[],
+  persenBaris: (b: T) => number,
+): RingkasOpnamePersen {
+  const total = baris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
+  const terpasang = baris.reduce(
+    (s, b) => s + b.volume * b.hargaSatuan * (jepitProgres(persenBaris(b)) / 100),
+    0,
+  );
+  return { total, terpasang, persen: total ? (terpasang / total) * 100 : 0 };
+}
+
 /**
  * Grup pekerjaan yang SEDANG berjalan, diturunkan dari progres per baris BOQ
  * Master — bukan lagi ditebak dari satu angka persen unit.
@@ -153,3 +197,22 @@ export function grupBerjalan(
     })
     .map(([grup]) => grup);
 }
+
+/**
+ * Apakah sebuah angka progres yang diketik pengguna sah untuk disimpan.
+ *
+ * Sengaja MENOLAK, bukan menjepit seperti `jepitProgres`. Bedanya penting:
+ * di form yang sedang diketik, angka nyeleneh cukup dijepit supaya
+ * ringkasannya tidak kacau; tapi pada saat menyimpan, angka nyeleneh berarti
+ * ada yang salah — dan opname adalah dasar penagihan vendor, jadi lebih baik
+ * ditolak dengan pesan daripada diam-diam diperbaiki.
+ */
+export const progresSah = (p: number): boolean => Number.isFinite(p) && p >= 0 && p <= 100;
+
+/**
+ * Progres yang disimpan selalu bilangan bulat persen.
+ *
+ * `UnitBoqItem.progress` bertipe Int, jadi pembulatan ini bukan pilihan
+ * tampilan melainkan syarat penyimpanan.
+ */
+export const bulatkanProgres = (p: number): number => Math.round(p);

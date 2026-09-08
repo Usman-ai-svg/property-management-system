@@ -10,10 +10,13 @@ import {
 } from "@/lib/actions/guard";
 import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
 import { simpanBuktiOpsional } from "@/lib/actions/bukti";
-import { alokasiPembayaran, periksaAlokasi } from "@/lib/calc/keuangan";
-import { progresSpk } from "@/lib/calc/kontrak-boq";
+import { alokasiPembayaran, periksaAlokasi, totalTerbayar, totalVoDisetujui } from "@/lib/calc/keuangan";
+import { nominalVo, progresSpk } from "@/lib/calc/kontrak-boq";
 import { nomorKontrakBaru } from "@/lib/data/vendor";
-import { JENIS_BIAYA_KONTRAK, JENIS_KONTRAK, METODE_TUNAI, POS_HPP, STATUS_VENDOR, STATUS_VO } from "@/lib/domain/enums";
+import {
+  JENIS_BIAYA_KONTRAK, JENIS_KONTRAK, METODE_TUNAI, peruntukanDariJenisKontrak, POS_HPP, STATUS_VENDOR,
+  STATUS_VO, type JenisKontrak,
+} from "@/lib/domain/enums";
 
 /**
  * Tambah Variation Order pada sebuah kontrak.
@@ -91,7 +94,7 @@ export async function tambahVo(_s: HasilAksi | null, form: FormData): Promise<Ha
     if (items.length === 0) throw new GagalIzin("Tambahkan minimal satu baris pekerjaan VO.");
 
     // Nominal VO = TURUNAN dari baris-barisnya (bisa negatif untuk pekerjaan kurang).
-    const nominal = Math.round(items.reduce((s, it) => s + it.volume * it.hargaSatuan, 0));
+    const nominal = nominalVo(items);
     if (nominal === 0) throw new GagalIzin("Total nilai VO nol — periksa baris tambah/kurang.");
 
     const nomor = `VO-${String(kontrak._count.variationOrders + 1).padStart(2, "0")}`;
@@ -205,11 +208,8 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
 
     // Pembayaran yang melampaui nilai kontrak ditolak — kelebihan bayar pada
     // kontrak borongan jauh lebih sulit ditarik kembali daripada dicegah.
-    const voDisetujui = kontrak.variationOrders
-      .filter((v) => v.status === "Disetujui")
-      .reduce((s, v) => s + v.nominal, 0);
-    const nilaiEfektif = kontrak.nominal + voDisetujui;
-    const sudah = kontrak.expenses.reduce((s, e) => s + e.total, 0);
+    const nilaiEfektif = kontrak.nominal + totalVoDisetujui(kontrak.variationOrders);
+    const sudah = totalTerbayar(kontrak);
 
     if (sudah + nominal > nilaiEfektif) {
       throw new GagalIzin(
@@ -241,7 +241,7 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
     // pembayaran ini terhitung di laporan realisasi & komposisi biaya. Nilai
     // teks lama ("Unit"/"Sarana & Prasarana") tidak cocok enum → dulu bikin
     // biaya konstruksi/sarpras luput dari laporan.
-    const peruntukan = kontrak.jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana";
+    const peruntukan = peruntukanDariJenisKontrak(kontrak.jenis as JenisKontrak);
 
     await prisma.expense.create({
       data: {

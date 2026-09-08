@@ -143,3 +143,25 @@ export function bacaPilihanOpsional<T extends string>(
   if (!sah.includes(v as T)) throw new GagalIsian(`Nilai "${v}" tidak sah untuk kolom "${nama}".`);
   return v as T;
 }
+
+/**
+ * Rakit baris dari beberapa larik sejajar.
+ *
+ * Formulir bertabel mengirim tiap kolom sebagai larik terpisah — seluruh
+ * `alokasiUnitId`, lalu seluruh `alokasiNominal`, dan seterusnya. Baris ke-i
+ * adalah nilai ke-i dari tiap larik.
+ *
+ * Panjangnya diambil dari larik TERPANJANG, bukan terpendek. Ini disengaja:
+ * kalau satu kolom lebih pendek karena isiannya kosong atau tidak terkirim,
+ * barisnya tetap ikut terbentuk dengan nilai kosong, lalu ditolak validasi
+ * dengan pesan yang jelas. Memakai yang terpendek akan membuat baris itu
+ * hilang diam-diam — dan pada pembebanan biaya, baris yang hilang berarti
+ * jumlah alokasi tidak lagi sama dengan total pembayaran.
+ */
+export function barisSejajar<T>(
+  panjangLarik: number[],
+  buat: (i: number) => T,
+): T[] {
+  const panjang = panjangLarik.length ? Math.max(...panjangLarik) : 0;
+  return Array.from({ length: panjang }, (_, i) => buat(i));
+}

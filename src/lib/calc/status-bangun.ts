@@ -53,3 +53,39 @@ export function statusBangunSarpras(progress: number): StatusSarpras {
   if (progress <= 0) return "Belum Terbangun";
   return progress < 100 ? "Progress" : "Selesai";
 }
+
+/** Sebaran progres sekumpulan objek beserta rata-ratanya. */
+export interface SebaranProgres {
+  total: number;
+  belum: number;
+  dikerjakan: number;
+  selesai: number;
+  /** Rata-rata progres, dibulatkan ke persen bulat. Tanpa objek: nol. */
+  rata: number;
+}
+
+/**
+ * Kelompokkan sekumpulan angka progres jadi belum / dikerjakan / selesai.
+ *
+ * Ambangnya sama persis dengan `statusBangunSarpras`: 0 ke bawah belum mulai,
+ * 100 ke atas selesai, sisanya sedang dikerjakan. Kesamaan itu bukan kebetulan
+ * dan tidak boleh berbeda — sebuah unit tidak boleh terhitung "dikerjakan" di
+ * kartu ringkasan sementara statusnya "Selesai" di tabel.
+ */
+export function sebaranProgres(nilai: number[]): SebaranProgres {
+  const total = nilai.length;
+  const belum = nilai.filter((p) => p <= 0).length;
+  const selesai = nilai.filter((p) => p >= 100).length;
+  return {
+    total,
+    belum,
+    selesai,
+    dikerjakan: total - belum - selesai,
+    rata: total ? Math.round(nilai.reduce((s, p) => s + p, 0) / total) : 0,
+  };
+}
+
+/** Porsi `n` terhadap `total` dalam persen bulat. Total nol menghasilkan nol. */
+export function porsiPersen(n: number, total: number): number {
+  return total ? Math.round((n / total) * 100) : 0;
+}

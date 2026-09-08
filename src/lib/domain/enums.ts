@@ -130,6 +130,22 @@ export const POS_HPP: Record<(typeof PERUNTUKAN_BIAYA)[number], string> = {
 };
 
 /**
+ * Peruntukan biaya sebuah kontrak vendor, diturunkan dari lingkupnya.
+ *
+ * Kontrak hanya punya dua lingkup, dan masing-masing membebani satu peruntukan
+ * saja: pekerjaan unit ke "Unit (rumah dijual)", pekerjaan sarpras ke
+ * "Prasarana & Sarana". Dua peruntukan lain (Perijinan, Pengolahan Lahan) tidak
+ * pernah lahir dari SPK.
+ *
+ * Ditulis sebagai fungsi karena pemetaan ini dulu diketik tangan di tiga tempat
+ * — aksi vendor, halaman vendor, dan lapisan data — sehingga peruntukan sebuah
+ * pembayaran bisa berbeda tergantung jalur mana yang menulisnya.
+ */
+export function peruntukanDariJenisKontrak(jenis: JenisKontrak): PeruntukanBiaya {
+  return jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana";
+}
+
+/**
  * Jenis biaya sebuah pengeluaran.
  *
  * "Kontraktor" berbeda kodrat dari sisanya: ia BUKAN rincian biaya, melainkan

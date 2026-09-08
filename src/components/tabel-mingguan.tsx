@@ -1,6 +1,6 @@
 import { rp } from "@/lib/format";
 import { Track } from "./ui";
-import type { BarisOpname } from "@/lib/calc/opname";
+import { ringkasOpname, type BarisOpname } from "@/lib/calc/opname";
 
 /**
  * Laporan opname mingguan.
@@ -17,8 +17,9 @@ export function TabelMingguan({
   baris: BarisOpname[];
   bolehHarga: boolean;
 }) {
-  const total = (k: keyof BarisOpname) =>
-    baris.reduce((a, r) => a + (r[k] as number), 0);
+  // Angka baris TOTAL diambil dari ringkasan yang sama dengan yang dipakai
+  // laporan tersimpan, bukan dijumlah ulang di sini.
+  const total = ringkasOpname(baris);
 
   const kolomBlok = bolehHarga ? 3 : 2;
 
@@ -134,15 +135,15 @@ export function TabelMingguan({
             <td className="frz frzedge" style={{ left: 226, width: 40 }} />
             <td style={{ textAlign: "right" }}>100,00</td>
             <td />
-            <td style={{ textAlign: "right" }}>{total("bobotLalu").toFixed(2)}</td>
-            {bolehHarga && <td style={{ textAlign: "right" }}>{rp(total("nilaiLalu"))}</td>}
+            <td style={{ textAlign: "right" }}>{total.bobotLalu.toFixed(2)}</td>
+            {bolehHarga && <td style={{ textAlign: "right" }}>{rp(total.nilaiLalu)}</td>}
             <td />
-            <td style={{ textAlign: "right" }}>{total("deltaBobot").toFixed(2)}</td>
-            {bolehHarga && <td style={{ textAlign: "right" }}>{rp(total("deltaNilai"))}</td>}
+            <td style={{ textAlign: "right" }}>{total.deltaBobot.toFixed(2)}</td>
+            {bolehHarga && <td style={{ textAlign: "right" }}>{rp(total.deltaNilai)}</td>}
             <td style={{ background: "var(--rona-teal)" }} />
-            <td style={{ textAlign: "right", background: "var(--rona-teal)" }}>{total("bobotKini").toFixed(2)}</td>
+            <td style={{ textAlign: "right", background: "var(--rona-teal)" }}>{total.bobotKini.toFixed(2)}</td>
             {bolehHarga && (
-              <td style={{ textAlign: "right", background: "var(--rona-teal)" }}>{rp(total("nilaiKini"))}</td>
+              <td style={{ textAlign: "right", background: "var(--rona-teal)" }}>{rp(total.nilaiKini)}</td>
             )}
           </tr>
         </tbody>

@@ -8,6 +8,7 @@ import { angka, GagalIzin, HasilAksi, izinkan, jalankan, teks } from "@/lib/acti
 import { nilaiBoqSeluruhObjek, periksaBarisBoqSpk } from "@/lib/calc/kontrak-boq";
 import { bacaBoqDariExcel } from "@/lib/impor-excel";
 import { mingguBaru } from "@/lib/calc/hari-kerja";
+import { bulatkanProgres, progresSah } from "@/lib/calc/opname";
 
 /**
  * BOQ SPK — model TEMPLATE + OVERRIDE.
@@ -403,10 +404,10 @@ export async function simpanProgresBoqSpk(_s: HasilAksi | null, form: FormData):
       if (isVo) {
         const lama = petaVo.get(realId);
         if (!lama) continue; // baris VO tak sah / bukan objek ini → abaikan
-        if (!Number.isFinite(p) || p < 0 || p > 100) {
+        if (!progresSah(p)) {
           throw new GagalIzin(`Progres "${lama.uraian}" harus di antara 0 dan 100 persen.`);
         }
-        const bulat = Math.round(p);
+        const bulat = bulatkanProgres(p);
         if (bulat === lama.progress) continue;
         const baru = mingguBaru(lama.progressLaluPada ?? null, sekarang);
         const progressLalu = baru ? lama.progress : lama.progressLalu;
@@ -416,10 +417,10 @@ export async function simpanProgresBoqSpk(_s: HasilAksi | null, form: FormData):
       }
 
       if (!sahId.has(realId)) continue; // form tertinggal versi lama → abaikan
-      if (!Number.isFinite(p) || p < 0 || p > 100) {
+      if (!progresSah(p)) {
         throw new GagalIzin(`Progres "${petaUraian.get(realId) ?? "baris"}" harus di antara 0 dan 100 persen.`);
       }
-      const bulat = Math.round(p);
+      const bulat = bulatkanProgres(p);
       const lama = petaOverride.get(realId);
       const progresLama = lama?.progress ?? 0;
       if (bulat === progresLama) continue;

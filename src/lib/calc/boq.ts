@@ -44,6 +44,16 @@ export const subtotal = (r: { volume: number; hargaSatuan: number }): number =>
 export const totalBaris = (rows: { volume: number; hargaSatuan: number }[]): number =>
   rows.reduce((s, r) => s + subtotal(r), 0);
 
+/**
+ * Bobot sebuah baris terhadap keseluruhan pekerjaan, dalam persen.
+ *
+ * Inilah kolom "%" pada tabel BOQ, dan dasar pembobotan opname: pekerjaan yang
+ * nilainya besar menyumbang lebih banyak pada progres. Total nol menghasilkan
+ * nol, bukan NaN yang menular ke seluruh kolom.
+ */
+export const bobotBaris = (sub: number, total: number): number =>
+  total ? (sub / total) * 100 : 0;
+
 // ---------------------------------------------------------------------------
 // Kategori RAP
 //
@@ -166,6 +176,25 @@ export const rabAcuan = (luasBangunan: number): number =>
 /** RAP acuan = 88% dari RAB acuan. */
 export const rapAcuan = (luasBangunan: number): number =>
   Math.round(rabAcuan(luasBangunan) * RASIO_RAP_TERHADAP_RAB);
+
+/**
+ * Markup harga jual bawaan terhadap RAB konstruksi.
+ *
+ * 1,42 berarti harga jual awal sebuah unit ditaruh 42% di atas biaya
+ * membangunnya — bantalan untuk tanah, perijinan, prasarana, pemasaran, dan
+ * margin. Ini angka kebijakan perusahaan, bukan rumus teknik, dan hanya nilai
+ * AWAL: begitu unit dibuat, harga jualnya bebas diubah dan tidak pernah
+ * dihitung ulang dari sini.
+ */
+export const MARKUP_HARGA_JUAL = 1.42;
+
+/**
+ * Harga jual bawaan sebuah unit baru, diturunkan dari RAB konstruksinya.
+ *
+ * Dulu ditulis langsung di dalam aksi pembuatan unit, sehingga satu-satunya
+ * cara mengetahui markup perusahaan adalah membaca kode penyimpanan unit.
+ */
+export const hargaJualAcuan = (rab: number): number => Math.round(rab * MARKUP_HARGA_JUAL);
 
 /**
  * Bangkitkan rincian material RAP untuk sebuah unit.
@@ -310,3 +339,18 @@ export function boqSarprasDefault(nama: string, jenis: string, rab: number): Bar
     urutan: i,
   }));
 }
+
+/**
+ * Apakah perubahan luas bangunan sebuah tipe unit perlu diberi tahu ke pengguna.
+ *
+ * Unit yang sudah dibuat menyimpan SNAPSHOT baris BOQ-nya sendiri; mengubah
+ * luas bangunan tipe tidak menghitung ulang RAB unit yang sudah ada. Itu
+ * memang disengaja — RAB yang sudah dipakai menagih tidak boleh berubah
+ * belakangan — tapi diam-diam membiarkannya membuat pengguna mengira seluruh
+ * unit ikut menyesuaikan.
+ */
+export const perluPeringatanLuasBangunan = (
+  luasLama: number,
+  luasBaru: number,
+  jumlahUnit: number,
+): boolean => luasLama !== luasBaru && jumlahUnit > 0;

@@ -10,6 +10,7 @@ import {
   hitungUlangProgresUnit,
 } from "@/lib/data/progres-konstruksi";
 import { mingguBaru } from "@/lib/calc/hari-kerja";
+import { bulatkanProgres, progresSah } from "@/lib/calc/opname";
 import { statusBangunSarpras, statusBangunUnit } from "@/lib/calc/status-bangun";
 
 /**
@@ -266,10 +267,10 @@ async function simpanBarisOpname(
     if (!lama) continue;
 
     const p = nilai[i];
-    if (!Number.isFinite(p) || p < 0 || p > 100) {
+    if (!progresSah(p)) {
       throw new GagalIzin(`Progres "${lama.uraian}" harus di antara 0 dan 100 persen.`);
     }
-    const bulat = Math.round(p);
+    const bulat = bulatkanProgres(p);
     if (bulat === lama.progress) continue;
 
     const baru = mingguBaru(lama.progressLaluPada, sekarang);

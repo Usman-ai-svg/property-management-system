@@ -6,6 +6,8 @@ import { detailPemasok } from "@/lib/data/estimasi";
 import { rp, tanggal } from "@/lib/format";
 import { Badge, BarisKpi, Kartu, KartuKosong } from "@/components/ui";
 import { Tabel } from "@/components/kartu-tabel";
+import { hutangPembelian, statusPembelian, totalPembelian, terbayarPembelian } from "@/lib/calc/pembelian";
+import { ringkasPemasok } from "@/lib/tampilan/estimasi";
 
 const WARNA_KATEGORI: Record<string, [string, string]> = {
   Material: ["var(--rona-biru)", "var(--blue)"],
@@ -16,8 +18,12 @@ const WARNA_AKTIF: Record<string, [string, string]> = {
   Aktif: ["var(--rona-hijau2)", "var(--green)"],
   Nonaktif: ["var(--rona-abu)", "var(--muted)"],
 };
+// Lima keadaan, sama persis dengan halaman Keuangan Proyek — satu PO tidak
+// boleh tampil beda tergantung dari mana dilihat.
 const WARNA_STATUS_PO: Record<string, [string, string]> = {
   Draft: ["var(--rona-amber)", "var(--amber)"],
+  DP: ["var(--rona-brass)", "var(--brass)"],
+  "Dibayar Penuh": ["var(--rona-ungu)", "var(--ungu)"],
   Diterima: ["var(--rona-biru)", "var(--blue)"],
   Lunas: ["var(--rona-hijau2)", "var(--green)"],
 };
@@ -33,15 +39,13 @@ export default async function DetailPemasok({ params }: { params: Promise<{ id: 
   // Ringkasan nilai: total pembelian, terbayar, dan hutang berjalan. Pembelian
   // (PO) kini dikelola di Keuangan Proyek — di sini hanya ditampilkan riwayatnya.
   const pembelian = pemasok.pembelian.map((b) => {
-    const total = b.items.reduce((s, it) => s + it.qty * it.harga, 0);
-    const terbayar = b.pembayaran.reduce((s, e) => s + e.total, 0);
-    const hutang = total - terbayar;
-    const statusTampil = total > 0 && hutang <= 0 ? "Lunas" : b.status;
+    const total = totalPembelian(b.items);
+    const terbayar = terbayarPembelian(b.pembayaran);
+    const hutang = hutangPembelian(total, terbayar);
+    const statusTampil = statusPembelian(b.status === "Diterima", total, terbayar);
     return { ...b, total, terbayar, hutang, statusTampil };
   });
-  const totalBeli = pembelian.reduce((s, b) => s + b.total, 0);
-  const totalBayar = pembelian.reduce((s, b) => s + b.terbayar, 0);
-  const totalHutang = totalBeli - totalBayar;
+  const { totalBeli, totalBayar, totalHutang } = ringkasPemasok(pembelian);
 
   return (
     <div style={{ padding: 24 }}>

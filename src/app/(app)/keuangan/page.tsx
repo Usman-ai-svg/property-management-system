@@ -11,6 +11,7 @@ import { CatatPembayaran } from "./catat-pembayaran";
 import { BreakdownKategori } from "./breakdown-kategori";
 import { KartuHutang } from "./hutang-tabel";
 import { Tabel } from "@/components/kartu-tabel";
+import { pengeluaranTerakhir, totalSisaHutang } from "@/lib/tampilan/keuangan-proyek";
 
 export default async function DashboardKeuangan() {
   const pengguna = await ambilPengguna();
@@ -23,8 +24,7 @@ export default async function DashboardKeuangan() {
   // aktif (dropdown ketat); menambah supplier baru lewat tautan ke laman Pemasok.
   const pemasokBayar = bolehCatat ? await pemasokUntukPembelian() : [];
 
-  const batas = new Date(Date.now() - 30 * 864e5);
-  const total30 = expenses.filter((e) => e.tanggal >= batas).reduce((s, e) => s + e.total, 0);
+  const total30 = pengeluaranTerakhir(expenses, 30, new Date());
 
   const aktif = proyek.filter((p) => p.status === "Dalam Pembangunan").length;
   const over = proyek.filter((p) => p.rap && p.realisasi / p.rap > 1).length;
@@ -35,7 +35,7 @@ export default async function DashboardKeuangan() {
 
   // Hutang berjalan: total sisa untuk KPI. Rinciannya (dikelompokkan per
   // supplier, dengan filter & pencarian) ada di kartu Hutang Jatuh Tempo.
-  const sisaHutang = hutang.reduce((s, h) => s + h.sisa, 0);
+  const sisaHutang = totalSisaHutang(hutang);
 
   const kpi: [string, string][] = [
     // Akrual: "Biaya" (bukan "Pengeluaran") karena memuat hutang sejak timbul,

@@ -7,10 +7,12 @@ import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, pilihanOpsional, teks, teksOpsional,
 } from "@/lib/actions/guard";
-import { bagiRata, periksaAlokasi } from "@/lib/calc/keuangan";
+import { bagiRata, periksaAlokasi, terbayarCicilan } from "@/lib/calc/keuangan";
 import { simpanBuktiOpsional } from "@/lib/actions/bukti";
 import { hapusBerkas } from "@/lib/storage";
 import { JENIS_BIAYA_SWAKELOLA, METODE_BAYAR, METODE_TUNAI, PERUNTUKAN_BIAYA, POS_HPP, SASARAN_PERUNTUKAN, STATUS_PEMBELIAN } from "@/lib/domain/enums";
+import { totalPembelian, terbayarPembelian } from "@/lib/calc/pembelian";
+import { barisSejajar } from "@/lib/adaptor/formulir";
 
 /**
  * Baca pembebanan sebuah pembayaran dari formulir.
@@ -34,12 +36,14 @@ async function bacaAlokasi(
   const sarprasIds = form.getAll("alokasiSarprasId").map((v) => String(v).trim());
   const nominals = form.getAll("alokasiNominal").map((v) => Number(String(v).trim()));
 
-  const panjang = Math.max(unitIds.length, sarprasIds.length, nominals.length);
-  const baris = Array.from({ length: panjang }, (_, i) => ({
-    unitId: unitIds[i] || null,
-    infrastructureId: sarprasIds[i] || null,
-    nominal: nominals[i] ?? 0,
-  }));
+  const baris = barisSejajar(
+    [unitIds.length, sarprasIds.length, nominals.length],
+    (i) => ({
+      unitId: unitIds[i] || null,
+      infrastructureId: sarprasIds[i] || null,
+      nominal: nominals[i] ?? 0,
+    }),
+  );
 
   const galat = periksaAlokasi(total, baris);
   if (galat) throw new GagalIzin(galat);
@@ -250,7 +254,7 @@ export async function ubahPengeluaran(_s: HasilAksi | null, form: FormData): Pro
     // kreditur/tenggatnya masih bisa dikoreksi. Total baru tak boleh turun di
     // bawah yang sudah dicicil — itu akan membuat sisa hutang jadi negatif.
     const isHutang = lama.metode === "Hutang";
-    const terbayar = lama.cicilan.reduce((s, c) => s + c.nominal, 0);
+    const terbayar = terbayarCicilan(lama.cicilan);
     if (isHutang && totalBaru < terbayar) {
       throw new GagalIzin(
         `Total tak boleh kurang dari yang sudah dicicil (${rpLog(terbayar)}).`,
@@ -605,12 +609,14 @@ async function bacaAlokasiOpsional(
   const sarprasIds = form.getAll("alokasiSarprasId").map((v) => String(v).trim());
   const nominals = form.getAll("alokasiNominal").map((v) => Number(String(v).trim()));
 
-  const panjang = Math.max(unitIds.length, sarprasIds.length, nominals.length);
-  const baris = Array.from({ length: panjang }, (_, i) => ({
-    unitId: unitIds[i] || null,
-    infrastructureId: sarprasIds[i] || null,
-    nominal: nominals[i] ?? 0,
-  })).filter((b) => b.unitId || b.infrastructureId || b.nominal > 0);
+  const baris = barisSejajar(
+    [unitIds.length, sarprasIds.length, nominals.length],
+    (i) => ({
+      unitId: unitIds[i] || null,
+      infrastructureId: sarprasIds[i] || null,
+      nominal: nominals[i] ?? 0,
+    }),
+  ).filter((b) => b.unitId || b.infrastructureId || b.nominal > 0);
 
   // Tak ada baris → biaya level proyek (perilaku lama). Sah.
   if (baris.length === 0) return [];
@@ -637,7 +643,7 @@ export async function buatPembelian(_s: HasilAksi | null, form: FormData): Promi
     const tanggal = isiTanggal ? new Date(isiTanggal) : new Date();
     const keterangan = teksOpsional(form, "keterangan");
     const items = await bacaItemPembelian(form);
-    const total = items.reduce((s, b) => s + b.qty * b.harga, 0);
+    const total = totalPembelian(items);
 
     await prisma.pembelian.create({
       data: {
@@ -750,8 +756,8 @@ export async function bayarPembelian(_s: HasilAksi | null, form: FormData): Prom
     if (!beli) throw new GagalIzin("Pembelian tidak ditemukan.");
     const pengguna = await izinkan("keuangan", beli.projectId);
     // Sengaja TANPA gerbang status: pembayaran boleh dicatat sebelum barang datang.
-    const total = beli.items.reduce((s, b) => s + b.qty * b.harga, 0);
-    const terbayar = beli.pembayaran.reduce((s, e) => s + e.total, 0);
+    const total = totalPembelian(beli.items);
+    const terbayar = terbayarPembelian(beli.pembayaran);
     const sisa = total - terbayar;
     if (sisa <= 0) throw new GagalIzin(`Pembelian ${beli.nomor} sudah lunas.`);
 
@@ -843,7 +849,7 @@ export async function bayarHutang(_s: HasilAksi | null, form: FormData): Promise
     if (hutang.metode !== "Hutang") throw new GagalIzin("Pengeluaran ini bukan hutang.");
     const pengguna = await izinkan("keuangan", hutang.projectId);
 
-    const terbayar = hutang.cicilan.reduce((s, c) => s + c.nominal, 0);
+    const terbayar = terbayarCicilan(hutang.cicilan);
     const sisa = hutang.total - terbayar;
     if (sisa <= 0) throw new GagalIzin("Hutang ini sudah lunas.");
 

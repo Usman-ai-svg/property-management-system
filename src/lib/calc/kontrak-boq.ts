@@ -26,6 +26,25 @@ export interface BarisBoqSpk {
 export const nilaiBaris = (b: { volume: number; hargaSatuan: number }): number =>
   b.volume * b.hargaSatuan;
 
+/**
+ * Batas selisih yang masih dianggap "BOQ cocok dengan nilai SPK", dalam rupiah.
+ *
+ * Nilai SPK dan jumlah baris BOQ dihitung lewat jalur berbeda dan tiap baris
+ * dibulatkan sendiri-sendiri, jadi selisih beberapa sen memang wajar. Selisih
+ * satu rupiah ke atas tidak wajar: itu tanda ada baris yang belum terinci atau
+ * volume yang keliru, dan harus terlihat oleh QS.
+ */
+export const TOLERANSI_SELISIH_BOQ = 1;
+
+/**
+ * Apakah rincian BOQ sudah menutup nilai SPK-nya.
+ *
+ * Dulu ditulis sebagai `Math.abs(selisih) < 1` di dalam komponen opname, tanpa
+ * nama dan tanpa penjelasan kenapa angkanya satu.
+ */
+export const boqCocokDenganSpk = (nilaiBoq: number, nilaiKontrak: number): boolean =>
+  Math.abs(nilaiBoq - nilaiKontrak) < TOLERANSI_SELISIH_BOQ;
+
 /** Satu baris template BOQ SPK (level kontrak). */
 export interface TemplateBoq {
   id: string;
@@ -308,3 +327,13 @@ export function periksaBarisBoqSpk(b: {
 // dan `statusSelaras` dihapus: status tidak lagi diketik lalu "diselaraskan",
 // melainkan disimpulkan seluruhnya dari progres + status jual + tanggal serah
 // terima.
+
+/**
+ * Nominal sebuah Variation Order dari baris-barisnya, dibulatkan ke rupiah.
+ *
+ * Boleh negatif — VO juga dipakai untuk pekerjaan KURANG. Karena itu nol punya
+ * arti khusus (tidak ada perubahan nilai sama sekali) dan pemanggilnya menolak
+ * VO bernilai nol, bukan menyimpannya.
+ */
+export const nominalVo = (items: { volume: number; hargaSatuan: number }[]): number =>
+  Math.round(items.reduce((s, it) => s + nilaiBaris(it), 0));

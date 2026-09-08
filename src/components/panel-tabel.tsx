@@ -4,6 +4,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 
 import { createPortal } from "react-dom";
 import { ChevronDown, Search, SlidersHorizontal } from "lucide-react";
 import { Tabel, type KolomOpsional } from "@/components/kartu-tabel";
+import { kelompokkanBaris } from "@/lib/adaptor/kelompok-tabel";
 
 /**
  * Kartu-tabel yang bisa DILIPAT, DICARI, dan DIFILTER — untuk tabel yang bisa
@@ -17,32 +18,6 @@ import { Tabel, type KolomOpsional } from "@/components/kartu-tabel";
  * `baris`, `cari`, dan `filter` berupa fungsi, jadi komponen PEMANGGILNYA harus
  * ikut client ("use client"): fungsi tidak bisa dilewatkan dari server ke klien.
  */
-
-/**
- * Kelompokkan baris menurut `grup`, diurutkan sesuai `urutanGrup` (yang tak
- * terdaftar disusun alfabetis di belakang). Dipakai bila tabel diminta
- * menampilkan baris judul kelompok yang bisa dilipat.
- */
-function kelompokkan<T>(
-  rows: T[],
-  grup: (t: T) => string,
-  urutanGrup?: readonly string[],
-): { nama: string; rows: T[] }[] {
-  const peta = new Map<string, T[]>();
-  for (const t of rows) {
-    const g = grup(t) || "Lainnya";
-    const list = peta.get(g);
-    if (list) list.push(t);
-    else peta.set(g, [t]);
-  }
-  const posisi = (n: string) => {
-    const i = urutanGrup?.indexOf(n) ?? -1;
-    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
-  };
-  return [...peta.entries()]
-    .map(([nama, r]) => ({ nama, rows: r }))
-    .sort((a, b) => posisi(a.nama) - posisi(b.nama) || a.nama.localeCompare(b.nama));
-}
 
 export interface FilterTabel<T> {
   /** Label pemilih, mis. "Kategori". */
@@ -353,7 +328,7 @@ export function PanelTabel<T>({
 
   // Baris isi tabel: berkelompok (dengan judul yang bisa dilipat) atau datar.
   const isiTabel = grup
-    ? kelompokkan(tersaring, grup, urutanGrup).flatMap(({ nama, rows }) => {
+    ? kelompokkanBaris(tersaring, grup, urutanGrup).flatMap(({ nama, rows }) => {
         const dilipat = tutupGrup[nama];
         return [
           <tr

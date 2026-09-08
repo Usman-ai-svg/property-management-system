@@ -55,3 +55,25 @@ export function ringkasEstimasi<T extends { grup: string; volume: number; hargaS
 ): RingkasEstimasi<T> {
   return { grup: rekapRabPerGrup(items), total: totalRab(items) };
 }
+
+/** Ringkasan nilai pembelian seorang pemasok. */
+export interface RingkasPemasok {
+  totalBeli: number;
+  totalBayar: number;
+  totalHutang: number;
+}
+
+/**
+ * Jumlahkan seluruh PO seorang pemasok.
+ *
+ * Hutangnya dihitung dari selisih total — bukan dijumlahkan dari hutang tiap
+ * PO — supaya kelebihan bayar pada satu PO tetap mengurangi hutang keseluruhan,
+ * persis seperti yang terjadi pada uangnya.
+ */
+export function ringkasPemasok(
+  pembelian: { total: number; terbayar: number }[],
+): RingkasPemasok {
+  const totalBeli = pembelian.reduce((s, b) => s + b.total, 0);
+  const totalBayar = pembelian.reduce((s, b) => s + b.terbayar, 0);
+  return { totalBeli, totalBayar, totalHutang: totalBeli - totalBayar };
+}

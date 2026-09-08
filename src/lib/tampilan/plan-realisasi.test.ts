@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { kpiPlanRealisasi, TOLERANSI_SERAPAN, warnaSerapan } from "./plan-realisasi";
+import { cacahMelampaui, kpiPlanRealisasi, TOLERANSI_SERAPAN, warnaSerapan } from "./plan-realisasi";
 
 describe("kpiPlanRealisasi", () => {
   const sales = [
@@ -60,5 +60,37 @@ describe("warnaSerapan", () => {
     assert.equal(warnaSerapan(progres + TOLERANSI_SERAPAN + 0.001, progres), "var(--red)");
     assert.equal(warnaSerapan(progres + TOLERANSI_SERAPAN, progres), "var(--amber)");
     assert.equal(warnaSerapan(progres - TOLERANSI_SERAPAN, progres), "var(--green)");
+  });
+});
+
+describe("cacahMelampaui", () => {
+  const progres = 0.5;
+
+  it("mencacah pos yang serapannya mendahului progres", () => {
+    const biaya = [
+      { plan: 100, real: 90 }, // 90% pada progres 50% — melampaui
+      { plan: 100, real: 50 }, // sejalan
+      { plan: 100, real: 10 }, // hemat
+      { plan: 100, real: 80 }, // melampaui
+    ];
+    assert.equal(cacahMelampaui(biaya, progres), 2);
+  });
+
+  it("daftar kosong menghasilkan nol, bukan galat", () => {
+    assert.equal(cacahMelampaui([], progres), 0);
+  });
+
+  it("pos tanpa rencana tidak ikut dicacah walau sudah ada realisasinya", () => {
+    // Tanpa `plan`, real/plan akan jadi Infinity — dulu ini ikut terhitung
+    // sebagai "boros" padahal yang benar: belum ada rencana untuk dilampaui.
+    assert.equal(cacahMelampaui([{ plan: 0, real: 5_000_000 }], progres), 0);
+  });
+
+  it("hasilnya sama dengan melampaui di kpiPlanRealisasi", () => {
+    const biaya = [{ plan: 100, real: 90 }, { plan: 100, real: 10 }];
+    assert.equal(
+      cacahMelampaui(biaya, progres),
+      kpiPlanRealisasi([], biaya, progres).melampaui,
+    );
   });
 });

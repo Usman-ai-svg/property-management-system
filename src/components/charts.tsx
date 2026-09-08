@@ -1,5 +1,6 @@
 import { pct, rp } from "@/lib/format";
 import { Track } from "./ui";
+import { pembagiProporsi } from "@/lib/tampilan/grafik";
 
 /** Diagram donat sederhana, digambar sebagai SVG tanpa pustaka grafik. */
 export function Donut({
@@ -9,7 +10,7 @@ export function Donut({
   data: { label: string; nilai: number; warna: string }[];
   ukuran?: number;
 }) {
-  const total = data.reduce((s, d) => s + d.nilai, 0) || 1;
+  const total = pembagiProporsi(data);
   const R = 54;
   const keliling = 2 * Math.PI * R;
   let geser = 0;
@@ -89,7 +90,7 @@ export function LegendaDonut({
 }: {
   data: { label: string; nilai: number; warna: string }[];
 }) {
-  const total = data.reduce((s, d) => s + d.nilai, 0) || 1;
+  const total = pembagiProporsi(data);
   return (
     <div style={{ flex: 1, minWidth: 220 }}>
       {data.map((d) => (

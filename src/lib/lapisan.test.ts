@@ -21,6 +21,12 @@ const LAPISAN_MURNI = [
   "src/lib/domain",
   "src/lib/tampilan",
   "src/lib/adaptor",
+  // Lapisan kelima yang resmi. Dulu `src/lib/format.ts` berdiri sendiri di luar
+  // daftar ini — murni, dipakai lapisan murni lain, tapi tidak dijaga. Dijadikan
+  // folder ber-index supaya masuk penjagaan tanpa mengubah satu pun jalur impor
+  // (`@/lib/format` tetap sama) dan supaya bisa jadi namespace tersendiri di
+  // bundel ERP.
+  "src/lib/format",
 ];
 
 /** Yang tidak boleh diimpor dari lapisan murni. */
@@ -176,7 +182,7 @@ describe("penjaga halaman tidak menyentuh Prisma", () => {
 /**
  * PENJAGA BERKAS PORTABEL DI AKAR src/lib.
  *
- * `format.ts` dan `nav.ts` tidak berada di dalam empat folder lapisan murni,
+ * `nav.ts` tidak berada di dalam folder lapisan murni,
  * tetapi ikut dipancarkan oleh `npm run bangun:portabel` karena keduanya murni
  * dan justru paling dibutuhkan UI: cara menulis rupiah, persen, dan tanggal,
  * tarif PPN 11% & all-in 10%, serta struktur menu beserta sub-bagian hak
@@ -186,7 +192,9 @@ describe("penjaga halaman tidak menyentuh Prisma", () => {
  * Prisma di sini tidak akan tertangkap oleh siapa pun — dan pemancarannya baru
  * gagal belakangan, jauh dari sebabnya. Karena itu keduanya disebut eksplisit.
  */
-const BERKAS_PORTABEL = ["src/lib/format.ts", "src/lib/nav.ts"];
+// `format` dulu ikut di sini sebagai `src/lib/format.ts`. Sekarang ia folder
+// ber-index dan sudah masuk LAPISAN_MURNI di atas, jadi tak perlu disebut dua kali.
+const BERKAS_PORTABEL = ["src/lib/nav.ts"];
 
 describe("kemurnian berkas portabel di akar src/lib", () => {
   for (const berkas of BERKAS_PORTABEL) {

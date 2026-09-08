@@ -2,6 +2,11 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import {
   alokasiKontrakSarprasTerbayar,
+  anggaranPerKategori,
+  realisasiPerKategori,
+  subtotalBiaya,
+  totalAnggaranKategori,
+  totalProyek,
   alokasiKontrakTerbayar,
   biayaLangsung,
   komposisiObjek,
@@ -221,5 +226,111 @@ describe("totalDibebankan", () => {
 
   it("nol untuk daftar kosong", () => {
     assert.equal(totalDibebankan([]), 0);
+  });
+});
+
+describe("totalProyek", () => {
+  const unit = [{ rab: 500, rap: 440 }, { rab: 300, rap: 260 }];
+  const sarpras = [{ rab: 200, rap: 180 }];
+
+  it("menjumlahkan RAB & RAP unit dan sarpras", () => {
+    const t = totalProyek(unit, sarpras, []);
+    assert.equal(t.rab, 1000);
+    assert.equal(t.rap, 880);
+  });
+
+  it("realisasi adalah seluruh pengeluaran apa adanya", () => {
+    const t = totalProyek(unit, sarpras, [{ total: 120 }, { total: 80 }]);
+    assert.equal(t.realisasi, 200);
+  });
+
+  it("proyek kosong menghasilkan nol di semua angka", () => {
+    assert.deepEqual(totalProyek([], [], []), { rab: 0, rap: 0, realisasi: 0 });
+  });
+
+  it("proyek tanpa sarpras tetap menghitung unitnya", () => {
+    assert.equal(totalProyek(unit, [], []).rab, 800);
+  });
+});
+
+describe("realisasiPerKategori", () => {
+  const peta = { Material: "Material", "Upah Borongan": "Tenaga Kerja" };
+
+  it("mengelompokkan pengeluaran menurut jenisnya", () => {
+    const hasil = realisasiPerKategori(
+      [{ jenis: "Material", total: 100 }, { jenis: "Material", total: 50 }, { jenis: "Upah Borongan", total: 70 }],
+      peta,
+    );
+    assert.deepEqual(hasil, { Material: 150, "Tenaga Kerja": 70 });
+  });
+
+  it("jenis tanpa padanan kategori DILEWATKAN, bukan masuk lain-lain", () => {
+    // "Kontraktor" adalah pekerjaan borongan di luar basis RAP; memasukkannya
+    // membuat realisasi tampak melampaui anggaran pada proyek yang diborongkan.
+    const hasil = realisasiPerKategori([{ jenis: "Kontraktor", total: 900 }], peta);
+    assert.deepEqual(hasil, {});
+  });
+
+  it("tanpa pengeluaran menghasilkan peta kosong", () => {
+    assert.deepEqual(realisasiPerKategori([], peta), {});
+  });
+});
+
+describe("anggaranPerKategori", () => {
+  const urut = ["Material", "Subkon"] as const;
+
+  it("menyusun baris urut sesuai daftar kategori", () => {
+    const baris = anggaranPerKategori(urut, { Material: 100, Subkon: 200 }, { Material: 60 });
+    assert.deepEqual(baris.map((b) => b.kategori), ["Material", "Subkon"]);
+  });
+
+  it("kategori tanpa realisasi tetap muncul dengan nol", () => {
+    const baris = anggaranPerKategori(urut, { Material: 100, Subkon: 200 }, {});
+    assert.deepEqual(baris[1], { kategori: "Subkon", rap: 200, realisasi: 0 });
+  });
+});
+
+describe("subtotalBiaya", () => {
+  const objek = [{ id: "u1", rap: 100 }, { id: "u2", rap: 200 }];
+  const langsung = new Map([["u1", 30]]);
+  const alokasi = new Map([["u2", 50]]);
+
+  it("menjumlahkan RAP, biaya langsung, dan alokasi kontrak", () => {
+    const s = subtotalBiaya(objek, (o) => o.id, (o) => o.rap, langsung, alokasi);
+    assert.deepEqual(s, { rap: 300, langsung: 30, alokasi: 50 });
+  });
+
+  it("objek tanpa catatan biaya dihitung nol, bukan dilewati", () => {
+    const s = subtotalBiaya(objek, (o) => o.id, (o) => o.rap, new Map(), new Map());
+    assert.equal(s.rap, 300);
+    assert.equal(s.langsung, 0);
+  });
+
+  it("tanpa objek sama sekali menghasilkan nol", () => {
+    assert.deepEqual(
+      subtotalBiaya([], (o: { id: string }) => o.id, () => 0, new Map(), new Map()),
+      { rap: 0, langsung: 0, alokasi: 0 },
+    );
+  });
+});
+
+describe("totalAnggaranKategori", () => {
+  it("menandai melampaui saat realisasi melebihi anggaran", () => {
+    const t = totalAnggaranKategori([
+      { kategori: "Material", rap: 100, realisasi: 120 },
+      { kategori: "Subkon", rap: 100, realisasi: 50 },
+    ]);
+    assert.equal(t.rap, 200);
+    assert.equal(t.realisasi, 170);
+    assert.equal(t.melampaui, false);
+  });
+
+  it("realisasi persis sama dengan anggaran belum dianggap melampaui", () => {
+    const t = totalAnggaranKategori([{ kategori: "Material", rap: 100, realisasi: 100 }]);
+    assert.equal(t.melampaui, false);
+  });
+
+  it("tabel kosong: nol dan tidak melampaui", () => {
+    assert.deepEqual(totalAnggaranKategori([]), { rap: 0, realisasi: 0, melampaui: false });
   });
 });

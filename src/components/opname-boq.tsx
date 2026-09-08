@@ -6,6 +6,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Tabel } from "@/components/kartu-tabel";
 import { pct, rp } from "@/lib/format";
 import type { HasilAksi } from "@/lib/actions/guard";
+import { jepitProgres, ringkasOpnamePersen } from "@/lib/calc/opname";
 
 /**
  * Opname konstruksi: QS mengisi persentase tiap baris BOQ Master Proyek.
@@ -72,14 +73,9 @@ export function OpnameBoq({
 
   const angka = (id: string) => nilai.get(id) ?? 0;
   const ubah = (id: string, v: number) =>
-    setNilai((lama) => new Map(lama).set(id, Math.max(0, Math.min(100, v))));
+    setNilai((lama) => new Map(lama).set(id, jepitProgres(v)));
 
-  const total = baris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
-  const terpasang = baris.reduce(
-    (s, b) => s + b.volume * b.hargaSatuan * (angka(b.id) / 100),
-    0,
-  );
-  const persen = total ? (terpasang / total) * 100 : 0;
+  const { total, terpasang, persen } = ringkasOpnamePersen(baris, (b) => angka(b.id));
 
   return (
     <form action={kirim}>

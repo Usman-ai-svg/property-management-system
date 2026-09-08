@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { hargaSatuanDb, rekapAnalisaDb, ringkasEstimasi, type AnalisaDb } from "./estimasi";
+import {
+  hargaSatuanDb, rekapAnalisaDb, ringkasEstimasi, ringkasPemasok, type AnalisaDb,
+} from "./estimasi";
 
 /** Analisa contoh dalam bentuk basis data (komponen menunjuk harga dasar). */
 const GALIAN: AnalisaDb = {
@@ -59,5 +61,27 @@ describe("ringkasEstimasi", () => {
     const { grup, total } = ringkasEstimasi([]);
     assert.deepEqual(grup, []);
     assert.equal(total, 0);
+  });
+});
+
+describe("ringkasPemasok", () => {
+  it("menjumlahkan seluruh PO seorang pemasok", () => {
+    const r = ringkasPemasok([
+      { total: 10_000_000, terbayar: 4_000_000 },
+      { total: 5_000_000, terbayar: 5_000_000 },
+    ]);
+    assert.deepEqual(r, { totalBeli: 15_000_000, totalBayar: 9_000_000, totalHutang: 6_000_000 });
+  });
+
+  it("kelebihan bayar satu PO mengurangi hutang keseluruhan", () => {
+    const r = ringkasPemasok([
+      { total: 10_000_000, terbayar: 12_000_000 },
+      { total: 5_000_000, terbayar: 0 },
+    ]);
+    assert.equal(r.totalHutang, 3_000_000);
+  });
+
+  it("pemasok tanpa pembelian bernilai nol", () => {
+    assert.deepEqual(ringkasPemasok([]), { totalBeli: 0, totalBayar: 0, totalHutang: 0 });
   });
 });

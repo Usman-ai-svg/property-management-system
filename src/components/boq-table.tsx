@@ -5,6 +5,7 @@ import { AlertTriangle } from "lucide-react";
 import type { HasilAksi } from "@/lib/actions/guard";
 import { rp } from "@/lib/format";
 import { ModalImpor } from "./impor";
+import { bobotBaris, totalBaris } from "@/lib/calc/boq";
 
 /**
  * Tabel BOQ dengan mode sunting menyeluruh, meniru artifact.
@@ -103,10 +104,7 @@ export function BoqTable({
   const [menyimpan, mulai] = useTransition();
 
   const kelompok = sunting ? draft : kelompokkan(baris);
-  const total = kelompok.reduce(
-    (s, g) => s + g.items.reduce((a, i) => a + i.volume * i.hargaSatuan, 0),
-    0,
-  );
+  const total = totalBaris(kelompok.flatMap((g) => g.items));
 
   const mulaiSunting = () => {
     setDraft(kelompokkan(baris).map((g) => ({ ...g, items: g.items.map((i) => ({ ...i })) })));
@@ -314,7 +312,7 @@ export function BoqTable({
                         <td className="num" style={{ textAlign: "right" }}>{rp(sub)}</td>
                       )}
                       <td style={{ textAlign: "right", color: "var(--muted)" }}>
-                        {total ? ((sub / total) * 100).toFixed(2) : "0.00"}%
+                        {bobotBaris(sub, total).toFixed(2)}%
                       </td>
                       <td style={{ whiteSpace: "normal", color: "var(--muted)", lineHeight: 1.45 }}>
                         {sunting ? isian(gi, ii, "spesifikasi") : r.spesifikasi || "—"}

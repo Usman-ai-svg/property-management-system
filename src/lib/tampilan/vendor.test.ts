@@ -1,6 +1,8 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { kpiVendor, ringkasVendor, susunBarisVendor } from "./vendor";
+import {
+  kpiVendor, kumulatifPembayaran, ringkasVendor, susunBarisVendor, totalKontrakProyek,
+} from "./vendor";
 
 const kontrak = (
   nominal: number,
@@ -103,5 +105,35 @@ describe("kpiVendor", () => {
     assert.equal(k.jumlahKontrak, 0);
     assert.equal(k.totalNilai, 0);
     assert.equal(k.belumTerbayar, 0);
+  });
+});
+
+describe("totalKontrakProyek", () => {
+  it("menjumlahkan nilai efektif dan pembayaran seluruh kontrak", () => {
+    const t = totalKontrakProyek([
+      { nilaiEfektif: 900_000_000, terbayar: 300_000_000 },
+      { nilaiEfektif: 100_000_000, terbayar: 100_000_000 },
+    ]);
+    assert.deepEqual(t, { nilai: 1_000_000_000, terbayar: 400_000_000 });
+  });
+
+  it("vendor tanpa kontrak di sebuah proyek bernilai nol", () => {
+    assert.deepEqual(totalKontrakProyek([]), { nilai: 0, terbayar: 0 });
+  });
+});
+
+describe("kumulatifPembayaran", () => {
+  it("tiap baris berisi jumlah sampai baris itu", () => {
+    assert.deepEqual(kumulatifPembayaran([{ total: 100 }, { total: 250 }, { total: 50 }]), [100, 350, 400]);
+  });
+
+  it("baris terakhir sama dengan total seluruh pembayaran", () => {
+    const bayar = [{ total: 10 }, { total: 20 }, { total: 30 }];
+    const kum = kumulatifPembayaran(bayar);
+    assert.equal(kum[kum.length - 1], 60);
+  });
+
+  it("tanpa pembayaran menghasilkan daftar kosong", () => {
+    assert.deepEqual(kumulatifPembayaran([]), []);
   });
 });

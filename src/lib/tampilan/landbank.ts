@@ -197,3 +197,62 @@ export function labelKuartal(tahun: number, kuartal: number): string {
   const rentang = ["Jan–Mar", "Apr–Jun", "Jul–Sep", "Okt–Des"][kuartal - 1] ?? "";
   return `Kuartal ${kuartal} · ${tahun} (${rentang})`;
 }
+
+/**
+ * Nominal yang sudah diterima atas penjualan sebuah unit.
+ *
+ * Dipakai untuk membandingkan pencairan terhadap harga akad. Sengaja tidak
+ * dibatasi harga jual: pencairan BISA melebihi harga akad karena biaya
+ * tambahan, dan itu diperingatkan, bukan ditolak.
+ */
+export const totalPenerimaan = (penerimaan: { nominal: number }[]): number =>
+  penerimaan.reduce((s, p) => s + p.nominal, 0);
+
+/** Total luas lahan dan biaya perolehan seluruh landbank. */
+export interface TotalLandbank {
+  luas: number;
+  perolehan: number;
+}
+
+/**
+ * Jumlahkan angka seluruh baris landbank untuk kartu KPI.
+ *
+ * `bolehHarga` menentukan apakah biaya perolehan ikut dihitung. Sama seperti di
+ * Master Proyek: peran tanpa hak atas angka harga mendapat nol, bukan angka
+ * yang disembunyikan belakangan di tampilan.
+ */
+export function totalLandbank(
+  baris: { luasTotal: number; perolehan: number }[],
+  bolehHarga: boolean,
+): TotalLandbank {
+  return {
+    luas: baris.reduce((s, p) => s + p.luasTotal, 0),
+    perolehan: bolehHarga ? baris.reduce((s, p) => s + p.perolehan, 0) : 0,
+  };
+}
+
+/** Total omzet rencana pada tiga tingkat harga: dasar, ber-PPN, dan all-in. */
+export interface TotalOmzet {
+  dasar: number;
+  ppn: number;
+  allIn: number;
+}
+
+/**
+ * Jumlahkan omzet rencana penjualan.
+ *
+ * Ketiga tingkat harga diturunkan dari harga dasar yang sama lewat fungsi yang
+ * diberikan, bukan disimpan terpisah — supaya tidak mungkin ada baris yang
+ * harga all-in-nya tidak sejalan dengan harga dasarnya.
+ */
+export function totalOmzetRencana(
+  omzet: { hargaDasar: number }[],
+  hargaPpn: (dasar: number) => number,
+  hargaAllIn: (dasar: number) => number,
+): TotalOmzet {
+  return {
+    dasar: omzet.reduce((s, u) => s + u.hargaDasar, 0),
+    ppn: omzet.reduce((s, u) => s + hargaPpn(u.hargaDasar), 0),
+    allIn: omzet.reduce((s, u) => s + hargaAllIn(u.hargaDasar), 0),
+  };
+}

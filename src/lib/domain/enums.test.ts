@@ -1,7 +1,9 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
-import { SECTIONS, SEMUA_ENUM } from "./enums";
+import {
+  JENIS_KONTRAK, peruntukanDariJenisKontrak, PERUNTUKAN_BIAYA, POS_HPP, SECTIONS, SEMUA_ENUM,
+} from "./enums";
 
 /**
  * Penjaga persiapan Postgres.
@@ -106,6 +108,33 @@ describe("berkas hasil generate untuk Postgres", () => {
       const isi = baris.match(/^\s+'(.*)',?$/);
       if (!isi) continue;
       assert.equal(isi[1].replace(/''/g, "").includes("'"), false, `nilai tidak aman: ${baris}`);
+    }
+  });
+});
+
+describe("peruntukanDariJenisKontrak", () => {
+  it("kontrak unit membebani peruntukan unit", () => {
+    assert.equal(peruntukanDariJenisKontrak("Unit"), "Unit (rumah dijual)");
+  });
+
+  it("kontrak sarpras membebani prasarana & sarana", () => {
+    assert.equal(peruntukanDariJenisKontrak("Sarpras"), "Prasarana & Sarana");
+  });
+
+  it("setiap jenis kontrak menghasilkan peruntukan yang sah", () => {
+    // Penjaga terhadap nilai teks lama seperti "Sarana & Prasarana", yang dulu
+    // tidak cocok enum sehingga biayanya luput dari laporan realisasi.
+    for (const jenis of JENIS_KONTRAK) {
+      assert.ok(
+        (PERUNTUKAN_BIAYA as readonly string[]).includes(peruntukanDariJenisKontrak(jenis)),
+        `${jenis} menghasilkan peruntukan di luar enum`,
+      );
+    }
+  });
+
+  it("peruntukan hasilnya selalu punya pos HPP", () => {
+    for (const jenis of JENIS_KONTRAK) {
+      assert.ok(POS_HPP[peruntukanDariJenisKontrak(jenis)], `${jenis} tanpa pos HPP`);
     }
   });
 });

@@ -4,6 +4,7 @@ import { segmen } from "@/lib/adaptor/rute";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
+import { totalPenerimaan } from "@/lib/tampilan/landbank";
 import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, teks, teksOpsional,
 } from "@/lib/actions/guard";
@@ -129,7 +130,7 @@ export async function simpanPembayaranJual(_s: HasilAksi | null, form: FormData)
 
     // Peringatan, bukan penolakan: pencairan bisa melebihi harga akad karena
     // biaya tambahan, dan yang tahu duduk perkaranya adalah penggunanya.
-    const sudah = unit.penerimaan.reduce((s, p) => s + p.nominal, 0);
+    const sudah = totalPenerimaan(unit.penerimaan);
     const lebih = sudah + nominal - unit.hargaJual;
 
     await prisma.salesPayment.create({

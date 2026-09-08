@@ -190,3 +190,15 @@ export function rekapPemenang(items: BarisTenderLike[]): RekapPemenang {
     perVendor: [...peta.entries()].map(([vendorId, v]) => ({ vendorId, ...v })),
   };
 }
+
+/**
+ * Nilai SPK dari baris-baris yang menang, untuk sekian objek cakupan.
+ *
+ * Model "satu BOQ berlaku untuk tiap unit": template BOQ digandakan ke SETIAP
+ * objek yang dicakup kontrak, jadi nilai SPK ikut jumlah objek supaya "Nilai
+ * BOQ Terinci" sama dengan "Nilai SPK". Salah di sini berarti seluruh kontrak
+ * bernilai sepersekian dari yang seharusnya, dan itu baru ketahuan saat opname
+ * pertama tidak pernah bisa mencapai 100%.
+ */
+export const nilaiKontrakDariMenang = (totalMenang: number, jumlahObjek: number): number =>
+  Math.round(totalMenang * jumlahObjek);

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   barisVoEfektif,
+  boqCocokDenganSpk,
+  nominalVo,
   nilaiBoqSeluruhObjek,
   nilaiTerpasang,
   periksaBarisBoqSpk,
@@ -196,5 +198,49 @@ describe("VO masuk BOQ terinci (rekonsiliasi nilai kontrak)", () => {
     // Pokok Rp20jt (0%), VO Rp20jt (100%) → tertimbang 50%.
     const voItems = [{ unitId: "U1", volume: 1, hargaSatuan: 20_000_000, progress: 100 }];
     assert.equal(progresSpk(template, [], objekIds, voItems), 50);
+  });
+});
+
+describe("boqCocokDenganSpk", () => {
+  it("selisih pecahan rupiah masih dianggap cocok", () => {
+    assert.equal(boqCocokDenganSpk(900_000_000.4, 900_000_000), true);
+  });
+
+  it("nilai persis sama tentu cocok", () => {
+    assert.equal(boqCocokDenganSpk(900_000_000, 900_000_000), true);
+  });
+
+  it("selisih satu rupiah penuh sudah tidak cocok — itu tanda baris belum terinci", () => {
+    assert.equal(boqCocokDenganSpk(900_000_001, 900_000_000), false);
+    assert.equal(boqCocokDenganSpk(899_999_999, 900_000_000), false);
+  });
+
+  it("BOQ kosong pada kontrak bernilai tidak dianggap cocok", () => {
+    assert.equal(boqCocokDenganSpk(0, 900_000_000), false);
+  });
+
+  it("dua-duanya nol dianggap cocok", () => {
+    assert.equal(boqCocokDenganSpk(0, 0), true);
+  });
+});
+
+describe("nominalVo", () => {
+  it("menjumlahkan baris dan membulatkan ke rupiah", () => {
+    assert.equal(nominalVo([{ volume: 2.5, hargaSatuan: 1_000_001 }]), 2_500_003);
+  });
+
+  it("VO pekerjaan kurang bernilai negatif", () => {
+    assert.equal(nominalVo([{ volume: -1, hargaSatuan: 5_000_000 }]), -5_000_000);
+  });
+
+  it("tambah dan kurang bisa saling meniadakan jadi nol", () => {
+    assert.equal(
+      nominalVo([{ volume: 1, hargaSatuan: 1000 }, { volume: -1, hargaSatuan: 1000 }]),
+      0,
+    );
+  });
+
+  it("tanpa baris bernilai nol", () => {
+    assert.equal(nominalVo([]), 0);
   });
 });

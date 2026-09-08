@@ -4,7 +4,7 @@ import Link from "next/link";
 import { PanelTabel, type FilterTabel } from "@/components/panel-tabel";
 import { rp, tanggal } from "@/lib/format";
 import { PERUNTUKAN_BIAYA } from "@/lib/domain/enums";
-import { statusHutang } from "@/lib/calc/keuangan";
+import { statusHutang, terbayarCicilan } from "@/lib/calc/keuangan";
 import { UbahTransaksi, HapusTransaksi } from "./ubah-transaksi";
 
 /**
@@ -184,7 +184,7 @@ export function PanelTransaksi({
                       bukti: e.bukti,
                       kreditur: e.kreditur,
                       tenggat: e.tenggat ? e.tenggat.toISOString().slice(0, 10) : null,
-                      terbayar: e.cicilan.reduce((s, c) => s + c.nominal, 0),
+                      terbayar: terbayarCicilan(e.cicilan),
                       alokasi: e.alokasi.map((a) => ({
                         unitId: a.unitId, infrastructureId: a.infrastructureId, nominal: a.nominal,
                       })),
@@ -205,7 +205,7 @@ export function PanelTransaksi({
 
 /** Penanda status pelunasan sebuah pengeluaran-hutang di daftar Transaksi. */
 function ChipHutang({ e }: { e: BarisTransaksi }) {
-  const terbayar = e.cicilan.reduce((s, c) => s + c.nominal, 0);
+  const terbayar = terbayarCicilan(e.cicilan);
   const sisa = e.total - terbayar;
   const st = statusHutang(e.total, terbayar);
   const warna = st === "Lunas" ? "var(--green)" : "var(--amber)";

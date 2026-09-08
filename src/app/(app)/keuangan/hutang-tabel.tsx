@@ -2,6 +2,7 @@
 
 import { PanelTabel } from "@/components/panel-tabel";
 import { rp } from "@/lib/format";
+import { subtotalHutang } from "@/lib/tampilan/keuangan-proyek";
 
 export type BarisHutang = {
   id: string;
@@ -58,9 +59,7 @@ export function KartuHutang({ hutang }: { hutang: BarisHutang[] }) {
       grup={(h) => h.kreditur}
       ringkasGrupSpan={3}
       ringkasGrup={(rows) => {
-        const t = rows.reduce((s, h) => s + h.total, 0);
-        const b = rows.reduce((s, h) => s + h.terbayar, 0);
-        const s = rows.reduce((a, h) => a + h.sisa, 0);
+        const { total: t, terbayar: b, sisa: s } = subtotalHutang(rows);
         return [
           rp(t),
           b > 0 ? <span style={{ color: "var(--muted)" }}>{rp(b)}</span> : "—",
@@ -101,9 +100,7 @@ export function KartuHutang({ hutang }: { hutang: BarisHutang[] }) {
         </tr>
       )}
       footer={(rows) => {
-        const t = rows.reduce((s, h) => s + h.total, 0);
-        const b = rows.reduce((s, h) => s + h.terbayar, 0);
-        const s = rows.reduce((a, h) => a + h.sisa, 0);
+        const { total: t, terbayar: b, sisa: s } = subtotalHutang(rows);
         return (
           <tr style={{ borderTop: "2px solid var(--line)" }}>
             <td colSpan={3} style={{ textAlign: "right", fontWeight: 700 }}>Total</td>

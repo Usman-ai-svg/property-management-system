@@ -73,3 +73,38 @@ export function kpiVendor<
     belumTerbayar: totalNilai - totalTerbayar,
   };
 }
+
+/** Nilai dan pembayaran seluruh kontrak vendor pada satu proyek. */
+export interface TotalKontrakProyek {
+  nilai: number;
+  terbayar: number;
+}
+
+/**
+ * Jumlahkan ringkasan beberapa kontrak jadi angka setingkat proyek.
+ *
+ * Yang dijumlahkan adalah NILAI EFEKTIF — nilai kontrak setelah VO disetujui,
+ * bukan nilai awalnya. Memakai nilai awal akan membuat pekerjaan tambah tidak
+ * pernah terlihat di ringkasan proyek.
+ */
+export function totalKontrakProyek(
+  ringkas: { nilaiEfektif: number; terbayar: number }[],
+): TotalKontrakProyek {
+  return {
+    nilai: ringkas.reduce((s, r) => s + r.nilaiEfektif, 0),
+    terbayar: ringkas.reduce((s, r) => s + r.terbayar, 0),
+  };
+}
+
+/**
+ * Deret kumulatif pembayaran, sejajar dengan daftar pembayarannya.
+ *
+ * Baris ke-i berisi jumlah pembayaran ke-0 sampai ke-i. Dipakai kolom
+ * "kumulatif" pada riwayat pembayaran kontrak, yang dulu menghitung ulang
+ * seluruh deret di dalam JSX untuk tiap baris — sekali jalan di sini,
+ * bukan sekali per baris.
+ */
+export function kumulatifPembayaran(pembayaran: { total: number }[]): number[] {
+  let jalan = 0;
+  return pembayaran.map((p) => (jalan += p.total));
+}

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { filterProyek, type Pengguna } from "@/lib/auth/rbac";
-import { jatuhTempo, ringkasKontrak, statusHutang } from "@/lib/calc/keuangan";
+import { jatuhTempo, ringkasKontrak, statusHutang, terbayarCicilan } from "@/lib/calc/keuangan";
+import { peruntukanDariJenisKontrak, type JenisKontrak } from "@/lib/domain/enums";
 import { nilaiUnit, nilaiSarpras } from "@/lib/data/proyek";
 import { rp, tanggal } from "@/lib/format";
 
@@ -168,7 +169,7 @@ export async function hutangBerjalan(u: Pengguna) {
   const sekarang = new Date();
   return rows
     .map((h) => {
-      const terbayar = h.cicilan.reduce((s, c) => s + c.nominal, 0);
+      const terbayar = terbayarCicilan(h.cicilan);
       return {
         id: h.id,
         kreditur: h.kreditur ?? "—",
@@ -386,7 +387,7 @@ export async function pintuBayar(u: Pengguna) {
           // Terkunci di form pembayaran: peruntukan mengikuti lingkup kontrak,
           // jenis biaya mengikuti jenisBiaya kontrak, pembebanan otomatis dibagi
           // ke sekian objek cakupan.
-          peruntukan: k.jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana",
+          peruntukan: peruntukanDariJenisKontrak(k.jenis as JenisKontrak),
           jenisBiaya: k.jenisBiaya,
           cakupan: k._count.units + k._count.infrastructures,
         };
@@ -410,7 +411,7 @@ export async function pintuBayar(u: Pengguna) {
       .filter((b) => b.sisa > 0),
     hutang: p.expenses
       .map((h) => {
-        const sisa = h.total - h.cicilan.reduce((s, c) => s + c.nominal, 0);
+        const sisa = h.total - terbayarCicilan(h.cicilan);
         return {
           id: h.id,
           label: `${h.kreditur ?? "—"} — ${h.uraian} · sisa ${rp(sisa)}`,

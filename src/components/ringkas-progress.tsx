@@ -1,3 +1,5 @@
+import { porsiPersen, sebaranProgres } from "@/lib/calc/status-bangun";
+
 /**
  * Ringkasan progres sekumpulan objek (unit atau sarpras) dalam gaya kartu
  * dashboard manajemen proyek: cincin capaian rata-rata di kiri, rincian status
@@ -14,13 +16,8 @@ export function RingkasProgress({
   nilai: number[];
   satuan?: string;
 }) {
-  const total = nilai.length;
-  const belum = nilai.filter((p) => p <= 0).length;
-  const selesai = nilai.filter((p) => p >= 100).length;
-  const dikerjakan = total - belum - selesai;
-  const rata = total ? Math.round(nilai.reduce((s, p) => s + p, 0) / total) : 0;
-
-  const pctDari = (n: number) => (total ? Math.round((n / total) * 100) : 0);
+  const { total, belum, selesai, dikerjakan, rata } = sebaranProgres(nilai);
+  const pctDari = (n: number) => porsiPersen(n, total);
 
   const status: [string, number, string][] = [
     ["Selesai", selesai, "var(--green)"],

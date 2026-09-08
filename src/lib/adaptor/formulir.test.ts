@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import {
-  angkaIndonesia, bacaAngka, bacaPilihan, bacaTeks, bacaTeksOpsional, GagalIsian,
+  angkaIndonesia, bacaAngka, bacaPilihan, bacaTeks, bacaTeksOpsional, barisSejajar, GagalIsian,
   type Pembaca,
 } from "./formulir";
 import { angkaDari } from "./tabel-aturan";
@@ -152,5 +152,32 @@ describe("bacaPilihan", () => {
 
   it("peka huruf besar-kecil — nilai enum harus persis", () => {
     assert.throws(() => bacaPilihan(dari({ s: "aktif" }), "s", SAH), /tidak sah/);
+  });
+});
+
+describe("barisSejajar", () => {
+  const ids = ["u1", "u2"];
+  const nominal = [100, 200];
+
+  it("merakit baris dari beberapa larik sejajar", () => {
+    const baris = barisSejajar([ids.length, nominal.length], (i) => ({ id: ids[i], nominal: nominal[i] }));
+    assert.deepEqual(baris, [{ id: "u1", nominal: 100 }, { id: "u2", nominal: 200 }]);
+  });
+
+  it("memakai larik TERPANJANG supaya baris berisian kosong tidak hilang diam-diam", () => {
+    // Kalau kolom nominal lebih pendek karena satu isian tak terkirim, barisnya
+    // tetap terbentuk dan akan ditolak validasi — bukan lenyap tanpa jejak.
+    const kurang = [100];
+    const baris = barisSejajar([ids.length, kurang.length], (i) => ({ id: ids[i], nominal: kurang[i] ?? 0 }));
+    assert.equal(baris.length, 2);
+    assert.deepEqual(baris[1], { id: "u2", nominal: 0 });
+  });
+
+  it("seluruh larik kosong menghasilkan daftar kosong", () => {
+    assert.deepEqual(barisSejajar([0, 0], (i) => i), []);
+  });
+
+  it("tanpa larik sama sekali juga kosong, bukan galat", () => {
+    assert.deepEqual(barisSejajar([], (i) => i), []);
   });
 });

@@ -2,6 +2,8 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import {
   biayaPerolehan,
+  totalLandbank,
+  totalOmzetRencana,
   kelompokKuartal,
   kuartalPeriode,
   luasTotal,
@@ -228,5 +230,41 @@ describe("kelompokKuartal", () => {
     const g = kelompokKuartal(acak);
     assert.deepEqual(g.map((t) => t.tahun), [2025, 2026]);
     assert.equal(g[0].kumulatifAkhir, 210);
+  });
+});
+
+describe("totalLandbank", () => {
+  const baris = [
+    { luasTotal: 12_000, perolehan: 3_000_000_000 },
+    { luasTotal: 8_000, perolehan: 1_500_000_000 },
+  ];
+
+  it("menjumlahkan luas dan biaya perolehan", () => {
+    assert.deepEqual(totalLandbank(baris, true), { luas: 20_000, perolehan: 4_500_000_000 });
+  });
+
+  it("tanpa hak harga, perolehan nol tapi luas tetap tampil", () => {
+    assert.deepEqual(totalLandbank(baris, false), { luas: 20_000, perolehan: 0 });
+  });
+
+  it("landbank kosong bernilai nol", () => {
+    assert.deepEqual(totalLandbank([], true), { luas: 0, perolehan: 0 });
+  });
+});
+
+describe("totalOmzetRencana", () => {
+  const ppn = (d: number) => d * 1.11;
+  const allIn = (d: number) => ppn(d) * 1.05;
+  const omzet = [{ hargaDasar: 400_000_000 }, { hargaDasar: 600_000_000 }];
+
+  it("menjumlahkan tiga tingkat harga dari harga dasar yang sama", () => {
+    const t = totalOmzetRencana(omzet, ppn, allIn);
+    assert.equal(t.dasar, 1_000_000_000);
+    assert.equal(t.ppn, ppn(1_000_000_000));
+    assert.ok(t.allIn > t.ppn && t.ppn > t.dasar);
+  });
+
+  it("rencana kosong bernilai nol di ketiga tingkat", () => {
+    assert.deepEqual(totalOmzetRencana([], ppn, allIn), { dasar: 0, ppn: 0, allIn: 0 });
   });
 });

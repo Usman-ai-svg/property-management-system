@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ExternalLink, MapPin } from "lucide-react";
 import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
-import { detailProyek, nilaiSarpras, nilaiUnit } from "@/lib/data/proyek";
+import { detailProyek } from "@/lib/data/proyek";
+import { nilaiSarpras, nilaiUnit } from "@/lib/tampilan/proyek";
+import { luasBersertifikat, totalRabRap } from "@/lib/tampilan/master";
 import { luasTotal } from "@/lib/tampilan/landbank";
 import { m2, pct, rp } from "@/lib/format";
 import { Badge, CardHead, InfoRow, Kartu, TabelHead, Terbatas, WARNA_STATUS } from "@/components/ui";
@@ -47,16 +49,16 @@ export default async function DetailProyek({ params }: { params: Promise<{ kode:
     ? `https://www.google.com/maps/search/?api=1&query=${proyek.pinLat},${proyek.pinLng}`
     : null;
 
-  const totalBersertifikat = proyek.legalitas.reduce((a, l) => a + (l.luas || 0), 0);
+  const totalBersertifikat = luasBersertifikat(proyek.legalitas);
   const nomorBerikutnya = unit.length + 1;
 
   // Total RAB & RAP se-proyek — dijumlahkan dari nilai tiap unit dan tiap item
   // sarpras (nilai per baris memakai rumus yang sama dengan yang ditampilkan di
   // tabelnya). Hanya bermakna bila peran berhak atas angka harga.
-  const totalRabUnit = bolehHarga ? unit.reduce((s, u) => s + nilaiUnit(u).rab, 0) : 0;
-  const totalRapUnit = bolehHarga ? unit.reduce((s, u) => s + nilaiUnit(u).rap, 0) : 0;
-  const totalRabSarpras = bolehHarga ? sarpras.reduce((s, x) => s + nilaiSarpras(x).rab, 0) : 0;
-  const totalRapSarpras = bolehHarga ? sarpras.reduce((s, x) => s + nilaiSarpras(x).rap, 0) : 0;
+  const {
+    rabUnit: totalRabUnit, rapUnit: totalRapUnit,
+    rabSarpras: totalRabSarpras, rapSarpras: totalRapSarpras,
+  } = totalRabRap(unit.map(nilaiUnit), sarpras.map(nilaiSarpras), bolehHarga);
 
   // Baris tabel (serializable) untuk komponen klien PanelTabel.
   const barisUnit: BarisUnit[] = unit.map((u) => ({

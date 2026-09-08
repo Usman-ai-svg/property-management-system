@@ -8,7 +8,7 @@ import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional,
 } from "@/lib/actions/guard";
 import { simpanBuktiOpsional } from "@/lib/actions/bukti";
-import { cariTransisi } from "@/lib/calc/petty-cash";
+import { cariTransisi, totalLaporan } from "@/lib/calc/petty-cash";
 import { rentangTanggal } from "@/lib/data/petty-cash";
 import {
   JENIS_BIAYA_SWAKELOLA, PERUNTUKAN_BIAYA, POS_HPP, STATUS_PETTY_CASH,
@@ -134,7 +134,7 @@ export async function reimburseLaporanPetty(_s: HasilAksi | null, form: FormData
     const transisi = cariTransisi(r.status as (typeof STATUS_PETTY_CASH)[number], "Direimburse");
     if (!transisi) throw new GagalIzin("Laporan ini belum disetujui, jadi belum bisa direimburse.");
 
-    const total = r.expenses.reduce((s, e) => s + e.total, 0);
+    const total = totalLaporan(r.expenses);
     if (total <= 0) throw new GagalIzin("Laporan kosong — tak ada yang perlu direimburse.");
 
     const { bukti, buktiKey } = await simpanBuktiOpsional(form);

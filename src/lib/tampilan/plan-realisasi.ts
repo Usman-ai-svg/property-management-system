@@ -1,13 +1,14 @@
 /**
  * Penyusunan angka halaman Plan vs Realisasi.
  *
- * Bebas framework dan bebas Prisma. Toleransi ±3 poin persen dipakai di sini
- * dan di `statusSerapan` — nilainya sengaja satu tempat supaya keduanya tidak
- * bisa bergeser sendiri-sendiri.
+ * Bebas framework dan bebas Prisma. Toleransi serapannya TIDAK didefinisikan di
+ * sini — ia milik `calc/keuangan.ts` dan hanya diteruskan ulang, supaya tidak
+ * bisa bergeser sendiri seperti dulu.
  */
 
-/** Toleransi selisih serapan terhadap progres, dalam pecahan (0,03 = 3 poin persen). */
-export const TOLERANSI_SERAPAN = 0.03;
+import { TOLERANSI_SERAPAN, tingkatSerapanPecahan } from "@/lib/calc/keuangan";
+
+export { TOLERANSI_SERAPAN };
 
 export interface BarisPenjualan {
   target: number;
@@ -46,18 +47,42 @@ export function kpiPlanRealisasi(
     targetJual: sales.reduce((s, x) => s + x.target, 0),
     realJual: sudahAkad.reduce((s, x) => s + x.real, 0),
     terjual: sudahAkad.length,
-    melampaui: biaya.filter((c) => c.plan && c.real / c.plan > progres + TOLERANSI_SERAPAN).length,
+    melampaui: cacahMelampaui(biaya, progres),
   };
 }
+
+/**
+ * Berapa pos biaya yang serapannya mendahului progres fisik melebihi toleransi.
+ *
+ * Berdiri sendiri karena halaman Landbank membutuhkan angka ini tanpa KPI
+ * lainnya — dan dulu menghitungnya sendiri dengan cara membandingkan token
+ * warna. Pos tanpa rencana (`plan` nol) tidak ikut: tidak ada yang bisa
+ * dilampaui kalau tidak ada rencananya.
+ */
+export function cacahMelampaui(biaya: BarisBiaya[], progres: number): number {
+  return biaya.filter(
+    (c) => Boolean(c.plan) && tingkatSerapanPecahan(c.real / c.plan, progres) === "Over",
+  ).length;
+}
+
+/** Token warna untuk tiap tingkat serapan. Presentasi, bukan aturan. */
+const WARNA_SERAPAN = {
+  Over: "var(--red)",
+  Sesuai: "var(--amber)",
+  Hemat: "var(--green)",
+} as const;
 
 /**
  * Warna penanda serapan sebuah pos biaya terhadap progres fisik.
  *
  * Merah berarti uang keluar mendahului pekerjaan jadi; hijau berarti hemat.
  * Mengembalikan nama token CSS, bukan hex, supaya tema ERP bisa menimpanya.
+ *
+ * Keputusannya sendiri ada di `tingkatSerapanPecahan()` — di sini tinggal
+ * memetakan hasilnya ke warna. Pemisahan ini bukan kerapian: halaman Landbank
+ * dulu mencacah pos boros dengan membandingkan `=== "var(--red)"`, sehingga
+ * mengganti nama token warna akan membuat cacahnya jadi nol tanpa galat.
  */
 export function warnaSerapan(terpakai: number, progres: number): string {
-  if (terpakai > progres + TOLERANSI_SERAPAN) return "var(--red)";
-  if (terpakai > progres - TOLERANSI_SERAPAN) return "var(--amber)";
-  return "var(--green)";
+  return WARNA_SERAPAN[tingkatSerapanPecahan(terpakai, progres)];
 }

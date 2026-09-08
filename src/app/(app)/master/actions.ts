@@ -20,7 +20,10 @@ import { bersihkanNamaFile, periksaBerkas, periksaBerkasKategori, simpanBerkas }
 import {
   JENIS_HAK_ATAS_TANAH, JENIS_SARPRAS, STATUS_JUAL, STATUS_PROYEK,
 } from "@/lib/domain/enums";
-import { buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap, rabAcuan, totalBaris } from "@/lib/calc/boq";
+import {
+  buatBoqDariTemplate, buatRapDariTemplate, hargaJualAcuan, hitungUpahRap,
+  perluPeringatanLuasBangunan, rabAcuan, totalBaris,
+} from "@/lib/calc/boq";
 import { statusBangunSarpras, statusBangunUnit } from "@/lib/calc/status-bangun";
 
 /** Segarkan halaman proyek dan ringkasan setelah perubahan. */
@@ -571,7 +574,7 @@ export async function simpanTipeUnit(_s: HasilAksi | null, form: FormData): Prom
         label: { kode: "Kode", nama: "Nama", luasBangunan: "Luas bangunan", luasTanah: "Luas tanah" },
       });
 
-      if (jml > 0 && lama.luasBangunan !== data.luasBangunan && lama._count.units > 0) {
+      if (jml > 0 && perluPeringatanLuasBangunan(lama.luasBangunan, data.luasBangunan, lama._count.units)) {
         return `Tersimpan. Catatan: ${lama._count.units} unit yang sudah ada tetap memakai RAB lamanya — baris BOQ mereka adalah snapshot.`;
       }
     } else {
@@ -864,7 +867,7 @@ export async function tambahUnit(_s: HasilAksi | null, form: FormData): Promise<
       data: {
         kode: kodeUnit, projectId: proyek.id, phaseId: fase.id, unitTypeId: tipe.id,
         nomor, luasTanah, statusPembangunan, statusJual, progress,
-        hargaJual: Math.round((dariTipe ? totalBaris(boq) : rabAcuan(tipe.luasBangunan)) * 1.42),
+        hargaJual: hargaJualAcuan(dariTipe ? totalBaris(boq) : rabAcuan(tipe.luasBangunan)),
         rapUpahVolume, rapUpahHarga,
         // Urutan diberi ulang secara eksplisit (bukan diwariskan) supaya baris
         // tetap tampil sesuai urutan sumbernya walau field `urutan` tidak ikut

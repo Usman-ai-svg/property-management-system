@@ -7,13 +7,14 @@ import {
   pembelianProyek, proyekKeuangan, WARNA_JENIS,
 } from "@/lib/data/keuangan";
 import {
-  alokasiKontrakSarprasTerbayar, alokasiKontrakTerbayar, biayaLangsung,
-  komposisiObjek, totalDibebankan, transaksiUntukObjek,
+  alokasiKontrakSarprasTerbayar, alokasiKontrakTerbayar, anggaranPerKategori, biayaLangsung,
+  komposisiObjek, realisasiPerKategori, subtotalBiaya, totalAnggaranKategori, totalDibebankan,
+  totalProyek, transaksiUntukObjek,
 } from "@/lib/tampilan/keuangan-proyek";
-import { nilaiUnit, nilaiSarpras } from "@/lib/data/proyek";
+import { nilaiSarpras, nilaiUnit } from "@/lib/tampilan/proyek";
 import { pemegangKandidat, pettyCashProyek } from "@/lib/data/petty-cash";
-import { alokasiKontrak, ringkasKontrak } from "@/lib/calc/keuangan";
-import { jumlahRapKategori, KATEGORI_DARI_JENIS, type KategoriRap } from "@/lib/calc/boq";
+import { alokasiKontrak, ringkasKontrak, statusSerapan } from "@/lib/calc/keuangan";
+import { jumlahRapKategori, KATEGORI_DARI_JENIS, KATEGORI_RAP } from "@/lib/calc/boq";
 import { pct, rp, tanggal } from "@/lib/format";
 import { RvsRAP } from "@/components/charts";
 import { Badge, Kartu, TabelHead, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
@@ -62,13 +63,11 @@ export default async function KeuanganProyek({
   // RAB & RAP proyek — dihitung lewat nilaiUnit/nilaiSarpras (fungsi yang sama
   // dengan Master Proyek & dashboard Keuangan), jadi angkanya sinkron di semua
   // halaman: mencakup unit (+ kerja tambah) dan sarpras.
-  const totalRab =
-    proyek.units.reduce((s, u) => s + nilaiUnit(u).rab, 0) +
-    proyek.infrastructures.reduce((s, x) => s + nilaiSarpras(x).rab, 0);
-  const totalRap =
-    proyek.units.reduce((s, u) => s + nilaiUnit(u).rap, 0) +
-    proyek.infrastructures.reduce((s, x) => s + nilaiSarpras(x).rap, 0);
-  const totalRealisasi = proyek.expenses.reduce((s, e) => s + e.total, 0);
+  const { rab: totalRab, rap: totalRap, realisasi: totalRealisasi } = totalProyek(
+    proyek.units.map(nilaiUnit),
+    proyek.infrastructures.map(nilaiSarpras),
+    proyek.expenses,
+  );
   const kompJenis = komposisi(proyek.expenses, "jenis");
   const kompPeruntukan = komposisi(proyek.expenses, "peruntukan");
 
@@ -81,24 +80,16 @@ export default async function KeuanganProyek({
     ...proyek.infrastructures,
   ];
   const rapKat = jumlahRapKategori(objekRap);
-  const realKat: Record<string, number> = {};
-  for (const e of proyek.expenses) {
-    const kat = KATEGORI_DARI_JENIS[e.jenis];
-    if (!kat) continue;
-    realKat[kat] = (realKat[kat] ?? 0) + e.total;
-  }
-  const anggaranKategori: { kategori: KategoriRap; rap: number; realisasi: number }[] = (
-    [
-      ["Material", rapKat.material],
-      ["Tenaga Kerja", rapKat.tenaga],
-      ["Subkon", rapKat.subkon],
-      ["Lain-lain Proyek", rapKat.lain],
-    ] as [KategoriRap, number][]
-  ).map(([kategori, rapNilai]) => ({
-    kategori,
-    rap: rapNilai,
-    realisasi: realKat[kategori] ?? 0,
-  }));
+  const anggaranKategori = anggaranPerKategori(
+    KATEGORI_RAP,
+    {
+      Material: rapKat.material,
+      "Tenaga Kerja": rapKat.tenaga,
+      Subkon: rapKat.subkon,
+      "Lain-lain Proyek": rapKat.lain,
+    },
+    realisasiPerKategori(proyek.expenses, KATEGORI_DARI_JENIS),
+  );
 
   // Satu pembayaran boleh menanggung beberapa unit, jadi angka per unit
   // dijumlahkan dari baris alokasinya — bukan dari totalnya.
@@ -112,23 +103,11 @@ export default async function KeuanganProyek({
 
   // Subtotal tabel (baris SUM). Alokasi kontrak sudah dibagi ke tiap objek, jadi
   // dijumlahkan langsung dari petanya — bukan dari nilai kontrak utuh.
-  const subUnit = proyek.units.reduce(
-    (a, u) => {
-      const rap = nilaiUnit(u).rap;
-      const langsung = langsungPerUnit.get(u.id) ?? 0;
-      const alokasi = alokasiPerUnit.get(u.id) ?? 0;
-      return { rap: a.rap + rap, langsung: a.langsung + langsung, alokasi: a.alokasi + alokasi };
-    },
-    { rap: 0, langsung: 0, alokasi: 0 },
+  const subUnit = subtotalBiaya(
+    proyek.units, (u) => u.id, (u) => nilaiUnit(u).rap, langsungPerUnit, alokasiPerUnit,
   );
-  const subSarpras = proyek.infrastructures.reduce(
-    (a, s) => {
-      const rap = nilaiSarpras(s).rap;
-      const langsung = langsungPerSarpras.get(s.id) ?? 0;
-      const alokasi = alokasiPerSarpras.get(s.id) ?? 0;
-      return { rap: a.rap + rap, langsung: a.langsung + langsung, alokasi: a.alokasi + alokasi };
-    },
-    { rap: 0, langsung: 0, alokasi: 0 },
+  const subSarpras = subtotalBiaya(
+    proyek.infrastructures, (x) => x.id, (x) => nilaiSarpras(x).rap, langsungPerSarpras, alokasiPerSarpras,
   );
 
   const transaksiUntuk = (kunci: { unitId?: string; sarprasId?: string }) =>
@@ -707,7 +686,7 @@ export default async function KeuanganProyek({
               <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 12, lineHeight: 1.6 }}>
                 Terpakai {pct(terpakai / (rap || 1), 1)} dari RAP dengan progres fisik{" "}
                 {sarprasRinci.progress}%
-                {rap > 0 && terpakai / rap > sarprasRinci.progress / 100 + 0.03 && (
+                {rap > 0 && statusSerapan(terpakai / rap, sarprasRinci.progress) === "Over" && (
                   <span style={{ color: "var(--red)", fontWeight: 600 }}> · biaya mendahului progres</span>
                 )}
               </div>
@@ -852,8 +831,7 @@ function KartuAnggaranKategori({
 }: {
   data: { kategori: string; rap: number; realisasi: number }[];
 }) {
-  const totalRapKat = data.reduce((s, d) => s + d.rap, 0);
-  const totalRealKat = data.reduce((s, d) => s + d.realisasi, 0);
+  const { rap: totalRapKat, realisasi: totalRealKat, melampaui } = totalAnggaranKategori(data);
 
   return (
     <div className="card" style={{ marginTop: 16, overflow: "hidden" }}>
@@ -891,7 +869,7 @@ function KartuAnggaranKategori({
           <td>Total</td>
           <td style={{ textAlign: "right" }}>{rp(totalRapKat)}</td>
           <td style={{ textAlign: "right" }}>{rp(totalRealKat)}</td>
-          <td style={{ textAlign: "right", color: totalRealKat > totalRapKat ? "var(--red)" : "var(--text)" }}>
+          <td style={{ textAlign: "right", color: melampaui ? "var(--red)" : "var(--text)" }}>
             {rp(totalRapKat - totalRealKat)}
           </td>
           <td />

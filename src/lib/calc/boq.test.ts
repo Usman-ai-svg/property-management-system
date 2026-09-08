@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   boqSarprasDefault, buatBoqDariTemplate, buatRapDariTemplate, hitungUpahRap,
-  kelompokkanRap, rabAcuan, rapAcuan, totalBaris,
+  bobotBaris, hargaJualAcuan, kelompokkanRap, MARKUP_HARGA_JUAL, perluPeringatanLuasBangunan,
+  rabAcuan, rapAcuan, totalBaris,
 } from "./boq";
 import { PORSI_MATERIAL_DALAM_RAP, RASIO_RAP_TERHADAP_RAB, TEMPLATE_BOQ } from "../domain/templates";
 
@@ -61,6 +62,30 @@ describe("rabAcuan", () => {
   it("naik seiring luas bangunan", () => {
     for (let i = 1; i < LUAS_TIPE.length; i++) {
       assert.ok(rabAcuan(LUAS_TIPE[i]) > rabAcuan(LUAS_TIPE[i - 1]));
+    }
+  });
+});
+
+describe("hargaJualAcuan", () => {
+  it("menaruh harga jual 42% di atas RAB", () => {
+    assert.equal(hargaJualAcuan(100_000_000), 142_000_000);
+  });
+
+  it("RAB nol menghasilkan harga nol, bukan NaN", () => {
+    assert.equal(hargaJualAcuan(0), 0);
+  });
+
+  it("dibulatkan ke rupiah penuh", () => {
+    // 1.234.567 × 1,42 = 1.753.085,14 → tidak boleh menyisakan pecahan sen.
+    const hasil = hargaJualAcuan(1_234_567);
+    assert.equal(Number.isInteger(hasil), true);
+    assert.equal(hasil, Math.round(1_234_567 * MARKUP_HARGA_JUAL));
+  });
+
+  it("selalu di atas RAB-nya selama RAB positif", () => {
+    for (const lb of LUAS_TIPE) {
+      const rab = rabAcuan(lb);
+      assert.ok(hargaJualAcuan(rab) > rab, `LB ${lb} tidak menghasilkan margin`);
     }
   });
 });
@@ -138,5 +163,36 @@ describe("boqSarprasDefault", () => {
   it("menyebut nama item pada pekerjaan utamanya", () => {
     const baris = boqSarprasDefault("Saluran Drainase", "Prasarana", 1_000_000);
     assert.ok(baris.some((b) => b.uraian.includes("Saluran Drainase")));
+  });
+});
+
+describe("bobotBaris", () => {
+  it("menghitung porsi sebuah baris terhadap keseluruhan", () => {
+    assert.equal(bobotBaris(250, 1000), 25);
+  });
+
+  it("total nol menghasilkan nol, bukan NaN yang menular ke seluruh kolom", () => {
+    assert.equal(bobotBaris(0, 0), 0);
+  });
+
+  it("seluruh bobot berjumlah seratus persen", () => {
+    const sub = [300, 500, 200];
+    const total = sub.reduce((a, b) => a + b, 0);
+    const jumlahBobot = sub.reduce((a, b) => a + bobotBaris(b, total), 0);
+    assert.ok(Math.abs(jumlahBobot - 100) < 1e-9);
+  });
+});
+
+describe("perluPeringatanLuasBangunan", () => {
+  it("perlu diberi tahu bila luas berubah dan tipe sudah punya unit", () => {
+    assert.equal(perluPeringatanLuasBangunan(45, 50, 3), true);
+  });
+
+  it("tidak perlu bila luasnya tidak berubah", () => {
+    assert.equal(perluPeringatanLuasBangunan(45, 45, 3), false);
+  });
+
+  it("tidak perlu bila tipe belum punya unit sama sekali", () => {
+    assert.equal(perluPeringatanLuasBangunan(45, 50, 0), false);
   });
 });

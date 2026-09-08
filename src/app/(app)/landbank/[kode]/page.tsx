@@ -7,9 +7,9 @@ import { businessPlanProyek, detailLandbank } from "@/lib/data/landbank";
 import { planVsRealisasi } from "@/lib/data/plan-real";
 import {
   kelompokKuartal, labelKuartal, luasTotal, ringkasRencana,
-  totalKategoriHpp, totalKategoriOps,
+  totalKategoriHpp, totalKategoriOps, totalOmzetRencana,
 } from "@/lib/tampilan/landbank";
-import { warnaSerapan } from "@/lib/tampilan/plan-realisasi";
+import { cacahMelampaui, warnaSerapan } from "@/lib/tampilan/plan-realisasi";
 import { hargaAllIn, hargaPpn, m2, pct, periodeBulan, rp, tanggal } from "@/lib/format";
 import { Badge, CardHead, InfoRow, Kartu, TabelHead, WARNA_STATUS } from "@/components/ui";
 import { MenuAksi } from "@/components/form";
@@ -167,9 +167,7 @@ export default async function DetailLandbank({
   const realHpp = new Map((pvr?.biaya ?? []).map((c) => [c.nama, c]));
   const realOps = new Map((pvr?.ops ?? []).map((o) => [o.nama, o.real]));
   const saleUnit = new Map((pvr?.sales ?? []).map((s) => [s.id, s]));
-  const melampaui = (pvr?.biaya ?? []).filter(
-    (c) => c.plan && warnaSerapan(c.real / c.plan, progres) === "var(--red)",
-  ).length;
+  const melampaui = cacahMelampaui(pvr?.biaya ?? [], progres);
 
   return (
     <div style={{ padding: 24 }}>
@@ -491,10 +489,10 @@ export default async function DetailLandbank({
                     <td colSpan={4}>TOTAL · {rencana.omzet.length} unit</td>
                     <td className="num" style={{ textAlign: "right" }}>{rp(totalOmzet)}</td>
                     <td className="num" style={{ textAlign: "right" }}>
-                      {rp(rencana.omzet.reduce((s, u) => s + hargaPpn(u.hargaDasar), 0))}
+                      {rp(totalOmzetRencana(rencana.omzet, hargaPpn, hargaAllIn).ppn)}
                     </td>
                     <td className="num" style={{ textAlign: "right" }}>
-                      {rp(rencana.omzet.reduce((s, u) => s + hargaAllIn(u.hargaDasar), 0))}
+                      {rp(totalOmzetRencana(rencana.omzet, hargaPpn, hargaAllIn).allIn)}
                     </td>
                     <td className="num" style={{ textAlign: "right" }}>
                       <span style={{ color: "var(--green)" }}>{rp(pvr?.penjualanReal ?? 0)}</span>

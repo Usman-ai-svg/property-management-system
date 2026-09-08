@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   alokasiKontrak, bagiRata, jatuhTempoRetensi, periksaAlokasi, ringkasKontrak, statusBayarKontrak, statusSerapan,
-  totalVoDisetujui, alokasiPembayaran,
+  jumlahAlokasi, selisihAlokasi, statusHutang, terbayarCicilan, tingkatSerapanPecahan,
+  TOLERANSI_SERAPAN, totalVoDisetujui,
+  alokasiPembayaran,
 } from "./keuangan";
 
 describe("statusSerapan", () => {
@@ -21,6 +23,38 @@ describe("statusSerapan", () => {
   it("memberi toleransi tiga poin persen agar tidak berkedip", () => {
     assert.equal(statusSerapan(0.52, 50), "Sesuai");
     assert.equal(statusSerapan(0.48, 50), "Sesuai");
+  });
+
+  it("memakai TOLERANSI_SERAPAN sebagai bawaan, bukan angka yang ditulis ulang", () => {
+    // Kalau nilai bawaannya pernah dilepas dari konstanta, dua baris ini akan
+    // berbeda hasilnya — itulah cacat yang dulu tersebar di empat berkas.
+    const tepatDiAmbang = 0.5 + TOLERANSI_SERAPAN + 1e-9;
+    assert.equal(statusSerapan(tepatDiAmbang, 50), "Over");
+    assert.equal(statusSerapan(tepatDiAmbang, 50, TOLERANSI_SERAPAN), "Over");
+  });
+
+  it("progres nol: serapan di atas toleransi langsung Over, belum keluar apa pun Sesuai", () => {
+    assert.equal(statusSerapan(0.04, 0), "Over");
+    // Proyek yang belum jalan dan belum mengeluarkan uang bukan "Hemat" —
+    // tidak ada penghematan yang terjadi, keduanya memang masih di titik nol.
+    assert.equal(statusSerapan(0, 0), "Sesuai");
+  });
+});
+
+describe("tingkatSerapanPecahan", () => {
+  it("memberi jawaban sama dengan statusSerapan untuk progres yang setara", () => {
+    assert.equal(tingkatSerapanPecahan(0.8, 0.5), statusSerapan(0.8, 50));
+    assert.equal(tingkatSerapanPecahan(0.5, 0.5), statusSerapan(0.5, 50));
+    assert.equal(tingkatSerapanPecahan(0.2, 0.5), statusSerapan(0.2, 50));
+  });
+
+  it("nol lawan nol dianggap Sesuai — belum ada uang keluar dan belum ada pekerjaan", () => {
+    assert.equal(tingkatSerapanPecahan(0, 0), "Sesuai");
+  });
+
+  it("tepat di ambang toleransi masih Sesuai, sedikit di atasnya Over", () => {
+    assert.equal(tingkatSerapanPecahan(0.5 + TOLERANSI_SERAPAN, 0.5), "Sesuai");
+    assert.equal(tingkatSerapanPecahan(0.5 + TOLERANSI_SERAPAN + 1e-9, 0.5), "Over");
   });
 });
 
@@ -295,5 +329,54 @@ describe("alokasiPembayaran", () => {
 
   it("mengembalikan daftar kosong bila tidak ada cakupan", () => {
     assert.deepEqual(alokasiPembayaran(100, 200, []), []);
+  });
+});
+
+describe("jumlahAlokasi & selisihAlokasi", () => {
+  it("menjumlahkan seluruh baris pembebanan", () => {
+    assert.equal(jumlahAlokasi([{ nominal: 300 }, { nominal: 700 }]), 1000);
+  });
+
+  it("tanpa baris berarti nol", () => {
+    assert.equal(jumlahAlokasi([]), 0);
+  });
+
+  it("nominal yang bukan angka dihitung nol, bukan membuat seluruhnya NaN", () => {
+    assert.equal(jumlahAlokasi([{ nominal: 500 }, { nominal: Number.NaN }]), 500);
+  });
+
+  it("selisih nol berarti seimbang", () => {
+    assert.equal(selisihAlokasi(1000, [{ nominal: 600 }, { nominal: 400 }]), 0);
+  });
+
+  it("selisih positif berarti pembebanan melebihi total", () => {
+    assert.equal(selisihAlokasi(1000, [{ nominal: 1200 }]), 200);
+  });
+
+  it("selisih negatif berarti masih kurang", () => {
+    assert.equal(selisihAlokasi(1000, [{ nominal: 400 }]), -600);
+  });
+
+  it("seimbang menurut selisihAlokasi berarti lolos periksaAlokasi", () => {
+    const baris = [{ unitId: "u1", nominal: 600 }, { unitId: "u2", nominal: 400 }];
+    assert.equal(selisihAlokasi(1000, baris), 0);
+    assert.equal(periksaAlokasi(1000, baris), null);
+  });
+});
+
+describe("terbayarCicilan", () => {
+  it("menjumlahkan seluruh cicilan", () => {
+    assert.equal(terbayarCicilan([{ nominal: 2_000_000 }, { nominal: 3_000_000 }]), 5_000_000);
+  });
+
+  it("hutang yang belum dicicil sama sekali bernilai nol", () => {
+    assert.equal(terbayarCicilan([]), 0);
+  });
+
+  it("sejalan dengan statusHutang", () => {
+    const cicilan = [{ nominal: 10_000_000 }];
+    assert.equal(statusHutang(10_000_000, terbayarCicilan(cicilan)), "Lunas");
+    assert.equal(statusHutang(20_000_000, terbayarCicilan(cicilan)), "DP");
+    assert.equal(statusHutang(20_000_000, terbayarCicilan([])), "Belum");
   });
 });

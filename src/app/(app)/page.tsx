@@ -9,6 +9,7 @@ import { statusSerapan } from "@/lib/calc/keuangan";
 import { rpRingkas } from "@/lib/format";
 import { Badge, JudulHalaman, Kpi, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { Tabel } from "@/components/kartu-tabel";
+import { proyekBerjalan, totalProgresUnit } from "@/lib/tampilan/ringkasan";
 
 export default async function Ringkasan() {
   const pengguna = await ambilPengguna();
@@ -18,9 +19,8 @@ export default async function Ringkasan() {
   const grup = await kpiSeluruhFitur(pengguna, proyek);
   const bolehKeuangan = bolehLihat(pengguna, "keuangan");
 
-  const totalProgress = proyek.reduce((s, p) => s + p.unitProgress, 0);
-  const aktif = proyek.filter((p) => p.status === "Dalam Pembangunan");
-  const tertinggi = [...aktif].sort((a, b) => b.rataProgress - a.rataProgress)[0];
+  const totalProgress = totalProgresUnit(proyek);
+  const { aktif, tertinggi } = proyekBerjalan(proyek);
 
   return (
     <div style={{ padding: "26px 28px 40px" }}>

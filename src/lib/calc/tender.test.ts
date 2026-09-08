@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  hargaTerendah, nilaiHpsBaris, nilaiMenangBaris, rekapPemenang, rekapVendor,
+  hargaTerendah, nilaiHpsBaris, nilaiKontrakDariMenang, nilaiMenangBaris, rekapPemenang, rekapVendor,
   susunPerbandingan, totalHps,
 } from "./tender";
 
@@ -144,5 +144,23 @@ describe("rekapPemenang", () => {
   });
   it("tetap melaporkan total HPS penuh termasuk baris belum diputus", () => {
     assert.equal(r.totalHps, 21_500_000);
+  });
+});
+
+describe("nilaiKontrakDariMenang", () => {
+  it("mengalikan total baris menang dengan jumlah objek cakupan", () => {
+    assert.equal(nilaiKontrakDariMenang(150_000_000, 4), 600_000_000);
+  });
+
+  it("satu objek berarti nilainya sama dengan total baris", () => {
+    assert.equal(nilaiKontrakDariMenang(150_000_000, 1), 150_000_000);
+  });
+
+  it("tanpa objek cakupan bernilai nol — pemanggilnya yang menolak", () => {
+    assert.equal(nilaiKontrakDariMenang(150_000_000, 0), 0);
+  });
+
+  it("dibulatkan ke rupiah penuh", () => {
+    assert.equal(nilaiKontrakDariMenang(333_333.4, 3), 1_000_000);
   });
 });

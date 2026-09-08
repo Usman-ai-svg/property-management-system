@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { bagiRata, periksaAlokasi } from "@/lib/calc/keuangan";
+import { bagiRata, periksaAlokasi, jumlahAlokasi, selisihAlokasi } from "@/lib/calc/keuangan";
 import { rp } from "@/lib/format";
 
 /**
@@ -72,8 +72,9 @@ export function AlokasiBiaya({
     });
   };
 
-  const jumlah = baris.reduce((s, b) => s + (Number(b.nominal) || 0), 0);
-  const selisih = jumlah - total;
+  const nominalBaris = baris.map((b) => ({ nominal: Number(b.nominal) || 0 }));
+  const jumlah = jumlahAlokasi(nominalBaris);
+  const selisih = selisihAlokasi(total, nominalBaris);
 
   const galat = periksaAlokasi(
     total,

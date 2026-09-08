@@ -6,6 +6,7 @@ import type { HasilAksi } from "@/lib/actions/guard";
 import { rp } from "@/lib/format";
 import { PORSI_LAIN_LAIN, isSubkon } from "@/lib/calc/boq";
 import { ModalImpor } from "./impor";
+import { totalBaris } from "@/lib/calc/boq";
 
 /**
  * Tabel RAP dengan EMPAT kelompok tetap, sesuai kesepakatan:
@@ -34,8 +35,7 @@ export interface BarisRapUI {
 
 const sel = { fontSize: 11, padding: "3px 6px" } as const;
 
-const jumlah = (rows: { volume: number; hargaSatuan: number }[]) =>
-  rows.reduce((s, r) => s + r.volume * r.hargaSatuan, 0);
+const jumlah = totalBaris;
 
 const barisBaru = (kategori: "Material" | "Subkon"): BarisRapUI => ({
   grup: kategori, kategori, nama: `${kategori === "Subkon" ? "Pekerjaan subkon" : "Material"} baru`,

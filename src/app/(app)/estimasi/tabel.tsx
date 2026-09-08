@@ -18,6 +18,7 @@ import {
   UbahHargaDasar, UbahPemasok, UbahRabEstimasi, type HargaDasarOpsi, type KatalogItem,
 } from "./editors";
 import { simpanBarisRabEstimasi } from "./actions";
+import { biayaKomponen, rekapAnalisa, type KelompokDasar } from "@/lib/calc/ahsp";
 
 const WARNA_STATUS: Record<string, [string, string]> = {
   Draft: ["var(--rona-amber)", "var(--amber)"],
@@ -142,11 +143,19 @@ function BarisAnalisa({
     return {
       kategori: m?.kategori ?? "—", kode: m?.kode ?? "?", uraian: m?.uraian ?? "(harga dasar terhapus)",
       satuan: m?.satuan ?? "", koefisien: k.koefisien, hargaAcuan: m?.hargaAcuan ?? 0,
-      subtotal: k.koefisien * (m?.hargaAcuan ?? 0),
+      subtotal: biayaKomponen({ koefisien: k.koefisien, hargaAcuan: m?.hargaAcuan ?? 0 }),
     };
   });
-  const langsung = rincian.reduce((s, r) => s + r.subtotal, 0);
-  const overhead = (langsung * a.overheadPct) / 100;
+  // Rumusnya milik calc/ahsp.ts — komponen tanpa harga dasar bernilai nol, jadi
+  // kelompoknya tidak berpengaruh pada jumlah.
+  const { langsung, overhead } = rekapAnalisa({
+    overheadPct: a.overheadPct,
+    komponen: rincian.map((r) => ({
+      kelompok: (r.kategori === "UPAH" || r.kategori === "ALAT" ? r.kategori : "BAHAN") as KelompokDasar,
+      koefisien: r.koefisien,
+      hargaAcuan: r.hargaAcuan,
+    })),
+  });
 
   return (
     <>

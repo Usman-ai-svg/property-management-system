@@ -6,6 +6,8 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Tabel } from "@/components/kartu-tabel";
 import { pct, rp } from "@/lib/format";
 import type { HasilAksi } from "@/lib/actions/guard";
+import { jepitProgres, ringkasOpnamePersen } from "@/lib/calc/opname";
+import { boqCocokDenganSpk } from "@/lib/calc/kontrak-boq";
 
 /**
  * Opname BOQ SPK (Progress Vendor): QS mengisi progres tiap baris pekerjaan
@@ -76,7 +78,7 @@ export function TabelOpnameSpk({
 
   const angka = (id: string) => nilai.get(id) ?? 0;
   const ubah = (id: string, v: number) =>
-    setNilai((lama) => new Map(lama).set(id, Math.max(0, Math.min(100, v))));
+    setNilai((lama) => new Map(lama).set(id, jepitProgres(v)));
 
   return (
     <form action={kirim}>
@@ -84,12 +86,7 @@ export function TabelOpnameSpk({
       <input type="hidden" name="objek" value={tujuan} />
 
       {objek.map((o) => {
-        const total = o.baris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
-        const terpasang = o.baris.reduce(
-          (s, b) => s + b.volume * b.hargaSatuan * (angka(b.id) / 100),
-          0,
-        );
-        const persen = total ? (terpasang / total) * 100 : 0;
+        const { total, terpasang, persen } = ringkasOpnamePersen(o.baris, (b) => angka(b.id));
 
         return (
           <div key={o.kunci} style={{ marginBottom: 18 }}>
@@ -233,7 +230,7 @@ export function RingkasOpname({
   if (!bolehHarga) return null;
 
   const selisih = nilaiBoq - nilaiKontrak;
-  const cocok = Math.abs(selisih) < 1;
+  const cocok = boqCocokDenganSpk(nilaiBoq, nilaiKontrak);
 
   return (
     <div className="grid grid4" style={{ gap: 12, marginBottom: 16 }}>

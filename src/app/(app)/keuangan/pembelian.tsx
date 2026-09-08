@@ -9,6 +9,7 @@ import { Tabel } from "@/components/kartu-tabel";
 import { METODE_TUNAI, PERUNTUKAN_BIAYA, SASARAN_PERUNTUKAN } from "@/lib/domain/enums";
 import { rp, tanggal, tanggalJam } from "@/lib/format";
 import { bayarPembelian, buatPembelian, hapusPembayaran, hapusPembelian, terimaPembelian } from "./actions";
+import { hutangPembelian, statusPembelian, totalPembelian, terbayarPembelian } from "@/lib/calc/pembelian";
 
 /**
  * Pembelian material (PO) sebuah proyek — SATU-SATUNYA tempat belanja material
@@ -18,7 +19,7 @@ import { bayarPembelian, buatPembelian, hapusPembayaran, hapusPembelian, terimaP
  * "Bayar" lepas dari "terima": pembayaran boleh dicatat kapan saja — DP/uang
  * muka atau pelunasan di depan sebelum barang datang, maupun termin biasa
  * setelah barang diterima. `Diterima` murni penanda barang fisik sudah datang.
- * Label status menggabungkan dua sumbu itu (lihat `statusPO`).
+ * Label status menggabungkan dua sumbu itu (lihat `statusPembelian` di calc).
  */
 
 const WARNA_STATUS_PO: Record<string, [string, string]> = {
@@ -28,20 +29,6 @@ const WARNA_STATUS_PO: Record<string, [string, string]> = {
   Diterima: ["var(--rona-biru)", "var(--blue)"],
   Lunas: ["var(--rona-hijau2)", "var(--green)"],
 };
-
-/**
- * Label status gabungan dari dua sumbu independen: barang sudah diterima?
- * (`diterima`) dan seberapa banyak sudah dibayar (`terbayar` vs `total`).
- *
- *  Belum diterima : Draft (belum bayar) · DP (sebagian) · Dibayar Penuh (lunas di muka)
- *  Sudah diterima : Diterima (masih ada sisa) · Lunas (sisa habis)
- */
-function statusPO(diterima: boolean, total: number, terbayar: number): string {
-  const lunasBayar = total > 0 && terbayar >= total;
-  if (diterima) return lunasBayar ? "Lunas" : "Diterima";
-  if (terbayar <= 0) return "Draft";
-  return lunasBayar ? "Dibayar Penuh" : "DP";
-}
 
 export interface PemasokPilih {
   id: string;
@@ -112,7 +99,7 @@ function IsianItemPembelian({ hargaDasar }: { hargaDasar: HargaDasarPilih[] }) {
     );
   };
 
-  const total = baris.reduce((s, b) => s + (Number(b.qty) || 0) * (Number(b.harga) || 0), 0);
+  const total = totalPembelian(baris.map((b) => ({ qty: Number(b.qty) || 0, harga: Number(b.harga) || 0 })));
 
   return (
     <div>
@@ -390,12 +377,12 @@ export function PanelPembelian({
   namaPengguna: string;
 }) {
   const daftar = pembelian.map((b) => {
-    const total = b.items.reduce((s, it) => s + it.qty * it.harga, 0);
-    const terbayar = b.pembayaran.reduce((s, e) => s + e.total, 0);
-    const hutang = total - terbayar;
+    const total = totalPembelian(b.items);
+    const terbayar = terbayarPembelian(b.pembayaran);
+    const hutang = hutangPembelian(total, terbayar);
     const lunas = total > 0 && hutang <= 0;
     const diterima = b.status === "Diterima";
-    const statusTampil = statusPO(diterima, total, terbayar);
+    const statusTampil = statusPembelian(diterima, total, terbayar);
     return { ...b, total, terbayar, hutang, lunas, diterima, statusTampil };
   });
 

@@ -7,6 +7,7 @@ import { Badge, WARNA_STATUS } from "@/components/ui";
 import { rp } from "@/lib/format";
 import { STATUS_JUAL, STATUS_PEMBANGUNAN } from "@/lib/domain/enums";
 import { EditUnit, HapusUnit } from "./editors";
+import { totalKolomRabRap } from "@/lib/tampilan/master";
 
 export interface BarisUnit {
   id: string;
@@ -82,10 +83,10 @@ export function TabelUnit({
               <tr style={{ fontWeight: 700, borderTop: "2px solid var(--line)", background: "var(--rona-baris)" }}>
                 <td colSpan={8}>TOTAL</td>
                 <td className="num" style={{ textAlign: "right", color: "var(--brass)" }}>
-                  {rp(rows.reduce((s, u) => s + (u.rab ?? 0), 0))}
+                  {rp(totalKolomRabRap(rows).rab)}
                 </td>
                 <td className="num" style={{ textAlign: "right", color: "var(--brass)" }}>
-                  {rp(rows.reduce((s, u) => s + (u.rap ?? 0), 0))}
+                  {rp(totalKolomRabRap(rows).rap)}
                 </td>
                 {adaAksi && <td />}
               </tr>

@@ -4,6 +4,8 @@ import { ambilPengguna, bolehLihat, bolehUbah } from "@/lib/auth/rbac";
 import { proyekUntukKontrak as ambilProyekUntukKontrak, vendorDetail } from "@/lib/data/vendor";
 import { jatuhTempo, jatuhTempoRetensi, ringkasKontrak, statusBayarKontrak } from "@/lib/calc/keuangan";
 import { progresSpk } from "@/lib/calc/kontrak-boq";
+import { kumulatifPembayaran, totalKontrakProyek } from "@/lib/tampilan/vendor";
+import { peruntukanDariJenisKontrak, type JenisKontrak } from "@/lib/domain/enums";
 import { pct, rp, tanggal } from "@/lib/format";
 import { Badge, Kartu, KartuKosong, Terbatas, Track, WARNA_STATUS } from "@/components/ui";
 import { BatalSelesai, HapusPembayaran, HapusVo, StatusVo, TambahPembayaran, TambahVo, TandaiSelesai } from "./editors";
@@ -110,8 +112,7 @@ export default async function DetailVendor({
       ) : (
         [...perProyek.entries()].map(([kodeProyek, daftar]) => {
           const ringkas = daftar.map(ringkasKontrak);
-          const nilaiProyek = ringkas.reduce((s, r) => s + r.nilaiEfektif, 0);
-          const terbayarProyek = ringkas.reduce((s, r) => s + r.terbayar, 0);
+          const { nilai: nilaiProyek, terbayar: terbayarProyek } = totalKontrakProyek(ringkas);
 
           return (
             <div key={kodeProyek} style={{ marginBottom: 20 }}>
@@ -423,7 +424,7 @@ export default async function DetailVendor({
                             <TambahPembayaran
                               contractId={k.id}
                               sisa={r.sisa}
-                              peruntukan={k.jenis === "Unit" ? "Unit (rumah dijual)" : "Prasarana & Sarana"}
+                              peruntukan={peruntukanDariJenisKontrak(k.jenis as JenisKontrak)}
                               jenisBiaya={k.jenisBiaya}
                               cakupan={k.units.length + k.infrastructures.length}
                             />
@@ -442,10 +443,8 @@ export default async function DetailVendor({
                               bolehBayar && { label: "", lebar: 70 },
                             ]}
                           >
-                            {k.expenses.map((p, i) => {
-                              const kumulatif = k.expenses
-                                .slice(0, i + 1)
-                                .reduce((s, x) => s + x.total, 0);
+                            {k.expenses.map((p, i, semua) => {
+                              const kumulatif = kumulatifPembayaran(semua)[i];
                               return (
                                 <tr key={p.id}>
                                   <td style={{ color: "var(--muted)" }}>{tanggal(p.tanggal)}</td>

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  bulatkanProgres,
   fraksiBaris,
+  progresSah,
+  jepitProgres,
+  ringkasOpnamePersen,
   grupBerjalan,
   ringkasOpname,
   susunOpname,
@@ -154,5 +158,91 @@ describe("susunOpname dari angka per baris", () => {
 
   it("mengembalikan daftar kosong bila tidak ada baris bernilai", () => {
     assert.deepEqual(susunOpname([]), []);
+  });
+});
+
+describe("jepitProgres", () => {
+  it("membiarkan nilai di dalam rentang", () => {
+    assert.equal(jepitProgres(45), 45);
+  });
+
+  it("menjepit ketikan di luar rentang", () => {
+    assert.equal(jepitProgres(150), 100);
+    assert.equal(jepitProgres(-20), 0);
+  });
+
+  it("bukan-angka jadi nol, bukan NaN yang menular ke penjumlahan", () => {
+    assert.equal(jepitProgres(Number.NaN), 0);
+    assert.equal(jepitProgres(Number.POSITIVE_INFINITY), 0);
+  });
+});
+
+describe("ringkasOpnamePersen", () => {
+  const baris = [
+    { id: "a", volume: 10, hargaSatuan: 100_000 },  // 1.000.000
+    { id: "b", volume: 5, hargaSatuan: 200_000 },   // 1.000.000
+  ];
+
+  it("menjumlahkan nilai seluruh baris", () => {
+    assert.equal(ringkasOpnamePersen(baris, () => 0).total, 2_000_000);
+  });
+
+  it("menghitung nilai terpasang menurut persen tiap baris", () => {
+    const r = ringkasOpnamePersen(baris, (b) => (b.id === "a" ? 50 : 0));
+    assert.equal(r.terpasang, 500_000);
+    assert.equal(r.persen, 25);
+  });
+
+  it("seluruh baris seratus persen berarti terpasang penuh", () => {
+    const r = ringkasOpnamePersen(baris, () => 100);
+    assert.equal(r.terpasang, r.total);
+    assert.equal(r.persen, 100);
+  });
+
+  it("daftar kosong menghasilkan nol, bukan pembagian nol", () => {
+    assert.deepEqual(ringkasOpnamePersen([], () => 50), { total: 0, terpasang: 0, persen: 0 });
+  });
+
+  it("baris bernilai nol tidak membuat persen jadi NaN", () => {
+    const r = ringkasOpnamePersen([{ id: "x", volume: 0, hargaSatuan: 0 }], () => 100);
+    assert.equal(r.persen, 0);
+  });
+
+  it("persen di luar rentang dijepit — terpasang tak pernah melebihi total", () => {
+    const r = ringkasOpnamePersen(baris, () => 150);
+    assert.equal(r.terpasang, r.total);
+    assert.equal(r.persen, 100);
+  });
+});
+
+describe("progresSah", () => {
+  it("menerima seluruh rentang 0 sampai 100", () => {
+    for (const p of [0, 0.5, 50, 99.9, 100]) assert.equal(progresSah(p), true, String(p));
+  });
+
+  it("menolak di luar rentang — opname dasar penagihan, jadi ditolak bukan dijepit", () => {
+    assert.equal(progresSah(-1), false);
+    assert.equal(progresSah(101), false);
+  });
+
+  it("menolak bukan-angka", () => {
+    assert.equal(progresSah(Number.NaN), false);
+    assert.equal(progresSah(Number.POSITIVE_INFINITY), false);
+  });
+
+  it("berbeda sikap dengan jepitProgres pada nilai yang sama", () => {
+    assert.equal(progresSah(150), false);
+    assert.equal(jepitProgres(150), 100);
+  });
+});
+
+describe("bulatkanProgres", () => {
+  it("membulatkan ke persen bulat karena kolomnya bertipe Int", () => {
+    assert.equal(bulatkanProgres(49.4), 49);
+    assert.equal(bulatkanProgres(49.5), 50);
+  });
+
+  it("nilai bulat tidak berubah", () => {
+    assert.equal(bulatkanProgres(100), 100);
   });
 });

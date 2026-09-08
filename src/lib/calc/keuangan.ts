@@ -6,17 +6,57 @@
 export type StatusSerapan = "Hemat" | "Sesuai" | "Over";
 
 /**
+ * Toleransi selisih serapan terhadap progres, dalam pecahan (0,03 = 3 poin
+ * persen).
+ *
+ * SATU-SATUNYA tempat angka ini boleh ditulis. Ia pernah hidup di empat tempat
+ * sekaligus — nilai bawaan `statusSerapan`, konstanta kembar di
+ * `tampilan/plan-realisasi.ts`, dan dua halaman yang menuliskan `0.03`
+ * langsung. Menggesernya waktu itu berarti tiga tempat diam-diam tertinggal,
+ * tanpa satu tes pun jatuh.
+ */
+export const TOLERANSI_SERAPAN = 0.03;
+
+/**
  * Bandingkan serapan anggaran terhadap progres fisik.
  *
  * Serapan 60% pada progres 60% berarti "Sesuai". Serapan jauh mendahului
  * progres berarti "Over" — uang keluar lebih cepat daripada pekerjaan jadi.
  * Toleransi ±3 poin persen supaya tidak berkedip karena pembulatan.
+ *
+ * PERHATIKAN SATUANNYA: `terpakai` pecahan (0,6 = 60% anggaran terserap),
+ * `progres` persen (60 = 60% pekerjaan jadi). Beda satuan ini sengaja
+ * dipertahankan karena itulah bentuk data yang datang dari database, tapi ia
+ * gampang salah dipakai — lihat `tingkatSerapanPecahan()` bila kedua sisimu
+ * sudah berbentuk pecahan.
  */
-export function statusSerapan(terpakai: number, progres: number, toleransi = 0.03): StatusSerapan {
+export function statusSerapan(
+  terpakai: number,
+  progres: number,
+  toleransi = TOLERANSI_SERAPAN,
+): StatusSerapan {
   const acuan = progres / 100;
   if (terpakai > acuan + toleransi) return "Over";
   if (terpakai > acuan - toleransi) return "Sesuai";
   return "Hemat";
+}
+
+/**
+ * Sama dengan `statusSerapan`, untuk pemanggil yang progresnya sudah berbentuk
+ * pecahan (0,6 = 60%). Dipakai halaman Landbank dan Plan vs Realisasi, yang
+ * memang menyimpan progres sebagai pecahan.
+ */
+export function tingkatSerapanPecahan(
+  terpakai: number,
+  progres: number,
+  toleransi = TOLERANSI_SERAPAN,
+): StatusSerapan {
+  return statusSerapan(terpakai, progres * 100, toleransi);
+}
+
+/** Yang sudah dicicil atas sebuah pengeluaran-hutang. */
+export function terbayarCicilan(cicilan: { nominal: number }[]): number {
+  return cicilan.reduce((s, c) => s + c.nominal, 0);
 }
 
 /**
@@ -217,6 +257,25 @@ export interface BarisAlokasi {
  *
  * Mengembalikan pesan kesalahan, atau null bila sudah benar.
  */
+/**
+ * Jumlah seluruh baris pembebanan.
+ *
+ * Nominal yang bukan angka dihitung nol, supaya form yang sedang diketik
+ * ("12x") tidak membuat seluruh jumlah jadi NaN dan pesan seimbang/tidaknya
+ * ikut hilang.
+ */
+export function jumlahAlokasi(baris: { nominal: number }[]): number {
+  return baris.reduce((s, b) => s + (Number.isFinite(b.nominal) ? b.nominal : 0), 0);
+}
+
+/**
+ * Selisih pembebanan terhadap totalnya. Positif berarti lebih, negatif kurang,
+ * nol berarti seimbang — dan hanya nol yang boleh disimpan.
+ */
+export function selisihAlokasi(total: number, baris: { nominal: number }[]): number {
+  return jumlahAlokasi(baris) - total;
+}
+
 export function periksaAlokasi(total: number, baris: BarisAlokasi[]): string | null {
   if (baris.length === 0) return "Pembayaran harus dibebankan ke setidaknya satu tujuan.";
 

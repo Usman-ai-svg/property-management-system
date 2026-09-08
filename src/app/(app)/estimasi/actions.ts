@@ -14,6 +14,8 @@ import { hargaSatuanDb } from "@/lib/tampilan/estimasi";
 import { nomorKontrakBaru } from "@/lib/data/vendor";
 import { bacaBoqDariExcel } from "@/lib/impor-excel";
 import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
+import { totalBaris } from "@/lib/calc/boq";
+import { nilaiKontrakDariMenang } from "@/lib/calc/tender";
 
 /**
  * Lapisan perubahan data modul Estimasi RAB.
@@ -667,8 +669,8 @@ export async function simpanBarisRabEstimasi(rabEstimasiId: string, dataJson: st
 
     const analisaLama = new Map(rab.items.map((it) => [it.id, it.analisaId]));
     const baris = bacaBarisRabEstimasi(dataJson, analisaLama);
-    const sebelum = rab.items.reduce((s, it) => s + it.volume * it.hargaSatuan, 0);
-    const sesudah = baris.reduce((s, b) => s + b.volume * b.hargaSatuan, 0);
+    const sebelum = totalBaris(rab.items);
+    const sesudah = totalBaris(baris);
 
     await prisma.$transaction([
       prisma.rabEstimasiItem.deleteMany({ where: { rabEstimasiId } }),
@@ -1065,7 +1067,7 @@ export async function buatKontrakDariRab(_s: HasilAksi | null, form: FormData): 
     // berlaku untuk tiap unit": template BOQ digandakan ke SETIAP objek, jadi nilai
     // SPK ikut jumlah objek agar "Nilai BOQ Terinci" = "Nilai SPK". Ditetapkan di
     // server (bukan dari form) supaya konsistensinya terjamin.
-    const nominal = Math.round(totalMenang * cakupan.length);
+    const nominal = nilaiKontrakDariMenang(totalMenang, cakupan.length);
     if (nominal <= 0) throw new GagalIzin("Nilai kontrak nol — pastikan baris menang punya harga penawaran.");
     const deskripsi = teksOpsional(form, "deskripsi")?.trim() || `Pemenang RAB ${rab.nomor}`;
 
