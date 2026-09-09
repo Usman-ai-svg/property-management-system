@@ -170,26 +170,28 @@ melahirkan sumber kebenaran kedua yang bisa hanyut sendiri.
 | Director | Director | BOD |
 | Head of Operation | Operasional | **Head Operation Office + Head Operation Project** |
 | Manager Proyek | Produksi | **Project Manager + Supervisor** |
-| Logistic Staff | Produksi | **Procurement + Supervisor** |
-| Quantity Surveyor Asst | Produksi | Quantity Surveyor |
+| Logistic Staff | Produksi | **Supervisor** |
+| Quantity Surveyor Asst | Produksi | **Quantity Surveyor + Procurement** |
 | Junior Arsitek Staff | Produksi | Arsitek |
 | Finance & Tax | Operasional | Finance |
-| Staff Administration | Operasional | Admin |
+| Staff Administration | Operasional | **Admin + Finance** |
 | HRD Staff | Operasional | HRD |
 | Customer Service | Operasional | Customer Care |
-| Support Function | Operasional | Customer Care (baca-saja, sementara) |
+| **Support Function** | Operasional | **tanpa akses modul proyek** |
 | Manager Marketing | Marketing | Head Marketing & Sales |
 | Sales & Marketing | Marketing | Sales |
 | Agent Coordinator | Marketing | Agent Coordinator |
-| Copy Writer | Marketing | Editor |
-| Design Graphic Staff | Marketing | Social Media |
+| Copy Writer | Marketing | Head Content & Media |
+| Design Graphic Staff | Marketing | Editor |
 | Graphic Designer | Marketing | Social Media |
 | **Security** | Produksi & Operasional | **tanpa akses modul proyek** |
 
-Lima posisi Marketing terakhir berprofil izin **identik** — enam sub-bagian
-baca-saja. Peran yang dipilih hanya menentukan label, bukan kewenangan.
+Kelima posisi Marketing berprofil izin **identik** — enam sub-bagian baca-saja
+(deskripsi, daftar unit, daftar sarpras, dokumen teknis, aset, penyesuaian
+aset). Peran yang dipilih hanya menentukan label, bukan kewenangan — tetapi
+label itu ikut ke jejak audit, jadi tetap perlu benar.
 
-### Tiga rangkap peran, dan alasannya
+### Empat rangkap peran, dan alasannya
 
 Izin selalu mengikuti peran yang SEDANG dipakai, tidak pernah gabungan. Jadi
 rangkap peran berarti orangnya berpindah lewat pemilih "Lihat sebagai".
@@ -198,20 +200,28 @@ rangkap peran berarti orangnya berpindah lewat pemilih "Lihat sebagai".
   lapangan (Head Operation Project). Yang kedua wajib: tahap "Setujui" pada
   alur petty cash menuntut nama peran itu persis. Tanpanya, laporan petty cash
   mentok di DiverifikasiQS dan tidak pernah bisa direimburse.
-- **Manager Proyek** dan **Logistic Staff** merangkap Supervisor karena
-  merekalah pemegang dana petty cash. Konsekuensinya perlu diketahui: untuk
-  mencatat pengeluaran dana talangannya, keduanya harus berpindah ke peran
-  Supervisor lebih dulu — Project Manager dan Procurement tidak berhak
-  mengubah petty cash. Itu bukan kerepotan tak sengaja: memegang uang tunai
-  perusahaan memang tindakan yang berbeda dari mengelola proyek.
+- **Manager Proyek** merangkap Supervisor sebagai pemegang dana petty cash.
+  Konsekuensinya perlu diketahui: Project Manager tidak berhak mengubah petty
+  cash, jadi untuk mencatat pengeluaran dana talangannya ia harus berpindah ke
+  peran Supervisor lebih dulu. Itu bukan kerepotan tak sengaja — memegang uang
+  tunai perusahaan memang tindakan yang berbeda dari mengelola proyek.
+- **Logistic Staff** murni Supervisor, sehingga ia tak perlu berpindah peran
+  sama sekali untuk memegang dana. Ia bisa mencatat penyesuaian stok (Hilang /
+  Rusak / Koreksi Stok) tetapi TIDAK mendaftarkan alat baru — pendaftaran alat
+  ikut Procurement, yang kini dipegang QS Asst.
+- **Staff Administration** merangkap Finance. Kedua peran itu berprofil izin
+  identik, jadi rangkapnya tidak menambah kewenangan apa pun pada matriks. Yang
+  ditambahkannya justru hal yang tak terlihat dari matriks: tahap **Reimburse**
+  menuntut nama peran "Finance" persis, sehingga pencairan tidak berhenti bila
+  Finance & Tax berhalangan.
 
 ### Alur petty cash — keempat tahapnya kini ada pemegangnya
 
 ```
-Pemegang (Supervisor)      → Manager Proyek / Logistic Staff
+Pemegang (Supervisor)      → Manager Proyek · Logistic Staff
 Verifikasi (QS)            → Quantity Surveyor Asst
 Setujui (Head Ops Project) → Head of Operation
-Reimburse (Finance)        → Finance & Tax
+Reimburse (Finance)        → Finance & Tax · Staff Administration
 ```
 
 Ada tes yang gagal bila salah satu tahap kehilangan pemegangnya.
@@ -222,7 +232,7 @@ Ada tes yang gagal bila salah satu tahap kehilangan pemegangnya.
 |---|---|
 | **Administrator Sistem** | tak ada padanannya di daftar ERP. Selama begitu, matriks hak akses hanya bisa diubah lewat database |
 | **Tujuh akun "Belum"** | dua di antaranya kunci: Manager Proyek dan QS Asst. Selama belum aktif, tak ada yang bisa mengisi progres maupun memverifikasi petty cash |
-| **Support Function** | diberi baca-saja sementara; melonggarkan belakangan lebih murah daripada menarik akses yang terlanjur diberikan |
+| **Support Function** | diputuskan Usman: tanpa akses modul proyek |
 | Komisaris, Business Development, Consultant Finance, Head Content & Media | tak ada orangnya di ERP — barisnya tinggal kosong, tidak masalah |
 
 ### Pembatasan per proyek: DIHAPUS

@@ -206,3 +206,35 @@ describe("peranDariPosisiErp", () => {
     }
   });
 });
+
+describe("koreksi pemetaan 2026-09-09", () => {
+  it("Logistic Staff murni Supervisor — pendaftaran alat bukan urusannya", () => {
+    assert.deepEqual(peranDariPosisiErp("Logistic Staff"), ["Supervisor"]);
+  });
+
+  it("Procurement tetap ada pemegangnya, pindah ke QS Asst", () => {
+    const semua = Object.values(PETA_POSISI_ERP).flat();
+    assert.ok(semua.includes("Procurement"), "tak ada yang memegang Procurement");
+    assert.ok(peranDariPosisiErp("Quantity Surveyor Asst").includes("Procurement"));
+  });
+
+  it("tahap Reimburse punya DUA pemegang — tidak berhenti bila satu berhalangan", () => {
+    const pemegangFinance = Object.entries(PETA_POSISI_ERP)
+      .filter(([, peran]) => peran.includes("Finance"))
+      .map(([posisi]) => posisi);
+    assert.deepEqual(pemegangFinance.sort(), ["Finance & Tax", "Staff Administration"]);
+  });
+
+  it("Support Function ditutup, dan tidak sekaligus ada di peta", () => {
+    assert.equal(posisiBolehBukaModulProyek("Support Function"), false);
+    assert.ok(TANPA_AKSES_PROYEK.includes("Support Function"));
+  });
+
+  it("posisi media dipetakan ke tiga peran berbeda walau izinnya identik", () => {
+    // Bedanya label, bukan kewenangan — tetapi labelnya ikut ke jejak audit,
+    // jadi tetap perlu benar.
+    assert.deepEqual(peranDariPosisiErp("Copy Writer"), ["Head Content & Media"]);
+    assert.deepEqual(peranDariPosisiErp("Design Graphic Staff"), ["Editor"]);
+    assert.deepEqual(peranDariPosisiErp("Graphic Designer"), ["Social Media"]);
+  });
+});

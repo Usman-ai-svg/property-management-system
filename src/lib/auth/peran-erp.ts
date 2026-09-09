@@ -179,34 +179,41 @@ export const PETA_POSISI_ERP: Record<string, string[]> = {
 
   // --- Produksi ---
   /**
-   * Manager Proyek dan Logistic Staff sama-sama merangkap Supervisor, atas
+   * Manager Proyek merangkap Supervisor, atas
    * keputusan Usman: merekalah pemegang dana petty cash di lapangan.
    *
-   * Perlu diketahui konsekuensinya. Izin mengikuti peran AKTIF, dan baik
-   * Project Manager maupun Procurement tidak berhak mengubah petty cash. Jadi
-   * untuk mencatat pengeluaran dana talangannya, keduanya harus berpindah ke
-   * peran Supervisor lebih dulu lewat pemilih "Lihat sebagai". Itu bukan
+   * Perlu diketahui konsekuensinya. Izin mengikuti peran AKTIF, dan Project
+   * Manager tidak berhak mengubah petty cash. Jadi untuk mencatat pengeluaran
+   * dana talangannya, Manager Proyek harus berpindah ke peran Supervisor lebih
+   * dulu lewat pemilih "Lihat sebagai". Itu bukan
    * kerepotan yang tak disengaja — memegang uang tunai perusahaan memang
    * tindakan yang berbeda dari mengelola proyek.
    */
   "Manager Proyek": ["Project Manager", "Supervisor"],
-  "Logistic Staff": ["Procurement", "Supervisor"],
+  /**
+   * Logistic Staff MURNI Supervisor, bukan Procurement. Keputusan Usman: yang
+   * memegang daftar induk alat adalah QS Asst, sementara logistik mengurus
+   * pergerakan barangnya di lapangan. Praktisnya, ia bisa mencatat penyesuaian
+   * stok (Hilang / Rusak / Koreksi Stok) tetapi tidak mendaftarkan alat baru.
+   */
+  "Logistic Staff": ["Supervisor"],
   "Junior Arsitek Staff": ["Arsitek"],
   /** Verifikator petty cash (tahap DiverifikasiQS) dan pemegang harga RAB. */
-  "Quantity Surveyor Asst": ["Quantity Surveyor"],
+  "Quantity Surveyor Asst": ["Quantity Surveyor", "Procurement"],
 
   // --- Operasional ---
   /** Pemegang tahap Reimburse pada alur petty cash. */
   "Finance & Tax": ["Finance"],
-  "Staff Administration": ["Admin"],
+  /**
+   * Admin dan Finance berprofil izin IDENTIK di sistem ini, jadi rangkap ini
+   * tidak menambah satu pun kewenangan pada matriks. Yang ditambahkannya justru
+   * hal yang tak terlihat dari matriks: tahap "Reimburse" petty cash menuntut
+   * NAMA peran "Finance" persis. Dengan rangkap ini, pencairan reimburse tidak
+   * berhenti bila Finance & Tax sedang berhalangan.
+   */
+  "Staff Administration": ["Admin", "Finance"],
   "HRD Staff": ["HRD"],
   "Customer Service": ["Customer Care"],
-  /**
-   * Belum jelas fungsinya di modul proyek. Diberi profil baca-saja sampai
-   * diperjelas — melonggarkan belakangan jauh lebih murah daripada menarik
-   * kembali akses yang terlanjur diberikan.
-   */
-  "Support Function": ["Customer Care"],
 
   // --- Marketing ---
   // Kelimanya berprofil izin IDENTIK di sistem ini: enam sub-bagian baca-saja
@@ -215,8 +222,8 @@ export const PETA_POSISI_ERP: Record<string, string[]> = {
   "Manager Marketing": ["Head Marketing & Sales"],
   "Sales & Marketing": ["Sales"],
   "Agent Coordinator": ["Agent Coordinator"],
-  "Copy Writer": ["Editor"],
-  "Design Graphic Staff": ["Social Media"],
+  "Copy Writer": ["Head Content & Media"],
+  "Design Graphic Staff": ["Editor"],
   "Graphic Designer": ["Social Media"],
 };
 
@@ -226,7 +233,11 @@ export const PETA_POSISI_ERP: Record<string, string[]> = {
  * Dinyatakan eksplisit, bukan sekadar absen dari peta, supaya bedanya jelas
  * antara "sudah diputuskan tidak" dan "belum sempat dipetakan".
  */
-export const TANPA_AKSES_PROYEK = ["Security"];
+export const TANPA_AKSES_PROYEK = [
+  "Security",
+  /** Fungsinya di modul proyek tidak jelas; ditutup sampai diperjelas. */
+  "Support Function",
+];
 
 /** Peran modul PROYEK untuk sebuah posisi ERP. Kosong berarti tak berhak. */
 export const peranDariPosisiErp = (posisi: string): string[] =>
