@@ -130,3 +130,108 @@ export function penggunaDariErp(mentah: PenggunaMentah & { peranErp: string }): 
 /** Apakah sebuah peran ERP berhak membuka modul proyek sama sekali. */
 export const bolehBukaModulProyek = (peranErp: string): boolean =>
   peranErp in PETA_PERAN_ERP;
+
+// ===========================================================================
+// PEMETAAN POSISI ERP → PERAN MODUL PROYEK
+// ===========================================================================
+//
+// Ditetapkan bersama Usman pada 2026-09-09, dari daftar pengguna ERP yang
+// sebenarnya (kolom POSISI dan DIVISI). Ditulis di kode, bukan disepakati
+// lisan, supaya tidak ada yang menebak sendiri saat migrasi.
+//
+// Kenapa POSISI, bukan `profiles.role`. ERP menyimpan dua hal: peran kasar
+// (`director`/`accountant`/`manager`/`admin`/`staff` — lihat PETA_PERAN_ERP di
+// atas) dan posisi sebenarnya di daftar pegawai. Peran kasar terlalu tumpul
+// untuk modul proyek: `staff` yang sama dipakai Logistic Staff, Junior Arsitek,
+// dan Security, padahal ketiganya butuh akses yang jauh berbeda. POSISI-lah
+// yang membedakannya.
+//
+// Nilainya berupa NAMA PERAN kita, bukan peta izin. Itu disengaja: izinnya
+// sendiri sudah ada di tabel `RoleSectionPermission` yang sejak Kelompok C
+// dikunci ke nama peran, jadi seluruh isinya bisa ditempel apa adanya ke ERP.
+// Menyalin izinnya ke sini akan melahirkan sumber kebenaran kedua yang bisa
+// hanyut sendiri.
+
+/**
+ * Posisi di ERP → peran di modul PROYEK.
+ *
+ * Daftar berisi LEBIH DARI SATU peran berarti orangnya merangkap dan bisa
+ * berpindah lewat pemilih "Lihat sebagai" — izin selalu mengikuti peran yang
+ * sedang dipakai, tidak pernah gabungan.
+ *
+ * Posisi yang TIDAK ada di peta ini tidak berhak membuka modul proyek sama
+ * sekali. Itu daftar putih, dan disengaja: posisi baru di ERP tidak otomatis
+ * mendapat akses.
+ */
+export const PETA_POSISI_ERP: Record<string, string[]> = {
+  // --- Pimpinan ---
+  Director: ["BOD"],
+
+  /**
+   * Head of Operation merangkap DUA peran, atas keputusan Usman.
+   *
+   * Head Operation Office memberi sisi kantor (deskripsi, unit, sarpras, harga
+   * RAB, keuangan); Head Operation Project memberi sisi lapangan (progres,
+   * aset) DAN tahap "Setujui" pada alur petty cash. Tanpa yang kedua, laporan
+   * petty cash mentok di DiverifikasiQS dan tidak pernah bisa direimburse.
+   */
+  "Head of Operation": ["Head Operation Office", "Head Operation Project"],
+
+  // --- Produksi ---
+  /**
+   * Manager Proyek dan Logistic Staff sama-sama merangkap Supervisor, atas
+   * keputusan Usman: merekalah pemegang dana petty cash di lapangan.
+   *
+   * Perlu diketahui konsekuensinya. Izin mengikuti peran AKTIF, dan baik
+   * Project Manager maupun Procurement tidak berhak mengubah petty cash. Jadi
+   * untuk mencatat pengeluaran dana talangannya, keduanya harus berpindah ke
+   * peran Supervisor lebih dulu lewat pemilih "Lihat sebagai". Itu bukan
+   * kerepotan yang tak disengaja — memegang uang tunai perusahaan memang
+   * tindakan yang berbeda dari mengelola proyek.
+   */
+  "Manager Proyek": ["Project Manager", "Supervisor"],
+  "Logistic Staff": ["Procurement", "Supervisor"],
+  "Junior Arsitek Staff": ["Arsitek"],
+  /** Verifikator petty cash (tahap DiverifikasiQS) dan pemegang harga RAB. */
+  "Quantity Surveyor Asst": ["Quantity Surveyor"],
+
+  // --- Operasional ---
+  /** Pemegang tahap Reimburse pada alur petty cash. */
+  "Finance & Tax": ["Finance"],
+  "Staff Administration": ["Admin"],
+  "HRD Staff": ["HRD"],
+  "Customer Service": ["Customer Care"],
+  /**
+   * Belum jelas fungsinya di modul proyek. Diberi profil baca-saja sampai
+   * diperjelas — melonggarkan belakangan jauh lebih murah daripada menarik
+   * kembali akses yang terlanjur diberikan.
+   */
+  "Support Function": ["Customer Care"],
+
+  // --- Marketing ---
+  // Kelimanya berprofil izin IDENTIK di sistem ini: enam sub-bagian baca-saja
+  // (deskripsi, daftar unit, daftar sarpras, dokumen teknis, aset, penyesuaian
+  // aset). Peran yang dipilih hanya menentukan label, bukan kewenangan.
+  "Manager Marketing": ["Head Marketing & Sales"],
+  "Sales & Marketing": ["Sales"],
+  "Agent Coordinator": ["Agent Coordinator"],
+  "Copy Writer": ["Editor"],
+  "Design Graphic Staff": ["Social Media"],
+  "Graphic Designer": ["Social Media"],
+};
+
+/**
+ * Posisi yang sengaja TIDAK diberi akses modul proyek.
+ *
+ * Dinyatakan eksplisit, bukan sekadar absen dari peta, supaya bedanya jelas
+ * antara "sudah diputuskan tidak" dan "belum sempat dipetakan".
+ */
+export const TANPA_AKSES_PROYEK = ["Security"];
+
+/** Peran modul PROYEK untuk sebuah posisi ERP. Kosong berarti tak berhak. */
+export const peranDariPosisiErp = (posisi: string): string[] =>
+  PETA_POSISI_ERP[posisi] ?? [];
+
+/** Apakah sebuah posisi ERP berhak membuka modul proyek sama sekali. */
+export const posisiBolehBukaModulProyek = (posisi: string): boolean =>
+  peranDariPosisiErp(posisi).length > 0;

@@ -76,7 +76,7 @@ nyata**, yang belum tentu punya akun:
 
 | Model | Kolom | Kenapa dibiarkan |
 |---|---|---|
-| `Pembelian.penerima` | siapa yang menerima barang | diprisi nama pengguna aktif, **tetapi bisa disunting** — sering diisi nama mandor atau satpam yang menerima kiriman. Memaksanya jadi id akan menolak kenyataan lapangan |
+| `Pembelian.penerima` | siapa yang menerima barang | diisi awal dengan nama pengguna aktif, **tetapi bisa disunting** — sering diisi nama mandor atau satpam yang menerima kiriman. Memaksanya jadi id akan menolak kenyataan lapangan |
 | `EquipmentUsage.penanggungJawab` | penanggung jawab alat di lapangan | sama: bisa nama tukang atau supervisor yang bukan pengguna aplikasi |
 | `Contract` / vendor | nama vendor, kontak | vendor bukan pengguna sistem sama sekali |
 
@@ -140,10 +140,95 @@ Tiga hal yang tidak bisa diselesaikan dari repo ini:
    masih terbaca sebagai teks, tetapi tidak bisa di-join. Yang paling murah:
    satu tabel pemetaan sementara `cuid → uuid` saat memindahkan data.
 
-2. **Pembatasan per proyek.** ERP belum punya padanan `semuaProyek` /
-   `proyekIds`. Selama mode RBAC ERP aktif, setiap pengguna melihat SELURUH
-   proyek — pelonggaran nyata yang sudah dicatat di `src/lib/auth/peran-erp.ts`
-   dan diulang di sini supaya tidak ditemukan sebagai kejutan.
+2. ~~Pembatasan per proyek.~~ **SUDAH DIPUTUSKAN** (Usman, 2026-09-09): boleh
+   hilang. Lihat bagian terakhir dokumen ini.
 
 3. **`PettyCashFund.pemegangId`.** Lihat bagian 2: ini penunjukan yang berlaku,
    bukan sejarah. Dana yang pemegangnya tak punya akun ERP menjadi tak terpakai.
+
+---
+
+## Pemetaan posisi ERP → peran modul PROYEK
+
+Ditetapkan bersama Usman **2026-09-09**, dari daftar pengguna ERP yang
+sebenarnya. Ditulis di kode (`PETA_POSISI_ERP` di `src/lib/auth/peran-erp.ts`)
+dan dijaga tes, bukan disepakati lisan.
+
+**Kenapa POSISI, bukan `profiles.role`.** ERP menyimpan peran kasar
+(`director`/`accountant`/`manager`/`admin`/`staff`) dan posisi sebenarnya di
+daftar pegawai. Peran kasar terlalu tumpul untuk modul ini: `staff` yang sama
+dipakai Logistic Staff, Junior Arsitek, dan Security — padahal ketiganya butuh
+akses yang jauh berbeda.
+
+**Isinya nama peran kita, bukan peta izin.** Izinnya sendiri sudah ada di
+`RoleSectionPermission` yang sejak C3 dikunci ke nama peran, jadi seluruh isi
+tabel itu bisa ditempel apa adanya ke ERP. Menyalin izin ke peta posisi akan
+melahirkan sumber kebenaran kedua yang bisa hanyut sendiri.
+
+| Posisi ERP | Divisi | Peran modul PROYEK |
+|---|---|---|
+| Director | Director | BOD |
+| Head of Operation | Operasional | **Head Operation Office + Head Operation Project** |
+| Manager Proyek | Produksi | **Project Manager + Supervisor** |
+| Logistic Staff | Produksi | **Procurement + Supervisor** |
+| Quantity Surveyor Asst | Produksi | Quantity Surveyor |
+| Junior Arsitek Staff | Produksi | Arsitek |
+| Finance & Tax | Operasional | Finance |
+| Staff Administration | Operasional | Admin |
+| HRD Staff | Operasional | HRD |
+| Customer Service | Operasional | Customer Care |
+| Support Function | Operasional | Customer Care (baca-saja, sementara) |
+| Manager Marketing | Marketing | Head Marketing & Sales |
+| Sales & Marketing | Marketing | Sales |
+| Agent Coordinator | Marketing | Agent Coordinator |
+| Copy Writer | Marketing | Editor |
+| Design Graphic Staff | Marketing | Social Media |
+| Graphic Designer | Marketing | Social Media |
+| **Security** | Produksi & Operasional | **tanpa akses modul proyek** |
+
+Lima posisi Marketing terakhir berprofil izin **identik** — enam sub-bagian
+baca-saja. Peran yang dipilih hanya menentukan label, bukan kewenangan.
+
+### Tiga rangkap peran, dan alasannya
+
+Izin selalu mengikuti peran yang SEDANG dipakai, tidak pernah gabungan. Jadi
+rangkap peran berarti orangnya berpindah lewat pemilih "Lihat sebagai".
+
+- **Head of Operation** memegang sisi kantor (Head Operation Office) dan sisi
+  lapangan (Head Operation Project). Yang kedua wajib: tahap "Setujui" pada
+  alur petty cash menuntut nama peran itu persis. Tanpanya, laporan petty cash
+  mentok di DiverifikasiQS dan tidak pernah bisa direimburse.
+- **Manager Proyek** dan **Logistic Staff** merangkap Supervisor karena
+  merekalah pemegang dana petty cash. Konsekuensinya perlu diketahui: untuk
+  mencatat pengeluaran dana talangannya, keduanya harus berpindah ke peran
+  Supervisor lebih dulu — Project Manager dan Procurement tidak berhak
+  mengubah petty cash. Itu bukan kerepotan tak sengaja: memegang uang tunai
+  perusahaan memang tindakan yang berbeda dari mengelola proyek.
+
+### Alur petty cash — keempat tahapnya kini ada pemegangnya
+
+```
+Pemegang (Supervisor)      → Manager Proyek / Logistic Staff
+Verifikasi (QS)            → Quantity Surveyor Asst
+Setujui (Head Ops Project) → Head of Operation
+Reimburse (Finance)        → Finance & Tax
+```
+
+Ada tes yang gagal bila salah satu tahap kehilangan pemegangnya.
+
+### Yang belum terjawab
+
+| Hal | Keadaannya |
+|---|---|
+| **Administrator Sistem** | tak ada padanannya di daftar ERP. Selama begitu, matriks hak akses hanya bisa diubah lewat database |
+| **Tujuh akun "Belum"** | dua di antaranya kunci: Manager Proyek dan QS Asst. Selama belum aktif, tak ada yang bisa mengisi progres maupun memverifikasi petty cash |
+| **Support Function** | diberi baca-saja sementara; melonggarkan belakangan lebih murah daripada menarik akses yang terlanjur diberikan |
+| Komisaris, Business Development, Consultant Finance, Head Content & Media | tak ada orangnya di ERP — barisnya tinggal kosong, tidak masalah |
+
+### Pembatasan per proyek: DIHAPUS
+
+Diputuskan Usman 2026-09-09: pembatasan per proyek boleh hilang di ERP. Enam
+akun di repo ini berstatus "proyek terbatas"; di ERP semuanya melihat seluruh
+proyek. `penggunaDariErp()` memang sudah menyetel `semuaProyek: true`, jadi
+tidak ada yang perlu diubah — tetapi sekarang itu keputusan yang diambil
+sadar, bukan pelonggaran yang terlanjur.

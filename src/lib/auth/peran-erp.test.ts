@@ -1,10 +1,11 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { SECTIONS } from "@/lib/domain/enums";
+import { ROLES, SECTIONS } from "@/lib/domain/enums";
 import { periksaPengguna } from "@/lib/adaptor/identitas";
 import {
   bolehBukaModulProyek, izinDariPeranErp, modeRbac, penggunaDariErp,
-  PETA_PERAN_ERP, TERTUTUP_UNTUK_PELAKSANA,
+  PETA_PERAN_ERP, peranDariPosisiErp, PETA_POSISI_ERP, posisiBolehBukaModulProyek,
+  TANPA_AKSES_PROYEK, TERTUTUP_UNTUK_PELAKSANA,
 } from "./peran-erp";
 
 describe("modeRbac", () => {
@@ -140,5 +141,68 @@ describe("penggunaDariErp", () => {
   it("peran ERP tanpa akses modul menghasilkan izin kosong", () => {
     const u = penggunaDariErp({ ...mentah, peranErp: "sales" });
     assert.equal(u.izin.size, 0);
+  });
+});
+
+// ===========================================================================
+// Pemetaan posisi ERP → peran modul proyek
+// ===========================================================================
+
+describe("peranDariPosisiErp", () => {
+  it("Director memegang BOD — satu-satunya yang boleh Business Plan", () => {
+    assert.deepEqual(peranDariPosisiErp("Director"), ["BOD"]);
+  });
+
+  it("Head of Operation merangkap dua peran, keputusan Usman 2026-09-09", () => {
+    const peran = peranDariPosisiErp("Head of Operation");
+    assert.deepEqual(peran, ["Head Operation Office", "Head Operation Project"]);
+  });
+
+  it("tahap Setujui petty cash ada pemegangnya", () => {
+    // TRANSISI_PETTY menuntut nama peran persis "Head Operation Project".
+    // Tanpa satu pun posisi yang memetakannya, laporan petty cash mentok di
+    // DiverifikasiQS dan tidak pernah bisa direimburse.
+    const adaHop = Object.values(PETA_POSISI_ERP).some((p) => p.includes("Head Operation Project"));
+    assert.ok(adaHop, "tidak ada posisi ERP yang memegang Head Operation Project");
+  });
+
+  it("keempat tahap alur petty cash punya pemegang di daftar ERP", () => {
+    const semua = Object.values(PETA_POSISI_ERP).flat();
+    for (const peran of ["Supervisor", "Quantity Surveyor", "Head Operation Project", "Finance"]) {
+      assert.ok(semua.includes(peran), `tahap petty cash tanpa pemegang: ${peran}`);
+    }
+  });
+
+  it("pemegang dana petty cash adalah Manager Proyek dan Logistic Staff", () => {
+    // Keduanya merangkap Supervisor — syarat keras di beriDanaPetty.
+    assert.ok(peranDariPosisiErp("Manager Proyek").includes("Supervisor"));
+    assert.ok(peranDariPosisiErp("Logistic Staff").includes("Supervisor"));
+  });
+
+  it("Security tidak berhak membuka modul proyek", () => {
+    assert.equal(posisiBolehBukaModulProyek("Security"), false);
+    assert.ok(TANPA_AKSES_PROYEK.includes("Security"));
+  });
+
+  it("posisi yang belum dipetakan tidak otomatis dapat akses", () => {
+    // Daftar putih: posisi baru di ERP harus diputuskan, bukan diwarisi.
+    assert.deepEqual(peranDariPosisiErp("Posisi Yang Belum Ada"), []);
+    assert.equal(posisiBolehBukaModulProyek("Posisi Yang Belum Ada"), false);
+  });
+
+  it("tiap peran yang dipetakan memang ada di ROLES", () => {
+    const semua = [...new Set(Object.values(PETA_POSISI_ERP).flat())];
+    for (const peran of semua) {
+      assert.ok(
+        (ROLES as readonly string[]).includes(peran),
+        `"${peran}" dipetakan tapi bukan peran yang dikenal di domain/enums.ts`,
+      );
+    }
+  });
+
+  it("posisi yang tanpa akses tidak boleh sekaligus ada di peta", () => {
+    for (const posisi of TANPA_AKSES_PROYEK) {
+      assert.equal(posisi in PETA_POSISI_ERP, false, `${posisi} ada di dua tempat`);
+    }
   });
 });
