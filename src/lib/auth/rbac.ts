@@ -43,7 +43,7 @@ export const ambilPengguna = cache(async (): Promise<Pengguna | null> => {
       id: true,
       nama: true,
       semuaProyek: true,
-      roles: { select: { role: { select: { nama: true, permissions: true } } } },
+      roles: { select: { role: { select: { nama: true } } } },
       aksesProyek: { select: { projectId: true } },
     },
   });
@@ -60,12 +60,12 @@ export const ambilPengguna = cache(async (): Promise<Pengguna | null> => {
   // tampak tertutup padahal pengguna "punya" peran yang berhak, periksa dulu
   // peran mana yang sedang dipilih.
   const izin = new Map<Section, boolean>();
-  for (const { role } of user.roles) {
-    if (role.nama !== session.peranAktif) continue;
-    for (const p of role.permissions) {
-      const sec = p.section as Section;
-      izin.set(sec, (izin.get(sec) ?? false) || p.bolehUbah);
-    }
+  if (peran.includes(session.peranAktif)) {
+    const baris = await prisma.roleSectionPermission.findMany({
+      where: { roleNama: session.peranAktif },
+      select: { section: true, bolehUbah: true },
+    });
+    for (const p of baris) izin.set(p.section as Section, p.bolehUbah);
   }
 
   return {

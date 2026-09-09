@@ -42,6 +42,7 @@ export interface PerubahanProgres {
 export async function hitungUlangProgresUnit(
   unitId: string,
   dicatatOleh: string,
+  dicatatOlehId: string,
 ): Promise<PerubahanProgres | null> {
   const unit = await prisma.unit.findUnique({
     where: { id: unitId },
@@ -69,7 +70,7 @@ export async function hitungUlangProgresUnit(
   await prisma.progressRecord.create({
     data: {
       unitId, tanggal: new Date(), progress: baru,
-      catatan: "Opname BOQ konstruksi", dicatatOleh,
+      catatan: "Opname BOQ konstruksi", dicatatOleh, dicatatOlehId,
     },
   });
 
@@ -80,6 +81,7 @@ export async function hitungUlangProgresUnit(
 export async function hitungUlangProgresSarpras(
   sarprasId: string,
   dicatatOleh: string,
+  dicatatOlehId: string,
 ): Promise<PerubahanProgres | null> {
   const item = await prisma.infrastructure.findUnique({
     where: { id: sarprasId },
@@ -100,7 +102,7 @@ export async function hitungUlangProgresSarpras(
   await prisma.progressRecord.create({
     data: {
       infrastructureId: sarprasId, tanggal: new Date(), progress: baru,
-      catatan: "Opname BOQ konstruksi", dicatatOleh,
+      catatan: "Opname BOQ konstruksi", dicatatOleh, dicatatOlehId,
     },
   });
 

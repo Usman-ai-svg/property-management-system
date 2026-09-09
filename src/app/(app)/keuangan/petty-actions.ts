@@ -240,6 +240,7 @@ export async function catatPengeluaranPetty(_s: HasilAksi | null, form: FormData
         total,
         status: "Lunas",
         pic: pengguna.nama,
+        picId: pengguna.id,
         posHpp: POS_HPP[peruntukan as PeruntukanBiaya],
         pettyCashReportId: draft.id,
       },

@@ -263,6 +263,7 @@ export async function tambahPembayaran(_s: HasilAksi | null, form: FormData): Pr
         buktiKey,
         posHpp: POS_HPP[peruntukan],
         pic: pengguna.nama,
+        picId: pengguna.id,
         alokasi: { create: porsi },
       },
     });

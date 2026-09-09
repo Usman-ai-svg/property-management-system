@@ -9,12 +9,12 @@ async function main() {
   const SEC = "setujuiRab";
   let n = 0;
   for (const peran of ACL_AWAL[SEC] ?? []) {
-    const role = await prisma.role.findUnique({ where: { nama: peran }, select: { id: true } });
-    if (!role) continue;
     const bolehUbah = (ACL_UBAH[SEC] ?? []).includes(peran);
-    const ada = await prisma.roleSectionPermission.findFirst({ where: { roleId: role.id, section: SEC } });
-    if (ada) await prisma.roleSectionPermission.update({ where: { id: ada.id }, data: { bolehUbah } });
-    else await prisma.roleSectionPermission.create({ data: { roleId: role.id, section: SEC, bolehUbah } });
+    await prisma.roleSectionPermission.upsert({
+      where: { roleNama_section: { roleNama: peran, section: SEC } },
+      create: { roleNama: peran, section: SEC, bolehUbah },
+      update: { bolehUbah },
+    });
     n++;
   }
   console.log(`✔ izin ${SEC} tersinkron untuk ${n} peran`);

@@ -42,7 +42,7 @@ export async function ubahIzin(_s: HasilAksi | null, form: FormData): Promise<Ha
     if (!role) throw new GagalIzin("Peran tidak ditemukan.");
 
     const lama = await prisma.roleSectionPermission.findUnique({
-      where: { roleId_section: { roleId, section } },
+      where: { roleNama_section: { roleNama: role.nama, section } },
       select: { bolehUbah: true },
     });
     const tingkatLama = !lama ? "tidak" : lama.bolehUbah ? "ubah" : "lihat";
@@ -63,11 +63,13 @@ export async function ubahIzin(_s: HasilAksi | null, form: FormData): Promise<Ha
     }
 
     if (tingkat === "tidak") {
-      await prisma.roleSectionPermission.deleteMany({ where: { roleId, section } });
+      await prisma.roleSectionPermission.deleteMany({
+        where: { roleNama: role.nama, section },
+      });
     } else {
       await prisma.roleSectionPermission.upsert({
-        where: { roleId_section: { roleId, section } },
-        create: { roleId, section, bolehUbah: tingkat === "ubah" },
+        where: { roleNama_section: { roleNama: role.nama, section } },
+        create: { roleNama: role.nama, section, bolehUbah: tingkat === "ubah" },
         update: { bolehUbah: tingkat === "ubah" },
       });
     }
@@ -239,8 +241,11 @@ export async function ubahUser(_s: HasilAksi | null, form: FormData): Promise<Ha
     // Pengelola tidak boleh mencabut hak kelolanya sendiri lewat halaman ini —
     // itu mengunci seluruh sistem bila dia satu-satunya yang memegangnya.
     if (id === pengguna.id) {
+      const namaPeran = (
+        await prisma.role.findMany({ where: { id: { in: peranIds } }, select: { nama: true } })
+      ).map((r) => r.nama);
       const masihKelola = await prisma.roleSectionPermission.count({
-        where: { roleId: { in: peranIds }, section: "deskripsi", bolehUbah: true },
+        where: { roleNama: { in: namaPeran }, section: "deskripsi", bolehUbah: true },
       });
       if (!masihKelola) {
         throw new GagalIzin(

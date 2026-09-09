@@ -52,6 +52,7 @@ export async function catatBiayaOperasional(
       data: {
         projectId, tanggal: new Date(), kategori, uraian, nominal,
         pic: pengguna.nama,
+        picId: pengguna.id,
         bukti: teksOpsional(form, "bukti"),
       },
     });

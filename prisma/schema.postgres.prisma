@@ -84,8 +84,9 @@ model Role {
   grup      String
   keterangan String?
 
-  users       UserRole[]
-  permissions RoleSectionPermission[]
+  users UserRole[]
+  // Izin per sub-bagian TIDAK direlasikan ke sini: matriksnya dikunci ke nama
+  // peran supaya bisa ikut pindah tanpa tabel Role. Lihat RoleSectionPermission.
 
   @@map("pm_roles")
 }
@@ -113,18 +114,29 @@ model UserProjectAccess {
 
 /// Matriks hak akses per sub-bagian — dikelola dari Admin → Kelola Hak Akses.
 /// Sengaja disimpan sebagai data, bukan hardcode, supaya bisa diubah tanpa deploy.
+/// MATRIKS HAK AKSES PER SUB-BAGIAN.
+///
+/// Dikunci ke NAMA PERAN, bukan id. Tabel `Role` tidak ikut migrasi — di ERP
+/// peran datang dari `public.profiles.role` yang berupa teks — jadi matriks
+/// yang menunjuk `roleId` akan kehilangan induknya begitu tabelnya hilang.
+/// Dengan nama peran, seluruh isi tabel ini bisa ditempel apa adanya ke ERP.
+///
+/// Konsekuensinya disengaja: mengganti nama sebuah peran memutus izinnya, dan
+/// itu memang harus terlihat — bukan diam-diam diwarisi oleh peran berbeda yang
+/// kebetulan memakai id yang sama.
 model RoleSectionPermission {
-  id      String @id @default(cuid())
-  roleId  String
-  /// deskripsi | daftarUnit | daftarSarpras | dokumenTeknis
-  /// hargaRabRap | businessPlan | keuangan | progress
+  id       String @id @default(cuid())
+  /// Nama peran, mis. "Project Manager". Lihat ROLES di src/lib/domain/enums.ts.
+  roleNama String
+  /// deskripsi | daftarUnit | daftarSarpras | dokumenTeknis | hargaRabRap
+  /// | setujuiRab | businessPlan | keuangan | pettyCash | progress | aset
+  /// | penyesuaianAset
   section String
   /// false = boleh lihat saja, true = boleh ubah
   bolehUbah Boolean @default(false)
 
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-  @@unique([roleId, section])
+  @@unique([roleNama, section])
+  @@index([roleNama])
   @@map("pm_role_section_permissions")
 }
 
@@ -559,6 +571,10 @@ model ProgressRecord {
   progress         Int
   catatan          String?
   dicatatOleh      String?
+  /// Id pelaku pada saat itu (cuid `User` di repo ini, `auth.users.id` di ERP).
+  /// Sengaja TANPA relasi: baris ini jejak sejarah, dan menghapus akun tidak
+  /// boleh ikut menghapus atau mengubahnya.
+  dicatatOlehId    String?
 
   unit           Unit?           @relation(fields: [unitId], references: [id], onDelete: Cascade)
   infrastructure Infrastructure? @relation(fields: [infrastructureId], references: [id], onDelete: Cascade)
@@ -936,6 +952,10 @@ model Expense {
   /// Lunas | DP | Belum
   status     String @default("Belum")
   pic        String?
+  /// Id pelaku pada saat itu (cuid `User` di repo ini, `auth.users.id` di ERP).
+  /// Sengaja TANPA relasi: baris ini jejak sejarah, dan menghapus akun tidak
+  /// boleh ikut menghapus atau mengubahnya.
+  picId      String?
   /// Pos HPP business plan yang dibebani, mis. "E — Konstruksi"
   posHpp     String?
   /// Nama berkas bukti (nota, berita acara, kwitansi) — untuk ditampilkan.
@@ -996,6 +1016,10 @@ model HutangCicilan {
   bukti     String?
   buktiKey  String?
   pic       String?
+  /// Id pelaku pada saat itu (cuid `User` di repo ini, `auth.users.id` di ERP).
+  /// Sengaja TANPA relasi: baris ini jejak sejarah, dan menghapus akun tidak
+  /// boleh ikut menghapus atau mengubahnya.
+  picId     String?
   dibuatPada DateTime @default(now())
 
   expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
@@ -1129,6 +1153,10 @@ model OperationalCost {
   /// Lunas | DP | Belum
   status    String   @default("Lunas")
   pic       String?
+  /// Id pelaku pada saat itu (cuid `User` di repo ini, `auth.users.id` di ERP).
+  /// Sengaja TANPA relasi: baris ini jejak sejarah, dan menghapus akun tidak
+  /// boleh ikut menghapus atau mengubahnya.
+  picId     String?
   bukti     String?
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -1365,6 +1393,10 @@ model EquipmentService {
   biaya         Decimal @db.Decimal(18, 2)    @default(0)
   catatan       String?
   dicatatOleh   String
+  /// Id pelaku pada saat itu (cuid `User` di repo ini, `auth.users.id` di ERP).
+  /// Sengaja TANPA relasi: baris ini jejak sejarah, dan menghapus akun tidak
+  /// boleh ikut menghapus atau mengubahnya.
+  dicatatOlehId String?
 
   equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
 
@@ -1399,6 +1431,10 @@ model EquipmentUsage {
   /// Aktif | Selesai. Hanya penggunaan "Aktif" yang mengurangi stok tersedia.
   status       String   @default("Aktif")
   dicatatOleh  String
+  /// Id pelaku pada saat itu (cuid `User` di repo ini, `auth.users.id` di ERP).
+  /// Sengaja TANPA relasi: baris ini jejak sejarah, dan menghapus akun tidak
+  /// boleh ikut menghapus atau mengubahnya.
+  dicatatOlehId String?
   dibuatPada   DateTime @default(now())
 
   equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
@@ -1435,6 +1471,10 @@ model EquipmentAdjustment {
   keterangan        String
   penanggungJawab   String?
   dicatatOleh       String
+  /// Id pelaku pada saat itu (cuid `User` di repo ini, `auth.users.id` di ERP).
+  /// Sengaja TANPA relasi: baris ini jejak sejarah, dan menghapus akun tidak
+  /// boleh ikut menghapus atau mengubahnya.
+  dicatatOlehId     String?
 
   equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
 
@@ -1581,12 +1621,16 @@ model RabEstimasi {
   tanggal    DateTime @default(now())
   /// Draft | Diajukan | Ditolak | Final (alur persetujuan)
   status     String   @default("Draft")
-  /// Jejak persetujuan. Nama penyetuju/pengaju disimpan sebagai string snapshot
-  /// agar tidak menyeret relasi User ke model ini.
-  diajukanPada DateTime?
-  diajukanOleh String?
-  diputusPada  DateTime?
-  diputusOleh  String?
+  /// Jejak persetujuan. NAMA disimpan sebagai jepretan sejarah — begitu orangnya
+  /// berganti nama atau keluar, dokumen lama tetap berbunyi seperti saat
+  /// diputuskan. ID pelaku disimpan berdampingan supaya keputusannya tetap bisa
+  /// ditelusuri balik ke akun; di ERP id itu `auth.users.id`.
+  diajukanPada   DateTime?
+  diajukanOleh   String?
+  diajukanOlehId String?
+  diputusPada    DateTime?
+  diputusOleh    String?
+  diputusOlehId  String?
   catatanTolak String?
   dibuatPada DateTime @default(now())
   diubahPada DateTime @updatedAt

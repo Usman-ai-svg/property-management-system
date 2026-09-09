@@ -657,10 +657,9 @@ async function main() {
   let jmlIzin = 0;
   for (const [section, peranBoleh] of Object.entries(ACL_AWAL)) {
     for (const peran of peranBoleh) {
-      const id = roleId.get(peran);
-      if (!id) continue;
+      if (!roleId.has(peran)) continue;
       await prisma.roleSectionPermission.create({
-        data: { roleId: id, section, bolehUbah: (ACL_UBAH[section] ?? []).includes(peran) },
+        data: { roleNama: peran, section, bolehUbah: (ACL_UBAH[section] ?? []).includes(peran) },
       });
       jmlIzin++;
     }

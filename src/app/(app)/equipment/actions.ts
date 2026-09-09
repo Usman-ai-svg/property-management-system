@@ -217,6 +217,7 @@ export async function catatPenyesuaianAset(
           keterangan,
           penanggungJawab,
           dicatatOleh: pengguna.nama,
+          dicatatOlehId: pengguna.id,
         },
       }),
     ]);
@@ -276,7 +277,10 @@ export async function catatServis(_s: HasilAksi | null, form: FormData): Promise
         data: { servisTerakhir: tanggal, servisBerikut },
       }),
       prisma.equipmentService.create({
-        data: { equipmentId, tanggal, servisBerikut, biaya, catatan, dicatatOleh: pengguna.nama },
+        data: {
+          equipmentId, tanggal, servisBerikut, biaya, catatan,
+          dicatatOleh: pengguna.nama, dicatatOlehId: pengguna.id,
+        },
       }),
     ]);
 
@@ -361,7 +365,7 @@ export async function tambahPenggunaan(_s: HasilAksi | null, form: FormData): Pr
     await prisma.equipmentUsage.create({
       data: {
         equipmentId, projectId, jumlah, tanggalMulai, tanggalSelesai, tarif,
-        penanggungJawab, catatan, status, dicatatOleh: pengguna.nama,
+        penanggungJawab, catatan, status, dicatatOleh: pengguna.nama, dicatatOlehId: pengguna.id,
       },
     });
 

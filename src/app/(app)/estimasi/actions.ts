@@ -498,7 +498,10 @@ export async function ajukanRab(_s: HasilAksi | null, form: FormData): Promise<H
 
     await prisma.rabEstimasi.update({
       where: { id: rab.id },
-      data: { status: "Diajukan", diajukanPada: new Date(), diajukanOleh: pengguna.nama, catatanTolak: null },
+      data: {
+        status: "Diajukan", diajukanPada: new Date(),
+        diajukanOleh: pengguna.nama, diajukanOlehId: pengguna.id, catatanTolak: null,
+      },
     });
     await catat({
       pengguna, projectId: rab.projectId, objek: `RAB Estimasi ${rab.project.kode} · ${rab.nomor}`,
@@ -517,7 +520,10 @@ export async function setujuiRab(_s: HasilAksi | null, form: FormData): Promise<
     wajibLolos(periksaSetujuiRab({ id: rab.id }, { status: rab.status, nomor: rab.nomor }));
     await prisma.rabEstimasi.update({
       where: { id: rab.id },
-      data: { status: "Final", diputusPada: new Date(), diputusOleh: pengguna.nama, catatanTolak: null },
+      data: {
+        status: "Final", diputusPada: new Date(),
+        diputusOleh: pengguna.nama, diputusOlehId: pengguna.id, catatanTolak: null,
+      },
     });
     await catat({
       pengguna, projectId: rab.projectId, objek: `RAB Estimasi ${rab.project.kode} · ${rab.nomor}`,
@@ -537,7 +543,10 @@ export async function tolakRab(_s: HasilAksi | null, form: FormData): Promise<Ha
     wajibLolos(periksaTolakRab({ id: rab.id, catatan }, { status: rab.status, nomor: rab.nomor }));
     await prisma.rabEstimasi.update({
       where: { id: rab.id },
-      data: { status: "Ditolak", diputusPada: new Date(), diputusOleh: pengguna.nama, catatanTolak: catatan },
+      data: {
+        status: "Ditolak", diputusPada: new Date(),
+        diputusOleh: pengguna.nama, diputusOlehId: pengguna.id, catatanTolak: catatan,
+      },
     });
     await catat({
       pengguna, projectId: rab.projectId, objek: `RAB Estimasi ${rab.project.kode} · ${rab.nomor}`,

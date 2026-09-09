@@ -69,7 +69,7 @@ export async function ubahProgresUnit(_s: HasilAksi | null, form: FormData): Pro
       prisma.progressRecord.create({
         data: {
           unitId: id, tanggal: new Date(), progress,
-          catatan: "Opname konstruksi", dicatatOleh: pengguna.nama,
+          catatan: "Opname konstruksi", dicatatOleh: pengguna.nama, dicatatOlehId: pengguna.id,
         },
       }),
     ]);
@@ -124,7 +124,7 @@ export async function ubahProgresSarpras(_s: HasilAksi | null, form: FormData): 
       prisma.progressRecord.create({
         data: {
           infrastructureId: id, tanggal: new Date(), progress,
-          catatan: "Opname konstruksi", dicatatOleh: pengguna.nama,
+          catatan: "Opname konstruksi", dicatatOleh: pengguna.nama, dicatatOlehId: pengguna.id,
         },
       }),
     ]);
@@ -174,7 +174,7 @@ export async function simpanOpnameUnit(
     const jml = await simpanBarisOpname(form, "unit", unitId);
     if (jml === 0) return "Tidak ada progres yang berubah.";
 
-    const berubah = await hitungUlangProgresUnit(unitId, pengguna.nama);
+    const berubah = await hitungUlangProgresUnit(unitId, pengguna.nama, pengguna.id);
 
     await catat({
       pengguna, projectId: unit.projectId,
@@ -215,7 +215,7 @@ export async function simpanOpnameSarpras(
     const jml = await simpanBarisOpname(form, "sarpras", sarprasId);
     if (jml === 0) return "Tidak ada progres yang berubah.";
 
-    const berubah = await hitungUlangProgresSarpras(sarprasId, pengguna.nama);
+    const berubah = await hitungUlangProgresSarpras(sarprasId, pengguna.nama, pengguna.id);
 
     await catat({
       pengguna, projectId: item.projectId,

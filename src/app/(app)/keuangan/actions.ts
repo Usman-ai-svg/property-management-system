@@ -143,6 +143,7 @@ export async function catatPengeluaran(_s: HasilAksi | null, form: FormData): Pr
         uraian,
         total,
         pic: pengguna.nama,
+        picId: pengguna.id,
         bukti,
         buktiKey,
         posHpp: POS_HPP[peruntukan as PeruntukanBiaya],
@@ -779,7 +780,7 @@ export async function bayarPembelian(_s: HasilAksi | null, form: FormData): Prom
       data: {
         projectId: beli.projectId, pembelianId, tanggal,
         peruntukan, jenis: "Material", metode, uraian,
-        total: bayar, bukti, buktiKey, pic: pengguna.nama,
+        total: bayar, bukti, buktiKey, pic: pengguna.nama, picId: pengguna.id,
         posHpp: POS_HPP[peruntukan as PeruntukanBiaya],
         alokasi: { create: alokasi },
       },
@@ -864,7 +865,10 @@ export async function bayarHutang(_s: HasilAksi | null, form: FormData): Promise
     const { bukti, buktiKey } = await simpanBuktiOpsional(form);
 
     await prisma.hutangCicilan.create({
-      data: { expenseId, tanggal, nominal: bayar, metode, bukti, buktiKey, pic: pengguna.nama },
+      data: {
+        expenseId, tanggal, nominal: bayar, metode, bukti, buktiKey,
+        pic: pengguna.nama, picId: pengguna.id,
+      },
     });
     await catat({
       pengguna, projectId: hutang.projectId,

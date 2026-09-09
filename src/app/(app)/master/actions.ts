@@ -760,7 +760,7 @@ export async function ubahUnit(_s: HasilAksi | null, form: FormData): Promise<Ha
       await prisma.progressRecord.create({
         data: {
           unitId: id, tanggal: new Date(), progress: baru.progress,
-          catatan: "Diubah lewat aplikasi", dicatatOleh: pengguna.nama,
+          catatan: "Diubah lewat aplikasi", dicatatOleh: pengguna.nama, dicatatOlehId: pengguna.id,
         },
       });
     }
@@ -882,6 +882,7 @@ export async function tambahUnit(_s: HasilAksi | null, form: FormData): Promise<
           unitId: (await prisma.unit.findUniqueOrThrow({ where: { kode: kodeUnit }, select: { id: true } })).id,
           tanggal: new Date(), progress, catatan: "Progres awal saat unit dibuat",
           dicatatOleh: pengguna.nama,
+          dicatatOlehId: pengguna.id,
         },
       });
     }
@@ -1277,7 +1278,7 @@ export async function simpanSarpras(_s: HasilAksi | null, form: FormData): Promi
         await prisma.progressRecord.create({
           data: {
             infrastructureId: id, tanggal: new Date(), progress,
-            catatan: "Diubah lewat aplikasi", dicatatOleh: pengguna.nama,
+            catatan: "Diubah lewat aplikasi", dicatatOleh: pengguna.nama, dicatatOlehId: pengguna.id,
           },
         });
       }
