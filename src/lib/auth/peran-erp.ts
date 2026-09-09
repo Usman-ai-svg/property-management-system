@@ -239,10 +239,61 @@ export const TANPA_AKSES_PROYEK = [
   "Support Function",
 ];
 
-/** Peran modul PROYEK untuk sebuah posisi ERP. Kosong berarti tak berhak. */
-export const peranDariPosisiErp = (posisi: string): string[] =>
-  PETA_POSISI_ERP[posisi] ?? [];
+/**
+ * Posisi di ERP yang setara Administrator Sistem — MENUNGGU KONFIRMASI.
+ *
+ * Instruksi Usman (2026-09-09): cek dulu apakah ERP sudah punya administrator
+ * sistemnya sendiri. Kalau ada, posisinya ditulis di sini dan otomatis
+ * dipetakan ke peran Administrator Sistem — tidak ada tempat lain yang perlu
+ * disunting.
+ *
+ * Sengaja dibiarkan KOSONG, bukan ditebak. Peran ini bukan sekadar label:
+ *
+ *   1. Ia memegang seluruh 12 sub-bagian dengan hak ubah.
+ *   2. Ia adalah PERAN_SUPERUSER pada alur petty cash — satu-satunya yang
+ *      boleh menembus gerbang tiap tahap (lihat superuserPetty di
+ *      keuangan/petty-actions.ts). Memberikannya ke posisi yang keliru berarti
+ *      seseorang bisa mengajukan, memverifikasi, menyetujui, DAN mereimburse
+ *      laporan petty cash-nya sendiri.
+ *
+ * Yang TIDAK perlu menunggu konfirmasi ini: pengelolaan pengguna dan matriks
+ * hak akses. Gerbangnya adalah hak ubah pada sub-bagian `deskripsi`, bukan
+ * nama peran ini — dan Director (BOD) serta Head of Operation (Head Operation
+ * Office) sudah memenuhinya. Halaman Admin bisa dipakai sejak hari pertama.
+ */
+export const POSISI_ADMIN_SISTEM: readonly string[] = [];
+
+/**
+ * Peran modul PROYEK untuk sebuah posisi ERP. Kosong berarti tak berhak.
+ *
+ * `posisiAdmin` bisa diberikan untuk pengujian; secara bawaan ia membaca
+ * `POSISI_ADMIN_SISTEM` di atas.
+ */
+export function peranDariPosisiErp(
+  posisi: string,
+  posisiAdmin: readonly string[] = POSISI_ADMIN_SISTEM,
+): string[] {
+  if (posisiAdmin.includes(posisi)) return ["Administrator Sistem"];
+  return PETA_POSISI_ERP[posisi] ?? [];
+}
 
 /** Apakah sebuah posisi ERP berhak membuka modul proyek sama sekali. */
-export const posisiBolehBukaModulProyek = (posisi: string): boolean =>
-  peranDariPosisiErp(posisi).length > 0;
+export const posisiBolehBukaModulProyek = (
+  posisi: string,
+  posisiAdmin: readonly string[] = POSISI_ADMIN_SISTEM,
+): boolean => peranDariPosisiErp(posisi, posisiAdmin).length > 0;
+
+/**
+ * Peran yang berhak mengelola pengguna dan matriks hak akses.
+ *
+ * Bukan daftar tetap melainkan turunan: gerbangnya adalah hak UBAH pada
+ * sub-bagian `deskripsi` (lihat izinkanKelolaAkses di admin/actions.ts). Daftar
+ * ini menyebutkan peran yang memenuhinya pada matriks bawaan, dan dipakai
+ * dokumentasi serta tes — bukan sebagai penegakan.
+ */
+export const PERAN_KELOLA_AKSES = [
+  "Administrator Sistem",
+  "BOD",
+  "Business Development",
+  "Head Operation Office",
+] as const;

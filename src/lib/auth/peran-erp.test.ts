@@ -4,7 +4,8 @@ import { ROLES, SECTIONS } from "@/lib/domain/enums";
 import { periksaPengguna } from "@/lib/adaptor/identitas";
 import {
   bolehBukaModulProyek, izinDariPeranErp, modeRbac, penggunaDariErp,
-  PETA_PERAN_ERP, peranDariPosisiErp, PETA_POSISI_ERP, posisiBolehBukaModulProyek,
+  PERAN_KELOLA_AKSES, PETA_PERAN_ERP, peranDariPosisiErp, PETA_POSISI_ERP,
+  POSISI_ADMIN_SISTEM, posisiBolehBukaModulProyek,
   TANPA_AKSES_PROYEK, TERTUTUP_UNTUK_PELAKSANA,
 } from "./peran-erp";
 
@@ -236,5 +237,41 @@ describe("koreksi pemetaan 2026-09-09", () => {
     assert.deepEqual(peranDariPosisiErp("Copy Writer"), ["Head Content & Media"]);
     assert.deepEqual(peranDariPosisiErp("Design Graphic Staff"), ["Editor"]);
     assert.deepEqual(peranDariPosisiErp("Graphic Designer"), ["Social Media"]);
+  });
+});
+
+describe("padanan Administrator Sistem", () => {
+  it("sengaja BELUM dipetakan — menunggu konfirmasi dari sisi ERP", () => {
+    // Kalau daftar ini terisi tanpa keputusan sadar, seseorang mendapat hak
+    // menembus seluruh tahap petty cash. Kosong berarti belum diputuskan,
+    // bukan terlupa.
+    assert.deepEqual([...POSISI_ADMIN_SISTEM], []);
+    const semua = Object.values(PETA_POSISI_ERP).flat();
+    assert.equal(semua.includes("Administrator Sistem"), false);
+  });
+
+  it("begitu diisi, posisinya langsung memetakan ke Administrator Sistem", () => {
+    // Mengisi POSISI_ADMIN_SISTEM adalah SATU-SATUNYA suntingan yang perlu.
+    const hasil = peranDariPosisiErp("IT Administrator", ["IT Administrator"]);
+    assert.deepEqual(hasil, ["Administrator Sistem"]);
+    assert.equal(posisiBolehBukaModulProyek("IT Administrator", ["IT Administrator"]), true);
+  });
+
+  it("posisi admin menimpa pemetaan biasanya, bukan menambahinya", () => {
+    // Kalau suatu saat posisi yang sudah dipetakan ternyata juga administrator
+    // sistem, yang berlaku adalah Administrator Sistem — bukan gabungan.
+    const hasil = peranDariPosisiErp("Head of Operation", ["Head of Operation"]);
+    assert.deepEqual(hasil, ["Administrator Sistem"]);
+  });
+
+  it("pengelolaan pengguna & matriks TIDAK menunggu konfirmasi itu", () => {
+    // Gerbangnya hak ubah `deskripsi`, bukan nama peran Administrator Sistem.
+    // Director dan Head of Operation sudah memenuhinya lewat peran mereka.
+    const director = peranDariPosisiErp("Director");
+    const headOps = peranDariPosisiErp("Head of Operation");
+    const bisaKelola = (peran: string[]) =>
+      peran.some((p) => (PERAN_KELOLA_AKSES as readonly string[]).includes(p));
+    assert.ok(bisaKelola(director), "Director seharusnya bisa mengelola akses");
+    assert.ok(bisaKelola(headOps), "Head of Operation seharusnya bisa mengelola akses");
   });
 });

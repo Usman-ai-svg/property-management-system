@@ -230,7 +230,7 @@ Ada tes yang gagal bila salah satu tahap kehilangan pemegangnya.
 
 | Hal | Keadaannya |
 |---|---|
-| **Administrator Sistem** | tak ada padanannya di daftar ERP. Selama begitu, matriks hak akses hanya bisa diubah lewat database |
+| **Administrator Sistem** | menunggu konfirmasi dari sisi ERP — lihat bagian di bawah |
 | **Tujuh akun "Belum"** | dua di antaranya kunci: Manager Proyek dan QS Asst. Selama belum aktif, tak ada yang bisa mengisi progres maupun memverifikasi petty cash |
 | **Support Function** | diputuskan Usman: tanpa akses modul proyek |
 | Komisaris, Business Development, Consultant Finance, Head Content & Media | tak ada orangnya di ERP — barisnya tinggal kosong, tidak masalah |
@@ -242,3 +242,37 @@ akun di repo ini berstatus "proyek terbatas"; di ERP semuanya melihat seluruh
 proyek. `penggunaDariErp()` memang sudah menyetel `semuaProyek: true`, jadi
 tidak ada yang perlu diubah — tetapi sekarang itu keputusan yang diambil
 sadar, bukan pelonggaran yang terlanjur.
+
+### Padanan Administrator Sistem — menunggu konfirmasi ERP
+
+Instruksi Usman (2026-09-09): **cek dulu apakah ERP sudah punya administrator
+sistemnya sendiri.** Kalau ada, posisinya diintegrasikan ke peran ini.
+
+Tempatnya sudah disiapkan: `POSISI_ADMIN_SISTEM` di `peran-erp.ts`, sekarang
+kosong. Mengisinya adalah **satu-satunya suntingan** yang perlu — pemetaannya
+langsung berlaku, dan ada tes yang membuktikannya.
+
+Sengaja dibiarkan kosong, bukan ditebak, karena peran ini bukan sekadar label:
+
+1. Ia memegang seluruh **12 sub-bagian** dengan hak ubah.
+2. Ia adalah **`PERAN_SUPERUSER`** pada alur petty cash — satu-satunya yang
+   boleh menembus gerbang tiap tahap. Memberikannya ke posisi yang keliru
+   berarti seseorang bisa mengajukan, memverifikasi, menyetujui, DAN
+   mereimburse laporan petty cash-nya sendiri.
+
+**Yang TIDAK perlu menunggu konfirmasi ini: pengelolaan pengguna dan matriks
+hak akses.** Gerbangnya bukan nama peran ini, melainkan hak **ubah** pada
+sub-bagian `deskripsi` (`izinkanKelolaAkses` di `admin/actions.ts`). Empat
+peran memenuhinya pada matriks bawaan:
+
+```
+Administrator Sistem · BOD · Business Development · Head Operation Office
+```
+
+Dua di antaranya sudah ada orangnya di ERP — **Director** (BOD) dan **Head of
+Operation** (Head Operation Office). Jadi menambah pengguna dan mengatur
+matriksnya sudah bisa dilakukan sejak hari pertama, tanpa Administrator Sistem.
+
+Kalau ternyata posisi administrator sistem ERP sudah ada, mengisinya tetap
+berguna: ia jadi satu-satunya yang bisa menembus alur petty cash saat ada
+laporan tersangkut karena pemegang tahapnya berhalangan.
