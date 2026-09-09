@@ -3,7 +3,7 @@
     "Matriks hak akses awal. Satu baris per sub-bagian; \"*\" berarti seluruh peran.",
     "Baris ADA di role_section_permissions berarti boleh melihat; bolehUbah menentukan boleh mengubah. Sub-bagian yang tidak tercantum untuk sebuah peran berarti tertutup sama sekali, bukan sekadar hanya-lihat.",
     "BOD sengaja tercantum pada seluruh sub-bagian: sebagai pemegang keputusan tertinggi, BOD tidak boleh terhalang saat perlu mengoreksi apa pun.",
-    "Administrator Sistem adalah peran sistem, bukan jabatan organisasi. Akses penuhnya berasal dari kebutuhan administrasi aplikasi (menambah pengguna dan mengubah matriks ini), bukan dari posisi di perusahaan. Padanannya di ERP masih harus dipastikan — lihat POSISI_ADMIN_SISTEM di src/lib/auth/peran-erp.ts."
+    "Administrator Sistem adalah peran sistem, bukan jabatan organisasi. Akses penuhnya berasal dari kebutuhan administrasi aplikasi (menambah pengguna dan mengubah matriks ini), bukan dari posisi di perusahaan. Di ERP tidak ada peran bernama begitu; yang bertindak sebagai administrator adalah director — ia yang memegang modul Pengaturan dan jejak audit. Posisi Director karena itu memperoleh BOD dan Administrator Sistem sekaligus; lihat POSISI_ADMIN_SISTEM di src/lib/auth/peran-erp.ts. Jangan tertukar dengan profiles.role bernama 'admin', yang di sini setara Staff Administration."
   ],
   "peran": [
     {

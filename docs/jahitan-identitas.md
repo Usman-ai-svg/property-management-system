@@ -230,7 +230,7 @@ Ada tes yang gagal bila salah satu tahap kehilangan pemegangnya.
 
 | Hal | Keadaannya |
 |---|---|
-| **Administrator Sistem** | menunggu konfirmasi dari sisi ERP — lihat bagian di bawah |
+| ~~Administrator Sistem~~ | **TERJAWAB 2026-09-09**: ERP tidak punya peran itu; `director` yang bertindak sebagai administrator — lihat bagian di bawah |
 | **Tujuh akun "Belum"** | dua di antaranya kunci: Manager Proyek dan QS Asst. Selama belum aktif, tak ada yang bisa mengisi progres maupun memverifikasi petty cash |
 | **Support Function** | diputuskan Usman: tanpa akses modul proyek |
 | Komisaris, Business Development, Consultant Finance, Head Content & Media | tak ada orangnya di ERP — barisnya tinggal kosong, tidak masalah |
@@ -243,36 +243,81 @@ proyek. `penggunaDariErp()` memang sudah menyetel `semuaProyek: true`, jadi
 tidak ada yang perlu diubah — tetapi sekarang itu keputusan yang diambil
 sadar, bukan pelonggaran yang terlanjur.
 
-### Padanan Administrator Sistem — menunggu konfirmasi ERP
+### Padanan Administrator Sistem — TERJAWAB: melekat pada `director`
 
-Instruksi Usman (2026-09-09): **cek dulu apakah ERP sudah punya administrator
-sistemnya sendiri.** Kalau ada, posisinya diintegrasikan ke peran ini.
+Jawaban Usman (2026-09-09) setelah memeriksa ERP: **tidak ada peran yang khusus
+bernama administrator sistem.** Nilai `profiles.role` yang tercatat ada delapan:
 
-Tempatnya sudah disiapkan: `POSISI_ADMIN_SISTEM` di `peran-erp.ts`, sekarang
-kosong. Mengisinya adalah **satu-satunya suntingan** yang perlu — pemetaannya
-langsung berlaku, dan ada tes yang membuktikannya.
+```
+director · accountant · manager · sales · staff · viewer · hrd · admin
+```
 
-Sengaja dibiarkan kosong, bukan ditebak, karena peran ini bukan sekadar label:
+`director` yang bertindak sebagai administrator, karena tiga hal:
+
+1. satu-satunya yang mendapat modul **Pengaturan** (`roles: ['director']` pada
+   `MODULES`);
+2. satu-satunya yang bisa membaca **jejak audit**;
+3. bersama `hrd`, satu-satunya yang lolos **`is_hr_admin()`** untuk gaji dan
+   payroll.
+
+Karena itu `POSISI_ADMIN_SISTEM = ["Director"]`.
+
+> **Jangan tertukar dengan `admin`.** Nilai `profiles.role` bernama `admin`
+> adalah padanan **Staff Administration** di sini — peran administrasi keuangan.
+> Ia tidak memegang modul Pengaturan di ERP, dan bukan administrator sistem.
+> Namanya yang paling mirip justru yang paling menyesatkan.
+
+#### Menambah, bukan menggantikan
+
+`peranDariPosisiErp("Director")` sekarang mengembalikan:
+
+```
+["BOD", "Administrator Sistem"]
+```
+
+Rangkap, dengan **BOD lebih dulu**. Dua alasannya:
+
+1. BOD adalah nama yang tercantum di matriks hak akses, di `PERAN_KELOLA_AKSES`,
+   dan di seluruh dokumen. Menimpanya membuat Director kehilangan identitas
+   yang dirujuk semua tempat lain.
+2. Yang pertama menjadi **peran aktif** saat masuk. Gerbang petty cash memeriksa
+   `peranAktif === "Administrator Sistem"`, jadi Director tidak masuk setiap
+   hari sebagai superuser: ia harus berpindah lebih dulu lewat pemilih "Lihat
+   sebagai". Perpindahan itu sadar, dan tercatat sebagai peran itu di jejak
+   audit.
+
+Pola yang sama sudah dipakai Manager Proyek, yang harus berpindah ke Supervisor
+untuk memegang uang tunai.
+
+#### Kenapa itu perlu dijaga
+
+Administrator Sistem bukan sekadar label:
 
 1. Ia memegang seluruh **12 sub-bagian** dengan hak ubah.
 2. Ia adalah **`PERAN_SUPERUSER`** pada alur petty cash — satu-satunya yang
-   boleh menembus gerbang tiap tahap. Memberikannya ke posisi yang keliru
-   berarti seseorang bisa mengajukan, memverifikasi, menyetujui, DAN
-   mereimburse laporan petty cash-nya sendiri.
+   boleh menembus gerbang tiap tahap. Pemegangnya bisa mengajukan,
+   memverifikasi, menyetujui, DAN mereimburse satu laporan sendirian.
 
-**Yang TIDAK perlu menunggu konfirmasi ini: pengelolaan pengguna dan matriks
-hak akses.** Gerbangnya bukan nama peran ini, melainkan hak **ubah** pada
-sub-bagian `deskripsi` (`izinkanKelolaAkses` di `admin/actions.ts`). Empat
-peran memenuhinya pada matriks bawaan:
+Poin kedua itulah gunanya: laporan yang tersangkut karena pemegang tahapnya
+berhalangan bisa didorong sampai selesai. Bahayanya dan kegunaannya satu hal
+yang sama, jadi yang menjaganya adalah keharusan berpindah peran secara sadar.
+
+#### Yang tidak bergantung pada peran ini
+
+Pengelolaan pengguna dan matriks hak akses. Gerbangnya hak **ubah** pada
+sub-bagian `deskripsi` (`izinkanKelolaAkses` di `admin/actions.ts`), bukan nama
+peran ini. Empat peran memenuhinya pada matriks bawaan:
 
 ```
 Administrator Sistem · BOD · Business Development · Head Operation Office
 ```
 
-Dua di antaranya sudah ada orangnya di ERP — **Director** (BOD) dan **Head of
-Operation** (Head Operation Office). Jadi menambah pengguna dan mengatur
-matriksnya sudah bisa dilakukan sejak hari pertama, tanpa Administrator Sistem.
+Director (lewat BOD) dan Head of Operation (Head Operation Office) sudah
+memenuhinya, jadi menambah pengguna dan mengatur matriksnya bisa dilakukan tanpa
+seorang pun berpindah ke peran administrator.
 
-Kalau ternyata posisi administrator sistem ERP sudah ada, mengisinya tetap
-berguna: ia jadi satu-satunya yang bisa menembus alur petty cash saat ada
-laporan tersangkut karena pemegang tahapnya berhalangan.
+#### `hrd` — besar di ERP, tertutup di sini
+
+`is_hr_admin()` memberi `hrd` kewenangan gaji dan payroll di ERP. Itu di luar
+modul proyek; di sini `hrd` sama tertutupnya dengan `viewer`. Dicatat supaya
+tidak ada yang membukanya "karena kelihatannya penting".

@@ -4,7 +4,7 @@ import { ROLES, SECTIONS } from "@/lib/domain/enums";
 import { periksaPengguna } from "@/lib/adaptor/identitas";
 import {
   bolehBukaModulProyek, izinDariPeranErp, modeRbac, penggunaDariErp,
-  PERAN_KELOLA_AKSES, PETA_PERAN_ERP, peranDariPosisiErp, PETA_POSISI_ERP,
+  PERAN_ERP, PERAN_KELOLA_AKSES, PETA_PERAN_ERP, peranDariPosisiErp, PETA_POSISI_ERP,
   POSISI_ADMIN_SISTEM, posisiBolehBukaModulProyek,
   TANPA_AKSES_PROYEK, TERTUTUP_UNTUK_PELAKSANA,
 } from "./peran-erp";
@@ -151,7 +151,7 @@ describe("penggunaDariErp", () => {
 
 describe("peranDariPosisiErp", () => {
   it("Director memegang BOD — satu-satunya yang boleh Business Plan", () => {
-    assert.deepEqual(peranDariPosisiErp("Director"), ["BOD"]);
+    assert.deepEqual(peranDariPosisiErp("Director"), ["BOD", "Administrator Sistem"]);
   });
 
   it("Head of Operation merangkap dua peran, keputusan Usman 2026-09-09", () => {
@@ -241,37 +241,82 @@ describe("koreksi pemetaan 2026-09-09", () => {
 });
 
 describe("padanan Administrator Sistem", () => {
-  it("sengaja BELUM dipetakan — menunggu konfirmasi dari sisi ERP", () => {
-    // Kalau daftar ini terisi tanpa keputusan sadar, seseorang mendapat hak
-    // menembus seluruh tahap petty cash. Kosong berarti belum diputuskan,
-    // bukan terlupa.
-    assert.deepEqual([...POSISI_ADMIN_SISTEM], []);
-    const semua = Object.values(PETA_POSISI_ERP).flat();
-    assert.equal(semua.includes("Administrator Sistem"), false);
+  it("melekat pada Director — ERP tidak punya peran administrator tersendiri", () => {
+    // Jawaban Usman 2026-09-09 setelah memeriksa ERP: profiles.role cuma
+    // delapan nilai dan tidak satu pun bernama administrator sistem. Yang
+    // memegang modul Pengaturan, jejak audit, dan is_hr_admin() adalah
+    // director — jadi dialah administratornya, de facto.
+    assert.deepEqual([...POSISI_ADMIN_SISTEM], ["Director"]);
+    assert.ok(peranDariPosisiErp("Director").includes("Administrator Sistem"));
   });
 
-  it("begitu diisi, posisinya langsung memetakan ke Administrator Sistem", () => {
-    // Mengisi POSISI_ADMIN_SISTEM adalah SATU-SATUNYA suntingan yang perlu.
-    const hasil = peranDariPosisiErp("IT Administrator", ["IT Administrator"]);
-    assert.deepEqual(hasil, ["Administrator Sistem"]);
-    assert.equal(posisiBolehBukaModulProyek("IT Administrator", ["IT Administrator"]), true);
+  it("MENAMBAH, bukan menggantikan peran hariannya", () => {
+    // Kalau menimpa, Director kehilangan BOD — nama yang tercantum di matriks
+    // hak akses, di PERAN_KELOLA_AKSES, dan di seluruh dokumen — lalu masuk
+    // setiap hari sebagai superuser petty cash.
+    const hasil = peranDariPosisiErp("Director");
+    assert.deepEqual(hasil, ["BOD", "Administrator Sistem"]);
   });
 
-  it("posisi admin menimpa pemetaan biasanya, bukan menambahinya", () => {
-    // Kalau suatu saat posisi yang sudah dipetakan ternyata juga administrator
-    // sistem, yang berlaku adalah Administrator Sistem — bukan gabungan.
-    const hasil = peranDariPosisiErp("Head of Operation", ["Head of Operation"]);
-    assert.deepEqual(hasil, ["Administrator Sistem"]);
+  it("peran hariannya yang aktif lebih dulu, bukan yang superuser", () => {
+    // Gerbang petty cash memeriksa peranAktif === "Administrator Sistem", dan
+    // peran pertama itulah yang aktif saat masuk. Jadi menembus alur petty cash
+    // menuntut perpindahan sadar lewat "Lihat sebagai" — persis seperti Manager
+    // Proyek yang harus berpindah ke Supervisor untuk memegang uang tunai.
+    assert.equal(peranDariPosisiErp("Director")[0], "BOD");
   });
 
-  it("pengelolaan pengguna & matriks TIDAK menunggu konfirmasi itu", () => {
+  it("tak ada posisi LAIN yang mendapat Administrator Sistem", () => {
+    const lain = Object.entries(PETA_POSISI_ERP)
+      .filter(([posisi]) => !POSISI_ADMIN_SISTEM.includes(posisi))
+      .filter(([, peran]) => peran.includes("Administrator Sistem"))
+      .map(([posisi]) => posisi);
+    assert.deepEqual(lain, []);
+  });
+
+  it("posisi tak dikenal tetap kosong, sekalipun disebut sebagai admin", () => {
+    // Daftar admin bukan pintu belakang untuk memberi akses: posisi yang tidak
+    // ada di peta tetap tidak punya peran harian, cuma dapat Administrator
+    // Sistem — dan itu harus datang dari keputusan sadar mengisi daftarnya.
+    assert.deepEqual(peranDariPosisiErp("Posisi Yang Belum Ada"), []);
+    assert.deepEqual(
+      peranDariPosisiErp("IT Administrator", ["IT Administrator"]),
+      ["Administrator Sistem"],
+    );
+  });
+
+  it("pengelolaan pengguna & matriks tidak bergantung pada peran itu", () => {
     // Gerbangnya hak ubah `deskripsi`, bukan nama peran Administrator Sistem.
-    // Director dan Head of Operation sudah memenuhinya lewat peran mereka.
-    const director = peranDariPosisiErp("Director");
-    const headOps = peranDariPosisiErp("Head of Operation");
+    // Director (lewat BOD) dan Head of Operation sudah memenuhinya, jadi
+    // halaman Admin tetap bisa dipakai walau seseorang tidak pernah berpindah
+    // ke peran administrator.
     const bisaKelola = (peran: string[]) =>
       peran.some((p) => (PERAN_KELOLA_AKSES as readonly string[]).includes(p));
-    assert.ok(bisaKelola(director), "Director seharusnya bisa mengelola akses");
-    assert.ok(bisaKelola(headOps), "Head of Operation seharusnya bisa mengelola akses");
+    assert.ok(bisaKelola(["BOD"]), "BOD seharusnya bisa mengelola akses");
+    assert.ok(bisaKelola(peranDariPosisiErp("Head of Operation")));
+  });
+});
+
+describe("daftar profiles.role", () => {
+  it("PETA_PERAN_ERP hanya menyebut peran yang benar-benar ada di ERP", () => {
+    // Salah ketik di sini tidak menimbulkan galat: peran tak dikenal cuma
+    // menghasilkan peta izin kosong, dan orangnya kehilangan seluruh akses
+    // tanpa satu pun pesan.
+    const sah = new Set<string>(PERAN_ERP);
+    for (const p of Object.keys(PETA_PERAN_ERP)) {
+      assert.ok(sah.has(p), `"${p}" bukan nilai profiles.role yang tercatat`);
+    }
+  });
+
+  it("yang sengaja ditutup persis sales, viewer, dan hrd", () => {
+    const tertutup = PERAN_ERP.filter((p) => !bolehBukaModulProyek(p));
+    assert.deepEqual([...tertutup].sort(), ["hrd", "sales", "viewer"]);
+  });
+
+  it("hrd besar di ERP tapi tertutup di sini", () => {
+    // is_hr_admin() memberinya gaji dan payroll di ERP. Itu di luar modul ini;
+    // di sini ia sama tertutupnya dengan viewer.
+    assert.equal(bolehBukaModulProyek("hrd"), false);
+    assert.deepEqual([...izinDariPeranErp("hrd").keys()], []);
   });
 });

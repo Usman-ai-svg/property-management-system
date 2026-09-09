@@ -48,10 +48,15 @@ export type Tingkat = "tidak" | "lihat" | "ubah";
  * otomatis membukanya untuk semua orang.
  *
  * Kesetaraan peran dikonfirmasi pemilik sistem:
- *   director   = BOD
+ *   director   = BOD, sekaligus administrator sistem de facto (lihat
+ *                POSISI_ADMIN_SISTEM: ERP tidak punya peran administrator
+ *                tersendiri; director-lah yang memegang modul Pengaturan dan
+ *                jejak audit)
  *   accountant = Finance / Consultant Finance
  *   manager    = Project Manager / Head Operation Project
- *   admin      = Admin (Staff Administration) — BUKAN Administrator Sistem
+ *   admin      = Admin (Staff Administration) — BUKAN Administrator Sistem,
+ *                sekalipun namanya paling mirip. Ini peran administrasi
+ *                keuangan; ia tidak memegang modul Pengaturan di ERP.
  *   staff      = Supervisor dan setingkat
  *
  * `sales`, `viewer`, dan `hrd` sengaja tidak ada di peta: ketiganya memang
@@ -240,31 +245,69 @@ export const TANPA_AKSES_PROYEK = [
 ];
 
 /**
- * Posisi di ERP yang setara Administrator Sistem — MENUNGGU KONFIRMASI.
+ * Posisi di ERP yang setara Administrator Sistem — TERJAWAB 2026-09-09.
  *
- * Instruksi Usman (2026-09-09): cek dulu apakah ERP sudah punya administrator
- * sistemnya sendiri. Kalau ada, posisinya ditulis di sini dan otomatis
- * dipetakan ke peran Administrator Sistem — tidak ada tempat lain yang perlu
- * disunting.
+ * Jawaban Usman setelah memeriksa ERP: **tidak ada peran yang khusus bernama
+ * administrator sistem.** Daftar `profiles.role` yang tercatat cuma delapan —
+ * lihat `PERAN_ERP` di bawah — dan `director`-lah yang bertindak sebagai
+ * administrator. Tiga hal yang membuatnya begitu, semuanya di ERP:
  *
- * Sengaja dibiarkan KOSONG, bukan ditebak. Peran ini bukan sekadar label:
+ *   1. satu-satunya yang mendapat modul Pengaturan (`roles: ['director']`);
+ *   2. satu-satunya yang bisa membaca jejak audit;
+ *   3. bersama `hrd`, satu-satunya yang lolos `is_hr_admin()` untuk gaji dan
+ *      payroll.
+ *
+ * AWAS — jangan tertukar dengan `admin` pada `profiles.role`. Namanya paling
+ * mirip, tapi ia setara Staff Administration di sini: peran administrasi
+ * keuangan, bukan administrator sistem. Lihat catatan pada `PETA_PERAN_ERP`.
+ *
+ * Konsekuensi yang harus disadari. Peran ini bukan sekadar label:
  *
  *   1. Ia memegang seluruh 12 sub-bagian dengan hak ubah.
  *   2. Ia adalah PERAN_SUPERUSER pada alur petty cash — satu-satunya yang
  *      boleh menembus gerbang tiap tahap (lihat superuserPetty di
- *      keuangan/petty-actions.ts). Memberikannya ke posisi yang keliru berarti
- *      seseorang bisa mengajukan, memverifikasi, menyetujui, DAN mereimburse
- *      laporan petty cash-nya sendiri.
+ *      keuangan/petty-actions.ts). Artinya pemegangnya bisa mengajukan,
+ *      memverifikasi, menyetujui, DAN mereimburse satu laporan sendirian.
  *
- * Yang TIDAK perlu menunggu konfirmasi ini: pengelolaan pengguna dan matriks
- * hak akses. Gerbangnya adalah hak ubah pada sub-bagian `deskripsi`, bukan
- * nama peran ini — dan Director (BOD) serta Head of Operation (Head Operation
- * Office) sudah memenuhinya. Halaman Admin bisa dipakai sejak hari pertama.
+ * Yang menjaga poin kedua bukan pemetaan ini melainkan peran AKTIF: gerbangnya
+ * memeriksa `peranAktif`, dan Director masuk sebagai BOD lebih dulu (BOD ditulis
+ * pertama pada hasil `peranDariPosisiErp`). Untuk menembus alur petty cash ia
+ * harus berpindah dulu ke Administrator Sistem lewat pemilih "Lihat sebagai" —
+ * tindakan sadar, dan tercatat di jejak audit sebagai peran itu. Pola yang sama
+ * dipakai Manager Proyek yang harus berpindah ke Supervisor untuk memegang uang
+ * tunai.
  */
-export const POSISI_ADMIN_SISTEM: readonly string[] = [];
+export const POSISI_ADMIN_SISTEM: readonly string[] = ["Director"];
+
+/**
+ * Nilai `profiles.role` yang tercatat di ERP.
+ *
+ * Didaftarkan supaya `PETA_PERAN_ERP` tidak bisa menyebut peran yang tidak ada
+ * — satu salah ketik di sana berarti seseorang kehilangan seluruh aksesnya
+ * tanpa galat apa pun, karena peran yang tak dikenal cuma menghasilkan peta
+ * izin kosong.
+ *
+ * `sales`, `viewer`, dan `hrd` memang tidak berhak membuka modul proyek. `hrd`
+ * punya kewenangan besar di ERP (gaji dan payroll lewat `is_hr_admin()`), tapi
+ * itu di luar modul ini; di sini ia sama tertutupnya dengan `viewer`.
+ */
+export const PERAN_ERP = [
+  "director", "accountant", "manager", "sales", "staff", "viewer", "hrd", "admin",
+] as const;
 
 /**
  * Peran modul PROYEK untuk sebuah posisi ERP. Kosong berarti tak berhak.
+ *
+ * Posisi administrator MENAMBAH "Administrator Sistem" pada pemetaan biasanya,
+ * bukan menggantikannya. Sebelum jawaban Usman datang, fungsi ini menimpa —
+ * asumsinya administrator sistem adalah posisi tersendiri. Kenyataannya ia
+ * melekat pada Director, yang tetap perlu BOD sebagai peran sehari-hari: BOD
+ * yang tercantum di matriks hak akses, di PERAN_KELOLA_AKSES, dan di seluruh
+ * dokumen. Menimpanya akan membuat Director kehilangan identitas itu dan masuk
+ * setiap hari sebagai superuser petty cash.
+ *
+ * Urutannya penting: peran biasa lebih dulu, karena yang pertama menjadi peran
+ * aktif saat masuk.
  *
  * `posisiAdmin` bisa diberikan untuk pengujian; secara bawaan ia membaca
  * `POSISI_ADMIN_SISTEM` di atas.
@@ -273,8 +316,9 @@ export function peranDariPosisiErp(
   posisi: string,
   posisiAdmin: readonly string[] = POSISI_ADMIN_SISTEM,
 ): string[] {
-  if (posisiAdmin.includes(posisi)) return ["Administrator Sistem"];
-  return PETA_POSISI_ERP[posisi] ?? [];
+  const biasa = PETA_POSISI_ERP[posisi] ?? [];
+  if (!posisiAdmin.includes(posisi)) return biasa;
+  return [...biasa, "Administrator Sistem"];
 }
 
 /** Apakah sebuah posisi ERP berhak membuka modul proyek sama sekali. */
