@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
 import { proyekPemilikDokumen, versiDokumen } from "@/lib/data/dokumen";
-import { bacaBerkas, tipeDari } from "@/lib/storage";
+import { alamatLuar, bacaBerkas, tipeDari } from "@/lib/storage";
 
 /**
  * Unduh berkas dokumen.
@@ -47,6 +47,17 @@ export async function GET(
 
   if (!proyekTerkait.some((pid) => bolehAksesProyek(pengguna, pid))) {
     return new NextResponse("Anda tidak memiliki akses ke proyek pemilik dokumen ini.", { status: 403 });
+  }
+
+  // Berkas yang cuma dicatat alamatnya tidak punya isi untuk dikirim: arahkan
+  // peramban ke sana. Pengarahannya SETELAH seluruh pemeriksaan izin di atas,
+  // jadi alamat Drive tidak bocor ke orang yang tak berhak atas proyeknya.
+  const luar = alamatLuar(versi.objectKey);
+  if (luar) {
+    return NextResponse.redirect(luar, {
+      status: 307,
+      headers: { "Cache-Control": "private, no-store" },
+    });
   }
 
   let isi: Buffer;

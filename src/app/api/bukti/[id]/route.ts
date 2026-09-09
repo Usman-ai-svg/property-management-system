@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { buktiPengeluaran } from "@/lib/data/keuangan";
 import { ambilPengguna, bolehAksesProyek, bolehLihat } from "@/lib/auth/rbac";
-import { bacaBerkas, tipeDari } from "@/lib/storage";
+import { alamatLuar, bacaBerkas, tipeDari } from "@/lib/storage";
 
 /**
  * Unduh berkas bukti sebuah pengeluaran.
@@ -32,6 +32,17 @@ export async function GET(
   }
   if (!bolehAksesProyek(pengguna, expense.projectId)) {
     return new NextResponse("Anda tidak memiliki akses ke proyek pemilik berkas ini.", { status: 403 });
+  }
+
+  // Berkas yang cuma dicatat alamatnya tidak punya isi untuk dikirim: arahkan
+  // peramban ke sana. Pengarahannya SETELAH seluruh pemeriksaan izin di atas,
+  // jadi alamat Drive tidak bocor ke orang yang tak berhak atas proyeknya.
+  const luar = alamatLuar(expense.buktiKey);
+  if (luar) {
+    return NextResponse.redirect(luar, {
+      status: 307,
+      headers: { "Cache-Control": "private, no-store" },
+    });
   }
 
   let isi: Buffer;

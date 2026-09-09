@@ -1101,7 +1101,7 @@ export async function unggahRevisi(_s: HasilAksi | null, form: FormData): Promis
 
     const namaFile = bersihkanNamaFile(berkas.name);
     periksaBerkas(namaFile, berkas.type, berkas.size);
-    periksaBerkasKategori(namaFile, kategori);
+    periksaBerkasKategori(namaFile, kategori, berkas.size);
 
     // Cari proyek pemilik dokumen, sekaligus memastikan pengguna berhak.
     let projectId: string;

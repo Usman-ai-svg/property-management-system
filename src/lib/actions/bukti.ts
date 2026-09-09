@@ -1,4 +1,6 @@
-import { bersihkanNamaFile, periksaBerkas, simpanBerkas } from "@/lib/storage";
+import {
+  bersihkanNamaFile, periksaBerkas, periksaBerkasKategori, simpanBerkas,
+} from "@/lib/storage";
 
 /**
  * Baca & simpan berkas bukti OPSIONAL dari sebuah formulir pengeluaran.
@@ -22,6 +24,9 @@ export async function simpanBuktiOpsional(
 
   const nama = bersihkanNamaFile(berkas.name);
   periksaBerkas(nama, berkas.type, berkas.size);
+  // Bukti transaksi termasuk kelas ringan: nota, kwitansi, foto. Batasnya jauh
+  // di bawah batas umum — lihat "berat dan ringan" di src/lib/storage/index.ts.
+  periksaBerkasKategori(nama, "bukti", berkas.size);
   const { objectKey } = await simpanBerkas(await berkas.arrayBuffer(), nama);
   return { bukti: nama, buktiKey: objectKey };
 }
