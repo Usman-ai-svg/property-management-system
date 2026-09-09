@@ -776,3 +776,16 @@ Password semua akun demo ada di `prisma/seed.ts`. Perintah lain yang berguna:
 Bila muncul galat yang menyebut tabel atau kolom tidak dikenal setelah menarik
 perubahan skema, jalankan `npm run db:reset`. README memuat tabel
 gejala → perintah yang lebih lengkap.
+
+---
+
+## Spesifikasi layar
+
+Tiga puluh halaman `src/app/(app)/` punya berkas spesifikasinya masing-masing di
+`docs/layar/`, beserta peta jalur di `docs/layar/README.md`. Tiap berkas memuat
+data yang dibutuhkan dari server (JSON nyata, ditangkap dari basis data demo),
+aksi yang bisa dipicu, sub-bagian izin beserta kolom yang tidak boleh terkirim,
+drill-down, dan keadaan kosong/memuat/galat.
+
+Itulah acuan menulis ulang tampilan di `proyek.js` — bukan membaca JSX sambil
+menebak data mana yang dari server.
