@@ -245,13 +245,16 @@ campur aduk antara baris lama dan baris baru, dan tidak ada yang tahu batasnya
 di mana.
 
 **Ditegakkan.** `prisma.$transaction([...])` pada `imporBarisRab`,
-`imporBoqSpk`, dan `imporTabel` — masing-masing `deleteMany` + `createMany`
-dalam satu transaksi.
+`imporBoqSpk`, dan delapan penyimpan `simpanBoq*`/`simpanRap*` yang dipakai
+`imporTabel` — masing-masing `deleteMany` + `createMany` dalam satu transaksi.
 
-**Tes.** Aturan pembacaannya bertes (`adaptor/tabel-aturan.test.ts`,
-`impor-excel.test.ts`), tetapi **sifat transaksionalnya tidak**. Di ERP,
-seluruh badan RPC berjalan dalam satu transaksi secara bawaan, jadi invarian
-ini justru lebih mudah dijaga di sana daripada di sini.
+**Tes.** Dua paruh, keduanya terjaga. Aturan pembacaannya:
+`adaptor/tabel-aturan.test.ts` dan `impor-excel.test.ts` — satu baris cacat
+membatalkan seluruh berkas sebelum menyentuh database. Sifat transaksionalnya:
+`impor-utuh.test.ts` membaca sumber kesepuluh penulis impor dan menolak
+penulisan yang berdiri di luar `prisma.$transaction([...])`, termasuk yang
+memisahkan hapus dan buat ke dua transaksi berbeda. Di ERP penjaga ini tidak
+diperlukan lagi: satu RPC adalah satu transaksi.
 
 ### INV-16 · Kontrak tidak ada tanpa dokumen SPK
 
@@ -344,15 +347,15 @@ sistem, dan memulihkannya butuh akses langsung ke database.
 
 ---
 
-## Dua invarian yang BELUM dijaga tes
+## Satu invarian yang BELUM dijaga tes
 
 Disebut terpisah supaya tidak tersamar di antara yang sudah aman:
 
 | Invarian | Keadaannya |
 |---|---|
 | INV-05 (akrual tak dihitung dua kali) | dijaga oleh bentuk skema saja; tak ada tes yang gagal bila suatu saat ada jalur yang membuat `Expense` dari pelunasan |
-| INV-15 (impor semua-atau-tidak) | aturan pembacaannya bertes, sifat transaksionalnya tidak |
 
-Keduanya lebih mudah dijaga di ERP daripada di sini: RPC berjalan dalam satu
-transaksi secara bawaan, dan menjadikan satu RPC sebagai satu-satunya penulis
-sebuah tabel adalah pola yang sudah dipakai di seluruh ERP.
+INV-15 dulu ada di daftar ini; sejak kelompok G, sifat transaksionalnya dijaga
+`impor-utuh.test.ts`. Yang tersisa lebih mudah dijaga di ERP daripada di sini:
+menjadikan satu RPC sebagai satu-satunya penulis sebuah tabel adalah pola yang
+sudah dipakai di seluruh ERP.
