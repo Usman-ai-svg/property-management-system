@@ -14,6 +14,7 @@
 
 import type { PrismaClient } from "../src/generated/prisma/client";
 import { hargaSatuanAnalisa, type KelompokDasar } from "../src/lib/calc/ahsp";
+import { ANALISA_ACUAN, HARGA_DASAR_ACUAN } from "./acuan/muat";
 
 // --- Pemasok -----------------------------------------------------------------
 const PEMASOK = [
@@ -34,54 +35,47 @@ interface HargaDasarSeed {
   penawaran?: { pemasok: string; harga: number; ket?: string }[];
 }
 
-const HARGA_DASAR: HargaDasarSeed[] = [
-  // Upah (OH = orang-hari)
-  { kode: "L.01", kategori: "UPAH", uraian: "Pekerja", satuan: "OH", acuan: 110_000 },
-  { kode: "L.02", kategori: "UPAH", uraian: "Tukang batu", satuan: "OH", acuan: 150_000 },
-  { kode: "L.03", kategori: "UPAH", uraian: "Tukang kayu", satuan: "OH", acuan: 150_000 },
-  { kode: "L.05", kategori: "UPAH", uraian: "Kepala tukang", satuan: "OH", acuan: 170_000 },
-  { kode: "L.06", kategori: "UPAH", uraian: "Mandor", satuan: "OH", acuan: 180_000 },
-  // Bahan
-  { kode: "M.01", kategori: "BAHAN", uraian: "Semen Portland (PC)", satuan: "kg", acuan: 1_600, penawaran: [
+/**
+ * Penawaran pemasok — DATA PERAGAAN, bukan acuan.
+ *
+ * Harga acuannya sendiri ada di prisma/acuan/harga-dasar.json karena ikut ke
+ * produksi; siapa menawar berapa adalah cerita demo yang berhenti di sini.
+ */
+const PENAWARAN: Record<string, { pemasok: string; harga: number; ket?: string }[]> = {
+  "M.01": [
     { pemasok: "Toko Bangunan Sejahtera", harga: 1_600 },
     { pemasok: "CV Mitra Material Utama", harga: 1_650 },
-  ] },
-  { kode: "M.02", kategori: "BAHAN", uraian: "Pasir pasang", satuan: "m3", acuan: 250_000, penawaran: [
+  ],
+  "M.02": [
     { pemasok: "Toko Bangunan Sejahtera", harga: 250_000 },
     { pemasok: "CV Mitra Material Utama", harga: 265_000 },
-  ] },
-  { kode: "M.03", kategori: "BAHAN", uraian: "Pasir beton (cor)", satuan: "m3", acuan: 300_000, penawaran: [
-    { pemasok: "CV Mitra Material Utama", harga: 300_000 },
-  ] },
-  { kode: "M.04", kategori: "BAHAN", uraian: "Batu belah/kali 15/20", satuan: "m3", acuan: 350_000, penawaran: [
+  ],
+  "M.03": [{ pemasok: "CV Mitra Material Utama", harga: 300_000 }],
+  "M.04": [
     { pemasok: "Toko Bangunan Sejahtera", harga: 350_000 },
     { pemasok: "CV Mitra Material Utama", harga: 340_000, ket: "Franco lokasi, minimal 6 m³" },
-  ] },
-  { kode: "M.05", kategori: "BAHAN", uraian: "Kerikil/split beton", satuan: "m3", acuan: 400_000, penawaran: [
-    { pemasok: "Toko Bangunan Sejahtera", harga: 400_000 },
-  ] },
-  { kode: "M.06", kategori: "BAHAN", uraian: "Besi beton polos", satuan: "kg", acuan: 15_000, penawaran: [
+  ],
+  "M.05": [{ pemasok: "Toko Bangunan Sejahtera", harga: 400_000 }],
+  "M.06": [
     { pemasok: "CV Mitra Material Utama", harga: 15_000 },
     { pemasok: "Toko Bangunan Sejahtera", harga: 15_500 },
-  ] },
-  { kode: "M.07", kategori: "BAHAN", uraian: "Kawat beton (bendrat)", satuan: "kg", acuan: 25_000 },
-  { kode: "M.08", kategori: "BAHAN", uraian: "Kayu bekisting/papan", satuan: "m3", acuan: 3_500_000 },
-  { kode: "M.09", kategori: "BAHAN", uraian: "Paku 5–10 cm", satuan: "kg", acuan: 22_000 },
-  { kode: "M.10", kategori: "BAHAN", uraian: "Bata ringan (hebel)", satuan: "m3", acuan: 650_000, penawaran: [
+  ],
+  "M.10": [
     { pemasok: "Toko Bangunan Sejahtera", harga: 650_000 },
     { pemasok: "CV Mitra Material Utama", harga: 640_000 },
-  ] },
-  { kode: "M.11", kategori: "BAHAN", uraian: "Semen instan (mortar)", satuan: "sak", acuan: 62_000 },
-  { kode: "M.12", kategori: "BAHAN", uraian: "Keramik lantai 40×40", satuan: "m2", acuan: 65_000 },
-  { kode: "M.13", kategori: "BAHAN", uraian: "Cat tembok interior", satuan: "kg", acuan: 35_000 },
-  { kode: "M.14", kategori: "BAHAN", uraian: "Pipa PVC AW 1/2\"", satuan: "btg", acuan: 45_000 },
-  { kode: "M.15", kategori: "BAHAN", uraian: "Kabel NYM 3×2,5", satuan: "m", acuan: 22_000 },
-  { kode: "M.16", kategori: "BAHAN", uraian: "Saklar/stopkontak + aksesoris", satuan: "titik", acuan: 45_000 },
-  // Alat
-  { kode: "E.01", kategori: "ALAT", uraian: "Sewa concrete mixer (molen)", satuan: "hari", acuan: 350_000, penawaran: [
-    { pemasok: "Nusantara Sewa Alat", harga: 350_000, ket: "Termasuk operator" },
-  ] },
-];
+  ],
+  "E.01": [{ pemasok: "Nusantara Sewa Alat", harga: 350_000, ket: "Termasuk operator" }],
+};
+
+/** Price book dari data acuan, ditempeli penawaran peragaan. */
+const HARGA_DASAR: HargaDasarSeed[] = HARGA_DASAR_ACUAN.map((h) => ({
+  kode: h.kode,
+  kategori: h.kategori as KelompokDasar,
+  uraian: h.uraian,
+  satuan: h.satuan,
+  acuan: h.hargaAcuan,
+  penawaran: PENAWARAN[h.kode],
+}));
 
 // --- Analisa harga satuan pekerjaan -----------------------------------------
 interface AnalisaSeed {
@@ -93,132 +87,15 @@ interface AnalisaSeed {
   komponen: { kode: string; koef: number }[];
 }
 
-const ANALISA: AnalisaSeed[] = [
-  {
-    kode: "A.01", uraian: "Pembersihan lapangan & perataan", satuan: "m2", kelompok: "Pekerjaan Persiapan",
-    komponen: [
-      { kode: "L.01", koef: 0.1 },
-      { kode: "L.06", koef: 0.005 },
-    ],
-  },
-  {
-    kode: "A.02", uraian: "Pengukuran & pemasangan bouwplank", satuan: "m'", kelompok: "Pekerjaan Persiapan",
-    komponen: [
-      { kode: "L.01", koef: 0.1 },
-      { kode: "L.03", koef: 0.1 },
-      { kode: "L.05", koef: 0.01 },
-      { kode: "L.06", koef: 0.005 },
-      { kode: "M.08", koef: 0.012 },
-      { kode: "M.09", koef: 0.02 },
-    ],
-  },
-  {
-    kode: "A.03", uraian: "Galian tanah biasa sedalam ≤ 1 m", satuan: "m3", kelompok: "Pekerjaan Tanah",
-    komponen: [
-      { kode: "L.01", koef: 0.75 },
-      { kode: "L.06", koef: 0.025 },
-    ],
-  },
-  {
-    kode: "A.04", uraian: "Urugan kembali & pemadatan", satuan: "m3", kelompok: "Pekerjaan Tanah",
-    komponen: [
-      { kode: "L.01", koef: 0.25 },
-      { kode: "L.06", koef: 0.008 },
-    ],
-  },
-  {
-    kode: "A.05", uraian: "Pasangan pondasi batu kali camp. 1:4", satuan: "m3", kelompok: "Pekerjaan Struktur",
-    komponen: [
-      { kode: "M.04", koef: 1.2 },
-      { kode: "M.01", koef: 163 },
-      { kode: "M.02", koef: 0.52 },
-      { kode: "L.01", koef: 1.5 },
-      { kode: "L.02", koef: 0.75 },
-      { kode: "L.05", koef: 0.075 },
-      { kode: "L.06", koef: 0.075 },
-    ],
-  },
-  {
-    kode: "A.06", uraian: "Beton bertulang K-225 (cor, besi & bekisting)", satuan: "m3", kelompok: "Pekerjaan Struktur",
-    komponen: [
-      { kode: "M.01", koef: 371 },
-      { kode: "M.03", koef: 0.499 },
-      { kode: "M.05", koef: 0.776 },
-      { kode: "M.06", koef: 105 },
-      { kode: "M.07", koef: 1.5 },
-      { kode: "M.08", koef: 0.04 },
-      { kode: "M.09", koef: 0.4 },
-      { kode: "L.01", koef: 5.3 },
-      { kode: "L.02", koef: 1.0 },
-      { kode: "L.05", koef: 0.1 },
-      { kode: "L.06", koef: 0.265 },
-      { kode: "E.01", koef: 0.1 },
-    ],
-  },
-  {
-    kode: "A.07", uraian: "Pasangan dinding bata ringan", satuan: "m2", kelompok: "Pekerjaan Arsitektur",
-    komponen: [
-      { kode: "M.10", koef: 0.1 },
-      { kode: "M.11", koef: 0.12 },
-      { kode: "L.01", koef: 0.3 },
-      { kode: "L.02", koef: 0.15 },
-      { kode: "L.05", koef: 0.015 },
-      { kode: "L.06", koef: 0.015 },
-    ],
-  },
-  {
-    kode: "A.08", uraian: "Plesteran & acian dinding", satuan: "m2", kelompok: "Pekerjaan Arsitektur",
-    komponen: [
-      { kode: "M.11", koef: 0.2 },
-      { kode: "L.01", koef: 0.3 },
-      { kode: "L.02", koef: 0.15 },
-      { kode: "L.05", koef: 0.015 },
-      { kode: "L.06", koef: 0.015 },
-    ],
-  },
-  {
-    kode: "A.09", uraian: "Pasang keramik lantai 40×40", satuan: "m2", kelompok: "Pekerjaan Arsitektur",
-    komponen: [
-      { kode: "M.12", koef: 1.05 },
-      { kode: "M.11", koef: 0.1 },
-      { kode: "L.01", koef: 0.35 },
-      { kode: "L.02", koef: 0.175 },
-      { kode: "L.05", koef: 0.018 },
-      { kode: "L.06", koef: 0.018 },
-    ],
-  },
-  {
-    kode: "A.10", uraian: "Pengecatan tembok interior", satuan: "m2", kelompok: "Pekerjaan Arsitektur",
-    komponen: [
-      { kode: "M.13", koef: 0.26 },
-      { kode: "L.01", koef: 0.02 },
-      { kode: "L.02", koef: 0.063 },
-      { kode: "L.05", koef: 0.006 },
-      { kode: "L.06", koef: 0.003 },
-    ],
-  },
-  {
-    kode: "A.11", uraian: "Instalasi titik listrik", satuan: "titik", kelompok: "Pekerjaan MEP",
-    komponen: [
-      { kode: "M.15", koef: 12 },
-      { kode: "M.16", koef: 1 },
-      { kode: "L.01", koef: 0.4 },
-      { kode: "L.02", koef: 0.4 },
-      { kode: "L.05", koef: 0.04 },
-      { kode: "L.06", koef: 0.02 },
-    ],
-  },
-  {
-    kode: "A.12", uraian: "Pemasangan pipa air bersih PVC 1/2\"", satuan: "m'", kelompok: "Pekerjaan MEP",
-    komponen: [
-      { kode: "M.14", koef: 0.3 },
-      { kode: "L.01", koef: 0.036 },
-      { kode: "L.02", koef: 0.06 },
-      { kode: "L.05", koef: 0.006 },
-      { kode: "L.06", koef: 0.003 },
-    ],
-  },
-];
+/** Analisa harga satuan dari data acuan. Koefisiennya bergaya SNI AHSP. */
+const ANALISA: AnalisaSeed[] = ANALISA_ACUAN.map((a) => ({
+  kode: a.kode,
+  uraian: a.uraian,
+  satuan: a.satuan,
+  kelompok: a.kelompok,
+  overheadPct: a.overheadPct,
+  komponen: a.komponen.map((k) => ({ kode: k.kode, koef: k.koefisien })),
+}));
 
 // --- RAB Estimasi contoh (volume diisi peran QS) -----------------------------
 const RAB_ITEMS: { kodeAnalisa: string; volume: number }[] = [

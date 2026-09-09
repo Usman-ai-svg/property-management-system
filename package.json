@@ -21,7 +21,8 @@
     "cek:endpoint": "tsx scripts/cek-endpoint-pindahan.ts",
     "cek:bukti": "tsx scripts/cek-bukti-pindahan.ts",
     "bangun:portabel": "node scripts/bangun-portabel.mjs",
-    "skema:sql": "tsx scripts/skema-sql.mjs"
+    "skema:sql": "tsx scripts/skema-sql.mjs",
+    "acuan:sql": "node scripts/acuan-sql.mjs"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.0",

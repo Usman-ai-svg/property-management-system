@@ -1,0 +1,304 @@
+{
+  "catatan": [
+    "Matriks hak akses awal. Satu baris per sub-bagian; \"*\" berarti seluruh peran.",
+    "Baris ADA di role_section_permissions berarti boleh melihat; bolehUbah menentukan boleh mengubah. Sub-bagian yang tidak tercantum untuk sebuah peran berarti tertutup sama sekali, bukan sekadar hanya-lihat.",
+    "BOD sengaja tercantum pada seluruh sub-bagian: sebagai pemegang keputusan tertinggi, BOD tidak boleh terhalang saat perlu mengoreksi apa pun.",
+    "Administrator Sistem adalah peran sistem, bukan jabatan organisasi. Akses penuhnya berasal dari kebutuhan administrasi aplikasi (menambah pengguna dan mengubah matriks ini), bukan dari posisi di perusahaan. Padanannya di ERP masih harus dipastikan — lihat POSISI_ADMIN_SISTEM di src/lib/auth/peran-erp.ts."
+  ],
+  "peran": [
+    {
+      "nama": "Administrator Sistem",
+      "grup": "sys"
+    },
+    {
+      "nama": "Komisaris",
+      "grup": "lead"
+    },
+    {
+      "nama": "BOD",
+      "grup": "lead"
+    },
+    {
+      "nama": "Head Operation Office",
+      "grup": "ops"
+    },
+    {
+      "nama": "Head Operation Project",
+      "grup": "ops"
+    },
+    {
+      "nama": "Project Manager",
+      "grup": "ops"
+    },
+    {
+      "nama": "Supervisor",
+      "grup": "ops"
+    },
+    {
+      "nama": "Business Development",
+      "grup": "biz"
+    },
+    {
+      "nama": "Arsitek",
+      "grup": "tech"
+    },
+    {
+      "nama": "Quantity Surveyor",
+      "grup": "tech"
+    },
+    {
+      "nama": "Procurement",
+      "grup": "tech"
+    },
+    {
+      "nama": "Customer Care",
+      "grup": "cc"
+    },
+    {
+      "nama": "Consultant Finance",
+      "grup": "fin"
+    },
+    {
+      "nama": "Finance",
+      "grup": "fin"
+    },
+    {
+      "nama": "Admin",
+      "grup": "fin"
+    },
+    {
+      "nama": "HRD",
+      "grup": "hr"
+    },
+    {
+      "nama": "Head Marketing & Sales",
+      "grup": "mkt"
+    },
+    {
+      "nama": "Agent Coordinator",
+      "grup": "mkt"
+    },
+    {
+      "nama": "Sales",
+      "grup": "mkt"
+    },
+    {
+      "nama": "Head Content & Media",
+      "grup": "media"
+    },
+    {
+      "nama": "Editor",
+      "grup": "media"
+    },
+    {
+      "nama": "Social Media",
+      "grup": "media"
+    }
+  ],
+  "akses": [
+    {
+      "section": "deskripsi",
+      "lihat": "*",
+      "ubah": [
+        "Administrator Sistem",
+        "BOD",
+        "Business Development",
+        "Head Operation Office"
+      ]
+    },
+    {
+      "section": "daftarUnit",
+      "lihat": "*",
+      "ubah": [
+        "Administrator Sistem",
+        "BOD",
+        "Head Operation Office",
+        "Head Operation Project",
+        "Project Manager"
+      ]
+    },
+    {
+      "section": "daftarSarpras",
+      "lihat": "*",
+      "ubah": [
+        "Administrator Sistem",
+        "BOD",
+        "Head Operation Office",
+        "Head Operation Project",
+        "Project Manager"
+      ]
+    },
+    {
+      "section": "dokumenTeknis",
+      "lihat": "*",
+      "ubah": [
+        "Administrator Sistem",
+        "BOD",
+        "Arsitek",
+        "Head Operation Project",
+        "Project Manager"
+      ]
+    },
+    {
+      "section": "hargaRabRap",
+      "lihat": [
+        "Administrator Sistem",
+        "Komisaris",
+        "BOD",
+        "Business Development",
+        "Head Operation Office",
+        "Head Operation Project",
+        "Project Manager",
+        "Quantity Surveyor",
+        "Procurement",
+        "Admin",
+        "Finance",
+        "Consultant Finance"
+      ],
+      "ubah": [
+        "Administrator Sistem",
+        "BOD",
+        "Quantity Surveyor",
+        "Head Operation Office"
+      ]
+    },
+    {
+      "section": "setujuiRab",
+      "lihat": [
+        "Administrator Sistem",
+        "Komisaris",
+        "BOD",
+        "Head Operation Office",
+        "Head Operation Project",
+        "Project Manager",
+        "Quantity Surveyor"
+      ],
+      "ubah": [
+        "Administrator Sistem",
+        "BOD",
+        "Head Operation Office",
+        "Head Operation Project",
+        "Project Manager"
+      ],
+      "catatan": [
+        "Ubah: berarti boleh menyetujui atau menolak. Quantity Surveyor TIDAK termasuk — ia menyusun dan mengajukan, tidak menyetujui buatannya sendiri."
+      ]
+    },
+    {
+      "section": "businessPlan",
+      "lihat": [
+        "Administrator Sistem",
+        "Komisaris",
+        "BOD",
+        "Business Development"
+      ],
+      "ubah": [
+        "Administrator Sistem",
+        "BOD",
+        "Business Development"
+      ]
+    },
+    {
+      "section": "keuangan",
+      "lihat": [
+        "Administrator Sistem",
+        "BOD",
+        "Business Development",
+        "Head Operation Office",
+        "Head Operation Project",
+        "Project Manager",
+        "Quantity Surveyor",
+        "Admin",
+        "Finance",
+        "Consultant Finance"
+      ],
+      "ubah": [
+        "Administrator Sistem",
+        "BOD",
+        "Finance",
+        "Admin",
+        "Head Operation Office"
+      ]
+    },
+    {
+      "section": "pettyCash",
+      "lihat": [
+        "Administrator Sistem",
+        "BOD",
+        "Head Operation Office",
+        "Head Operation Project",
+        "Project Manager",
+        "Supervisor",
+        "Quantity Surveyor",
+        "Admin",
+        "Finance",
+        "Consultant Finance"
+      ],
+      "ubah": [
+        "Administrator Sistem",
+        "BOD",
+        "Supervisor",
+        "Quantity Surveyor",
+        "Head Operation Project",
+        "Finance",
+        "Consultant Finance",
+        "Admin"
+      ],
+      "catatan": [
+        "Lihat: petty cash menyentuh lapangan sampai keuangan. Supervisor (pemegang dana), Quantity Surveyor (verifikasi), dan Head Operation Project (persetujuan) ikut melihat, di samping garis keuangan yang memberi dan mereimburse dana.",
+        "Ubah: berarti boleh ikut dalam alur (catat/ajukan/verifikasi/setujui/reimburse). Tahap mana yang boleh dilakukan tiap peran ditegakkan per nama peran di dalam action (wajibPeran), bukan di flag datar ini."
+      ]
+    },
+    {
+      "section": "progress",
+      "lihat": [
+        "Administrator Sistem",
+        "BOD",
+        "Head Operation Project",
+        "Project Manager",
+        "Supervisor",
+        "Quantity Surveyor",
+        "Arsitek",
+        "Procurement"
+      ],
+      "ubah": [
+        "Administrator Sistem",
+        "BOD",
+        "Project Manager",
+        "Supervisor",
+        "Head Operation Project",
+        "Quantity Surveyor"
+      ],
+      "catatan": [
+        "Ubah: Quantity Surveyor ikut boleh mengubah karena memantau progres vendor memang tugasnya, sekalipun angkanya diperoleh dari Supervisor di lapangan."
+      ]
+    },
+    {
+      "section": "aset",
+      "lihat": "*",
+      "ubah": [
+        "Administrator Sistem",
+        "BOD",
+        "Head Operation Office",
+        "Head Operation Project",
+        "Project Manager",
+        "Procurement"
+      ]
+    },
+    {
+      "section": "penyesuaianAset",
+      "lihat": "*",
+      "ubah": [
+        "Administrator Sistem",
+        "BOD",
+        "Head Operation Project",
+        "Project Manager",
+        "Quantity Surveyor",
+        "Supervisor"
+      ],
+      "catatan": [
+        "Penyesuaian stok dipisahkan dari hak ubah aset karena pelakunya berbeda: yang mendata kehilangan dan kerusakan adalah orang lapangan, sedangkan yang menambah atau menghapus master aset adalah bagian pengadaan."
+      ]
+    }
+  ]
+}

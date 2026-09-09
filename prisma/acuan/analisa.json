@@ -1,0 +1,366 @@
+[
+  {
+    "kode": "A.01",
+    "uraian": "Pembersihan lapangan & perataan",
+    "satuan": "m2",
+    "kelompok": "Pekerjaan Persiapan",
+    "overheadPct": 13,
+    "komponen": [
+      {
+        "kode": "L.01",
+        "koefisien": 0.1
+      },
+      {
+        "kode": "L.06",
+        "koefisien": 0.005
+      }
+    ]
+  },
+  {
+    "kode": "A.02",
+    "uraian": "Pengukuran & pemasangan bouwplank",
+    "satuan": "m'",
+    "kelompok": "Pekerjaan Persiapan",
+    "overheadPct": 13,
+    "komponen": [
+      {
+        "kode": "L.01",
+        "koefisien": 0.1
+      },
+      {
+        "kode": "L.03",
+        "koefisien": 0.1
+      },
+      {
+        "kode": "L.05",
+        "koefisien": 0.01
+      },
+      {
+        "kode": "L.06",
+        "koefisien": 0.005
+      },
+      {
+        "kode": "M.08",
+        "koefisien": 0.012
+      },
+      {
+        "kode": "M.09",
+        "koefisien": 0.02
+      }
+    ]
+  },
+  {
+    "kode": "A.03",
+    "uraian": "Galian tanah biasa sedalam ≤ 1 m",
+    "satuan": "m3",
+    "kelompok": "Pekerjaan Tanah",
+    "overheadPct": 13,
+    "komponen": [
+      {
+        "kode": "L.01",
+        "koefisien": 0.75
+      },
+      {
+        "kode": "L.06",
+        "koefisien": 0.025
+      }
+    ]
+  },
+  {
+    "kode": "A.04",
+    "uraian": "Urugan kembali & pemadatan",
+    "satuan": "m3",
+    "kelompok": "Pekerjaan Tanah",
+    "overheadPct": 13,
+    "komponen": [
+      {
+        "kode": "L.01",
+        "koefisien": 0.25
+      },
+      {
+        "kode": "L.06",
+        "koefisien": 0.008
+      }
+    ]
+  },
+  {
+    "kode": "A.05",
+    "uraian": "Pasangan pondasi batu kali camp. 1:4",
+    "satuan": "m3",
+    "kelompok": "Pekerjaan Struktur",
+    "overheadPct": 13,
+    "komponen": [
+      {
+        "kode": "M.04",
+        "koefisien": 1.2
+      },
+      {
+        "kode": "M.01",
+        "koefisien": 163
+      },
+      {
+        "kode": "M.02",
+        "koefisien": 0.52
+      },
+      {
+        "kode": "L.01",
+        "koefisien": 1.5
+      },
+      {
+        "kode": "L.02",
+        "koefisien": 0.75
+      },
+      {
+        "kode": "L.05",
+        "koefisien": 0.075
+      },
+      {
+        "kode": "L.06",
+        "koefisien": 0.075
+      }
+    ]
+  },
+  {
+    "kode": "A.06",
+    "uraian": "Beton bertulang K-225 (cor, besi & bekisting)",
+    "satuan": "m3",
+    "kelompok": "Pekerjaan Struktur",
+    "overheadPct": 13,
+    "komponen": [
+      {
+        "kode": "M.01",
+        "koefisien": 371
+      },
+      {
+        "kode": "M.03",
+        "koefisien": 0.499
+      },
+      {
+        "kode": "M.05",
+        "koefisien": 0.776
+      },
+      {
+        "kode": "M.06",
+        "koefisien": 105
+      },
+      {
+        "kode": "M.07",
+        "koefisien": 1.5
+      },
+      {
+        "kode": "M.08",
+        "koefisien": 0.04
+      },
+      {
+        "kode": "M.09",
+        "koefisien": 0.4
+      },
+      {
+        "kode": "L.01",
+        "koefisien": 5.3
+      },
+      {
+        "kode": "L.02",
+        "koefisien": 1
+      },
+      {
+        "kode": "L.05",
+        "koefisien": 0.1
+      },
+      {
+        "kode": "L.06",
+        "koefisien": 0.265
+      },
+      {
+        "kode": "E.01",
+        "koefisien": 0.1
+      }
+    ]
+  },
+  {
+    "kode": "A.07",
+    "uraian": "Pasangan dinding bata ringan",
+    "satuan": "m2",
+    "kelompok": "Pekerjaan Arsitektur",
+    "overheadPct": 13,
+    "komponen": [
+      {
+        "kode": "M.10",
+        "koefisien": 0.1
+      },
+      {
+        "kode": "M.11",
+        "koefisien": 0.12
+      },
+      {
+        "kode": "L.01",
+        "koefisien": 0.3
+      },
+      {
+        "kode": "L.02",
+        "koefisien": 0.15
+      },
+      {
+        "kode": "L.05",
+        "koefisien": 0.015
+      },
+      {
+        "kode": "L.06",
+        "koefisien": 0.015
+      }
+    ]
+  },
+  {
+    "kode": "A.08",
+    "uraian": "Plesteran & acian dinding",
+    "satuan": "m2",
+    "kelompok": "Pekerjaan Arsitektur",
+    "overheadPct": 13,
+    "komponen": [
+      {
+        "kode": "M.11",
+        "koefisien": 0.2
+      },
+      {
+        "kode": "L.01",
+        "koefisien": 0.3
+      },
+      {
+        "kode": "L.02",
+        "koefisien": 0.15
+      },
+      {
+        "kode": "L.05",
+        "koefisien": 0.015
+      },
+      {
+        "kode": "L.06",
+        "koefisien": 0.015
+      }
+    ]
+  },
+  {
+    "kode": "A.09",
+    "uraian": "Pasang keramik lantai 40×40",
+    "satuan": "m2",
+    "kelompok": "Pekerjaan Arsitektur",
+    "overheadPct": 13,
+    "komponen": [
+      {
+        "kode": "M.12",
+        "koefisien": 1.05
+      },
+      {
+        "kode": "M.11",
+        "koefisien": 0.1
+      },
+      {
+        "kode": "L.01",
+        "koefisien": 0.35
+      },
+      {
+        "kode": "L.02",
+        "koefisien": 0.175
+      },
+      {
+        "kode": "L.05",
+        "koefisien": 0.018
+      },
+      {
+        "kode": "L.06",
+        "koefisien": 0.018
+      }
+    ]
+  },
+  {
+    "kode": "A.10",
+    "uraian": "Pengecatan tembok interior",
+    "satuan": "m2",
+    "kelompok": "Pekerjaan Arsitektur",
+    "overheadPct": 13,
+    "komponen": [
+      {
+        "kode": "M.13",
+        "koefisien": 0.26
+      },
+      {
+        "kode": "L.01",
+        "koefisien": 0.02
+      },
+      {
+        "kode": "L.02",
+        "koefisien": 0.063
+      },
+      {
+        "kode": "L.05",
+        "koefisien": 0.006
+      },
+      {
+        "kode": "L.06",
+        "koefisien": 0.003
+      }
+    ]
+  },
+  {
+    "kode": "A.11",
+    "uraian": "Instalasi titik listrik",
+    "satuan": "titik",
+    "kelompok": "Pekerjaan MEP",
+    "overheadPct": 13,
+    "komponen": [
+      {
+        "kode": "M.15",
+        "koefisien": 12
+      },
+      {
+        "kode": "M.16",
+        "koefisien": 1
+      },
+      {
+        "kode": "L.01",
+        "koefisien": 0.4
+      },
+      {
+        "kode": "L.02",
+        "koefisien": 0.4
+      },
+      {
+        "kode": "L.05",
+        "koefisien": 0.04
+      },
+      {
+        "kode": "L.06",
+        "koefisien": 0.02
+      }
+    ]
+  },
+  {
+    "kode": "A.12",
+    "uraian": "Pemasangan pipa air bersih PVC 1/2\"",
+    "satuan": "m'",
+    "kelompok": "Pekerjaan MEP",
+    "overheadPct": 13,
+    "komponen": [
+      {
+        "kode": "M.14",
+        "koefisien": 0.3
+      },
+      {
+        "kode": "L.01",
+        "koefisien": 0.036
+      },
+      {
+        "kode": "L.02",
+        "koefisien": 0.06
+      },
+      {
+        "kode": "L.05",
+        "koefisien": 0.006
+      },
+      {
+        "kode": "L.06",
+        "koefisien": 0.003
+      }
+    ]
+  }
+]

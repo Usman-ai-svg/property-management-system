@@ -2,8 +2,11 @@
  * Data demo, dipindahkan apa adanya dari artifact `NanolandManagementSystem.jsx`.
  *
  * Dipisah dari seed.ts supaya logika penyemaian tidak tenggelam di antara data.
- * Semua nilai di sini fiktif dan hanya untuk peragaan.
+ * Semua nilai di sini fiktif dan hanya untuk peragaan — kecuali peran dan
+ * matriks hak akses, yang dibaca dari `prisma/acuan/` karena ikut ke produksi.
  */
+
+import { daftarPeran, PERAN_ACUAN, SEMUA_PERAN_ACUAN } from "./acuan/muat";
 
 export const BULAN_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
@@ -27,75 +30,31 @@ export function tglPendek(s: string): Date {
 // PERAN & HAK AKSES
 // ---------------------------------------------------------------------------
 
-export const ROLE_GRUP: Record<string, string> = {
-  // Peran sistem, bukan jabatan organisasi. Sengaja dipisahkan dari kelompok
-  // "lead" supaya jelas bahwa akses penuhnya berasal dari kebutuhan
-  // administrasi aplikasi, bukan dari posisi di perusahaan.
-  "Administrator Sistem": "sys",
-  Komisaris: "lead", BOD: "lead",
-  "Head Operation Office": "ops", "Head Operation Project": "ops",
-  "Project Manager": "ops", Supervisor: "ops",
-  "Business Development": "biz",
-  Arsitek: "tech", "Quantity Surveyor": "tech", Procurement: "tech",
-  "Customer Care": "cc",
-  "Consultant Finance": "fin", Finance: "fin", Admin: "fin",
-  HRD: "hr",
-  "Head Marketing & Sales": "mkt", "Agent Coordinator": "mkt", Sales: "mkt",
-  "Head Content & Media": "media", Editor: "media", "Social Media": "media",
-};
-
-export const SEMUA_PERAN = Object.keys(ROLE_GRUP);
-
-/** Matriks hak akses awal — sama dengan DEFAULT_ACL pada artifact. */
-export const ACL_AWAL: Record<string, string[]> = {
-  deskripsi: SEMUA_PERAN,
-  daftarUnit: SEMUA_PERAN,
-  daftarSarpras: SEMUA_PERAN,
-  dokumenTeknis: SEMUA_PERAN,
-  hargaRabRap: ["Administrator Sistem", "Komisaris", "BOD", "Business Development", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor", "Procurement", "Admin", "Finance", "Consultant Finance"],
-  setujuiRab: ["Administrator Sistem", "Komisaris", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor"],
-  businessPlan: ["Administrator Sistem", "Komisaris", "BOD", "Business Development"],
-  keuangan: ["Administrator Sistem", "BOD", "Business Development", "Head Operation Office", "Head Operation Project", "Project Manager", "Quantity Surveyor", "Admin", "Finance", "Consultant Finance"],
-  // Petty cash menyentuh lapangan sampai keuangan: Supervisor (pemegang dana),
-  // QS (verifikasi) & Head Operation Project (persetujuan) ikut melihat, di
-  // samping garis keuangan yang memberi & mereimburse dana.
-  pettyCash: ["Administrator Sistem", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager", "Supervisor", "Quantity Surveyor", "Admin", "Finance", "Consultant Finance"],
-  progress: ["Administrator Sistem", "BOD", "Head Operation Project", "Project Manager", "Supervisor", "Quantity Surveyor", "Arsitek", "Procurement"],
-  aset: SEMUA_PERAN,
-  penyesuaianAset: SEMUA_PERAN,
-};
-
 /**
- * Peran yang boleh MENGUBAH (bukan sekadar melihat) tiap sub-bagian.
+ * Peran dan matriks hak akses awal — DATA ACUAN, bukan peragaan.
  *
- * BOD sengaja tercantum pada seluruh sub-bagian: sebagai pemegang keputusan
- * tertinggi, BOD tidak boleh terhalang saat perlu mengoreksi apa pun. Pada
- * artifact, BOD belum punya hak ubah atas dokumen teknis dan progres.
+ * Isinya pindah ke `prisma/acuan/peran.json` sejak kelompok H: matriks ini ikut
+ * ke produksi ERP (lewat `npm run acuan:sql`), sedangkan pengguna contoh di
+ * bawahnya berhenti di demo. Alasan tiap keputusan — kenapa QS tidak menyetujui
+ * RAB buatannya sendiri, kenapa penyesuaian stok terpisah dari hak ubah aset —
+ * ikut pindah sebagai `catatan` di berkas itu, supaya tidak tertinggal di sini
+ * saat datanya dipakai di tempat lain.
  */
-export const ACL_UBAH: Record<string, string[]> = {
-  deskripsi: ["Administrator Sistem", "BOD", "Business Development", "Head Operation Office"],
-  daftarUnit: ["Administrator Sistem", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager"],
-  daftarSarpras: ["Administrator Sistem", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager"],
-  dokumenTeknis: ["Administrator Sistem", "BOD", "Arsitek", "Head Operation Project", "Project Manager"],
-  hargaRabRap: ["Administrator Sistem", "BOD", "Quantity Surveyor", "Head Operation Office"],
-  // Penyetuju RAB (bolehUbah = boleh menyetujui/menolak). QS TIDAK termasuk —
-  // ia menyusun & mengajukan, tak menyetujui buatannya sendiri.
-  setujuiRab: ["Administrator Sistem", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager"],
-  businessPlan: ["Administrator Sistem", "BOD", "Business Development"],
-  keuangan: ["Administrator Sistem", "BOD", "Finance", "Admin", "Head Operation Office"],
-  // bolehUbah pettyCash = boleh ikut dalam alur (catat/ajukan/verifikasi/setujui/
-  // reimburse). Tahap mana yang boleh dilakukan tiap peran ditegakkan per nama
-  // peran di dalam action (wajibPeran), bukan di flag datar ini.
-  pettyCash: ["Administrator Sistem", "BOD", "Supervisor", "Quantity Surveyor", "Head Operation Project", "Finance", "Consultant Finance", "Admin"],
-  // Quantity Surveyor ikut boleh mengubah karena memantau progres vendor
-  // memang tugasnya, sekalipun angkanya diperoleh dari Supervisor di lapangan.
-  progress: ["Administrator Sistem", "BOD", "Project Manager", "Supervisor", "Head Operation Project", "Quantity Surveyor"],
-  aset: ["Administrator Sistem", "BOD", "Head Operation Office", "Head Operation Project", "Project Manager", "Procurement"],
-  // Penyesuaian stok dipisahkan dari hak ubah aset karena pelakunya berbeda:
-  // yang mendata kehilangan dan kerusakan adalah orang lapangan, sedangkan
-  // yang menambah atau menghapus master aset adalah bagian pengadaan.
-  penyesuaianAset: ["Administrator Sistem", "BOD", "Head Operation Project", "Project Manager", "Quantity Surveyor", "Supervisor"],
-};
+export const ROLE_GRUP: Record<string, string> = Object.fromEntries(
+  PERAN_ACUAN.peran.map((p) => [p.nama, p.grup]),
+);
+
+export const SEMUA_PERAN = SEMUA_PERAN_ACUAN;
+
+/** Siapa boleh MELIHAT tiap sub-bagian. */
+export const ACL_AWAL: Record<string, string[]> = Object.fromEntries(
+  PERAN_ACUAN.akses.map((a) => [a.section, daftarPeran(a.lihat)]),
+);
+
+/** Siapa boleh MENGUBAH, bukan sekadar melihat. */
+export const ACL_UBAH: Record<string, string[]> = Object.fromEntries(
+  PERAN_ACUAN.akses.map((a) => [a.section, daftarPeran(a.ubah)]),
+);
 
 export const USERS = [
   { nama: "Andra Wijaya", inisial: "AW", peran: ["Business Development"], semua: true, proyek: [] },

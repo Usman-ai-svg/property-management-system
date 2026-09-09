@@ -1,0 +1,156 @@
+[
+  {
+    "kode": "L.01",
+    "kategori": "UPAH",
+    "uraian": "Pekerja",
+    "satuan": "OH",
+    "hargaAcuan": 110000
+  },
+  {
+    "kode": "L.02",
+    "kategori": "UPAH",
+    "uraian": "Tukang batu",
+    "satuan": "OH",
+    "hargaAcuan": 150000
+  },
+  {
+    "kode": "L.03",
+    "kategori": "UPAH",
+    "uraian": "Tukang kayu",
+    "satuan": "OH",
+    "hargaAcuan": 150000
+  },
+  {
+    "kode": "L.05",
+    "kategori": "UPAH",
+    "uraian": "Kepala tukang",
+    "satuan": "OH",
+    "hargaAcuan": 170000
+  },
+  {
+    "kode": "L.06",
+    "kategori": "UPAH",
+    "uraian": "Mandor",
+    "satuan": "OH",
+    "hargaAcuan": 180000
+  },
+  {
+    "kode": "M.01",
+    "kategori": "BAHAN",
+    "uraian": "Semen Portland (PC)",
+    "satuan": "kg",
+    "hargaAcuan": 1600
+  },
+  {
+    "kode": "M.02",
+    "kategori": "BAHAN",
+    "uraian": "Pasir pasang",
+    "satuan": "m3",
+    "hargaAcuan": 250000
+  },
+  {
+    "kode": "M.03",
+    "kategori": "BAHAN",
+    "uraian": "Pasir beton (cor)",
+    "satuan": "m3",
+    "hargaAcuan": 300000
+  },
+  {
+    "kode": "M.04",
+    "kategori": "BAHAN",
+    "uraian": "Batu belah/kali 15/20",
+    "satuan": "m3",
+    "hargaAcuan": 350000
+  },
+  {
+    "kode": "M.05",
+    "kategori": "BAHAN",
+    "uraian": "Kerikil/split beton",
+    "satuan": "m3",
+    "hargaAcuan": 400000
+  },
+  {
+    "kode": "M.06",
+    "kategori": "BAHAN",
+    "uraian": "Besi beton polos",
+    "satuan": "kg",
+    "hargaAcuan": 15000
+  },
+  {
+    "kode": "M.07",
+    "kategori": "BAHAN",
+    "uraian": "Kawat beton (bendrat)",
+    "satuan": "kg",
+    "hargaAcuan": 25000
+  },
+  {
+    "kode": "M.08",
+    "kategori": "BAHAN",
+    "uraian": "Kayu bekisting/papan",
+    "satuan": "m3",
+    "hargaAcuan": 3500000
+  },
+  {
+    "kode": "M.09",
+    "kategori": "BAHAN",
+    "uraian": "Paku 5–10 cm",
+    "satuan": "kg",
+    "hargaAcuan": 22000
+  },
+  {
+    "kode": "M.10",
+    "kategori": "BAHAN",
+    "uraian": "Bata ringan (hebel)",
+    "satuan": "m3",
+    "hargaAcuan": 650000
+  },
+  {
+    "kode": "M.11",
+    "kategori": "BAHAN",
+    "uraian": "Semen instan (mortar)",
+    "satuan": "sak",
+    "hargaAcuan": 62000
+  },
+  {
+    "kode": "M.12",
+    "kategori": "BAHAN",
+    "uraian": "Keramik lantai 40×40",
+    "satuan": "m2",
+    "hargaAcuan": 65000
+  },
+  {
+    "kode": "M.13",
+    "kategori": "BAHAN",
+    "uraian": "Cat tembok interior",
+    "satuan": "kg",
+    "hargaAcuan": 35000
+  },
+  {
+    "kode": "M.14",
+    "kategori": "BAHAN",
+    "uraian": "Pipa PVC AW 1/2\"",
+    "satuan": "btg",
+    "hargaAcuan": 45000
+  },
+  {
+    "kode": "M.15",
+    "kategori": "BAHAN",
+    "uraian": "Kabel NYM 3×2,5",
+    "satuan": "m",
+    "hargaAcuan": 22000
+  },
+  {
+    "kode": "M.16",
+    "kategori": "BAHAN",
+    "uraian": "Saklar/stopkontak + aksesoris",
+    "satuan": "titik",
+    "hargaAcuan": 45000
+  },
+  {
+    "kode": "E.01",
+    "kategori": "ALAT",
+    "uraian": "Sewa concrete mixer (molen)",
+    "satuan": "hari",
+    "hargaAcuan": 350000
+  }
+]
