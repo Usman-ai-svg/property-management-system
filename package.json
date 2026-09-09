@@ -22,7 +22,8 @@
     "cek:bukti": "tsx scripts/cek-bukti-pindahan.ts",
     "bangun:portabel": "node scripts/bangun-portabel.mjs",
     "skema:sql": "tsx scripts/skema-sql.mjs",
-    "acuan:sql": "node scripts/acuan-sql.mjs"
+    "acuan:sql": "node scripts/acuan-sql.mjs",
+    "bundel:hitung": "esbuild src/lib/_bundel.ts --bundle --format=iife --global-name=ProyekHitung --target=es2020 --minify --outfile=dist/proyek-hitung.min.js"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.0",
@@ -39,6 +40,7 @@
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.28.1",
     "pg-query-emscripten": "^5.1.0",
     "prisma": "^7.9.0",
     "tsx": "^4.23.1",

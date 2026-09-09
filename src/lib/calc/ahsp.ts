@@ -13,6 +13,7 @@
  * dengan tiap komponen = koefisien × harga satuan dasar. Overhead & keuntungan
  * dikenakan atas jumlah biaya langsung, bukan per kelompok.
  */
+import { nilaiBaris } from "./boq";
 
 /** Kelompok harga dasar. Menentukan komponen masuk ke ΣA, ΣB, atau ΣC. */
 export type KelompokDasar = "UPAH" | "BAHAN" | "ALAT";
@@ -101,9 +102,8 @@ export interface BarisRab {
   urutan: number;
 }
 
-/** Nilai satu baris RAB = volume × harga satuan. */
-export const nilaiBaris = (r: { volume: number; hargaSatuan: number }): number =>
-  r.volume * r.hargaSatuan;
+/** Nilai satu baris RAB = volume x harga satuan. Kanonisnya di `boq.ts`. */
+export { nilaiBaris };
 
 /** Jumlahkan nilai sekumpulan baris RAB. */
 export const totalRab = (rows: { volume: number; hargaSatuan: number }[]): number =>

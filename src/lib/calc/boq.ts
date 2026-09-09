@@ -36,9 +36,21 @@ export interface BarisRap {
   urutan: number;
 }
 
-/** Subtotal satu baris. */
-export const subtotal = (r: { volume: number; hargaSatuan: number }): number =>
+/**
+ * Nilai satu baris: volume x harga satuan.
+ *
+ * Rumah kanonisnya di sini. Perhitungan yang sama pernah berdiri sendiri tiga
+ * kali — di sini sebagai `subtotal`, di `ahsp.ts` dan `kontrak-boq.ts` sebagai
+ * `nilaiBaris` — dan ketiganya kebetulan masih sama. Kebetulan itu yang
+ * berbahaya: pembulatan yang suatu saat ditambahkan pada salah satunya tidak
+ * akan terlihat sampai dua laporan menampilkan angka berbeda untuk baris yang
+ * sama.
+ */
+export const nilaiBaris = (r: { volume: number; hargaSatuan: number }): number =>
   r.volume * r.hargaSatuan;
+
+/** Nama lama yang dipakai tabel BOQ/RAP. Fungsi yang sama persis. */
+export const subtotal = nilaiBaris;
 
 /** Jumlahkan subtotal sekumpulan baris. */
 export const totalBaris = (rows: { volume: number; hargaSatuan: number }[]): number =>

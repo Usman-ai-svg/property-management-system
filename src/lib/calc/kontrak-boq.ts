@@ -12,6 +12,7 @@
  * unit DIHITUNG dari baris-baris itu — tertimbang nilai, bukan rata-rata
  * sederhana, karena pekerjaan pondasi dan pekerjaan cat tidak sama bobotnya.
  */
+import { nilaiBaris } from "./boq";
 
 export interface BarisBoqSpk {
   unitId?: string | null;
@@ -22,9 +23,8 @@ export interface BarisBoqSpk {
   progress: number;
 }
 
-/** Nilai sebuah baris BOQ: volume dikali harga satuan. */
-export const nilaiBaris = (b: { volume: number; hargaSatuan: number }): number =>
-  b.volume * b.hargaSatuan;
+/** Nilai sebuah baris BOQ: volume dikali harga satuan. Kanonisnya di `boq.ts`. */
+export { nilaiBaris };
 
 /**
  * Batas selisih yang masih dianggap "BOQ cocok dengan nilai SPK", dalam rupiah.
