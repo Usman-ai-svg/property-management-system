@@ -37,6 +37,10 @@ sudah masuk allowlist `.claude/settings.local.json` — panggil tanpa ragu.
 - `npm run typecheck` — `tsc --noEmit` (wajib bersih sebelum selesai).
 - `npm run test` — unit test (`node --test`).
 - `npm run db:reset` — hapus DB, push skema, generate, seed ulang (SQLite demo).
-- `npm run skema:postgres` — regenerasi `schema.postgres.prisma` + `enum-postgres.sql`
-  dari `enums.ts` (jalankan bila enum/skema berubah).
+- `npm run skema:sql` — regenerasi `prisma/proyek.sql`, DDL PostgreSQL untuk
+  schema `proyek` di ERP (jalankan bila skema berubah). Inilah keluaran yang
+  dipakai migrasi.
+- `npm run skema:postgres` — regenerasi `schema.postgres.prisma` +
+  `enum-postgres.sql`. Jalur LAMA, dipertahankan sebagai pembanding sampai DDL
+  di atas terbukti; keluarannya masih skema Prisma bertabel `pm_`.
 - Login demo: password semua akun `nanoland2026`.
