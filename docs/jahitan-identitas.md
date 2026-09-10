@@ -93,7 +93,7 @@ Tempat identitas dipakai untuk memutuskan, bukan disimpan. Semuanya sudah lewat
 | `izinkan(section, projectId)` | gerbang tiap aksi tulis — peran aktif + akses proyek |
 | `petty-actions.ts` | `pengguna.id === dana.pemegangId` — hanya pemegang dana boleh mencatat |
 | `admin/actions.ts` | `target.id === pengguna.id` — tidak bisa menonaktifkan/menghapus diri sendiri |
-| `admin/actions.ts` | `pengguna.peranAktif === role.nama` — tidak bisa mencabut hak kelola diri sendiri |
+| `admin/actions.ts` | `pengguna.jabatan.includes(role.nama)` — tidak bisa mencabut hak kelola diri sendiri |
 | `audit.ts` (`catat`) | jejak audit menyimpan pelaku setiap aksi |
 
 Di ERP, keempat yang pertama jadi pemeriksaan di baris pertama tiap RPC dengan
@@ -104,7 +104,7 @@ Di ERP, keempat yang pertama jadi pemeriksaan di baris pertama tiap RPC dengan
 ## Yang berubah di Kelompok C
 
 **C1 — satu pintu.** `PenyediaIdentitas` di `src/lib/auth/penyedia.ts` menjawab
-tiga pertanyaan saja: `siapa()`, `peran()`, `boleh()`. Seluruh mekanisme sesi
+tiga pertanyaan saja: `siapa()`, `jabatan()`, `boleh()`. Seluruh mekanisme sesi
 (nama cookie, umur token, `jose`, `next/headers`) kini tidak pernah keluar dari
 `src/lib/auth/` — dijaga tes `penyedia.test.ts`, yang membaca berkas sumber dan
 gagal bila ada satu impor yang menembus.
@@ -148,176 +148,91 @@ Tiga hal yang tidak bisa diselesaikan dari repo ini:
 
 ---
 
-## Pemetaan posisi ERP → peran modul PROYEK
+## Sumbu hak akses: JABATAN
 
-Ditetapkan bersama Usman **2026-09-09**, dari daftar pengguna ERP yang
-sebenarnya. Ditulis di kode (`PETA_POSISI_ERP` di `src/lib/auth/peran-erp.ts`)
-dan dijaga tes, bukan disepakati lisan.
+> **Bagian ini menggantikan pemetaan "posisi ERP → peran" yang dulu ada di
+> sini.** Sejak revisi 2 dokumen perbaikan, konsep "peran" tidak ada lagi
+> sebagai sumbu izin. Peta lengkapnya, beserta instruksi untuk sisi ERP, ada di
+> [`jabatan-erp.md`](jabatan-erp.md).
 
-**Kenapa POSISI, bukan `profiles.role`.** ERP menyimpan peran kasar
-(`director`/`accountant`/`manager`/`admin`/`staff`) dan posisi sebenarnya di
-daftar pegawai. Peran kasar terlalu tumpul untuk modul ini: `staff` yang sama
-dipakai Logistic Staff, Junior Arsitek, dan Security — padahal ketiganya butuh
-akses yang jauh berbeda.
+ERP memakai dua lapis yang menjawab pertanyaan berbeda:
 
-**Isinya nama peran kita, bukan peta izin.** Izinnya sendiri sudah ada di
-`RoleSectionPermission` yang sejak C3 dikunci ke nama peran, jadi seluruh isi
-tabel itu bisa ditempel apa adanya ke ERP. Menyalin izin ke peta posisi akan
-melahirkan sumber kebenaran kedua yang bisa hanyut sendiri.
-
-| Posisi ERP | Divisi | Peran modul PROYEK |
+| Lapis | Sumber | Menjawab |
 |---|---|---|
-| Director | Director | BOD |
-| Head of Operation | Operasional | **Head Operation Office + Head Operation Project** |
-| Manager Proyek | Produksi | **Project Manager + Supervisor** |
-| Logistic Staff | Produksi | **Supervisor** |
-| Quantity Surveyor Asst | Produksi | **Quantity Surveyor + Procurement** |
-| Junior Arsitek Staff | Produksi | Arsitek |
-| Finance & Tax | Operasional | Finance |
-| Staff Administration | Operasional | **Admin + Finance** |
-| HRD Staff | Operasional | HRD |
-| Customer Service | Operasional | Customer Care |
-| **Support Function** | Operasional | **tanpa akses modul proyek** |
-| Manager Marketing | Marketing | Head Marketing & Sales |
-| Sales & Marketing | Marketing | Sales |
-| Agent Coordinator | Marketing | Agent Coordinator |
-| Copy Writer | Marketing | Head Content & Media |
-| Design Graphic Staff | Marketing | Editor |
-| Graphic Designer | Marketing | Social Media |
-| **Security** | Produksi & Operasional | **tanpa akses modul proyek** |
+| Luar | `profiles.role` | modul mana yang kelihatan |
+| Dalam | jabatan di `hris.employees` | di dalam modul Proyek boleh apa |
 
-Kelima posisi Marketing berprofil izin **identik** — enam sub-bagian baca-saja
-(deskripsi, daftar unit, daftar sarpras, dokumen teknis, aset, penyesuaian
-aset). Peran yang dipilih hanya menentukan label, bukan kewenangan — tetapi
-label itu ikut ke jejak audit, jadi tetap perlu benar.
+Modul ini dikunci ke lapis DALAM, dan **tidak menyentuh `profiles.role` sama
+sekali**. Sebabnya peran kasar terlalu tumpul: nilai `staff` yang sama dipakai
+Logistic Staff, Junior Arsitek, dan Security — padahal ketiganya butuh akses
+yang jauh berbeda.
 
-### Empat rangkap peran, dan alasannya
+Definisinya satu tempat: `src/lib/domain/jabatan.ts` — 18 jabatan, masing-masing
+dengan kunci baku, teks HRIS, label, grup, cakupan, dan peran repo lama yang
+dulu menempel padanya. `ROLES` dan `ROLE_GRUP` diturunkan dari sana.
 
-Izin selalu mengikuti peran yang SEDANG dipakai, tidak pernah gabungan. Jadi
-rangkap peran berarti orangnya berpindah lewat pemilih "Lihat sebagai".
+**Matriks dikunci ke KUNCI baku, bukan ke teks HRIS.** Selama kolom jabatan di
+HRIS belum terbukti punya daftar tertutup, teksnya harus dianggap bebas — dan
+satu salah ketik akan mencabut akses seseorang tanpa pesan apa pun. Dengan
+lapisan pemetaan, koreksinya satu baris di `ALIAS_HRIS`.
 
-- **Head of Operation** memegang sisi kantor (Head Operation Office) dan sisi
-  lapangan (Head Operation Project). Yang kedua wajib: tahap "Setujui" pada
-  alur petty cash menuntut nama peran itu persis. Tanpanya, laporan petty cash
-  mentok di DiverifikasiQS dan tidak pernah bisa direimburse.
-- **Manager Proyek** merangkap Supervisor sebagai pemegang dana petty cash.
-  Konsekuensinya perlu diketahui: Project Manager tidak berhak mengubah petty
-  cash, jadi untuk mencatat pengeluaran dana talangannya ia harus berpindah ke
-  peran Supervisor lebih dulu. Itu bukan kerepotan tak sengaja — memegang uang
-  tunai perusahaan memang tindakan yang berbeda dari mengelola proyek.
-- **Logistic Staff** murni Supervisor, sehingga ia tak perlu berpindah peran
-  sama sekali untuk memegang dana. Ia bisa mencatat penyesuaian stok (Hilang /
-  Rusak / Koreksi Stok) tetapi TIDAK mendaftarkan alat baru — pendaftaran alat
-  ikut Procurement, yang kini dipegang QS Asst.
-- **Staff Administration** merangkap Finance. Kedua peran itu berprofil izin
-  identik, jadi rangkapnya tidak menambah kewenangan apa pun pada matriks. Yang
-  ditambahkannya justru hal yang tak terlihat dari matriks: tahap **Reimburse**
-  menuntut nama peran "Finance" persis, sehingga pencairan tidak berhenti bila
-  Finance & Tax berhalangan.
+### Satu orang, beberapa jabatan, tanpa "Lihat sebagai"
 
-### Alur petty cash — keempat tahapnya kini ada pemegangnya
+Izin adalah **gabungan** seluruh jabatan yang dipegang, dengan tingkat tertinggi
+yang menang. Pemilih "Lihat sebagai" sudah dibuang, dan `peranAktif` tidak ada
+lagi di `Pengguna`.
+
+Yang hilang bersamanya: gerbang yang bersandar pada ritual berpindah peran.
+Gantinya aturan yang ditulis eksplisit di lapisan murni — dan itu justru yang
+bisa ikut pindah ke RPC. Dua aturan alur petty cash, di
+`src/lib/calc/petty-cash.ts`:
+
+1. **Pemegang dana hanya boleh mengajukan.** Tahap sesudahnya digerakkan orang
+   lain; tidak ada yang memeriksa pertanggungjawabannya sendiri. Inilah satu-
+   satunya hal yang memisahkan laporan petty cash dari catatan pribadi.
+2. **`director` menembus batas jabatan**, supaya laporan yang tersangkut karena
+   pemegang tahapnya berhalangan tetap bisa didorong — **kecuali** atas dana
+   yang ia pegang sendiri. Aturan 1 diperiksa lebih dulu dan tidak bisa
+   dilangkahi.
+
+### Administrator sistem: melekat pada `director`
+
+ERP tidak punya peran administrator tersendiri. `director` yang memegang modul
+Pengaturan dan jejak audit, dan bersama `hrd` lolos `is_hr_admin()`. Karena itu
+peran "Administrator Sistem" **dihapus** dari repo ini; padanannya jabatan
+`director`, dan ada tes yang gagal bila literalnya muncul lagi.
+
+> **Jangan tertukar dengan `admin` pada `profiles.role`.** Namanya paling mirip,
+> tapi ia padanan Staff Administration — administrasi keuangan, bukan
+> administrator sistem.
+
+Pengelolaan pengguna dan matriks hak akses tidak bergantung pada jabatan
+tertentu: gerbangnya hak **ubah** pada sub-bagian `deskripsi`
+(`izinkanKelolaAkses` di `admin/actions.ts`).
+
+### Alur petty cash — keempat tahapnya ada pemegangnya
 
 ```
-Pemegang (Supervisor)      → Manager Proyek · Logistic Staff
-Verifikasi (QS)            → Quantity Surveyor Asst
-Setujui (Head Ops Project) → Head of Operation
-Reimburse (Finance)        → Finance & Tax · Staff Administration
+Mengajukan   pemegang dana: logistic staff / manager proyek
+Verifikasi   quantity surveyor asst / head of operation
+Setujui      head of operation
+Reimburse    finance & tax / staff administration  (+ izin ubah keuangan)
 ```
 
-Ada tes yang gagal bila salah satu tahap kehilangan pemegangnya.
-
-### Yang belum terjawab
-
-| Hal | Keadaannya |
-|---|---|
-| ~~Administrator Sistem~~ | **TERJAWAB 2026-09-09**: ERP tidak punya peran itu; `director` yang bertindak sebagai administrator — lihat bagian di bawah |
-| **Tujuh akun "Belum"** | dua di antaranya kunci: Manager Proyek dan QS Asst. Selama belum aktif, tak ada yang bisa mengisi progres maupun memverifikasi petty cash |
-| **Support Function** | diputuskan Usman: tanpa akses modul proyek |
-| Komisaris, Business Development, Consultant Finance, Head Content & Media | tak ada orangnya di ERP — barisnya tinggal kosong, tidak masalah |
+Ada tes yang gagal bila salah satu tahap kehilangan pemegangnya, dan tes
+tersendiri untuk kedua aturan lintas transisi di atas.
 
 ### Pembatasan per proyek: DIHAPUS
 
-Diputuskan Usman 2026-09-09: pembatasan per proyek boleh hilang di ERP. Enam
-akun di repo ini berstatus "proyek terbatas"; di ERP semuanya melihat seluruh
-proyek. `penggunaDariErp()` memang sudah menyetel `semuaProyek: true`, jadi
-tidak ada yang perlu diubah — tetapi sekarang itu keputusan yang diambil
-sadar, bukan pelonggaran yang terlanjur.
+Diputuskan Usman 2026-09-09: pembatasan per proyek boleh hilang di ERP. Seed
+sekarang memberi `semuaProyek: true` ke semua orang, jadi demo dan ERP
+berperilaku sama — sebelumnya demo membatasi enam akun, dan bedanya cuma akan
+membingungkan saat dibandingkan.
 
-### Padanan Administrator Sistem — TERJAWAB: melekat pada `director`
+### Yang masih ditunggu dari sisi ERP
 
-Jawaban Usman (2026-09-09) setelah memeriksa ERP: **tidak ada peran yang khusus
-bernama administrator sistem.** Nilai `profiles.role` yang tercatat ada delapan:
-
-```
-director · accountant · manager · sales · staff · viewer · hrd · admin
-```
-
-`director` yang bertindak sebagai administrator, karena tiga hal:
-
-1. satu-satunya yang mendapat modul **Pengaturan** (`roles: ['director']` pada
-   `MODULES`);
-2. satu-satunya yang bisa membaca **jejak audit**;
-3. bersama `hrd`, satu-satunya yang lolos **`is_hr_admin()`** untuk gaji dan
-   payroll.
-
-Karena itu `POSISI_ADMIN_SISTEM = ["Director"]`.
-
-> **Jangan tertukar dengan `admin`.** Nilai `profiles.role` bernama `admin`
-> adalah padanan **Staff Administration** di sini — peran administrasi keuangan.
-> Ia tidak memegang modul Pengaturan di ERP, dan bukan administrator sistem.
-> Namanya yang paling mirip justru yang paling menyesatkan.
-
-#### Menambah, bukan menggantikan
-
-`peranDariPosisiErp("Director")` sekarang mengembalikan:
-
-```
-["BOD", "Administrator Sistem"]
-```
-
-Rangkap, dengan **BOD lebih dulu**. Dua alasannya:
-
-1. BOD adalah nama yang tercantum di matriks hak akses, di `PERAN_KELOLA_AKSES`,
-   dan di seluruh dokumen. Menimpanya membuat Director kehilangan identitas
-   yang dirujuk semua tempat lain.
-2. Yang pertama menjadi **peran aktif** saat masuk. Gerbang petty cash memeriksa
-   `peranAktif === "Administrator Sistem"`, jadi Director tidak masuk setiap
-   hari sebagai superuser: ia harus berpindah lebih dulu lewat pemilih "Lihat
-   sebagai". Perpindahan itu sadar, dan tercatat sebagai peran itu di jejak
-   audit.
-
-Pola yang sama sudah dipakai Manager Proyek, yang harus berpindah ke Supervisor
-untuk memegang uang tunai.
-
-#### Kenapa itu perlu dijaga
-
-Administrator Sistem bukan sekadar label:
-
-1. Ia memegang seluruh **12 sub-bagian** dengan hak ubah.
-2. Ia adalah **`PERAN_SUPERUSER`** pada alur petty cash — satu-satunya yang
-   boleh menembus gerbang tiap tahap. Pemegangnya bisa mengajukan,
-   memverifikasi, menyetujui, DAN mereimburse satu laporan sendirian.
-
-Poin kedua itulah gunanya: laporan yang tersangkut karena pemegang tahapnya
-berhalangan bisa didorong sampai selesai. Bahayanya dan kegunaannya satu hal
-yang sama, jadi yang menjaganya adalah keharusan berpindah peran secara sadar.
-
-#### Yang tidak bergantung pada peran ini
-
-Pengelolaan pengguna dan matriks hak akses. Gerbangnya hak **ubah** pada
-sub-bagian `deskripsi` (`izinkanKelolaAkses` di `admin/actions.ts`), bukan nama
-peran ini. Empat peran memenuhinya pada matriks bawaan:
-
-```
-Administrator Sistem · BOD · Business Development · Head Operation Office
-```
-
-Director (lewat BOD) dan Head of Operation (Head Operation Office) sudah
-memenuhinya, jadi menambah pengguna dan mengatur matriksnya bisa dilakukan tanpa
-seorang pun berpindah ke peran administrator.
-
-#### `hrd` — besar di ERP, tertutup di sini
-
-`is_hr_admin()` memberi `hrd` kewenangan gaji dan payroll di ERP. Itu di luar
-modul proyek; di sini `hrd` sama tertutupnya dengan `viewer`. Dicatat supaya
-tidak ada yang membukanya "karena kelihatannya penting".
+| Hal | Keadaannya |
+|---|---|
+| Kolom jabatan di HRIS | daftar tertutup atau teks bebas? Daftar periksanya di [`jabatan-erp.md`](jabatan-erp.md) bagian 3 |
+| `komisaris` & `consultant finance` | jabatannya perlu dibuat, dibiarkan kosong |
+| Akun yang belum aktif | selama belum ada orangnya, tak ada yang bisa mengisi progres maupun memverifikasi petty cash |

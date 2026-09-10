@@ -196,8 +196,8 @@ dan ikut pindah; mesinnya diganti.
 **Identitas.** Seluruh aplikasi membaca pengguna lewat satu fungsi,
 `ambilPengguna()`. `identitas.ts` menyatakan kontraknya, dan
 `periksaPengguna()` menolak adaptor baru yang lupa mengisi `izin` atau
-mengisi `peranAktif` dengan daftar — ketahuan di sana, bukan nanti sebagai
-halaman kosong tanpa penjelasan.
+mengirim `jabatan` yang kosong — ketahuan di sana, bukan nanti sebagai halaman
+kosong tanpa penjelasan.
 
 **Berkas.** Yang diamankan bukan kerapian melainkan daftar putih jenis
 berkas, batas ukuran, dan pembersihan nama. `bersihkanNamaFile()` sekarang
@@ -637,8 +637,8 @@ Prisma, dan sebagian besar `src/components/`.
 
 Titik sambung dengan login ERP hanya satu fungsi: `ambilPengguna()` di
 `rbac.ts`. Selama ia mengembalikan objek `Pengguna` yang sama bentuknya —
-`id`, `nama`, `peranAktif`, `peran[]`, `semuaProyek`, `proyekIds[]`, dan peta
-`izin` — seluruh aplikasi di atasnya tidak perlu tahu login-nya diganti.
+`id`, `nama`, `jabatan[]`, `semuaProyek`, `proyekIds[]`, dan peta `izin` —
+seluruh aplikasi di atasnya tidak perlu tahu login-nya diganti.
 Itu satu-satunya tempat yang membaca sesi.
 
 ---

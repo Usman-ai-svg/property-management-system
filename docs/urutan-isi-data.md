@@ -15,20 +15,22 @@ Dokumen ini urutannya. Dipakai tim yang mengisi data pertama kali.
 | Langkah | Perintah | Isinya |
 | --- | --- | --- |
 | Buat tabel | jalankan `prisma/proyek.sql` | 60 tabel schema `proyek`, RLS aktif, tanpa policy tulis |
-| Isi data acuan | jalankan `prisma/acuan.sql` | matriks hak akses, 22 harga dasar, 12 analisa harga satuan |
-| Pastikan akun ada | sisi ERP | tiap orang punya akun di `auth.users`, posisinya terisi |
+| Isi pustaka harga | jalankan `prisma/acuan.sql` | 22 harga dasar, 12 analisa harga satuan, 64 komponen |
+| Isi matriks hak akses | jalankan `prisma/acl.sql` | 145 baris untuk 18 jabatan |
+| Pastikan akun ada | sisi ERP | tiap orang punya akun di `auth.users`, dan jabatannya terisi di HRIS |
 
-Keduanya dihasilkan ulang dengan `npm run skema:sql` dan `npm run acuan:sql`;
-jangan disunting tangan.
+Ketiganya dihasilkan ulang dengan `npm run skema:sql`, `npm run acuan:sql`, dan
+`npm run acl:sql`; jangan disunting tangan.
 
 Setelah `acuan.sql` masuk, **harga dasarnya wajib disesuaikan** sebelum dipakai
 menyusun RAB. Yang bersifat acuan di sana strukturnya (kode, kategori, satuan,
 koefisien analisa), bukan angkanya — angka bawaannya kisaran wajar, bukan harga
 yang berlaku di lokasi Anda.
 
-Peta posisi ERP → peran modul ini ada di `src/lib/auth/peran-erp.ts`
-(`PETA_POSISI_ERP`). Kalau ada posisi baru di ERP, tambahkan di sana; posisi yang
-tidak terpetakan tidak bisa membuka modul Proyek sama sekali.
+Peta jabatan HRIS → hak akses modul ini ada di `src/lib/domain/jabatan.ts`.
+Kalau ada jabatan baru di HRIS, tambahkan di sana; jabatan yang tidak terpetakan
+tidak punya hak apa pun di modul Proyek. Instruksi untuk sisi ERP:
+[`jabatan-erp.md`](jabatan-erp.md).
 
 ---
 
@@ -126,9 +128,12 @@ manual.
 ## 11. Petty cash
 
 Butuh: proyek + orang yang memegang dana (satu dana per orang per proyek).
-Pemegangnya harus sudah punya akun; alurnya (catat → ajukan → verifikasi →
-setujui → reimburse) menyebut peran, bukan orang, jadi peran akun itu harus
-sudah benar sejak awal.
+Pemegangnya harus sudah punya akun, dan berjabatan **logistic staff** atau
+**manager proyek**. Alurnya (catat → ajukan → verifikasi → setujui → reimburse)
+menyebut jabatan, bukan orang, jadi jabatan akunnya harus sudah benar sejak
+awal. Satu aturan yang perlu diketahui sebelum menunjuk pemegang: **pemegang
+dana tidak bisa memverifikasi pengajuannya sendiri**, jadi harus ada orang lain
+berjabatan quantity surveyor asst atau head of operation.
 
 ## 12. Keuangan
 
