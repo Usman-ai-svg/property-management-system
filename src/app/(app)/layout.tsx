@@ -11,15 +11,14 @@ export default async function LayoutAplikasi({ children }: { children: React.Rea
   // Menu disaring di server berdasarkan izin sesungguhnya. Halaman yang tidak
   // muncul di sini juga menolak akses langsung lewat URL — penyaringan menu
   // adalah kenyamanan, bukan pengamanan.
-  const nav = navUntuk(pengguna.peranAktif, (s) => bolehLihat(pengguna, s));
+  const nav = navUntuk(pengguna.jabatan, (s) => bolehLihat(pengguna, s));
 
   return (
     <div className="shell">
       <Sidebar
         nav={nav}
         nama={pengguna.nama}
-        peranAktif={pengguna.peranAktif}
-        peran={pengguna.peran}
+        jabatan={pengguna.jabatan}
       />
       <main className="main">
         <ToastProvider>{children}</ToastProvider>

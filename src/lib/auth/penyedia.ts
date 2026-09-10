@@ -10,8 +10,7 @@
  * Antarmukanya sengaja cuma menjawab TIGA pertanyaan:
  *
  *   1. `siapa()`   — siapa yang sedang masuk?
- *   2. `peran()`   — peran apa yang sedang dipakainya, dan peran apa saja yang
- *                    dimilikinya?
+ *   2. `jabatan()` — jabatan apa saja yang dipegangnya?
  *   3. `boleh()`   — boleh apa dia pada sebuah sub-bagian?
  *
  * Tiga pertanyaan itu yang benar-benar ditanyakan aplikasi. Segala hal lain
@@ -45,14 +44,6 @@ export interface Identitas {
   nama: string;
 }
 
-/** Peran yang dipegang seseorang. */
-export interface PeranPengguna {
-  /** Peran yang SEDANG dipakai. Satu, bukan daftar. */
-  aktif: string;
-  /** Seluruh peran yang dimiliki, untuk mengisi pemilih "Lihat sebagai". */
-  dimiliki: string[];
-}
-
 /**
  * Sumber identitas yang bisa dipasang.
  *
@@ -62,7 +53,11 @@ export interface PeranPengguna {
  */
 export interface PenyediaIdentitas {
   siapa(): Promise<Identitas | null>;
-  peran(): Promise<PeranPengguna | null>;
+  /**
+   * Kunci jabatan yang dipegang, boleh lebih dari satu. Izinnya gabungan
+   * dengan tingkat tertinggi yang menang — lihat `gabungIzin`.
+   */
+  jabatan(): Promise<string[] | null>;
   boleh(section: Section): Promise<Kewenangan>;
 }
 
@@ -82,9 +77,9 @@ export function penyediaDari(muat: () => Promise<Pengguna | null>): PenyediaIden
       return u ? { id: u.id, nama: u.nama } : null;
     },
 
-    async peran() {
+    async jabatan() {
       const u = await muat();
-      return u ? { aktif: u.peranAktif, dimiliki: u.peran } : null;
+      return u ? [...u.jabatan] : null;
     },
 
     async boleh(section) {

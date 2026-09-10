@@ -615,7 +615,7 @@ export default async function KeuanganProyek({
           kandidat={kandidatPetty}
           konteks={{
             id: pengguna.id,
-            peranAktif: pengguna.peranAktif,
+            jabatan: pengguna.jabatan,
             bolehKeuangan: bolehUbahKeuangan,
             bolehPetty: bolehUbah(pengguna, "pettyCash"),
           }}

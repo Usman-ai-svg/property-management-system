@@ -88,8 +88,7 @@ describe("jahitan identitas tertutup", () => {
 const pengguna = (izin: [Section, boolean][]): Pengguna => ({
   id: "u1",
   nama: "Budi",
-  peranAktif: "Project Manager",
-  peran: ["Project Manager", "Supervisor"],
+  jabatan: ["manager_proyek", "logistic_staff"],
   semuaProyek: false,
   proyekIds: ["p1"],
   izin: new Map(izin),
@@ -124,10 +123,10 @@ describe("penyediaDari", () => {
     });
   });
 
-  it("peran() memisahkan yang aktif dari yang dimiliki", () => {
-    return p.peran().then((r) => {
-      assert.equal(r?.aktif, "Project Manager");
-      assert.deepEqual(r?.dimiliki, ["Project Manager", "Supervisor"]);
+  it("jabatan() membawa seluruh jabatan yang dipegang", () => {
+    // Bukan satu "yang aktif": izinnya gabungan, jadi yang relevan seluruhnya.
+    return p.jabatan().then((r) => {
+      assert.deepEqual(r, ["manager_proyek", "logistic_staff"]);
     });
   });
 
@@ -140,7 +139,7 @@ describe("penyediaDari", () => {
   it("tanpa sesi, ketiganya menjawab kosong — bukan melempar", async () => {
     const kosong = penyediaDari(async () => null);
     assert.equal(await kosong.siapa(), null);
-    assert.equal(await kosong.peran(), null);
+    assert.equal(await kosong.jabatan(), null);
     assert.equal(await kosong.boleh("keuangan"), "tidak");
   });
 });

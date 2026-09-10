@@ -7,7 +7,7 @@ import { PettyCash } from "../keuangan/[kode]/petty-cash";
 /**
  * Menu Petty Cash tersendiri.
  *
- * Ada supaya Supervisor pemegang dana bisa mengelola dananya — catat
+ * Ada supaya pemegang dana bisa mengelola dananya — catat
  * pengeluaran, ajukan laporan — tanpa perlu izin `keuangan` yang membuka angka
  * RAB/RAP & seluruh transaksi proyek. Peran pengawas keuangan (Finance/QS/Head
  * Ops) juga bisa memakainya sebagai pandangan petty cash lintas proyek. Beri
@@ -28,7 +28,7 @@ export default async function PettyCashMenu() {
   const grup = await pettyCashPengguna(pengguna);
   const konteks = {
     id: pengguna.id,
-    peranAktif: pengguna.peranAktif,
+    jabatan: pengguna.jabatan,
     bolehKeuangan: bolehUbah(pengguna, "keuangan"),
     bolehPetty: bolehUbah(pengguna, "pettyCash"),
   };

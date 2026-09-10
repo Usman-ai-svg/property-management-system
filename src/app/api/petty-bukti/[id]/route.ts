@@ -8,7 +8,7 @@ import { alamatLuar, bacaBerkas, tipeDari } from "@/lib/storage";
  *
  * Terpisah dari `/api/bukti/[id]` (yang melayani bukti sebuah Expense dan
  * dijaga izin "keuangan") karena berkas ini menempel pada PettyCashReport dan
- * audiensnya berbeda: Supervisor pemegang yang mengunggahnya, QS & Head Ops yang
+ * audiensnya berbeda: pemegang dana yang mengunggahnya, verifikator & penyetuju yang
  * mereviewnya — semuanya lewat izin "pettyCash", bukan "keuangan". Seperti bukti
  * lain, berkasnya tidak disajikan statis: tiap permintaan memeriksa sesi, izin,
  * dan akses ke proyek pemilik dana lebih dulu.

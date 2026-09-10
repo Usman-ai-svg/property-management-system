@@ -61,16 +61,22 @@ model User {
   @@map("users")
 }
 
+/// Jabatan yang dikenal sistem. `nama` berisi KUNCI jabatan
+/// (mis. "manager_proyek"), bukan label — lihat src/lib/domain/jabatan.ts.
+///
+/// Tabel ini tidak ikut ke ERP: di sana jabatan datang dari `hris.employees`.
+/// Namanya masih `Role` karena penggantian nama model tidak mengubah apa pun
+/// yang dikirim ke ERP, sementara diff-nya menyentuh belasan berkas.
 model Role {
   id        String  @id @default(cuid())
   nama      String  @unique
-  /// Pengelompokan untuk pewarnaan UI: lead|ops|biz|tech|cc|fin|hr|mkt|media
+  /// Pengelompokan untuk pewarnaan UI: lead|ops|tech|cc|fin|hr|mkt|media
   grup      String
   keterangan String?
 
   users UserRole[]
-  // Izin per sub-bagian TIDAK direlasikan ke sini: matriksnya dikunci ke nama
-  // peran supaya bisa ikut pindah tanpa tabel Role. Lihat RoleSectionPermission.
+  // Izin per sub-bagian TIDAK direlasikan ke sini: matriksnya dikunci ke kunci
+  // jabatan supaya bisa ikut pindah tanpa tabel ini. Lihat RoleSectionPermission.
 
   @@map("roles")
 }
@@ -110,17 +116,22 @@ model UserProjectAccess {
 /// kebetulan memakai id yang sama.
 model RoleSectionPermission {
   id       String @id @default(cuid())
-  /// Nama peran, mis. "Project Manager". Lihat ROLES di src/lib/domain/enums.ts.
-  roleNama String
+  /// Kunci jabatan, mis. "manager_proyek". Lihat JABATAN di
+  /// src/lib/domain/jabatan.ts. Dikunci ke kunci baku, BUKAN ke teks jabatan
+  /// HRIS: teks itu belum terbukti punya daftar tertutup, dan satu salah ketik
+  /// akan mencabut akses seseorang tanpa pesan apa pun.
+  jabatan String
   /// deskripsi | daftarUnit | daftarSarpras | dokumenTeknis | hargaRabRap
   /// | setujuiRab | businessPlan | keuangan | pettyCash | progress | aset
   /// | penyesuaianAset
   section String
+  /// true = sub-bagian ini kelihatan oleh jabatan tersebut
+  bolehLihat Boolean @default(true)
   /// false = boleh lihat saja, true = boleh ubah
   bolehUbah Boolean @default(false)
 
-  @@unique([roleNama, section])
-  @@index([roleNama])
+  @@unique([jabatan, section])
+  @@index([jabatan])
   @@map("role_section_permissions")
 }
 

@@ -21,11 +21,12 @@ export async function dataAdmin(u: Pengguna) {
       orderBy: { nama: "asc" },
       select: { id: true, nama: true, grup: true, _count: { select: { users: true } } },
     }),
-    // Matriks izin dikunci ke NAMA peran, bukan id — jadi ia diambil terpisah
-    // lalu ditempelkan, bukan lewat relasi. Bentuk itu yang membuat isinya bisa
-    // ditempel apa adanya ke ERP, tempat tabel Role tidak ada.
+    // Matriks izin dikunci ke KUNCI JABATAN, bukan id — jadi ia diambil
+    // terpisah lalu ditempelkan, bukan lewat relasi. Bentuk itu yang membuat
+    // isinya bisa ditempel apa adanya ke ERP, tempat tabel Role tidak ada.
     prisma.roleSectionPermission.findMany({
-      select: { roleNama: true, section: true, bolehUbah: true },
+      where: { bolehLihat: true },
+      select: { jabatan: true, section: true, bolehUbah: true },
     }),
     prisma.user.findMany({
       orderBy: { nama: "asc" },
@@ -53,9 +54,9 @@ export async function dataAdmin(u: Pengguna) {
 
   const izinPeran = new Map<string, { section: string; bolehUbah: boolean }[]>();
   for (const p of matriks) {
-    const daftar = izinPeran.get(p.roleNama);
+    const daftar = izinPeran.get(p.jabatan);
     if (daftar) daftar.push(p);
-    else izinPeran.set(p.roleNama, [p]);
+    else izinPeran.set(p.jabatan, [p]);
   }
 
   return {

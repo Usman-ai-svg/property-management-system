@@ -1,4 +1,7 @@
 import type { Section } from "./domain/enums";
+import {
+  JABATAN_DIRECTOR, JABATAN_HEAD_OF_OPERATION, JABATAN_STAFF_ADMINISTRATION,
+} from "./domain/jabatan";
 
 export interface ItemNav {
   id: string;
@@ -9,7 +12,7 @@ export interface ItemNav {
   /** Bila diisi, menu hanya muncul untuk peran yang boleh melihat sub-bagian ini. */
   butuhSection?: Section;
   /** Bila diisi, menu hanya muncul untuk peran dalam daftar. */
-  butuhPeran?: string[];
+  butuhJabatan?: string[];
   anak?: Omit<ItemNav, "ikon" | "anak">[];
 }
 
@@ -51,16 +54,16 @@ export const NAV: ItemNav[] = [
   // Hak Akses; secara bawaan audiensnya tetap Administrator Sistem, Komisaris,
   // BOD, dan Business Development — sama seperti sebelum penyatuan.
   { id: "landbank", label: "Landbank", href: "/landbank", ikon: "Map", butuhSection: "businessPlan" },
-  { id: "admin", label: "Admin", href: "/admin", ikon: "ShieldCheck", butuhPeran: ["Administrator Sistem", "BOD", "Business Development", "Head Operation Office", "Admin"] },
+  { id: "admin", label: "Admin", href: "/admin", ikon: "ShieldCheck", butuhJabatan: [JABATAN_DIRECTOR, JABATAN_HEAD_OF_OPERATION, JABATAN_STAFF_ADMINISTRATION] },
 ];
 
-/** Saring menu sesuai peran aktif dan izin yang dimiliki. */
+/** Saring menu sesuai jabatan yang dipegang dan izin yang dimiliki. */
 export function navUntuk(
-  peranAktif: string,
+  jabatan: readonly string[],
   bolehLihatSection: (s: Section) => boolean,
 ): ItemNav[] {
-  const lolos = (n: { butuhSection?: Section; butuhPeran?: string[] }) => {
-    if (n.butuhPeran && !n.butuhPeran.includes(peranAktif)) return false;
+  const lolos = (n: { butuhSection?: Section; butuhJabatan?: string[] }) => {
+    if (n.butuhJabatan && !jabatan.some((j) => n.butuhJabatan!.includes(j))) return false;
     if (n.butuhSection && !bolehLihatSection(n.butuhSection)) return false;
     return true;
   };

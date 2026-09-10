@@ -6,7 +6,13 @@
  * matriks hak akses, yang dibaca dari `prisma/acuan/` karena ikut ke produksi.
  */
 
-import { daftarPeran, PERAN_ACUAN, SEMUA_PERAN_ACUAN } from "./acuan/muat";
+import { HAK_AKSES_ACUAN } from "./acuan/muat";
+import { SECTIONS } from "../src/lib/domain/enums";
+import {
+  JABATAN, JABATAN_DIRECTOR, JABATAN_FINANCE_TAX, JABATAN_HEAD_OF_OPERATION,
+  JABATAN_LOGISTIC_STAFF, JABATAN_MANAGER_PROYEK, JABATAN_QS_ASST,
+  JABATAN_STAFF_ADMINISTRATION, KUNCI_JABATAN,
+} from "../src/lib/domain/jabatan";
 
 export const BULAN_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
@@ -31,52 +37,67 @@ export function tglPendek(s: string): Date {
 // ---------------------------------------------------------------------------
 
 /**
- * Peran dan matriks hak akses awal — DATA ACUAN, bukan peragaan.
+ * Jabatan dan matriks hak akses — DATA ACUAN, bukan peragaan.
  *
- * Isinya pindah ke `prisma/acuan/peran.json` sejak kelompok H: matriks ini ikut
- * ke produksi ERP (lewat `npm run acuan:sql`), sedangkan pengguna contoh di
- * bawahnya berhenti di demo. Alasan tiap keputusan — kenapa QS tidak menyetujui
- * RAB buatannya sendiri, kenapa penyesuaian stok terpisah dari hak ubah aset —
- * ikut pindah sebagai `catatan` di berkas itu, supaya tidak tertinggal di sini
- * saat datanya dipakai di tempat lain.
+ * Keduanya diturunkan dari satu sumber: definisi jabatan di
+ * `src/lib/domain/jabatan.ts` dan matriksnya di `prisma/acuan/hak-akses.json`.
+ * Sebelum ini seed menyimpan daftarnya sendiri, dan daftar itu berbeda isi
+ * dari `ROLES` di `enums.ts` — 22 lawan 21 — sehingga tipe `Role` berbohong
+ * dan runtime selamat hanya karena seed membaca daftarnya sendiri.
  */
 export const ROLE_GRUP: Record<string, string> = Object.fromEntries(
-  PERAN_ACUAN.peran.map((p) => [p.nama, p.grup]),
+  JABATAN.map((j) => [j.kunci, j.grup]),
 );
 
-export const SEMUA_PERAN = SEMUA_PERAN_ACUAN;
+export const SEMUA_PERAN = KUNCI_JABATAN;
 
 /** Siapa boleh MELIHAT tiap sub-bagian. */
 export const ACL_AWAL: Record<string, string[]> = Object.fromEntries(
-  PERAN_ACUAN.akses.map((a) => [a.section, daftarPeran(a.lihat)]),
+  SECTIONS.map((s) => [
+    s,
+    HAK_AKSES_ACUAN.akses.filter((a) => a.section === s && a.bolehLihat).map((a) => a.jabatan),
+  ]),
 );
 
 /** Siapa boleh MENGUBAH, bukan sekadar melihat. */
 export const ACL_UBAH: Record<string, string[]> = Object.fromEntries(
-  PERAN_ACUAN.akses.map((a) => [a.section, daftarPeran(a.ubah)]),
+  SECTIONS.map((s) => [
+    s,
+    HAK_AKSES_ACUAN.akses.filter((a) => a.section === s && a.bolehUbah).map((a) => a.jabatan),
+  ]),
 );
 
+/**
+ * Pengguna demo — orang sungguhan dari tabel 2.2 dokumen perbaikan.
+ *
+ * Bukan nama karangan lagi: seed harus menghasilkan sistem yang bisa dicoba
+ * dengan orang yang benar-benar akan memakainya, karena kekeliruan pemetaan
+ * jabatan baru kelihatan saat seseorang masuk dan menemukan menunya salah.
+ *
+ * `komisaris` dan `consultant finance` sengaja tanpa orang: jabatannya ada di
+ * matriks, orangnya belum. Barisnya tinggal diisi.
+ *
+ * `semua: true` untuk semuanya — pembatasan per proyek dihapus atas keputusan
+ * Usman (2026-09-09); ERP tidak menyimpannya, dan memalsukannya di sini cuma
+ * membuat demo berbeda dari kenyataannya.
+ */
 export const USERS = [
-  { nama: "Andra Wijaya", inisial: "AW", peran: ["Business Development"], semua: true, proyek: [] },
-  // Peran administrator ditaruh pertama karena `peranAktif` saat login diambil
-  // dari peran pertama — akun ini harus langsung berakses penuh, dan tetap
-  // bisa dipindah ke Komisaris atau BOD untuk memperagakan pembatasan peran.
-  { nama: "H. Nugroho", inisial: "HN", peran: ["Administrator Sistem", "Komisaris", "BOD"], semua: true, proyek: [] },
-  { nama: "Rina Safitri", inisial: "RS", peran: ["Head Operation Office", "Admin"], semua: true, proyek: [] },
-  { nama: "Hendra Kurnia", inisial: "HK", peran: ["Head Operation Project", "Project Manager"], semua: false, proyek: ["NT4", "GN2"] },
-  { nama: "Agus Pratama", inisial: "AP", peran: ["Supervisor"], semua: false, proyek: ["NT4", "GN2"] },
-  { nama: "Fajar Ramadhan", inisial: "FR", peran: ["Arsitek"], semua: true, proyek: [] },
-  { nama: "Sari Kusuma", inisial: "SK", peran: ["Quantity Surveyor"], semua: false, proyek: ["GN2"] },
-  { nama: "Budi Hartono", inisial: "BH", peran: ["Quantity Surveyor", "Procurement"], semua: false, proyek: ["NT4", "NT2"] },
-  { nama: "Dewi Anggraini", inisial: "DA", peran: ["Quantity Surveyor"], semua: false, proyek: [] },
-  { nama: "Maya Larasati", inisial: "ML", peran: ["Customer Care"], semua: false, proyek: ["NT2"] },
-  { nama: "Sinta Dewi", inisial: "SD", peran: ["Consultant Finance", "Finance"], semua: true, proyek: [] },
-  { nama: "Bayu Aditya", inisial: "BA", peran: ["HRD"], semua: true, proyek: [] },
-  { nama: "Rudi Hartawan", inisial: "RH", peran: ["Head Marketing & Sales"], semua: true, proyek: [] },
-  { nama: "Lina Marlina", inisial: "LM", peran: ["Agent Coordinator", "Sales"], semua: true, proyek: [] },
-  { nama: "Doni Saputra", inisial: "DS", peran: ["Sales"], semua: true, proyek: [] },
-  { nama: "Rani Puspita", inisial: "RP", peran: ["Head Content & Media", "Editor"], semua: true, proyek: [] },
-  { nama: "Tania Kirana", inisial: "TK", peran: ["Social Media"], semua: true, proyek: [] },
+  { nama: "Umar", inisial: "UM", jabatan: [JABATAN_DIRECTOR], semua: true, proyek: [] },
+  { nama: "Usman", inisial: "US", jabatan: [JABATAN_HEAD_OF_OPERATION], semua: true, proyek: [] },
+  { nama: "Abdillah", inisial: "AB", jabatan: [JABATAN_MANAGER_PROYEK], semua: true, proyek: [] },
+  { nama: "Dicky", inisial: "DC", jabatan: [JABATAN_LOGISTIC_STAFF], semua: true, proyek: [] },
+  { nama: "Laras", inisial: "LR", jabatan: [JABATAN_QS_ASST], semua: true, proyek: [] },
+  { nama: "Sabila", inisial: "SB", jabatan: ["junior_arsitek_staff"], semua: true, proyek: [] },
+  { nama: "Nisa", inisial: "NS", jabatan: [JABATAN_FINANCE_TAX], semua: true, proyek: [] },
+  { nama: "Firmanda", inisial: "FM", jabatan: [JABATAN_STAFF_ADMINISTRATION], semua: true, proyek: [] },
+  { nama: "Galih", inisial: "GL", jabatan: ["hrd_staff"], semua: true, proyek: [] },
+  { nama: "Diana", inisial: "DN", jabatan: ["sales_marketing"], semua: true, proyek: [] },
+  { nama: "Arzenico", inisial: "AR", jabatan: ["customer_service"], semua: true, proyek: [] },
+  { nama: "Wahyudi", inisial: "WY", jabatan: ["manager_marketing"], semua: true, proyek: [] },
+  { nama: "Imam Jaka", inisial: "IJ", jabatan: ["agent_coordinator"], semua: true, proyek: [] },
+  { nama: "Intan", inisial: "IN", jabatan: ["copy_writer"], semua: true, proyek: [] },
+  { nama: "Gunawan", inisial: "GN", jabatan: ["design_graphic_staff"], semua: true, proyek: [] },
+  { nama: "Yuzak", inisial: "YZ", jabatan: ["graphic_designer"], semua: true, proyek: [] },
 ];
 
 // ---------------------------------------------------------------------------
@@ -403,21 +424,21 @@ export const KONTRAK = [
 // ---------------------------------------------------------------------------
 
 export const ASET = [
-  { kode: "SCF-001", jumlah: 100, satuan: "set", nama: "Scaffolding Frame Set (100 set)", kategori: "Perancah", merk: "Multi Frame 1,7 m", milik: "Milik Sendiri", vendor: null as string | null, lokasi: "NT4", pj: "Agus Pratama", status: "Digunakan", satuanPakai: "hari", pakai: 128, servisAkhir: "12 Mar 2026", servisBerikut: "12 Sep 2026", nilai: 185000000 },
-  { kode: "MLN-002", jumlah: 3, satuan: "unit", nama: "Concrete Mixer / Molen 350 L", kategori: "Alat Berat Ringan", merk: "Hercules HCM-350", milik: "Milik Sendiri", vendor: null, lokasi: "NT4", pj: "Agus Pratama", status: "Digunakan", satuanPakai: "jam", pakai: 1240, servisAkhir: "02 Jun 2026", servisBerikut: "02 Sep 2026", nilai: 24500000 },
-  { kode: "STP-003", jumlah: 2, satuan: "unit", nama: "Stamper Kuda / Tamping Rammer", kategori: "Pemadatan", merk: "Mikasa MT-76", milik: "Milik Sendiri", vendor: null, lokasi: "GN2", pj: "Hendra Kurnia", status: "Digunakan", satuanPakai: "jam", pakai: 860, servisAkhir: "18 Apr 2026", servisBerikut: "18 Agu 2026", nilai: 32000000 },
-  { kode: "STP-004", jumlah: 2, satuan: "unit", nama: "Stamper Kodok / Plate Compactor", kategori: "Pemadatan", merk: "Tiger TPC-80", milik: "Sewa", vendor: "CV Karya Aspal", lokasi: "NT4", pj: "Agus Pratama", status: "Digunakan", satuanPakai: "jam", pakai: 320, servisAkhir: null, servisBerikut: null, nilai: 450000 },
-  { kode: "BOR-005", jumlah: 6, satuan: "unit", nama: "Mesin Bor Beton / Rotary Hammer", kategori: "Perkakas Listrik", merk: "Bosch GBH 2-26", milik: "Milik Sendiri", vendor: null, lokasi: "NT4", pj: "Agus Pratama", status: "Tersedia", satuanPakai: "jam", pakai: 410, servisAkhir: "20 Mei 2026", servisBerikut: "20 Nov 2026", nilai: 4200000 },
-  { kode: "VBR-006", jumlah: 4, satuan: "unit", nama: "Vibrator Beton (Concrete Vibrator)", kategori: "Pengecoran", merk: "Dynamic ZN-50", milik: "Milik Sendiri", vendor: null, lokasi: "NT4", pj: "Agus Pratama", status: "Pemeliharaan", satuanPakai: "jam", pakai: 980, servisAkhir: "10 Jul 2026", servisBerikut: "10 Okt 2026", nilai: 8900000 },
-  { kode: "GEN-007", jumlah: 2, satuan: "unit", nama: "Genset 5.000 Watt", kategori: "Daya & Listrik", merk: "Honda EP-6500", milik: "Milik Sendiri", vendor: null, lokasi: "GN2", pj: "Hendra Kurnia", status: "Digunakan", satuanPakai: "jam", pakai: 1520, servisAkhir: "28 Jun 2026", servisBerikut: "28 Agu 2026", nilai: 18500000 },
-  { kode: "LAS-008", jumlah: 3, satuan: "unit", nama: "Mesin Las Listrik 900 Watt", kategori: "Perkakas Listrik", merk: "Rhino MMA-120", milik: "Milik Sendiri", vendor: null, lokasi: "NT4", pj: "Agus Pratama", status: "Digunakan", satuanPakai: "jam", pakai: 640, servisAkhir: "05 Mei 2026", servisBerikut: "05 Nov 2026", nilai: 3100000 },
-  { kode: "BCT-009", jumlah: 2, satuan: "unit", nama: "Bar Cutter (Pemotong Besi)", kategori: "Pembesian", merk: "Toyo TBC-25", milik: "Milik Sendiri", vendor: null, lokasi: "NT4", pj: "Agus Pratama", status: "Digunakan", satuanPakai: "jam", pakai: 720, servisAkhir: "14 Apr 2026", servisBerikut: "14 Okt 2026", nilai: 21000000 },
-  { kode: "BBD-010", jumlah: 2, satuan: "unit", nama: "Bar Bender (Pembengkok Besi)", kategori: "Pembesian", merk: "Toyo TBB-25", milik: "Milik Sendiri", vendor: null, lokasi: "NT4", pj: "Agus Pratama", status: "Tersedia", satuanPakai: "jam", pakai: 540, servisAkhir: "14 Apr 2026", servisBerikut: "14 Okt 2026", nilai: 19500000 },
-  { kode: "SRV-011", jumlah: 1, satuan: "unit", nama: "Theodolite / Total Station", kategori: "Survey & Ukur", merk: "Topcon GTS-235", milik: "Sewa", vendor: "PT Bina Marga Sejahtera", lokasi: "NT4", pj: "Fajar Ramadhan", status: "Digunakan", satuanPakai: "hari", pakai: 22, servisAkhir: null, servisBerikut: null, nilai: 350000 },
-  { kode: "SRV-012", jumlah: 2, satuan: "unit", nama: "Automatic Level / Waterpass", kategori: "Survey & Ukur", merk: "Nikon AX-2S", milik: "Milik Sendiri", vendor: null, lokasi: "GN2", pj: "Fajar Ramadhan", status: "Tersedia", satuanPakai: "hari", pakai: 64, servisAkhir: "08 Jan 2026", servisBerikut: "08 Jan 2027", nilai: 9800000 },
-  { kode: "PMP-013", jumlah: 3, satuan: "unit", nama: 'Pompa Air / Water Pump 3"', kategori: "Daya & Listrik", merk: "Honda WB-30", milik: "Milik Sendiri", vendor: null, lokasi: "NT2", pj: "Rina Safitri", status: "Tersedia", satuanPakai: "jam", pakai: 380, servisAkhir: "02 Feb 2026", servisBerikut: "02 Agu 2026", nilai: 6700000 },
-  { kode: "JCH-014", jumlah: 2, satuan: "unit", nama: "Jack Hammer / Bobok Beton", kategori: "Alat Berat Ringan", merk: "Makita HM-1317", milik: "Sewa", vendor: "CV Cipta Bangun", lokasi: "GN2", pj: "Hendra Kurnia", status: "Digunakan", satuanPakai: "jam", pakai: 96, servisAkhir: null, servisBerikut: null, nilai: 275000 },
-  { kode: "TWL-015", jumlah: 4, satuan: "unit", nama: "Tower Lamp / Lampu Sorot Proyek", kategori: "Daya & Listrik", merk: "Airman 4x400W", milik: "Sewa", vendor: "CV Elektrindo Jaya", lokasi: "NT4", pj: "Agus Pratama", status: "Rusak", satuanPakai: "jam", pakai: 210, servisAkhir: "30 Jun 2026", servisBerikut: null, nilai: 400000 },
+  { kode: "SCF-001", jumlah: 100, satuan: "set", nama: "Scaffolding Frame Set (100 set)", kategori: "Perancah", merk: "Multi Frame 1,7 m", milik: "Milik Sendiri", vendor: null as string | null, lokasi: "NT4", pj: "Dicky", status: "Digunakan", satuanPakai: "hari", pakai: 128, servisAkhir: "12 Mar 2026", servisBerikut: "12 Sep 2026", nilai: 185000000 },
+  { kode: "MLN-002", jumlah: 3, satuan: "unit", nama: "Concrete Mixer / Molen 350 L", kategori: "Alat Berat Ringan", merk: "Hercules HCM-350", milik: "Milik Sendiri", vendor: null, lokasi: "NT4", pj: "Dicky", status: "Digunakan", satuanPakai: "jam", pakai: 1240, servisAkhir: "02 Jun 2026", servisBerikut: "02 Sep 2026", nilai: 24500000 },
+  { kode: "STP-003", jumlah: 2, satuan: "unit", nama: "Stamper Kuda / Tamping Rammer", kategori: "Pemadatan", merk: "Mikasa MT-76", milik: "Milik Sendiri", vendor: null, lokasi: "GN2", pj: "Abdillah", status: "Digunakan", satuanPakai: "jam", pakai: 860, servisAkhir: "18 Apr 2026", servisBerikut: "18 Agu 2026", nilai: 32000000 },
+  { kode: "STP-004", jumlah: 2, satuan: "unit", nama: "Stamper Kodok / Plate Compactor", kategori: "Pemadatan", merk: "Tiger TPC-80", milik: "Sewa", vendor: "CV Karya Aspal", lokasi: "NT4", pj: "Dicky", status: "Digunakan", satuanPakai: "jam", pakai: 320, servisAkhir: null, servisBerikut: null, nilai: 450000 },
+  { kode: "BOR-005", jumlah: 6, satuan: "unit", nama: "Mesin Bor Beton / Rotary Hammer", kategori: "Perkakas Listrik", merk: "Bosch GBH 2-26", milik: "Milik Sendiri", vendor: null, lokasi: "NT4", pj: "Dicky", status: "Tersedia", satuanPakai: "jam", pakai: 410, servisAkhir: "20 Mei 2026", servisBerikut: "20 Nov 2026", nilai: 4200000 },
+  { kode: "VBR-006", jumlah: 4, satuan: "unit", nama: "Vibrator Beton (Concrete Vibrator)", kategori: "Pengecoran", merk: "Dynamic ZN-50", milik: "Milik Sendiri", vendor: null, lokasi: "NT4", pj: "Dicky", status: "Pemeliharaan", satuanPakai: "jam", pakai: 980, servisAkhir: "10 Jul 2026", servisBerikut: "10 Okt 2026", nilai: 8900000 },
+  { kode: "GEN-007", jumlah: 2, satuan: "unit", nama: "Genset 5.000 Watt", kategori: "Daya & Listrik", merk: "Honda EP-6500", milik: "Milik Sendiri", vendor: null, lokasi: "GN2", pj: "Abdillah", status: "Digunakan", satuanPakai: "jam", pakai: 1520, servisAkhir: "28 Jun 2026", servisBerikut: "28 Agu 2026", nilai: 18500000 },
+  { kode: "LAS-008", jumlah: 3, satuan: "unit", nama: "Mesin Las Listrik 900 Watt", kategori: "Perkakas Listrik", merk: "Rhino MMA-120", milik: "Milik Sendiri", vendor: null, lokasi: "NT4", pj: "Dicky", status: "Digunakan", satuanPakai: "jam", pakai: 640, servisAkhir: "05 Mei 2026", servisBerikut: "05 Nov 2026", nilai: 3100000 },
+  { kode: "BCT-009", jumlah: 2, satuan: "unit", nama: "Bar Cutter (Pemotong Besi)", kategori: "Pembesian", merk: "Toyo TBC-25", milik: "Milik Sendiri", vendor: null, lokasi: "NT4", pj: "Dicky", status: "Digunakan", satuanPakai: "jam", pakai: 720, servisAkhir: "14 Apr 2026", servisBerikut: "14 Okt 2026", nilai: 21000000 },
+  { kode: "BBD-010", jumlah: 2, satuan: "unit", nama: "Bar Bender (Pembengkok Besi)", kategori: "Pembesian", merk: "Toyo TBB-25", milik: "Milik Sendiri", vendor: null, lokasi: "NT4", pj: "Dicky", status: "Tersedia", satuanPakai: "jam", pakai: 540, servisAkhir: "14 Apr 2026", servisBerikut: "14 Okt 2026", nilai: 19500000 },
+  { kode: "SRV-011", jumlah: 1, satuan: "unit", nama: "Theodolite / Total Station", kategori: "Survey & Ukur", merk: "Topcon GTS-235", milik: "Sewa", vendor: "PT Bina Marga Sejahtera", lokasi: "NT4", pj: "Sabila", status: "Digunakan", satuanPakai: "hari", pakai: 22, servisAkhir: null, servisBerikut: null, nilai: 350000 },
+  { kode: "SRV-012", jumlah: 2, satuan: "unit", nama: "Automatic Level / Waterpass", kategori: "Survey & Ukur", merk: "Nikon AX-2S", milik: "Milik Sendiri", vendor: null, lokasi: "GN2", pj: "Sabila", status: "Tersedia", satuanPakai: "hari", pakai: 64, servisAkhir: "08 Jan 2026", servisBerikut: "08 Jan 2027", nilai: 9800000 },
+  { kode: "PMP-013", jumlah: 3, satuan: "unit", nama: 'Pompa Air / Water Pump 3"', kategori: "Daya & Listrik", merk: "Honda WB-30", milik: "Milik Sendiri", vendor: null, lokasi: "NT2", pj: "Usman", status: "Tersedia", satuanPakai: "jam", pakai: 380, servisAkhir: "02 Feb 2026", servisBerikut: "02 Agu 2026", nilai: 6700000 },
+  { kode: "JCH-014", jumlah: 2, satuan: "unit", nama: "Jack Hammer / Bobok Beton", kategori: "Alat Berat Ringan", merk: "Makita HM-1317", milik: "Sewa", vendor: "CV Cipta Bangun", lokasi: "GN2", pj: "Abdillah", status: "Digunakan", satuanPakai: "jam", pakai: 96, servisAkhir: null, servisBerikut: null, nilai: 275000 },
+  { kode: "TWL-015", jumlah: 4, satuan: "unit", nama: "Tower Lamp / Lampu Sorot Proyek", kategori: "Daya & Listrik", merk: "Airman 4x400W", milik: "Sewa", vendor: "CV Elektrindo Jaya", lokasi: "NT4", pj: "Dicky", status: "Rusak", satuanPakai: "jam", pakai: 210, servisAkhir: "30 Jun 2026", servisBerikut: null, nilai: 400000 },
 ];
 
 /**
@@ -443,21 +464,21 @@ export const ASET_KENDARAAN = [
  * lagi menahan stok.
  */
 export const PENGGUNAAN = [
-  { alat: "SCF-001", proyek: "NT4", jumlah: 60, mulai: "20 Jul 2026", selesai: null as string | null, tarif: 0, pj: "Agus Pratama", catatan: "Perancah struktur blok A", status: "Aktif" },
-  { alat: "SCF-001", proyek: "GN2", jumlah: 25, mulai: "01 Agu 2026", selesai: null, tarif: 0, pj: "Hendra Kurnia", catatan: "Perancah cluster tahap 1", status: "Aktif" },
-  { alat: "MLN-002", proyek: "NT4", jumlah: 3, mulai: "15 Jul 2026", selesai: null, tarif: 0, pj: "Agus Pratama", catatan: "Pengecoran jalan lingkungan", status: "Aktif" },
-  { alat: "STP-003", proyek: "GN2", jumlah: 2, mulai: "10 Jul 2026", selesai: null, tarif: 0, pj: "Hendra Kurnia", catatan: "Pemadatan tanah kavling", status: "Aktif" },
-  { alat: "GEN-007", proyek: "GN2", jumlah: 1, mulai: "05 Jun 2026", selesai: null, tarif: 0, pj: "Hendra Kurnia", catatan: "Sumber daya lokasi GN2", status: "Aktif" },
-  { alat: "LAS-008", proyek: "NT4", jumlah: 2, mulai: "01 Agu 2026", selesai: null, tarif: 0, pj: "Agus Pratama", catatan: "Pengelasan besi struktur", status: "Aktif" },
-  { alat: "BCT-009", proyek: "NT4", jumlah: 2, mulai: "20 Jul 2026", selesai: null, tarif: 0, pj: "Agus Pratama", catatan: "Pemotongan besi tulangan", status: "Aktif" },
-  { alat: "BOR-005", proyek: "NT4", jumlah: 4, mulai: "01 Jun 2026", selesai: "20 Jun 2026", tarif: 0, pj: "Agus Pratama", catatan: "Pengeboran dinding fase 1 — selesai", status: "Selesai" },
-  { alat: "STP-004", proyek: "NT4", jumlah: 2, mulai: "01 Agu 2026", selesai: null, tarif: 450000, pj: "Agus Pratama", catatan: "Pemadatan lapis aspal (sewa)", status: "Aktif" },
-  { alat: "SRV-011", proyek: "NT4", jumlah: 1, mulai: "05 Agu 2026", selesai: null, tarif: 350000, pj: "Fajar Ramadhan", catatan: "Pengukuran & stake out (sewa)", status: "Aktif" },
-  { alat: "JCH-014", proyek: "GN2", jumlah: 2, mulai: "28 Jul 2026", selesai: null, tarif: 275000, pj: "Hendra Kurnia", catatan: "Bobok beton lama (sewa)", status: "Aktif" },
-  { alat: "TWL-015", proyek: "NT4", jumlah: 2, mulai: "18 Jul 2026", selesai: null, tarif: 400000, pj: "Agus Pratama", catatan: "Penerangan kerja malam (sewa)", status: "Aktif" },
-  { alat: "MBL-001", proyek: "NT4", jumlah: 1, mulai: "01 Jul 2026", selesai: null, tarif: 0, pj: "Budi Hartono", catatan: "Kendaraan operasional site NT4", status: "Aktif" },
-  { alat: "MBL-002", proyek: "GN2", jumlah: 1, mulai: "10 Jul 2026", selesai: null, tarif: 0, pj: "Sari Kusuma", catatan: "Angkut material GN2", status: "Aktif" },
-  { alat: "MBL-003", proyek: "NT4", jumlah: 1, mulai: "01 Agu 2026", selesai: null, tarif: 850000, pj: "Budi Hartono", catatan: "Angkut tanah urug (sewa)", status: "Aktif" },
+  { alat: "SCF-001", proyek: "NT4", jumlah: 60, mulai: "20 Jul 2026", selesai: null as string | null, tarif: 0, pj: "Dicky", catatan: "Perancah struktur blok A", status: "Aktif" },
+  { alat: "SCF-001", proyek: "GN2", jumlah: 25, mulai: "01 Agu 2026", selesai: null, tarif: 0, pj: "Abdillah", catatan: "Perancah cluster tahap 1", status: "Aktif" },
+  { alat: "MLN-002", proyek: "NT4", jumlah: 3, mulai: "15 Jul 2026", selesai: null, tarif: 0, pj: "Dicky", catatan: "Pengecoran jalan lingkungan", status: "Aktif" },
+  { alat: "STP-003", proyek: "GN2", jumlah: 2, mulai: "10 Jul 2026", selesai: null, tarif: 0, pj: "Abdillah", catatan: "Pemadatan tanah kavling", status: "Aktif" },
+  { alat: "GEN-007", proyek: "GN2", jumlah: 1, mulai: "05 Jun 2026", selesai: null, tarif: 0, pj: "Abdillah", catatan: "Sumber daya lokasi GN2", status: "Aktif" },
+  { alat: "LAS-008", proyek: "NT4", jumlah: 2, mulai: "01 Agu 2026", selesai: null, tarif: 0, pj: "Dicky", catatan: "Pengelasan besi struktur", status: "Aktif" },
+  { alat: "BCT-009", proyek: "NT4", jumlah: 2, mulai: "20 Jul 2026", selesai: null, tarif: 0, pj: "Dicky", catatan: "Pemotongan besi tulangan", status: "Aktif" },
+  { alat: "BOR-005", proyek: "NT4", jumlah: 4, mulai: "01 Jun 2026", selesai: "20 Jun 2026", tarif: 0, pj: "Dicky", catatan: "Pengeboran dinding fase 1 — selesai", status: "Selesai" },
+  { alat: "STP-004", proyek: "NT4", jumlah: 2, mulai: "01 Agu 2026", selesai: null, tarif: 450000, pj: "Dicky", catatan: "Pemadatan lapis aspal (sewa)", status: "Aktif" },
+  { alat: "SRV-011", proyek: "NT4", jumlah: 1, mulai: "05 Agu 2026", selesai: null, tarif: 350000, pj: "Sabila", catatan: "Pengukuran & stake out (sewa)", status: "Aktif" },
+  { alat: "JCH-014", proyek: "GN2", jumlah: 2, mulai: "28 Jul 2026", selesai: null, tarif: 275000, pj: "Abdillah", catatan: "Bobok beton lama (sewa)", status: "Aktif" },
+  { alat: "TWL-015", proyek: "NT4", jumlah: 2, mulai: "18 Jul 2026", selesai: null, tarif: 400000, pj: "Dicky", catatan: "Penerangan kerja malam (sewa)", status: "Aktif" },
+  { alat: "MBL-001", proyek: "NT4", jumlah: 1, mulai: "01 Jul 2026", selesai: null, tarif: 0, pj: "Laras", catatan: "Kendaraan operasional site NT4", status: "Aktif" },
+  { alat: "MBL-002", proyek: "GN2", jumlah: 1, mulai: "10 Jul 2026", selesai: null, tarif: 0, pj: "Laras", catatan: "Angkut material GN2", status: "Aktif" },
+  { alat: "MBL-003", proyek: "NT4", jumlah: 1, mulai: "01 Agu 2026", selesai: null, tarif: 850000, pj: "Laras", catatan: "Angkut tanah urug (sewa)", status: "Aktif" },
 ];
 
 /**
@@ -466,11 +487,11 @@ export const PENGGUNAAN = [
  * tanggal servis terakhir tiap alat.
  */
 export const SERVIS = [
-  { alat: "MBL-001", tanggal: "15 Jun 2026", berikut: "15 Des 2026", biaya: 2500000, catatan: "Servis berkala 20.000 km — ganti oli, filter, kampas rem", oleh: "Budi Hartono" },
-  { alat: "MBL-002", tanggal: "20 Apr 2026", berikut: "20 Okt 2026", biaya: 1800000, catatan: "Servis berkala — ganti kampas kopling & tune up", oleh: "Sari Kusuma" },
-  { alat: "GEN-007", tanggal: "28 Jun 2026", berikut: "28 Agu 2026", biaya: 1200000, catatan: "Servis dinamo & ganti filter udara", oleh: "Hendra Kurnia" },
-  { alat: "MLN-002", tanggal: "02 Jun 2026", berikut: "02 Sep 2026", biaya: 850000, catatan: "Servis rutin 3 bulan — ganti oli & seal", oleh: "Agus Pratama" },
-  { alat: "STP-003", tanggal: "18 Apr 2026", berikut: "18 Agu 2026", biaya: 600000, catatan: "Servis mesin pemadatan", oleh: "Hendra Kurnia" },
+  { alat: "MBL-001", tanggal: "15 Jun 2026", berikut: "15 Des 2026", biaya: 2500000, catatan: "Servis berkala 20.000 km — ganti oli, filter, kampas rem", oleh: "Laras" },
+  { alat: "MBL-002", tanggal: "20 Apr 2026", berikut: "20 Okt 2026", biaya: 1800000, catatan: "Servis berkala — ganti kampas kopling & tune up", oleh: "Laras" },
+  { alat: "GEN-007", tanggal: "28 Jun 2026", berikut: "28 Agu 2026", biaya: 1200000, catatan: "Servis dinamo & ganti filter udara", oleh: "Abdillah" },
+  { alat: "MLN-002", tanggal: "02 Jun 2026", berikut: "02 Sep 2026", biaya: 850000, catatan: "Servis rutin 3 bulan — ganti oli & seal", oleh: "Dicky" },
+  { alat: "STP-003", tanggal: "18 Apr 2026", berikut: "18 Agu 2026", biaya: 600000, catatan: "Servis mesin pemadatan", oleh: "Abdillah" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -485,14 +506,14 @@ export { POS_HPP } from "../src/lib/domain/enums";
  * `unit` diisi nomor unit bila biaya itu menempel pada satu unit tertentu.
  */
 export const BIAYA_UMUM = [
-  { tgl: "14 Jul 2026", proyek: "GN2", fase: "F1", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Material", metode: "Petty Cash", uraian: "Besi 6mm & 10mm, semen unit 6-10", total: 62000000, status: "Lunas", pic: "Sari Kusuma", bukti: "nota-besi.jpg", kontrak: "" },
-  { tgl: "12 Jul 2026", proyek: "NT4", fase: "F2", unit: "", peruntukan: "Prasarana & Sarana", jenis: "Material", metode: "Transfer", uraian: "Beton jalan lingkungan", total: 18400000, status: "Lunas", pic: "Budi Hartono", bukti: "inv-beton.pdf", kontrak: "" },
-  { tgl: "11 Jul 2026", proyek: "GN2", fase: "F1", unit: "2", peruntukan: "Unit (rumah dijual)", jenis: "Material", metode: "Transfer", uraian: "Keramik lantai & sanitair", total: 9800000, status: "Belum", pic: "Sari Kusuma", bukti: "", kontrak: "" },
-  { tgl: "10 Jul 2026", proyek: "GN2", fase: "F1", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Upah Harian", metode: "Petty Cash", uraian: "Upah tukang minggu ke-2 Juli, 24 orang", total: 24000000, status: "Lunas", pic: "Sari Kusuma", bukti: "absensi.jpg", kontrak: "" },
-  { tgl: "08 Jul 2026", proyek: "NT4", fase: "F1", unit: "", peruntukan: "Prasarana & Sarana", jenis: "Upah Harian", metode: "Petty Cash", uraian: "Upah paving jalan cluster", total: 4500000, status: "Lunas", pic: "Budi Hartono", bukti: "", kontrak: "" },
-  { tgl: "28 Jun 2026", proyek: "NT2", fase: "F2", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Material", metode: "Transfer", uraian: "Bata ringan & mortar", total: 15600000, status: "Lunas", pic: "Dewi Anggraini", bukti: "nota-bata.jpg", kontrak: "" },
-  { tgl: "21 Jun 2026", proyek: "GN2", fase: "F1", unit: "", peruntukan: "Perijinan & Ormas", jenis: "Lain-lain proyek", metode: "Tunai langsung", uraian: "Biaya izin ormas & lingkungan", total: 6000000, status: "Lunas", pic: "Sari Kusuma", bukti: "kwitansi.jpg", kontrak: "" },
-  { tgl: "10 Jun 2026", proyek: "NT4", fase: "F3", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Upah Borongan", metode: "Transfer", uraian: "Borongan struktur Tesla", total: 95000000, status: "Lunas", pic: "Budi Hartono", bukti: "ba-tesla.pdf", kontrak: "" },
+  { tgl: "14 Jul 2026", proyek: "GN2", fase: "F1", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Material", metode: "Petty Cash", uraian: "Besi 6mm & 10mm, semen unit 6-10", total: 62000000, status: "Lunas", pic: "Laras", bukti: "nota-besi.jpg", kontrak: "" },
+  { tgl: "12 Jul 2026", proyek: "NT4", fase: "F2", unit: "", peruntukan: "Prasarana & Sarana", jenis: "Material", metode: "Transfer", uraian: "Beton jalan lingkungan", total: 18400000, status: "Lunas", pic: "Laras", bukti: "inv-beton.pdf", kontrak: "" },
+  { tgl: "11 Jul 2026", proyek: "GN2", fase: "F1", unit: "2", peruntukan: "Unit (rumah dijual)", jenis: "Material", metode: "Transfer", uraian: "Keramik lantai & sanitair", total: 9800000, status: "Belum", pic: "Laras", bukti: "", kontrak: "" },
+  { tgl: "10 Jul 2026", proyek: "GN2", fase: "F1", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Upah Harian", metode: "Petty Cash", uraian: "Upah tukang minggu ke-2 Juli, 24 orang", total: 24000000, status: "Lunas", pic: "Laras", bukti: "absensi.jpg", kontrak: "" },
+  { tgl: "08 Jul 2026", proyek: "NT4", fase: "F1", unit: "", peruntukan: "Prasarana & Sarana", jenis: "Upah Harian", metode: "Petty Cash", uraian: "Upah paving jalan cluster", total: 4500000, status: "Lunas", pic: "Laras", bukti: "", kontrak: "" },
+  { tgl: "28 Jun 2026", proyek: "NT2", fase: "F2", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Material", metode: "Transfer", uraian: "Bata ringan & mortar", total: 15600000, status: "Lunas", pic: "Laras", bukti: "nota-bata.jpg", kontrak: "" },
+  { tgl: "21 Jun 2026", proyek: "GN2", fase: "F1", unit: "", peruntukan: "Perijinan & Ormas", jenis: "Lain-lain proyek", metode: "Tunai langsung", uraian: "Biaya izin ormas & lingkungan", total: 6000000, status: "Lunas", pic: "Laras", bukti: "kwitansi.jpg", kontrak: "" },
+  { tgl: "10 Jun 2026", proyek: "NT4", fase: "F3", unit: "", peruntukan: "Unit (rumah dijual)", jenis: "Upah Borongan", metode: "Transfer", uraian: "Borongan struktur Tesla", total: 95000000, status: "Lunas", pic: "Laras", bukti: "ba-tesla.pdf", kontrak: "" },
 ];
 
 /**
@@ -500,30 +521,30 @@ export const BIAYA_UMUM = [
  * `kategori` harus cocok dengan nama pos pada business plan proyeknya.
  */
 export const BIAYA_OPERASIONAL = [
-  { tgl: "10 Jul 2026", proyek: "NT4", kategori: "Pemasaran", uraian: "Iklan properti & billboard kuartal III", nominal: 420000000, status: "Lunas", pic: "Rudi Hartawan" },
-  { tgl: "05 Jul 2026", proyek: "NT4", kategori: "Pemasaran", uraian: "Komisi agen — 6 unit akad", nominal: 285000000, status: "Lunas", pic: "Lina Marlina" },
-  { tgl: "30 Jun 2026", proyek: "NT4", kategori: "Umum & Administrasi", uraian: "Gaji staf proyek & kantor kuartal II", nominal: 640000000, status: "Lunas", pic: "Rina Safitri" },
-  { tgl: "28 Jun 2026", proyek: "NT4", kategori: "Bunga & Pajak", uraian: "Bunga pinjaman konstruksi kuartal II", nominal: 512000000, status: "Lunas", pic: "Sinta Dewi" },
-  { tgl: "20 Jun 2026", proyek: "NT4", kategori: "Umum & Administrasi", uraian: "Sewa kantor pemasaran & utilitas", nominal: 96000000, status: "Lunas", pic: "Rina Safitri" },
-  { tgl: "12 Jul 2026", proyek: "GN2", kategori: "Pemasaran", uraian: "Brosur, pameran, dan digital ads", nominal: 118000000, status: "Lunas", pic: "Rudi Hartawan" },
-  { tgl: "30 Jun 2026", proyek: "GN2", kategori: "Umum & Administrasi", uraian: "Gaji staf proyek kuartal II", nominal: 174000000, status: "Lunas", pic: "Rina Safitri" },
-  { tgl: "25 Jun 2026", proyek: "GN2", kategori: "Bunga & Pajak", uraian: "PPh final & bunga pinjaman", nominal: 143000000, status: "DP", pic: "Sinta Dewi" },
-  { tgl: "18 Mar 2023", proyek: "NT2", kategori: "Pemasaran", uraian: "Pemasaran seluruh masa penjualan", nominal: 498000000, status: "Lunas", pic: "Rudi Hartawan" },
-  { tgl: "20 Des 2023", proyek: "NT2", kategori: "Umum & Administrasi", uraian: "Umum & administrasi seluruh masa proyek", nominal: 321000000, status: "Lunas", pic: "Rina Safitri" },
-  { tgl: "20 Des 2023", proyek: "NT2", kategori: "Bunga & Pajak", uraian: "Bunga & pajak seluruh masa proyek", nominal: 476000000, status: "Lunas", pic: "Sinta Dewi" },
+  { tgl: "10 Jul 2026", proyek: "NT4", kategori: "Pemasaran", uraian: "Iklan properti & billboard kuartal III", nominal: 420000000, status: "Lunas", pic: "Wahyudi" },
+  { tgl: "05 Jul 2026", proyek: "NT4", kategori: "Pemasaran", uraian: "Komisi agen — 6 unit akad", nominal: 285000000, status: "Lunas", pic: "Imam Jaka" },
+  { tgl: "30 Jun 2026", proyek: "NT4", kategori: "Umum & Administrasi", uraian: "Gaji staf proyek & kantor kuartal II", nominal: 640000000, status: "Lunas", pic: "Usman" },
+  { tgl: "28 Jun 2026", proyek: "NT4", kategori: "Bunga & Pajak", uraian: "Bunga pinjaman konstruksi kuartal II", nominal: 512000000, status: "Lunas", pic: "Nisa" },
+  { tgl: "20 Jun 2026", proyek: "NT4", kategori: "Umum & Administrasi", uraian: "Sewa kantor pemasaran & utilitas", nominal: 96000000, status: "Lunas", pic: "Usman" },
+  { tgl: "12 Jul 2026", proyek: "GN2", kategori: "Pemasaran", uraian: "Brosur, pameran, dan digital ads", nominal: 118000000, status: "Lunas", pic: "Wahyudi" },
+  { tgl: "30 Jun 2026", proyek: "GN2", kategori: "Umum & Administrasi", uraian: "Gaji staf proyek kuartal II", nominal: 174000000, status: "Lunas", pic: "Usman" },
+  { tgl: "25 Jun 2026", proyek: "GN2", kategori: "Bunga & Pajak", uraian: "PPh final & bunga pinjaman", nominal: 143000000, status: "DP", pic: "Nisa" },
+  { tgl: "18 Mar 2023", proyek: "NT2", kategori: "Pemasaran", uraian: "Pemasaran seluruh masa penjualan", nominal: 498000000, status: "Lunas", pic: "Wahyudi" },
+  { tgl: "20 Des 2023", proyek: "NT2", kategori: "Umum & Administrasi", uraian: "Umum & administrasi seluruh masa proyek", nominal: 321000000, status: "Lunas", pic: "Usman" },
+  { tgl: "20 Des 2023", proyek: "NT2", kategori: "Bunga & Pajak", uraian: "Bunga & pajak seluruh masa proyek", nominal: 476000000, status: "Lunas", pic: "Nisa" },
 ];
 
 /**
  * Dana petty cash contoh + laporan pertanggungjawabannya.
  *
- * Satu Supervisor (Agus Pratama) memegang dana di dua proyek yang memang jadi
+ * Satu Supervisor (Dicky) memegang dana di dua proyek yang memang jadi
  * jangkauannya (NT4 & GN2). Laporannya sengaja tersebar di semua status supaya
  * tiap tahap alur kelihatan di demo. Pengeluaran dicatat dengan metode "Petty
- * Cash"; `oleh` (Sinta Dewi, Finance) yang memberi & mereimburse dana.
+ * Cash"; `oleh` (Nisa, Finance) yang memberi & mereimburse dana.
  */
 export const PETTY_CASH = [
   {
-    proyek: "GN2", pemegang: "Agus Pratama", oleh: "Sinta Dewi",
+    proyek: "GN2", pemegang: "Dicky", oleh: "Nisa",
     plafon: 5000000, awal: 5000000, awalTgl: "05 Jun 2026",
     laporan: [
       {
@@ -558,7 +579,7 @@ export const PETTY_CASH = [
     ],
   },
   {
-    proyek: "NT4", pemegang: "Agus Pratama", oleh: "Sinta Dewi",
+    proyek: "NT4", pemegang: "Abdillah", oleh: "Nisa",
     plafon: 3000000, awal: 3000000, awalTgl: "03 Jul 2026",
     laporan: [
       {
@@ -614,9 +635,9 @@ export const PORSI_BIAYA_SARPRAS: [string, number, string, string[]][] = [
 ];
 
 export const LOG_AWAL = [
-  { waktu: "22 Jul 2026 16:40", peran: "Quantity Surveyor", oleh: "Budi Hartono", proyek: "NT4", objek: "Unit F2-3 · RAB", aksi: "Ubah baris BOQ", dari: "Pek. Lantai & Keramik — Rp 285.000/m²", ke: "Pek. Lantai & Keramik — Rp 298.000/m²" },
-  { waktu: "22 Jul 2026 14:12", peran: "Arsitek", oleh: "Fajar Ramadhan", proyek: "NT4", objek: "Tipe Galileo · Gambar Kerja", aksi: "Unggah revisi", dari: "R2", ke: "R3" },
-  { waktu: "21 Jul 2026 11:05", peran: "Project Manager", oleh: "Hendra Kurnia", proyek: "GN2", objek: "Unit F1-4", aksi: "Ubah status bangun", dari: "Progress", ke: "Selesai" },
-  { waktu: "20 Jul 2026 09:30", peran: "Head Operation Office", oleh: "Rina Safitri", proyek: "NT2", objek: "Sarpras · Taman & RTH", aksi: "Ubah status bangun", dari: "Progress", ke: "Selesai" },
-  { waktu: "18 Jul 2026 15:22", peran: "Business Development", oleh: "Andra Wijaya", proyek: "NT4", objek: "Biaya Perolehan Lahan", aksi: "Ubah nilai", dari: "Rp 5.590.000.000", ke: "Rp 5.755.000.000" },
+  { waktu: "22 Jul 2026 16:40", peran: "Quantity Surveyor", oleh: "Laras", proyek: "NT4", objek: "Unit F2-3 · RAB", aksi: "Ubah baris BOQ", dari: "Pek. Lantai & Keramik — Rp 285.000/m²", ke: "Pek. Lantai & Keramik — Rp 298.000/m²" },
+  { waktu: "22 Jul 2026 14:12", peran: "Arsitek", oleh: "Sabila", proyek: "NT4", objek: "Tipe Galileo · Gambar Kerja", aksi: "Unggah revisi", dari: "R2", ke: "R3" },
+  { waktu: "21 Jul 2026 11:05", peran: "Project Manager", oleh: "Abdillah", proyek: "GN2", objek: "Unit F1-4", aksi: "Ubah status bangun", dari: "Progress", ke: "Selesai" },
+  { waktu: "20 Jul 2026 09:30", peran: "Head Operation Office", oleh: "Usman", proyek: "NT2", objek: "Sarpras · Taman & RTH", aksi: "Ubah status bangun", dari: "Progress", ke: "Selesai" },
+  { waktu: "18 Jul 2026 15:22", peran: "Business Development", oleh: "Usman", proyek: "NT4", objek: "Biaya Perolehan Lahan", aksi: "Ubah nilai", dari: "Rp 5.590.000.000", ke: "Rp 5.755.000.000" },
 ];

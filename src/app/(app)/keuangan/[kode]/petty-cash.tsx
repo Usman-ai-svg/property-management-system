@@ -5,20 +5,13 @@ import { BarisField, Field, FormModal, TombolTambah } from "@/components/form";
 import { Badge } from "@/components/ui";
 import { rp, tanggal } from "@/lib/format";
 import { JENIS_BIAYA_SWAKELOLA, PERUNTUKAN_BIAYA, type StatusPettyCash } from "@/lib/domain/enums";
-import { LABEL_STATUS_PETTY, transisiDari } from "@/lib/calc/petty-cash";
+import { LABEL_STATUS_PETTY, transisiUntuk } from "@/lib/calc/petty-cash";
 import type { DanaPettyCash } from "@/lib/data/petty-cash";
 import type { HasilAksi } from "@/lib/actions/guard";
 import {
   ajukanLaporanPetty, beriDanaPetty, catatPengeluaranPetty,
   reimburseLaporanPetty, transisiLaporanPetty,
 } from "../petty-actions";
-
-/**
- * Peran sistem yang menembus semua tahap alur (selaras dengan override di
- * petty-actions.ts) — supaya tombol tiap tahap tampil untuk menguji proses
- * ujung-ke-ujung dari satu akun.
- */
-const SUPERUSER = "Administrator Sistem";
 
 const WARNA_PETTY: Record<string, [string, string]> = {
   Draft: ["var(--rona-abu)", "var(--muted)"],
@@ -30,7 +23,7 @@ const WARNA_PETTY: Record<string, [string, string]> = {
 
 interface Konteks {
   id: string;
-  peranAktif: string;
+  jabatan: string[];
   bolehKeuangan: boolean;
   bolehPetty: boolean;
 }
@@ -70,8 +63,8 @@ export function PettyCash({
         <div style={{ padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 12.5 }}>
           Belum ada dana petty cash.
           {konteks.bolehKeuangan
-            ? " Beri dana ke seorang Supervisor untuk memulai."
-            : " Finance yang memberi dana ke Supervisor."}
+            ? " Beri dana ke pemegang di lapangan untuk memulai."
+            : " Finance yang memberi dana ke pemegangnya."}
         </div>
       ) : (
         funds.map((f) => <DanaBlok key={f.id} dana={f} konteks={konteks} />)
@@ -81,8 +74,10 @@ export function PettyCash({
 }
 
 function DanaBlok({ dana, konteks }: { dana: DanaPettyCash; konteks: Konteks }) {
-  const isAdmin = konteks.peranAktif === SUPERUSER;
-  const isPemegang = konteks.id === dana.pemegang.id || isAdmin;
+  // Pemegang dana adalah orangnya sendiri — tidak ada lagi jabatan yang
+  // "dianggap pemegang". Mencatat pengeluaran atas nama orang lain membuat
+  // selisih kas tidak bisa ditanyakan ke siapa pun.
+  const isPemegang = konteks.id === dana.pemegang.id;
   const saldoMinus = dana.saldo < 0;
 
   return (
@@ -137,16 +132,13 @@ function LaporanBaris({
   const [buka, setBuka] = useState(false);
   const status = laporan.status as StatusPettyCash;
 
-  // Aksi yang boleh dilakukan viewer pada status ini. Administrator Sistem
-  // (superuser) menembus semua tahap agar prosesnya bisa dijalankan dari satu
-  // akun — selaras dengan override di petty-actions.ts.
-  const isAdmin = konteks.peranAktif === SUPERUSER;
-  const aksi = transisiDari(status).filter((t) => {
-    if (t.oleh === "Pemegang") return isPemegang;
-    if (t.oleh === "Quantity Surveyor") return isAdmin || konteks.peranAktif === "Quantity Surveyor";
-    if (t.oleh === "Head Operation Project") return isAdmin || konteks.peranAktif === "Head Operation Project";
-    if (t.oleh === "Finance") return konteks.bolehKeuangan;
-    return false;
+  // Aturan siapa boleh menggerakkan apa ada di lapisan murni, bukan di sini.
+  // Tombol yang tampil harus persis sama dengan yang diterima server; dua
+  // salinan aturan berarti tombol yang ada tapi ditolak, atau sebaliknya.
+  const aksi = transisiUntuk(status, {
+    jabatan: konteks.jabatan,
+    pemegangDana: isPemegang,
+    bolehKeuangan: konteks.bolehKeuangan,
   });
 
   return (
@@ -175,7 +167,7 @@ function LaporanBaris({
           )}
           <span className="num" style={{ fontSize: 13, fontWeight: 700 }}>{rp(laporan.total)}</span>
           {aksi.map((t) =>
-            t.oleh === "Pemegang" ? (
+            t.olehPemegang ? (
               <AjukanLaporan key={t.ke + t.aksi} reportId={laporan.id} />
             ) : (
               <AksiPetty
@@ -184,7 +176,7 @@ function LaporanBaris({
                 ke={t.ke}
                 label={t.aksi}
                 mundur={t.mundur}
-                finance={t.oleh === "Finance"}
+                finance={!!t.perluIzinKeuangan}
               />
             ),
           )}
@@ -277,7 +269,7 @@ function AksiPetty({
 /**
  * Ajukan laporan — modal yang MEWAJIBKAN unggah PDF nota gabungan.
  *
- * 1 pengajuan = 1 dokumen: seluruh foto nota siklus ini dikumpulkan Supervisor
+ * 1 pengajuan = 1 dokumen: seluruh foto nota siklus ini dikumpulkan pemegang dana
  * jadi satu PDF, diunggah di sini. Begitu diajukan, barisnya terkunci.
  */
 function AjukanLaporan({ reportId }: { reportId: string }) {
@@ -319,7 +311,7 @@ function BeriDana({
   return (
     <FormModal
       judul="Beri Dana Petty Cash"
-      keterangan="Berikan / isi dana talangan untuk seorang Supervisor. Plafon hanya nilai acuan imprest — tidak membatasi pengeluaran maupun reimburse."
+      keterangan="Berikan / isi dana talangan untuk pemegang di lapangan. Plafon hanya nilai acuan imprest — tidak membatasi pengeluaran maupun reimburse."
       aksi={beriDanaPetty}
       labelSimpan="Beri Dana"
       pemicu={(buka) => <TombolTambah onClick={buka} label="Beri Dana" />}
@@ -327,7 +319,7 @@ function BeriDana({
       <input type="hidden" name="projectId" value={projectId} />
       <BarisField kolom={1}>
         <Field
-          label="Pemegang (Supervisor)"
+          label="Pemegang dana"
           nama="pemegangId"
           wajib
           pilihan={kandidat.map((k) => ({ nilai: k.id, label: k.nama }))}

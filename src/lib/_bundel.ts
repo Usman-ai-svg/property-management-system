@@ -46,6 +46,7 @@ import * as statusBangun from "./calc/status-bangun";
 import * as tender from "./calc/tender";
 
 import * as enums from "./domain/enums";
+import * as jabatan from "./domain/jabatan";
 import * as kolomEnum from "./domain/kolom-enum";
 import * as templates from "./domain/templates";
 
@@ -117,7 +118,7 @@ export const calc = gabung(
   calcPetty, statusBangun, tender,
 );
 
-export const domain = gabung("domain", enums, kolomEnum, templates);
+export const domain = gabung("domain", enums, jabatan, kolomEnum, templates);
 
 export const tampilan = gabung(
   "tampilan",

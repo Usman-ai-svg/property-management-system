@@ -1,0 +1,887 @@
+{
+  "catatan": [
+    "Matriks hak akses modul Proyek, satu baris per (jabatan, sub-bagian).",
+    "Dikunci ke KUNCI jabatan, bukan ke teks jabatan HRIS: selama kolom jabatan di HRIS belum terbukti punya daftar tertutup, teksnya harus dianggap bebas, dan satu salah ketik akan mencabut akses seseorang tanpa pesan apa pun. Pemetaan teks HRIS -> kunci ada di src/lib/domain/jabatan.ts.",
+    "Baris hanya ada bila boleh melihat. bolehUbah menentukan boleh mengubah; sub-bagian yang tidak punya baris berarti tertutup sama sekali, bukan sekadar hanya-lihat.",
+    "bolehUbah pada pettyCash berarti BOLEH IKUT DALAM ALUR, bukan boleh semua tahap. Tahap mana untuk jabatan mana ditegakkan tabel transisi di src/lib/calc/petty-cash.ts.",
+    "Hak sebuah jabatan adalah GABUNGAN hak peran-peran repo yang dulu menempel padanya (lihat peranAsal). Tiga jabatan menampung lebih dari satu peran: director, head of operation, quantity surveyor asst.",
+    "Satu orang boleh memegang lebih dari satu jabatan; izinnya gabungan dengan tingkat tertinggi yang menang.",
+    "Jabatan bercakupan luar tidak boleh punya satu pun bolehUbah. Ada tes yang gagal bila itu terjadi.",
+    "setujuiRab: Ubah berarti boleh menyetujui atau menolak. quantity_surveyor_asst TIDAK termasuk — ia yang menyusun dan mengajukan, dan tidak menyetujui buatannya sendiri.",
+    "pettyCash: Lihat: petty cash menyentuh lapangan sampai keuangan. Pemegang dana (logistic staff / manager proyek), verifikator (quantity surveyor asst), dan penyetuju (head of operation) ikut melihat, di samping garis keuangan yang memberi dan mereimburse dana. Ubah: berarti boleh ikut dalam alur (catat/ajukan/verifikasi/setujui/reimburse), BUKAN boleh semua tahap. Tahap mana untuk jabatan mana ditegakkan tabel transisi di src/lib/calc/petty-cash.ts.",
+    "progress: Ubah — quantity_surveyor_asst ikut boleh mengubah karena memantau progres vendor memang tugasnya, sekalipun angkanya diperoleh dari orang lapangan.",
+    "penyesuaianAset: Penyesuaian stok dipisahkan dari hak ubah aset karena pelakunya berbeda: yang mendata kehilangan dan kerusakan adalah orang lapangan, sedangkan yang menambah atau menghapus master aset adalah bagian pengadaan."
+  ],
+  "akses": [
+    {
+      "jabatan": "director",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "director",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "director",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "director",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "director",
+      "section": "hargaRabRap",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "director",
+      "section": "setujuiRab",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "director",
+      "section": "businessPlan",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "director",
+      "section": "keuangan",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "director",
+      "section": "pettyCash",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "director",
+      "section": "progress",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "director",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "director",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "komisaris",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "komisaris",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "komisaris",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "komisaris",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "komisaris",
+      "section": "hargaRabRap",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "komisaris",
+      "section": "setujuiRab",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "komisaris",
+      "section": "businessPlan",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "komisaris",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "komisaris",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "head_of_operation",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "head_of_operation",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "head_of_operation",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "head_of_operation",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "head_of_operation",
+      "section": "hargaRabRap",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "head_of_operation",
+      "section": "setujuiRab",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "head_of_operation",
+      "section": "businessPlan",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "head_of_operation",
+      "section": "keuangan",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "head_of_operation",
+      "section": "pettyCash",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "head_of_operation",
+      "section": "progress",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "head_of_operation",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "head_of_operation",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "manager_proyek",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "manager_proyek",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "manager_proyek",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "manager_proyek",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "manager_proyek",
+      "section": "hargaRabRap",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "manager_proyek",
+      "section": "setujuiRab",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "manager_proyek",
+      "section": "keuangan",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "manager_proyek",
+      "section": "pettyCash",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "manager_proyek",
+      "section": "progress",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "manager_proyek",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "manager_proyek",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "logistic_staff",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "logistic_staff",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "logistic_staff",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "logistic_staff",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "logistic_staff",
+      "section": "pettyCash",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "logistic_staff",
+      "section": "progress",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "logistic_staff",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "logistic_staff",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "quantity_surveyor_asst",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "quantity_surveyor_asst",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "quantity_surveyor_asst",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "quantity_surveyor_asst",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "quantity_surveyor_asst",
+      "section": "hargaRabRap",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "quantity_surveyor_asst",
+      "section": "setujuiRab",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "quantity_surveyor_asst",
+      "section": "keuangan",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "quantity_surveyor_asst",
+      "section": "pettyCash",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "quantity_surveyor_asst",
+      "section": "progress",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "quantity_surveyor_asst",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "quantity_surveyor_asst",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "junior_arsitek_staff",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "junior_arsitek_staff",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "junior_arsitek_staff",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "junior_arsitek_staff",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "junior_arsitek_staff",
+      "section": "progress",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "junior_arsitek_staff",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "junior_arsitek_staff",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "consultant_finance",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "consultant_finance",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "consultant_finance",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "consultant_finance",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "consultant_finance",
+      "section": "hargaRabRap",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "consultant_finance",
+      "section": "keuangan",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "consultant_finance",
+      "section": "pettyCash",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "consultant_finance",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "consultant_finance",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "finance_tax",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "finance_tax",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "finance_tax",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "finance_tax",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "finance_tax",
+      "section": "hargaRabRap",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "finance_tax",
+      "section": "keuangan",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "finance_tax",
+      "section": "pettyCash",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "finance_tax",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "finance_tax",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "staff_administration",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "staff_administration",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "staff_administration",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "staff_administration",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "staff_administration",
+      "section": "hargaRabRap",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "staff_administration",
+      "section": "keuangan",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "staff_administration",
+      "section": "pettyCash",
+      "bolehLihat": true,
+      "bolehUbah": true
+    },
+    {
+      "jabatan": "staff_administration",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "staff_administration",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "hrd_staff",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "hrd_staff",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "hrd_staff",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "hrd_staff",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "hrd_staff",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "hrd_staff",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "sales_marketing",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "sales_marketing",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "sales_marketing",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "sales_marketing",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "sales_marketing",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "sales_marketing",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "customer_service",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "customer_service",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "customer_service",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "customer_service",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "customer_service",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "customer_service",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "manager_marketing",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "manager_marketing",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "manager_marketing",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "manager_marketing",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "manager_marketing",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "manager_marketing",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "agent_coordinator",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "agent_coordinator",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "agent_coordinator",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "agent_coordinator",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "agent_coordinator",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "agent_coordinator",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "copy_writer",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "copy_writer",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "copy_writer",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "copy_writer",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "copy_writer",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "copy_writer",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "design_graphic_staff",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "design_graphic_staff",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "design_graphic_staff",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "design_graphic_staff",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "design_graphic_staff",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "design_graphic_staff",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "graphic_designer",
+      "section": "deskripsi",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "graphic_designer",
+      "section": "daftarUnit",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "graphic_designer",
+      "section": "daftarSarpras",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "graphic_designer",
+      "section": "dokumenTeknis",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "graphic_designer",
+      "section": "aset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    },
+    {
+      "jabatan": "graphic_designer",
+      "section": "penyesuaianAset",
+      "bolehLihat": true,
+      "bolehUbah": false
+    }
+  ]
+}

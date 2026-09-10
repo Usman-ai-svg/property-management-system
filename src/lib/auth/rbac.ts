@@ -2,7 +2,7 @@ import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { ambilSession } from "./session";
 import type { Section } from "@/lib/domain/enums";
-import type { Pengguna } from "@/lib/adaptor/identitas";
+import { gabungIzin, type Pengguna } from "@/lib/adaptor/identitas";
 
 /**
  * PENEGAKAN HAK AKSES DI SISI SERVER.
@@ -28,7 +28,7 @@ import type { Pengguna } from "@/lib/adaptor/identitas";
 export type { Pengguna };
 
 /**
- * Muat pengguna aktif beserta peran dan izinnya.
+ * Muat pengguna aktif beserta jabatan dan izinnya.
  *
  * Dibungkus `cache()` supaya beberapa komponen server dalam satu request
  * berbagi hasil yang sama, bukan memukul database berulang kali.
@@ -49,33 +49,28 @@ export const ambilPengguna = cache(async (): Promise<Pengguna | null> => {
   });
   if (!user) return null;
 
-  const peran = user.roles.map((r) => r.role.nama);
+  const jabatan = user.roles.map((r) => r.role.nama);
 
-  // Izin mengikuti PERAN YANG SEDANG AKTIF saja, bukan gabungan semua peran
-  // yang dimiliki pengguna. Inilah yang membuat pemilih "Lihat sebagai"
-  // bermakna: seseorang yang merangkap Komisaris dan Project Manager akan
-  // benar-benar kehilangan akses Keuangan saat sedang berperan Komisaris.
+  // Izin adalah GABUNGAN seluruh jabatan yang dipegang, dengan tingkat
+  // tertinggi yang menang. Tidak ada lagi "peran yang sedang aktif": sumbu
+  // izinnya jabatan, dan seseorang memegang jabatannya sekaligus.
   //
-  // Konsekuensinya sering disalahpahami sebagai bug — bila sebuah modul
-  // tampak tertutup padahal pengguna "punya" peran yang berhak, periksa dulu
-  // peran mana yang sedang dipilih.
-  const izin = new Map<Section, boolean>();
-  if (peran.includes(session.peranAktif)) {
-    const baris = await prisma.roleSectionPermission.findMany({
-      where: { roleNama: session.peranAktif },
-      select: { section: true, bolehUbah: true },
-    });
-    for (const p of baris) izin.set(p.section as Section, p.bolehUbah);
-  }
+  // Dibaca ulang tiap permintaan, bukan disimpan di token, supaya pencabutan
+  // hak berlaku seketika — bukan setelah orangnya keluar dan masuk lagi.
+  const baris = jabatan.length
+    ? await prisma.roleSectionPermission.findMany({
+        where: { jabatan: { in: jabatan }, bolehLihat: true },
+        select: { section: true, bolehUbah: true },
+      })
+    : [];
 
   return {
     id: user.id,
     nama: user.nama,
-    peranAktif: session.peranAktif,
-    peran,
+    jabatan,
     semuaProyek: user.semuaProyek,
     proyekIds: user.aksesProyek.map((a) => a.projectId),
-    izin,
+    izin: gabungIzin(baris),
   };
 });
 
@@ -90,14 +85,14 @@ export const bolehUbah = (u: Pengguna | null, sec: Section): boolean =>
 /** Lempar error bila tidak berhak melihat. Dipakai di awal Server Action. */
 export function wajibLihat(u: Pengguna | null, sec: Section): asserts u is Pengguna {
   if (!bolehLihat(u, sec)) {
-    throw new Error(`Akses ditolak: peran "${u?.peranAktif ?? "tamu"}" tidak berhak melihat "${sec}".`);
+    throw new Error(`Akses ditolak: jabatan "${u?.jabatan.join(", ") || "tamu"}" tidak berhak melihat "${sec}".`);
   }
 }
 
 /** Lempar error bila tidak berhak mengubah. */
 export function wajibUbah(u: Pengguna | null, sec: Section): asserts u is Pengguna {
   if (!bolehUbah(u, sec)) {
-    throw new Error(`Akses ditolak: peran "${u?.peranAktif ?? "tamu"}" tidak berhak mengubah "${sec}".`);
+    throw new Error(`Akses ditolak: jabatan "${u?.jabatan.join(", ") || "tamu"}" tidak berhak mengubah "${sec}".`);
   }
 }
 

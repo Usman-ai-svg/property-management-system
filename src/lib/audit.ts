@@ -26,7 +26,7 @@ export async function catat(c: CatatanPerubahan): Promise<void> {
   await prisma.auditLog.create({
     data: {
       userId: c.pengguna.id,
-      peran: c.pengguna.peranAktif,
+      peran: c.pengguna.jabatan.join(", "),
       projectId: c.projectId ?? null,
       objek: c.objek,
       aksi: c.aksi,
@@ -94,7 +94,7 @@ export async function catatDiff(opts: {
   await prisma.auditLog.createMany({
     data: baris.map((b) => ({
       userId: b.pengguna.id,
-      peran: b.pengguna.peranAktif,
+      peran: b.pengguna.jabatan.join(", "),
       projectId: b.projectId ?? null,
       objek: b.objek,
       aksi: b.aksi,

@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it, before } from "node:test";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { SECTIONS } from "./domain/enums";
 
 /**
  * PENJAGA DATA ACUAN.
@@ -36,13 +35,6 @@ const analisa = bacaJson("analisa.json") as {
   kode: string; uraian: string; satuan: string; kelompok: string; overheadPct: number;
   komponen: { kode: string; koefisien: number }[];
 }[];
-const peran = bacaJson("peran.json") as {
-  peran: { nama: string; grup: string }[];
-  akses: { section: string; lihat: string[] | "*"; ubah: string[] | "*" }[];
-};
-
-const semuaPeran = peran.peran.map((p) => p.nama);
-const bentang = (v: string[] | "*") => (v === "*" ? semuaPeran : v);
 
 describe("data acuan — isi", () => {
   it("kode harga dasar unik, kategorinya sah", () => {
@@ -79,33 +71,14 @@ describe("data acuan — isi", () => {
     }
   });
 
-  it("sub-bagian pada matriks benar-benar ada di enums.ts", () => {
-    const dikenal = new Set<string>(SECTIONS);
-    for (const a of peran.akses) {
-      assert.ok(dikenal.has(a.section), `sub-bagian "${a.section}" tidak ada di SECTIONS`);
-    }
-    assert.equal(peran.akses.length, SECTIONS.length, "ada sub-bagian yang tidak diatur matriks");
-  });
-
-  it("hak ubah tidak pernah melampaui hak lihat", () => {
-    // Baris di role_section_permissions ADALAH hak lihatnya. Hak ubah tanpa
-    // baris itu tidak bisa diwakili, dan diamnya akan tampak sebagai peran yang
-    // kehilangan akses.
-    for (const a of peran.akses) {
-      const lihat = new Set(bentang(a.lihat));
-      const nakal = bentang(a.ubah).filter((p) => !lihat.has(p));
-      assert.deepEqual(nakal, [], `${a.section}: boleh ubah tapi tidak boleh lihat`);
-    }
-  });
-
-  it("seluruh nama peran pada matriks terdaftar", () => {
-    const dikenal = new Set(semuaPeran);
-    for (const a of peran.akses) {
-      for (const p of [...bentang(a.lihat), ...bentang(a.ubah)]) {
-        assert.ok(dikenal.has(p), `${a.section}: peran "${p}" tidak terdaftar`);
-      }
-    }
-    assert.equal(new Set(semuaPeran).size, semuaPeran.length, "ada nama peran kembar");
+  it("matriks hak akses tidak di berkas ini — ia punya penjaganya sendiri", () => {
+    // Sejak matriks dikunci ke jabatan, ia punya perintah dan berkasnya
+    // sendiri (`acl:sql` -> prisma/acl.sql). Dijaga hak-akses.test.ts.
+    assert.equal(
+      SQL.includes("role_section_permissions"),
+      false,
+      "matriks hak akses seharusnya tidak lagi ikut acuan.sql",
+    );
   });
 });
 
@@ -131,12 +104,10 @@ describe("acuan.sql — masih sejalan dengan sumbernya", () => {
     // Kalau JSON disunting tanpa menjalankan ulang `npm run acuan:sql`, di
     // sinilah ketahuannya — bukan di Supabase, setengah jalan.
     const komponen = analisa.reduce((n, a) => n + a.komponen.length, 0);
-    const akses = peran.akses.reduce((n, a) => n + bentang(a.lihat).length, 0);
     const hitung = (awalan: string) => SQL.split(`('${awalan}`).length - 1;
     assert.equal(hitung("hd-"), hargaDasar.length, "baris harga dasar tidak sinkron");
     assert.equal(hitung("an-"), analisa.length, "baris analisa tidak sinkron");
     assert.equal(hitung("ka-"), komponen, "baris komponen tidak sinkron");
-    assert.equal(hitung("rsp-"), akses, "baris hak akses tidak sinkron");
   });
 
   it("tiap kode harga dasar dan analisa benar-benar muncul", () => {
@@ -146,7 +117,7 @@ describe("acuan.sql — masih sejalan dengan sumbernya", () => {
 
   it("hanya mengisi tabel yang memang ada di DDL, tanpa awalan pm_", () => {
     const tabel = [...SQL.matchAll(/insert into proyek\.(\w+) /g)].map((m) => m[1]);
-    assert.ok(tabel.length >= 4, `hanya ${tabel.length} pernyataan insert`);
+    assert.ok(tabel.length >= 3, `hanya ${tabel.length} pernyataan insert`);
     for (const t of tabel) {
       assert.ok(DDL.includes(`create table proyek.${t} (`), `tabel ${t} tidak ada di proyek.sql`);
       assert.equal(t.startsWith("pm_"), false);

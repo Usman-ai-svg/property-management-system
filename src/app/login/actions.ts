@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { gantiPeranAktif, keluar, masuk } from "@/lib/auth/masuk";
+import { keluar, masuk } from "@/lib/auth/masuk";
 
 /**
  * Aksi layar masuk.
@@ -28,13 +28,4 @@ export async function login(_sebelumnya: HasilLogin, form: FormData): Promise<Ha
 export async function logout() {
   await keluar();
   redirect("/login");
-}
-
-/**
- * Ganti peran aktif. Hanya boleh memilih peran yang memang dimiliki —
- * inilah sebabnya pemilih peran tidak bisa dipakai untuk menaikkan hak akses.
- */
-export async function gantiPeran(form: FormData) {
-  const galat = await gantiPeranAktif(String(form.get("peran") ?? ""));
-  if (galat) throw new Error(galat);
 }

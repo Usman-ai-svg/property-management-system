@@ -15,13 +15,17 @@ import { SignJWT, jwtVerify } from "jose";
 const NAMA_COOKIE = "nms_session";
 const MASA_BERLAKU_DETIK = 60 * 60 * 8; // 8 jam kerja
 
+/**
+ * Isi token sesi — sengaja cuma identitas, tanpa jabatan.
+ *
+ * Jabatan dan izinnya dibaca dari database pada tiap permintaan. Menyimpannya
+ * di token akan membuat pencabutan hak baru berlaku setelah orangnya keluar
+ * dan masuk lagi — dan sepanjang jeda itu, token lama tetap membuka pintu
+ * yang sudah dikunci.
+ */
 export interface IsiSession {
   userId: string;
   nama: string;
-  /** Peran yang sedang aktif dipakai (user bisa punya beberapa). */
-  peranAktif: string;
-  /** Seluruh peran yang dimiliki user. */
-  peran: string[];
 }
 
 function kunci(): Uint8Array {
@@ -45,9 +49,9 @@ export async function buatToken(isi: IsiSession): Promise<string> {
 export async function bacaToken(token: string): Promise<IsiSession | null> {
   try {
     const { payload } = await jwtVerify(token, kunci());
-    const { userId, nama, peranAktif, peran } = payload as unknown as IsiSession;
-    if (!userId || !peranAktif) return null;
-    return { userId, nama, peranAktif, peran: peran ?? [] };
+    const { userId, nama } = payload as unknown as IsiSession;
+    if (!userId) return null;
+    return { userId, nama };
   } catch {
     // Token kedaluwarsa, tanda tangan salah, atau rusak — semuanya berarti
     // tidak ada session yang sah.

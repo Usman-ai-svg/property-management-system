@@ -1,6 +1,6 @@
 import analisaJson from "./analisa.json";
 import hargaDasarJson from "./harga-dasar.json";
-import peranJson from "./peran.json";
+import hakAksesJson from "./hak-akses.json";
 
 /**
  * DATA ACUAN — isi yang harus ada SEBELUM sistem bisa dipakai sama sekali.
@@ -17,7 +17,7 @@ import peranJson from "./peran.json";
  *
  * Yang TIDAK ada di sini:
  *
- *   - Pengguna dan peran-per-pengguna. Identitas milik ERP; lihat
+ *   - Pengguna dan jabatan-per-pengguna. Identitas milik ERP; lihat
  *     `docs/jahitan-identitas.md`.
  *   - Kategori dan status. Semuanya enum di `src/lib/domain/enums.ts`, dan
  *     sudah jadi CHECK constraint di `prisma/proyek.sql` — bukan baris data.
@@ -42,19 +42,15 @@ export interface AnalisaAcuan {
   komponen: { kode: string; koefisien: number }[];
 }
 
-export interface PeranAcuan {
-  peran: { nama: string; grup: string }[];
-  /** Satu baris per sub-bagian. `"*"` berarti seluruh peran. */
-  akses: { section: string; lihat: string[] | "*"; ubah: string[] | "*" }[];
+export interface HakAksesAcuan {
+  catatan: string[];
+  /**
+   * Satu baris per (jabatan, sub-bagian). Baris hanya ada bila boleh melihat;
+   * sub-bagian tanpa baris berarti tertutup sama sekali, bukan hanya-lihat.
+   */
+  akses: { jabatan: string; section: string; bolehLihat: boolean; bolehUbah: boolean }[];
 }
 
 export const HARGA_DASAR_ACUAN = hargaDasarJson as HargaDasarAcuan[];
 export const ANALISA_ACUAN = analisaJson as AnalisaAcuan[];
-export const PERAN_ACUAN = peranJson as PeranAcuan;
-
-export const SEMUA_PERAN_ACUAN = PERAN_ACUAN.peran.map((p) => p.nama);
-
-/** Bentangkan `"*"` menjadi daftar peran yang sebenarnya. */
-export function daftarPeran(nilai: string[] | "*"): string[] {
-  return nilai === "*" ? [...SEMUA_PERAN_ACUAN] : nilai;
-}
+export const HAK_AKSES_ACUAN = hakAksesJson as HakAksesAcuan;

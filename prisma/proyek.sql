@@ -5,7 +5,7 @@
 -- Sumbernya prisma/schema.prisma; jalankan `npm run skema:sql` sesudah skema
 -- berubah.
 --
---   60 tabel · 523 kolom
+--   60 tabel · 524 kolom
 --   51 kolom uang numeric(18,2)
 --   27 CHECK enum, seluruhnya dari src/lib/domain/enums.ts
 --   96 foreign key dalam schema · 4 dialihkan ke auth.users
@@ -22,10 +22,11 @@ create schema if not exists proyek;
 
 create table proyek.role_section_permissions (
   "id" text primary key,
-  "roleNama" text not null,
+  "jabatan" text not null,
   "section" text not null,
+  "bolehLihat" boolean not null default true,
   "bolehUbah" boolean not null default false,
-  unique ("roleNama", "section")
+  unique ("jabatan", "section")
 );
 
 create table proyek.documents (
@@ -884,7 +885,7 @@ create table proyek.audit_logs (
 -- INDEKS
 -- ---------------------------------------------------------------------------
 
-create index role_section_permissions_rolenama_idx on proyek.role_section_permissions ("roleNama");
+create index role_section_permissions_jabatan_idx on proyek.role_section_permissions ("jabatan");
 create index unit_type_boq_items_unittypeid_idx on proyek.unit_type_boq_items ("unitTypeId");
 create index unit_type_rap_items_unittypeid_idx on proyek.unit_type_rap_items ("unitTypeId");
 create index units_projectid_phaseid_idx on proyek.units ("projectId", "phaseId");

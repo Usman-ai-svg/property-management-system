@@ -4,6 +4,8 @@ import { segmen } from "@/lib/adaptor/rute";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { punyaJabatan } from "@/lib/adaptor/identitas";
+import { JABATAN_DIRECTOR, labelJabatan } from "@/lib/domain/jabatan";
 import { catat, catatDiff, rpLog } from "@/lib/audit";
 import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional, wajibLolos,
@@ -15,7 +17,7 @@ import {
  * merangkap peran ini harus benar-benar sedang berperan Administrator Sistem
  * untuk memakainya, bukan sekadar memilikinya.
  */
-const PERAN_HAPUS_PAKSA = "Administrator Sistem";
+const JABATAN_HAPUS_PAKSA = JABATAN_DIRECTOR;
 import { bersihkanNamaFile, periksaBerkas, periksaBerkasKategori, simpanBerkas } from "@/lib/storage";
 import {
   JENIS_HAK_ATAS_TANAH, JENIS_SARPRAS, STATUS_JUAL, STATUS_PROYEK,
@@ -956,8 +958,8 @@ export async function hapusUnitPaksa(_s: HasilAksi | null, form: FormData): Prom
     const pengguna = await izinkan("daftarUnit", unit.projectId);
 
     // Di atas izin operasional itu, hapus paksa masih dikunci ke satu peran.
-    if (pengguna.peranAktif !== PERAN_HAPUS_PAKSA) {
-      throw new GagalIzin(`Hanya peran ${PERAN_HAPUS_PAKSA} yang boleh menghapus paksa.`);
+    if (!punyaJabatan(pengguna, JABATAN_HAPUS_PAKSA)) {
+      throw new GagalIzin(`Hanya ${labelJabatan(JABATAN_HAPUS_PAKSA)} yang boleh menghapus paksa.`);
     }
 
     if (unit._count.contractUnits > 0) {
@@ -1360,8 +1362,8 @@ export async function hapusSarprasPaksa(_s: HasilAksi | null, form: FormData): P
     const pengguna = await izinkan("daftarSarpras", s.projectId);
 
     // Di atas izin operasional itu, hapus paksa masih dikunci ke satu peran.
-    if (pengguna.peranAktif !== PERAN_HAPUS_PAKSA) {
-      throw new GagalIzin(`Hanya peran ${PERAN_HAPUS_PAKSA} yang boleh menghapus paksa.`);
+    if (!punyaJabatan(pengguna, JABATAN_HAPUS_PAKSA)) {
+      throw new GagalIzin(`Hanya ${labelJabatan(JABATAN_HAPUS_PAKSA)} yang boleh menghapus paksa.`);
     }
 
     if (s._count.contractItems > 0) {

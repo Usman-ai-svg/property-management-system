@@ -7,6 +7,7 @@ import { ambilPengguna, bolehUbah } from "@/lib/auth/rbac";
 import { hashPassword } from "@/lib/auth/password";
 import { GagalIzin, HasilAksi, jalankan, teks, teksOpsional , wajibLolos } from "@/lib/actions/guard";
 import { SECTION_LABELS, SECTIONS, type Section } from "@/lib/domain/enums";
+import { labelJabatan } from "@/lib/domain/jabatan";
 import { periksaUbahIzin, periksaUbahStatusUser, periksaUser } from "@/lib/kontrak/admin";
 
 /**
@@ -22,7 +23,9 @@ async function izinkanKelolaAkses() {
   const pengguna = await ambilPengguna();
   if (!pengguna) throw new GagalIzin("Sesi Anda sudah berakhir. Silakan masuk kembali.");
   if (!bolehUbah(pengguna, "deskripsi")) {
-    throw new GagalIzin(`Peran "${pengguna.peranAktif}" tidak berhak mengubah matriks hak akses.`);
+    throw new GagalIzin(
+      `Jabatan "${pengguna.jabatan.join(", ")}" tidak berhak mengubah matriks hak akses.`,
+    );
   }
   return pengguna;
 }
@@ -42,7 +45,7 @@ export async function ubahIzin(_s: HasilAksi | null, form: FormData): Promise<Ha
     if (!role) throw new GagalIzin("Peran tidak ditemukan.");
 
     const lama = await prisma.roleSectionPermission.findUnique({
-      where: { roleNama_section: { roleNama: role.nama, section } },
+      where: { jabatan_section: { jabatan: role.nama, section } },
       select: { bolehUbah: true },
     });
     const tingkatLama = !lama ? "tidak" : lama.bolehUbah ? "ubah" : "lihat";
@@ -55,22 +58,22 @@ export async function ubahIzin(_s: HasilAksi | null, form: FormData): Promise<Ha
     if (
       section === "deskripsi" &&
       tingkat !== "ubah" &&
-      pengguna.peranAktif === role.nama
+      pengguna.jabatan.includes(role.nama)
     ) {
       throw new GagalIzin(
-        `Tidak bisa mencabut hak ubah "Deskripsi Proyek" dari peran Anda sendiri (${role.nama}) — Anda akan terkunci dari halaman ini.`,
+        `Tidak bisa mencabut hak ubah "Deskripsi Proyek" dari jabatan Anda sendiri (${labelJabatan(role.nama)}) — Anda akan terkunci dari halaman ini.`,
       );
     }
 
     if (tingkat === "tidak") {
       await prisma.roleSectionPermission.deleteMany({
-        where: { roleNama: role.nama, section },
+        where: { jabatan: role.nama, section },
       });
     } else {
       await prisma.roleSectionPermission.upsert({
-        where: { roleNama_section: { roleNama: role.nama, section } },
-        create: { roleNama: role.nama, section, bolehUbah: tingkat === "ubah" },
-        update: { bolehUbah: tingkat === "ubah" },
+        where: { jabatan_section: { jabatan: role.nama, section } },
+        create: { jabatan: role.nama, section, bolehLihat: true, bolehUbah: tingkat === "ubah" },
+        update: { bolehLihat: true, bolehUbah: tingkat === "ubah" },
       });
     }
 
@@ -245,11 +248,11 @@ export async function ubahUser(_s: HasilAksi | null, form: FormData): Promise<Ha
         await prisma.role.findMany({ where: { id: { in: peranIds } }, select: { nama: true } })
       ).map((r) => r.nama);
       const masihKelola = await prisma.roleSectionPermission.count({
-        where: { roleNama: { in: namaPeran }, section: "deskripsi", bolehUbah: true },
+        where: { jabatan: { in: namaPeran }, section: "deskripsi", bolehUbah: true },
       });
       if (!masihKelola) {
         throw new GagalIzin(
-          "Peran yang dipilih membuat Anda kehilangan hak mengelola hak akses. Minta pengelola lain yang mengubahnya.",
+          "Jabatan yang dipilih membuat Anda kehilangan hak mengelola hak akses. Minta pengelola lain yang mengubahnya.",
         );
       }
     }

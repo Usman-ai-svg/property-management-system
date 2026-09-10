@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowUpRight, Lightbulb } from "lucide-react";
 import { ambilPengguna, bolehLihat } from "@/lib/auth/rbac";
+import { labelJabatan } from "@/lib/domain/jabatan";
 import { ringkasanProyek } from "@/lib/data/ringkasan";
 import { kpiSeluruhFitur } from "@/lib/data/kpi-ringkasan";
 import { statusSerapan } from "@/lib/calc/keuangan";
@@ -26,7 +27,7 @@ export default async function Ringkasan() {
     <div style={{ padding: "26px 28px 40px" }}>
       <JudulHalaman
         judul={`Selamat datang, ${pengguna.nama.split(" ")[0]}`}
-        keterangan={`Peran aktif: ${pengguna.peranAktif} · ${
+        keterangan={`Jabatan: ${pengguna.jabatan.map(labelJabatan).join(" · ")} · ${
           pengguna.semuaProyek ? "akses seluruh proyek" : `akses ${proyek.length} proyek`
         }`}
       />

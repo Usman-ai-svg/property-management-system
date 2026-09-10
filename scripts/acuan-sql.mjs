@@ -3,10 +3,14 @@ import { readFileSync, writeFileSync } from "node:fs";
 /**
  * DATA ACUAN → INSERT untuk schema `proyek`.
  *
- * Pasangan `skema:sql`: yang itu membuat tabelnya, yang ini mengisi baris yang
- * harus sudah ada sebelum tim bisa memakai sistemnya sama sekali — matriks hak
- * akses, price book, dan analisa harga satuan. Dijalankan sekali di SQL editor
+ * Pasangan `skema:sql`: yang itu membuat tabelnya, yang ini mengisi pustaka
+ * harga — price book dan analisa harga satuan. Dijalankan sekali di SQL editor
  * Supabase, sesudah `prisma/proyek.sql`.
+ *
+ * Matriks hak akses TIDAK di sini: ia punya perintahnya sendiri, `acl:sql`.
+ * Alasannya bukan kerapian — matriks disunting berkali-kali sesudah sistem
+ * jalan, sedangkan pustaka harga diisi sekali lalu dirawat tim. Menggabungkan
+ * keduanya berarti menjalankan ulang yang satu memaksa menyentuh yang lain.
  *
  * Data peragaan TIDAK ikut. Proyek contoh, unit contoh, dan pengeluaran contoh
  * tetap di `prisma/seed.ts` dan berhenti di demo.
@@ -33,7 +37,7 @@ const baca = (nama) => JSON.parse(readFileSync(`prisma/acuan/${nama}`, "utf8"));
 
 const hargaDasar = baca("harga-dasar.json");
 const analisa = baca("analisa.json");
-const peran = baca("peran.json");
+
 
 // --- alat bantu --------------------------------------------------------------
 
@@ -60,39 +64,6 @@ function pernyataan(tabel, kolom, baris) {
   const daftar = kolom.map((k) => `"${k}"`).join(", ");
   const nilai = baris.map((b) => `  (${kolom.map((k) => kutip(b[k])).join(", ")})`).join(",\n");
   return `insert into proyek.${tabel} (${daftar}) values\n${nilai}\non conflict ("id") do nothing;\n`;
-}
-
-// --- matriks hak akses -------------------------------------------------------
-
-const semuaPeran = peran.peran.map((p) => p.nama);
-const bentang = (nilai) => (nilai === "*" ? semuaPeran : nilai);
-
-const barisAkses = [];
-for (const a of peran.akses) {
-  const lihat = bentang(a.lihat);
-  const ubah = bentang(a.ubah);
-
-  // Hak ubah tanpa hak lihat adalah baris yang tidak bisa terjadi: baris di
-  // tabel ini ADALAH hak lihatnya. Kalau sampai ada, matriksnya salah tulis —
-  // dan diamnya akan tampak sebagai peran yang kehilangan akses, bukan sebagai
-  // galat.
-  const nakal = ubah.filter((p) => !lihat.includes(p));
-  if (nakal.length > 0) {
-    throw new Error(`${a.section}: boleh ubah tapi tidak boleh lihat — ${nakal.join(", ")}`);
-  }
-  const asing = [...lihat, ...ubah].filter((p) => !semuaPeran.includes(p));
-  if (asing.length > 0) {
-    throw new Error(`${a.section}: peran tidak dikenal — ${[...new Set(asing)].join(", ")}`);
-  }
-
-  for (const p of lihat) {
-    barisAkses.push({
-      id: `rsp-${slug(p)}-${slug(a.section)}`,
-      roleNama: p,
-      section: a.section,
-      bolehUbah: ubah.includes(p),
-    });
-  }
 }
 
 // --- price book & analisa ----------------------------------------------------
@@ -144,14 +115,11 @@ const bagian = [
 -- "on conflict do nothing", jadi menjalankan dua kali tidak menggandakan
 -- apa pun dan juga TIDAK menimpa nilai yang sudah disunting tim.
 --
+-- Matriks hak akses TIDAK di berkas ini — lihat prisma/acl.sql (npm run acl:sql).
 -- Urutan pengisian data sesudah ini: docs/urutan-isi-data.md
 
 begin;
 `,
-  `-- ${barisAkses.length} baris hak akses (${peran.akses.length} sub-bagian × peran yang boleh melihat).
--- Baris ADA berarti boleh melihat; "bolehUbah" menentukan boleh mengubah.
--- Sub-bagian yang tidak tercantum untuk sebuah peran tertutup sama sekali.`,
-  pernyataan("role_section_permissions", ["id", "roleNama", "section", "bolehUbah"], barisAkses),
   `-- ${barisHarga.length} harga dasar. Nilainya harga awal yang WAJIB disesuaikan
 -- tim sebelum dipakai menyusun RAB — yang acuan di sini strukturnya, bukan angkanya.`,
   pernyataan("harga_dasar", ["id", "kode", "kategori", "uraian", "satuan", "hargaAcuan"], barisHarga),
@@ -166,6 +134,6 @@ begin;
 writeFileSync(KELUARAN, bagian.join("\n"));
 
 console.log(
-  `${KELUARAN}: ${barisAkses.length} hak akses, ${barisHarga.length} harga dasar, ` +
-    `${barisAnalisa.length} analisa, ${barisKomponen.length} komponen.`,
+  `${KELUARAN}: ${barisHarga.length} harga dasar, ${barisAnalisa.length} analisa, ` +
+    `${barisKomponen.length} komponen.`,
 );

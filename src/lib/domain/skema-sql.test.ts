@@ -135,13 +135,18 @@ describe("DDL proyek.sql — keputusan yang tidak boleh hanyut", () => {
     assert.match(SQL, /references auth\.users\(id\)/);
   });
 
-  it("matriks hak akses ikut, dan dikunci ke nama peran", () => {
-    // Panduan: jangan membuang RoleSectionPermission. Di ERP dibiarkan terbuka
-    // penuh, tapi mekanismenya harus utuh supaya bisa diperketat tanpa
-    // membongkar RPC satu per satu.
+  it("matriks hak akses ikut, dan dikunci ke KUNCI JABATAN", () => {
+    // Jangan membuang RoleSectionPermission: mekanismenya harus utuh supaya
+    // bisa diperketat tanpa membongkar RPC satu per satu.
+    //
+    // Kuncinya jabatan, bukan nama peran repo dan bukan `profiles.role`.
+    // Peran repo tidak punya padanan di ERP; `profiles.role` terlalu tumpul —
+    // nilai `staff` yang sama dipakai logistik, arsitek, dan security.
     assert.match(SQL, /create table proyek\.role_section_permissions/);
-    assert.match(SQL, /"roleNama" text/);
+    assert.match(SQL, /"jabatan" text/);
+    assert.match(SQL, /"bolehLihat" boolean/);
     assert.equal(/role_section_permissions[\s\S]*?"roleId"/.test(SQL), false);
+    assert.equal(/"roleNama"/.test(SQL), false, "kolom roleNama sudah diganti jabatan");
   });
 
   it("@updatedAt jadi trigger, bukan diisi aplikasi", () => {

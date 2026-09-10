@@ -7,20 +7,19 @@ import {
   Building2, Calculator, ChevronDown, LayoutGrid, LogOut, Map, ShieldCheck, Wallet,
 } from "lucide-react";
 import type { ItemNav } from "@/lib/nav";
-import { gantiPeran, logout } from "@/app/login/actions";
+import { labelJabatan } from "@/lib/domain/jabatan";
+import { logout } from "@/app/login/actions";
 
 const IKON = { LayoutGrid, Building2, Wallet, Map, ShieldCheck, Calculator };
 
 export function Sidebar({
   nav,
   nama,
-  peranAktif,
-  peran,
+  jabatan,
 }: {
   nav: ItemNav[];
   nama: string;
-  peranAktif: string;
-  peran: string[];
+  jabatan: string[];
 }) {
   const path = usePathname();
   const [terbuka, setTerbuka] = useState<string[]>(["manpro"]);
@@ -109,40 +108,13 @@ export function Sidebar({
       </nav>
 
       <div style={{ marginTop: 16 }}>
-        {peran.length > 1 && (
-          <>
-            <div
-              style={{
-                fontSize: 10.5, color: "#8fa6ae", letterSpacing: ".08em",
-                marginBottom: 6, paddingLeft: 4,
-              }}
-            >
-              PERAN AKTIF
-            </div>
-            <form action={gantiPeran}>
-              <div style={{ position: "relative" }}>
-                <select
-                  className="roleSel"
-                  name="peran"
-                  defaultValue={peranAktif}
-                  onChange={(e) => e.currentTarget.form?.requestSubmit()}
-                >
-                  {peran.map((r) => (
-                    <option key={r}>{r}</option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={15}
-                  style={{
-                    position: "absolute", right: 10, top: 11,
-                    pointerEvents: "none", color: "#8fa6ae",
-                  }}
-                />
-              </div>
-            </form>
-          </>
-        )}
-
+        {/*
+          Pemilih "Lihat sebagai" sudah dibuang. Sumbu izin sekarang jabatan,
+          dan seseorang memegang jabatannya sekaligus — tidak ada keadaan
+          "sedang tidak menjabat" yang perlu dipilih. Yang dulu dijaga oleh
+          ritual berpindah peran kini ditulis sebagai aturan; lihat
+          `bolehTransisi` di src/lib/calc/petty-cash.ts.
+        */}
         <div
           style={{
             marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,.09)",
@@ -164,7 +136,7 @@ export function Sidebar({
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}
             >
-              {peranAktif}
+              {jabatan.map(labelJabatan).join(" · ")}
             </div>
           </div>
           <form action={logout}>

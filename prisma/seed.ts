@@ -13,6 +13,7 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/lib/auth/password";
+import { labelJabatan } from "../src/lib/domain/jabatan";
 import { buatBoqDariTemplate, buatRapDariTemplate, buatSubkonDariTemplate, hitungUpahRap, rabAcuan, rapAcuan, totalBaris, boqSarprasDefault, rapGenerik } from "../src/lib/calc/boq";
 import { parseUkuran } from "../src/lib/format";
 import { alokasiPembayaran, statusHutang } from "../src/lib/calc/keuangan";
@@ -32,7 +33,7 @@ const prisma = new PrismaClient({
 /** Password seragam untuk seluruh akun demo. */
 const PASSWORD_DEMO = "nanoland2026";
 
-/** Ubah nama menjadi email kantor: "Andra Wijaya" → "andra.wijaya@nanoland.id" */
+/** Ubah nama menjadi email kantor: "Usman" → "andra.wijaya@nanoland.id" */
 const emailDari = (nama: string) =>
   nama.toLowerCase().replace(/[^a-z\s]/g, "").trim().replace(/\s+/g, ".") + "@nanoland.id";
 
@@ -247,12 +248,12 @@ async function isiPenyesuaianAset() {
     pj?: string;
     oleh: string;
   }[] = [
-    { kode: "SCF-001", jenis: "Hilang", banyak: 3, keterangan: "Hilang di lokasi NT4 setelah pemindahan barak pekerja", pj: "Agus Pratama", oleh: "Agus Pratama" },
-    { kode: "SCF-001", jenis: "Rusak", banyak: 2, keterangan: "Retak tertimpa material saat bongkar muat", pj: "Agus Pratama", oleh: "Budi Hartono" },
-    { kode: "GEN-007", jenis: "Rusak", banyak: 1, keterangan: "Dinamo terbakar, menunggu suku cadang", pj: "Hendra Kurnia", oleh: "Hendra Kurnia" },
-    { kode: "VBR-006", jenis: "Rusak", banyak: 2, keterangan: "Dua unit mati total setelah kemasukan air", pj: "Agus Pratama", oleh: "Agus Pratama" },
-    { kode: "VBR-006", jenis: "Perbaikan Selesai", banyak: 1, keterangan: "Satu unit selesai servis, sudah bisa dipakai kembali", oleh: "Hendra Kurnia" },
-    { kode: "SCF-001", jenis: "Koreksi Stok", banyak: -4, keterangan: "Opname fisik gudang: tercatat lebih banyak daripada yang ada", oleh: "Budi Hartono" },
+    { kode: "SCF-001", jenis: "Hilang", banyak: 3, keterangan: "Hilang di lokasi NT4 setelah pemindahan barak pekerja", pj: "Dicky", oleh: "Dicky" },
+    { kode: "SCF-001", jenis: "Rusak", banyak: 2, keterangan: "Retak tertimpa material saat bongkar muat", pj: "Dicky", oleh: "Laras" },
+    { kode: "GEN-007", jenis: "Rusak", banyak: 1, keterangan: "Dinamo terbakar, menunggu suku cadang", pj: "Abdillah", oleh: "Abdillah" },
+    { kode: "VBR-006", jenis: "Rusak", banyak: 2, keterangan: "Dua unit mati total setelah kemasukan air", pj: "Dicky", oleh: "Dicky" },
+    { kode: "VBR-006", jenis: "Perbaikan Selesai", banyak: 1, keterangan: "Satu unit selesai servis, sudah bisa dipakai kembali", oleh: "Abdillah" },
+    { kode: "SCF-001", jenis: "Koreksi Stok", banyak: -4, keterangan: "Opname fisik gudang: tercatat lebih banyak daripada yang ada", oleh: "Laras" },
   ];
 
   let n = 0;
@@ -417,7 +418,7 @@ const PEMBELIAN_DEMO: PoDemo[] = [
   {
     proyek: "NT4", nomor: "PO-2026-021", pemasok: "Toko Bangunan Sejahtera",
     status: "Diterima", tanggal: "28 Jul 2026", tanggalTerima: "30 Jul 2026",
-    penerima: "Agus Pratama", keterangan: "Material struktur Fase 2",
+    penerima: "Dicky", keterangan: "Material struktur Fase 2",
     items: [
       { uraian: "Semen Portland 50kg", satuan: "sak", qty: 300, harga: 62_000 },
       { uraian: "Pasir beton (cor)", satuan: "m³", qty: 24, harga: 300_000 },
@@ -436,7 +437,7 @@ const PEMBELIAN_DEMO: PoDemo[] = [
   {
     proyek: "GN2", nomor: "PO-2026-023", pemasok: "Toko Bangunan Sejahtera",
     status: "Diterima", tanggal: "18 Jul 2026", tanggalTerima: "20 Jul 2026",
-    penerima: "Hendra Kurnia", keterangan: "Keramik & cat finishing",
+    penerima: "Abdillah", keterangan: "Keramik & cat finishing",
     items: [
       { uraian: "Keramik lantai 40×40", satuan: "m²", qty: 320, harga: 65_000 },
       { uraian: "Cat tembok interior", satuan: "kg", qty: 180, harga: 35_000 },
@@ -534,7 +535,7 @@ async function isiPembelianDanHutang(projectId: Map<string, string>) {
           peruntukan, jenis: "Material", metode: "Transfer",
           uraian: `${bayar >= total ? "Pembayaran" : "Uang muka"} PO ${po.nomor} — ${po.pemasok}`,
           total: bayar, status: bayar >= total ? "Lunas" : "DP",
-          posHpp: POS_HPP[peruntukan], pic: "Sinta Dewi",
+          posHpp: POS_HPP[peruntukan], pic: "Nisa",
           alokasi: { create: [{ unitId, infrastructureId: null, nominal: bayar }] },
         },
       });
@@ -556,7 +557,7 @@ async function isiPembelianDanHutang(projectId: Map<string, string>) {
         kreditur: h.pemasok, tenggat: tgl(h.tenggat)!,
         uraian: h.uraian, total: h.total,
         status: statusHutang(h.total, cicilan),
-        posHpp: POS_HPP[h.peruntukan as keyof typeof POS_HPP], pic: "Sinta Dewi",
+        posHpp: POS_HPP[h.peruntukan as keyof typeof POS_HPP], pic: "Nisa",
         alokasi: {
           create: [{
             unitId: keSarpras ? null : unitId,
@@ -571,7 +572,7 @@ async function isiPembelianDanHutang(projectId: Map<string, string>) {
       await prisma.hutangCicilan.create({
         data: {
           expenseId: exp.id, tanggal: tgl(h.tglCicilan ?? h.timbul)!,
-          nominal: cicilan, metode: "Transfer", pic: "Sinta Dewi",
+          nominal: cicilan, metode: "Transfer", pic: "Nisa",
         },
       });
       jmlCicilan++;
@@ -659,7 +660,10 @@ async function main() {
     for (const peran of peranBoleh) {
       if (!roleId.has(peran)) continue;
       await prisma.roleSectionPermission.create({
-        data: { roleNama: peran, section, bolehUbah: (ACL_UBAH[section] ?? []).includes(peran) },
+        data: {
+          jabatan: peran, section, bolehLihat: true,
+          bolehUbah: (ACL_UBAH[section] ?? []).includes(peran),
+        },
       });
       jmlIzin++;
     }
@@ -1046,7 +1050,7 @@ async function main() {
           total: r.nominal,
           status: "Lunas",
           posHpp: POS_HPP[peruntukan],
-          pic: "Sinta Dewi",
+          pic: "Nisa",
           alokasi: { create: porsi },
         },
       });
@@ -1212,7 +1216,7 @@ async function main() {
       data: {
         nama: U.nama, inisial: U.inisial, email: emailDari(U.nama),
         passwordHash, semuaProyek: U.semua,
-        roles: { create: U.peran.filter((p) => roleId.has(p)).map((p) => ({ roleId: roleId.get(p)! })) },
+        roles: { create: U.jabatan.filter((p) => roleId.has(p)).map((p) => ({ roleId: roleId.get(p)! })) },
         aksesProyek: {
           create: U.proyek.filter((k) => projectId.has(k)).map((k) => ({ projectId: projectId.get(k)! })),
         },
@@ -1246,7 +1250,8 @@ async function main() {
   // 11. PETTY CASH — dana talangan lapangan + alur pertanggungjawaban
   // ---------------------------------------------------------------------
   //
-  // Satu Supervisor (Agus Pratama) memegang dana di dua proyek. Laporannya
+  // Dua pemegang dana: Dicky (logistic staff) dan Abdillah (manager proyek) —
+  // sejak jabatan manager proyek ikut boleh memegang dana. Laporannya
   // sengaja tersebar di semua status supaya tiap tahap alur (Draft → Diajukan →
   // DiverifikasiQS → Disetujui → Direimburse) kelihatan di demo. Saldo tidak
   // disimpan — dihitung dari topUp − pengeluaran saat halaman digambar.
@@ -1319,7 +1324,7 @@ async function main() {
   console.log(`  Total RAB seluruh unit : Rp ${Math.round(totalBaris(totalRab)).toLocaleString("id-ID")}`);
   console.log(`\n  Login demo — password semua akun: ${PASSWORD_DEMO}`);
   for (const U of USERS.slice(0, 4)) {
-    console.log(`    ${emailDari(U.nama).padEnd(30)} ${U.peran.join(", ")}`);
+    console.log(`    ${emailDari(U.nama).padEnd(30)} ${U.jabatan.map(labelJabatan).join(", ")}`);
   }
   console.log(`    … dan ${USERS.length - 4} akun lain.\n`);
 }

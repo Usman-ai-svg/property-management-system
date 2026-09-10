@@ -8,7 +8,10 @@ import {
   angka, GagalIzin, HasilAksi, izinkan, jalankan, pilihan, teks, teksOpsional, wajibLolos,
 } from "@/lib/actions/guard";
 import { simpanBuktiOpsional } from "@/lib/actions/bukti";
-import { cariTransisi, totalLaporan } from "@/lib/calc/petty-cash";
+import {
+  bolehTransisi, cariTransisi, totalLaporan, type TransisiPetty,
+} from "@/lib/calc/petty-cash";
+import { JABATAN_PEMEGANG_PETTY, labelJabatan } from "@/lib/domain/jabatan";
 import {
   periksaAjukanLaporanPetty, periksaBeriDanaPetty, periksaCatatPengeluaranPetty,
   periksaReimburseLaporanPetty, periksaTransisiLaporanPetty,
@@ -18,7 +21,7 @@ import {
   JENIS_BIAYA_SWAKELOLA, PERUNTUKAN_BIAYA, POS_HPP, STATUS_PETTY_CASH,
   type PeruntukanBiaya, type StatusPettyCash,
 } from "@/lib/domain/enums";
-import type { Pengguna } from "@/lib/auth/rbac";
+import { bolehUbah, type Pengguna } from "@/lib/auth/rbac";
 
 /**
  * Peran sistem yang boleh menembus SEMUA tahap alur petty cash — pintasan
@@ -26,20 +29,28 @@ import type { Pengguna } from "@/lib/auth/rbac";
  * tanpa berganti-ganti login. Administrator Sistem memang sudah memegang hak
  * ubah semua sub-bagian; ini menyelaraskan alur petty cash dengannya.
  */
-const PERAN_SUPERUSER = "Administrator Sistem";
-
-/** Apakah pengguna adalah superuser yang menembus batas peran petty cash. */
-const superuserPetty = (pengguna: Pengguna): boolean =>
-  pengguna.peranAktif === PERAN_SUPERUSER;
-
-/** Tolak bila peran aktif bukan salah satu yang berhak atas tahap ini. */
-function wajibPeran(pengguna: Pengguna, ...peran: string[]): void {
-  if (superuserPetty(pengguna)) return;
-  if (!peran.includes(pengguna.peranAktif)) {
+/**
+ * Tolak bila pengguna tidak berhak menggerakkan transisi ini.
+ *
+ * Aturannya sendiri milik `bolehTransisi()` di lapisan murni — termasuk dua
+ * aturan lintas transisi: pemegang dana hanya boleh mengajukan, dan `director`
+ * menembus batas jabatan kecuali atas dana yang ia pegang sendiri. Di sini
+ * cuma dibungkus jadi lemparan yang menjelaskan penolakannya.
+ */
+function wajibBolehTransisi(
+  pengguna: Pengguna,
+  transisi: TransisiPetty,
+  pemegangDana: boolean,
+  bolehKeuangan: boolean,
+): void {
+  if (bolehTransisi(transisi, { jabatan: pengguna.jabatan, pemegangDana, bolehKeuangan })) return;
+  if (pemegangDana) {
     throw new GagalIzin(
-      `Tahap ini hanya untuk peran ${peran.join(" / ")} — Anda sedang berperan "${pengguna.peranAktif}".`,
+      `Pemegang dana tidak boleh menggerakkan tahap "${transisi.aksi}" atas pengajuannya sendiri.`,
     );
   }
+  const daftar = (transisi.jabatan ?? []).map(labelJabatan).join(" / ");
+  throw new GagalIzin(`Tahap "${transisi.aksi}" hanya untuk ${daftar}.`);
 }
 
 /** Muat sebuah laporan + konteks dananya, atau lempar bila tak ada. */
@@ -68,7 +79,7 @@ function revalidasi(kode: string) {
 // ===========================================================================
 
 /**
- * Beri / isi dana petty cash untuk seorang pemegang (Supervisor). Membuat dana
+ * Beri / isi dana petty cash untuk seorang pemegang. Membuat dana
  * bila belum ada, lalu mencatat penambahan saldo jenis "Awal". Plafon di sini
  * hanya nilai acuan imprest — tidak membatasi pengeluaran maupun reimburse.
  */
@@ -84,7 +95,7 @@ export async function beriDanaPetty(_s: HasilAksi | null, form: FormData): Promi
     const pemegang = await prisma.user.findFirst({
       where: {
         id: pemegangId, aktif: true,
-        roles: { some: { role: { nama: "Supervisor" } } },
+        roles: { some: { role: { nama: { in: [...JABATAN_PEMEGANG_PETTY] } } } },
       },
       select: { id: true, nama: true },
     });
@@ -96,7 +107,14 @@ export async function beriDanaPetty(_s: HasilAksi | null, form: FormData): Promi
       keterangan: null,
     };
     wajibLolos(periksaBeriDanaPetty(masukan, { pemegangSah: Boolean(pemegang) }));
-    if (!pemegang) throw new GagalIzin("Pemegang dana harus seorang Supervisor yang aktif.");
+    if (!pemegang) {
+      // Dulu hanya Supervisor. Dengan satu orang berjabatan logistic staff,
+      // cuma satu proyek yang bisa punya dana talangan — karena itu manager
+      // proyek ikut. Pesannya menyebut keduanya: pesan yang menyesatkan
+      // membuat orang mengira akunnya rusak.
+      const boleh = JABATAN_PEMEGANG_PETTY.map(labelJabatan).join(" atau ");
+      throw new GagalIzin(`Pemegang dana harus ${boleh} yang aktif.`);
+    }
 
     const { plafon, nominal } = masukan;
     const { bukti, buktiKey } = await simpanBuktiOpsional(form);
@@ -176,7 +194,7 @@ export async function reimburseLaporanPetty(_s: HasilAksi | null, form: FormData
 }
 
 // ===========================================================================
-// PEMEGANG (Supervisor) — catat pengeluaran & ajukan
+// PEMEGANG DANA — catat pengeluaran & ajukan
 // ===========================================================================
 
 /**
@@ -207,7 +225,7 @@ export async function catatPengeluaranPetty(_s: HasilAksi | null, form: FormData
     wajibLolos(
       periksaCatatPengeluaranPetty(masukan, {
         danaAktif: dana.aktif,
-        pelakuPemegang: pengguna.id === dana.pemegangId || superuserPetty(pengguna),
+        pelakuPemegang: pengguna.id === dana.pemegangId,
       }),
     );
     const { peruntukan, jenis, uraian, total } = masukan;
@@ -275,7 +293,7 @@ export async function ajukanLaporanPetty(_s: HasilAksi | null, form: FormData): 
         { reportId },
         {
           status: r.status as StatusPettyCash,
-          pelakuPemegang: pengguna.id === r.fund.pemegangId || superuserPetty(pengguna),
+          pelakuPemegang: pengguna.id === r.fund.pemegangId,
           jumlahPengeluaran: r._count.expenses,
           adaNota: Boolean(buktiKey),
         },
@@ -327,15 +345,19 @@ export async function transisiLaporanPetty(_s: HasilAksi | null, form: FormData)
         { reportId, ke },
         {
           status: r.status as StatusPettyCash,
-          tahapVerifikasi:
-            transisi?.oleh === "Quantity Surveyor" || transisi?.oleh === "Head Operation Project",
+          tahapVerifikasi: Boolean(transisi && !transisi.olehPemegang && !transisi.perluIzinKeuangan),
         },
       ),
     );
     if (!transisi) throw new GagalIzin(`Transisi ${r.status} → ${ke} tidak sah.`);
 
     const pengguna = await izinkan("pettyCash", r.fund.projectId);
-    wajibPeran(pengguna, transisi.oleh);
+    wajibBolehTransisi(
+      pengguna,
+      transisi,
+      pengguna.id === r.fund.pemegangId,
+      bolehUbah(pengguna, "keuangan"),
+    );
 
     const stamp =
       ke === "DiverifikasiQS" ? { diverifikasiQsPada: new Date() }

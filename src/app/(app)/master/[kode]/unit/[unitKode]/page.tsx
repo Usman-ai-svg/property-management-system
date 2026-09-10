@@ -6,6 +6,8 @@ import { detailUnit, kontrakUnit } from "@/lib/data/proyek";
 import { Badge, CardHead, InfoRow, Kartu, Terbatas, WARNA_STATUS } from "@/components/ui";
 import { FileRow } from "@/components/file-row";
 import { KATEGORI_EKSTENSI } from "@/lib/storage";
+import { punyaJabatan } from "@/lib/adaptor/identitas";
+import { JABATAN_DIRECTOR } from "@/lib/domain/jabatan";
 import { hapusUnitPaksa, unggahRevisi } from "../../../actions";
 import { HapusPaksa } from "@/components/hapus-paksa";
 import { KontrakBacaSaja } from "@/components/kontrak-baca-saja";
@@ -365,7 +367,7 @@ export default async function RincianUnit({
         </>
       )}
 
-      {pengguna.peranAktif === "Administrator Sistem" && (
+      {punyaJabatan(pengguna, JABATAN_DIRECTOR) && (
         <HapusPaksa
           aksi={hapusUnitPaksa}
           id={unit.id}

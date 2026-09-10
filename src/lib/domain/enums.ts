@@ -1,3 +1,7 @@
+import {
+  JABATAN, KUNCI_JABATAN, type GrupJabatan,
+} from "./jabatan";
+
 /**
  * Nilai enum domain.
  *
@@ -292,87 +296,55 @@ export const SECTION_LABELS: Record<Section, string> = {
   penyesuaianAset: "Penyesuaian Aset",
 };
 
-/** Peran. Satu user boleh memegang lebih dari satu. */
-export const ROLES = [
-  "Komisaris",
-  "BOD",
-  "Head Operation Office",
-  "Head Operation Project",
-  "Project Manager",
-  "Supervisor",
-  "Business Development",
-  "Arsitek",
-  "Quantity Surveyor",
-  "Procurement",
-  "Customer Care",
-  "Consultant Finance",
-  "Finance",
-  "Admin",
-  "HRD",
-  "Head Marketing & Sales",
-  "Agent Coordinator",
-  "Sales",
-  "Head Content & Media",
-  "Editor",
-  "Social Media",
-] as const;
+/**
+ * Jabatan yang dikenal sistem, dalam bentuk kunci baku.
+ *
+ * DITURUNKAN, tidak ditulis ulang. Sebelumnya ada dua daftar yang tidak sama:
+ * `ROLES` di sini berisi 21 nama tanpa peran administrator, sedangkan daftar
+ * yang dipakai seed berisi 22 — sehingga tipe `Role` berbohong dan runtime
+ * selamat hanya karena seed membaca daftar yang lain. Satu sumber menutup
+ * seluruh kelas kekeliruan itu; ada tes yang gagal bila keduanya berbeda.
+ *
+ * Namanya tetap `ROLES` supaya pemanggil lama tidak perlu diburu, tapi isinya
+ * kunci jabatan — lihat `src/lib/domain/jabatan.ts`.
+ */
+export const ROLES: readonly string[] = KUNCI_JABATAN;
 
-/** Pengelompokan peran, dipakai untuk pewarnaan chip di UI. */
-export const ROLE_GROUP: Record<Role, RoleGroup> = {
-  Komisaris: "lead",
-  BOD: "lead",
-  "Head Operation Office": "ops",
-  "Head Operation Project": "ops",
-  "Project Manager": "ops",
-  Supervisor: "ops",
-  "Business Development": "biz",
-  Arsitek: "tech",
-  "Quantity Surveyor": "tech",
-  Procurement: "tech",
-  "Customer Care": "cc",
-  "Consultant Finance": "fin",
-  Finance: "fin",
-  Admin: "fin",
-  HRD: "hr",
-  "Head Marketing & Sales": "mkt",
-  "Agent Coordinator": "mkt",
-  Sales: "mkt",
-  "Head Content & Media": "media",
-  Editor: "media",
-  "Social Media": "media",
+/** Pengelompokan jabatan, dipakai untuk pewarnaan chip di UI. */
+export const ROLE_GROUP: Record<string, GrupJabatan> = Object.fromEntries(
+  JABATAN.map((j) => [j.kunci, j.grup]),
+);
+
+/** Nama divisi yang ditampilkan untuk tiap grup jabatan. */
+const NAMA_GRUP: Record<GrupJabatan, string> = {
+  lead: "Direksi & Komisaris",
+  ops: "Operasional",
+  tech: "Teknik",
+  fin: "Keuangan & Administrasi",
+  hr: "HRD",
+  cc: "Customer Care",
+  mkt: "Marketing & Sales",
+  media: "Content & Media",
 };
 
 /**
- * Struktur organisasi: divisi beserta peran anggotanya, berurut sesuai bagan.
+ * Struktur organisasi: divisi beserta jabatan anggotanya, berurut sesuai bagan.
  *
- * Dipakai untuk mengelompokkan baris pada Admin → Kelola Hak Akses dan Kelola
- * User. Peran pertama tiap divisi adalah "kepala"-nya (mis. Head Operation
- * Project); sisanya anggota di bawahnya. Sebagian nama divisi memang sama
- * dengan nama peran kepalanya — kepala tetap punya baris hak aksesnya sendiri.
- *
- * "Social Media" dicantumkan sesuai bagan meski belum ada sebagai peran;
- * barisnya muncul otomatis di posisi ini begitu peran tersebut dibuat.
+ * Dipakai untuk mengelompokkan baris pada Admin - Kelola Hak Akses dan Kelola
+ * User. Ikut diturunkan dari `JABATAN`: urutan grupnya mengikuti kemunculan
+ * pertama tiap grup di sana, jadi menambah jabatan baru cukup di satu tempat
+ * dan barisnya langsung muncul di divisi yang benar.
  */
-export const DIVISI: { nama: string; peran: string[] }[] = [
-  { nama: "Administrator Sistem", peran: ["Administrator Sistem"] },
-  { nama: "Komisaris / BOD", peran: ["Komisaris", "BOD"] },
-  { nama: "Project Manager", peran: ["Project Manager", "Supervisor"] },
-  {
-    nama: "Head Operation Project",
-    peran: [
-      "Head Operation Project", "Business Development", "Arsitek",
-      "Quantity Surveyor", "Procurement", "Customer Care",
-    ],
-  },
-  {
-    nama: "Head Operation Office",
-    peran: ["Head Operation Office", "Consultant Finance", "Finance", "Admin", "HRD"],
-  },
-  { nama: "Head Marketing & Sales", peran: ["Head Marketing & Sales", "Agent Coordinator", "Sales"] },
-  { nama: "Head Content & Media", peran: ["Head Content & Media", "Editor", "Social Media"] },
-];
+export const DIVISI: { nama: string; peran: string[] }[] = (() => {
+  const urut: GrupJabatan[] = [];
+  for (const j of JABATAN) if (!urut.includes(j.grup)) urut.push(j.grup);
+  return urut.map((g) => ({
+    nama: NAMA_GRUP[g],
+    peran: JABATAN.filter((j) => j.grup === g).map((j) => j.kunci),
+  }));
+})();
 
-/** Indeks divisi yang memuat sebuah peran, atau -1 bila tak ada. */
+/** Indeks divisi yang memuat sebuah jabatan, atau -1 bila tak ada. */
 export function divisiPeran(nama: string): number {
   return DIVISI.findIndex((d) => d.peran.includes(nama));
 }
@@ -402,17 +374,9 @@ export type KepemilikanAset = (typeof KEPEMILIKAN_ASET)[number];
 export type JenisAset = (typeof JENIS_ASET)[number];
 export type StatusPenggunaan = (typeof STATUS_PENGGUNAAN)[number];
 export type Section = (typeof SECTIONS)[number];
-export type Role = (typeof ROLES)[number];
-export type RoleGroup =
-  | "lead"
-  | "ops"
-  | "biz"
-  | "tech"
-  | "cc"
-  | "fin"
-  | "hr"
-  | "mkt"
-  | "media";
+/** Kunci jabatan. Dulu nama peran; sumbunya sekarang jabatan. */
+export type Role = string;
+export type RoleGroup = GrupJabatan;
 
 /**
  * Seluruh enum domain dalam satu peta.
