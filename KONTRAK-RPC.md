@@ -1,6 +1,6 @@
 # Kontrak RPC — Modul PROYEK
 
-Daftar lengkap **135 aksi tulis** repo ini beserta usulan RPC Postgres-nya.
+Daftar lengkap **134 aksi tulis** repo ini beserta usulan RPC Postgres-nya.
 Dokumen ini menggantikan versi lama yang menyebut 77 aksi.
 
 Untuk penerjemah RPC: kolom **Masukan** menunjuk tipe di `src/lib/kontrak/`.
@@ -14,13 +14,13 @@ fungsi — daftar field-nya persis daftar yang harus dibaca RPC).
 
 | Hal | Angka |
 |---|---|
-| Aksi tulis | 135 |
+| Aksi tulis | 134 |
 | Berkas ber-`"use server"` | 13 |
-| RPC setelah peleburan | **93** |
+| RPC setelah peleburan | **92** |
 | Tipe masukan di `src/lib/kontrak/` | 10 berkas, 2.647 baris |
 | Tes kontrak | 305 |
 
-**Catatan jujur soal angka 93.** Panduan menargetkan sekitar 45 RPC. Angka itu
+**Catatan jujur soal angka 92.** Panduan menargetkan sekitar 45 RPC. Angka itu
 tidak tercapai dengan peleburan yang aman, dan memaksakannya berarti menyatukan
 aksi yang invariannya berbeda ke dalam satu fungsi bercabang — persis bentuk
 yang membuat aturan gampang hanyut. Bagian "Peleburan" di bawah menjelaskan
@@ -175,11 +175,10 @@ disarankan beserta alasannya.
 | `simpanProgresBoqSpk` | `proyek_spk_opname_simpan` | `MasukanSimpanProgres` | progress | ya | tiap progres 0–100; progres SPK dihitung ulang dari baris | Opname progres BOQ | contractVoItem |
 | `login` | _(tidak jadi RPC — Supabase Auth)_ | `MasukanLogin` | — | ya | — | — | — |
 | `logout` | _(tidak jadi RPC — Supabase Auth)_ | `MasukanId` | — | ya | — | — | — |
-| `gantiPeran` | `proyek_peran_aktif_set` | `MasukanId` | — | ya | — | — | — |
 
 ## Peleburan (B4)
 
-135 aksi → **93 RPC**. Tiga pola dipakai, dan hanya tiga.
+134 aksi → **92 RPC**. Tiga pola dipakai, dan hanya tiga.
 
 ### 1. `tambah` + `ubah` → satu `*_simpan`
 
@@ -234,7 +233,7 @@ Contoh yang paling gampang tertukar:
 
 ### Tingkat kedua peleburan — mungkin, tapi tidak disarankan
 
-Angka 93 bisa ditekan ke sekitar 66 dengan satu langkah lagi: menyatukan ~28
+Angka 92 bisa ditekan ke sekitar 66 dengan satu langkah lagi: menyatukan ~28
 aksi `hapus*` berbentuk "satu id" menjadi satu RPC
 `proyek_hapus(entitas text, id uuid)`.
 
@@ -248,10 +247,13 @@ puluh tujuh lainnya.
 
 ## Yang tidak ikut jadi RPC
 
-`login`, `logout`, dan `gantiPeran` tidak diterjemahkan: identitas di ERP datang
-dari Supabase Auth. `gantiPeran` tetap didaftar karena mekanismenya — peran
-aktif yang menentukan hak akses — memang ikut pindah, hanya penyimpanannya yang
-berbeda.
+`login` dan `logout` tidak diterjemahkan: identitas di ERP datang dari Supabase
+Auth.
+
+`gantiPeran` dulu ada di daftar ini dan sudah DIHAPUS dari repo. Sumbu izin
+sekarang jabatan, dan seseorang memegang jabatannya sekaligus — tidak ada
+keadaan "sedang tidak menjabat" yang perlu dipilih, jadi tidak ada yang perlu
+disimpan maupun dipindahkan.
 
 Aksi Admin (`tambahUser`, `ubahUser`, `hapusUser`, `ubahStatusUser`) juga tidak
 akan punya RPC di modul PROYEK: pengelolaan pengguna sudah ada di ERP. Yang

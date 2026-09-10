@@ -3,9 +3,9 @@ import { describe, it } from "node:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
-  alamatLuar, bacaBerkas, batasKategori, catatTautan, diTautanLuar, hapusBerkas,
-  kelasKategori, penyediaKunci, periksaBerkasKategori, BATAS_RINGAN, GagalUnggah,
-  MAKS_UKURAN,
+  alamatLuar, bacaBerkas, batasKategori, catatTautan, diGdrive, diTautanLuar,
+  hapusBerkas, kelasKategori, mesinAktif, penyediaKunci, periksaBerkasKategori,
+  simpanBerkas, BATAS_RINGAN, GagalUnggah, MAKS_UKURAN,
 } from "./index";
 
 /**
@@ -158,5 +158,50 @@ describe("kelas berkas", () => {
     assert.throws(() => periksaBerkasKategori("gambar.dwg", "gambarKerjaPdf"), GagalUnggah);
     // Pemanggil lama yang belum mengirim ukuran tidak ikut berubah perilakunya.
     periksaBerkasKategori("nota.pdf", "bukti");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tanpa Google Drive, semuanya harus tetap jalan
+// ---------------------------------------------------------------------------
+
+describe("jalur berkas dengan env kosong", () => {
+  // Drive belum disiapkan, dan aplikasi harus jalan penuh tanpanya. Yang
+  // diperiksa di sini bukan cuma `mesinAktif()` menjawab "lokal", melainkan
+  // seluruh jalurnya benar-benar bekerja: simpan, baca lagi, hapus.
+
+  it("tanpa satu pun variabel Drive, mesinnya lokal", () => {
+    assert.equal(mesinAktif({}), "lokal");
+  });
+
+  it("konfigurasi Drive yang setengah jadi tidak membuatnya beralih", () => {
+    // Justru kasus yang berbahaya: seseorang mengisi dua dari tiga variabel,
+    // lalu unggahan gagal dengan galat yang menyebut kredensial — padahal yang
+    // benar adalah tetap menulis ke disk sampai konfigurasinya lengkap.
+    assert.equal(mesinAktif({ GDRIVE_CLIENT_EMAIL: "a@b.iam.gserviceaccount.com" }), "lokal");
+    assert.equal(mesinAktif({ STORAGE_ENGINE: "" }), "lokal");
+    assert.equal(mesinAktif({ STORAGE_ENGINE: "LOKAL" }), "lokal");
+  });
+
+  it("simpan, baca, dan hapus benar-benar bekerja di disk", async () => {
+    const isi = new TextEncoder().encode("nota demo tanpa drive").buffer;
+    const { objectKey, ukuranByte, sha256 } = await simpanBerkas(isi, "nota uji.pdf");
+
+    assert.equal(diGdrive(objectKey), false);
+    assert.equal(diTautanLuar(objectKey), false);
+    assert.equal(ukuranByte, 21);
+    assert.equal(sha256.length, 64, "sidik jari isi berkas ikut dihitung");
+
+    const kembali = await bacaBerkas(objectKey);
+    assert.equal(kembali.toString("utf8"), "nota demo tanpa drive");
+
+    await hapusBerkas(objectKey);
+    await assert.rejects(() => bacaBerkas(objectKey), "berkas seharusnya sudah hilang");
+  });
+
+  it("menghapus berkas yang sudah tidak ada bukan kegagalan", async () => {
+    // Hasil akhirnya sama saja, dan melempar di sini cuma membuat aksi
+    // penghapusan baris gagal karena berkasnya sudah lebih dulu hilang.
+    await hapusBerkas("2026/tidak-pernah-ada.pdf");
   });
 });

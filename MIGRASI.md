@@ -321,18 +321,30 @@ ketika isian datang sebagai parameter RPC alih-alih `FormData`.
 
 ## Skema Postgres yang sudah disiapkan
 
-`npm run skema:postgres` menghasilkan dua berkas dari `prisma/schema.prisma`:
+Jalur yang dipakai sekarang: **`npm run skema:sql`** menghasilkan
+`prisma/proyek.sql` — DDL `CREATE TABLE` polos untuk schema `proyek`, langsung
+jalan di SQL editor Supabase tanpa langkah tengah.
 
 | Berkas | Isi |
 |---|---|
-| `prisma/schema.postgres.prisma` | 43 tabel berawalan `pm_`, 34 kolom uang jadi `Decimal(18,2)` |
-| `prisma/enum-postgres.sql` | 19 `CREATE TYPE` dari `src/lib/domain/enums.ts` |
+| `prisma/proyek.sql` | 60 tabel schema `proyek`, 51 kolom uang `numeric(18,2)`, 27 CHECK enum, RLS + grant |
+| `prisma/acuan.sql` | `INSERT` pustaka harga: 22 harga dasar, 12 analisa, 64 komponen |
+| `prisma/acl.sql` | `INSERT` matriks hak akses: 145 baris untuk 18 jabatan |
 
-Sudah lolos `prisma validate`. Aplikasi ini tidak memakainya — gunanya bahan
-siap pakai saat penyerapan.
+Ketiganya dijaga tes yang mengurai hasilnya dengan grammar PostgreSQL asli
+(`pg-query-emscripten`), jadi "sintaksnya sah" bukan klaim melainkan hasil
+pemeriksaan.
 
-Awalan `pm_` dipakai karena ERP sudah punya 40-an tabel; tanpa awalan,
-`projects` kita akan bertabrakan dengan milik mereka.
+Tanpa awalan `pm_`: modul ini punya schema sendiri, jadi `proyek.projects`
+tidak bertabrakan dengan `public.projects` milik ERP. Awalan cuma perlu kalau
+semuanya berdesakan di satu schema.
+
+**Jalur lama, dipertahankan sebagai pembanding.** `npm run skema:postgres`
+menghasilkan `prisma/schema.postgres.prisma` (43 tabel berawalan `pm_`) dan
+`prisma/enum-postgres.sql` (19 `CREATE TYPE`). Angka 43 itu benar untuk berkas
+tersebut — ia dihasilkan sebelum belasan model terakhir ditambahkan, dan tidak
+diperbarui dengan sengaja. Jalur ini dibuang setelah `proyek.sql` terbukti
+jalan di Supabase.
 
 > **Yang paling mudah salah di sini:** menaikkan SEMUA `Float` jadi
 > `Decimal(18,2)`. Volume pekerjaan punya pecahan halus — 12,375 m³ beton
@@ -341,10 +353,15 @@ Awalan `pm_` dipakai karena ERP sudah punya 40-an tabel; tanpa awalan,
 > kilometer. 22 kolom sengaja tetap `Float`, didaftar sebagai `BUKAN_UANG` di
 > `scripts/skema-postgres.mjs` dan dijaga tes.
 
-Yang masih menunggu keputusan manusia: enum masih bertipe `String` (SQL-nya
-sudah siap, tapi menaikkannya perlu migrasi data), Row Level Security belum
-ada sama sekali, dan apakah tabel `User`/`Role` kita dipakai atau digantikan
-`profiles` ERP.
+Yang sudah diputuskan sejak catatan ini ditulis: RLS **ada** di `proyek.sql`
+(satu policy SELECT per tabel, tanpa satu pun policy tulis — seluruh penulisan
+lewat RPC `SECURITY DEFINER`), dan tabel `User`/`Role` kita **tidak ikut**:
+identitas datang dari `auth.users`, sedangkan hak akses di dalam modul dikunci
+ke jabatan HRIS. Lihat `docs/jabatan-erp.md` dan `docs/jahitan-identitas.md`.
+
+Yang masih menunggu: enum tetap `text` + CHECK, bukan tipe enum Postgres —
+menaikkannya perlu migrasi data dan tidak menambah jaminan apa pun di atas
+CHECK yang sudah ada.
 
 ---
 
@@ -747,8 +764,9 @@ perakitan halaman, dan ERP punya kerangkanya sendiri.
 
 Server Actions tidak punya padanan langsung. Setiap aksi di
 `src/app/(app)/**/actions.ts` menjadi fungsi RPC Postgres — daftar lengkap
-**135 aksi** beserta izin, invarian, jejak audit, dan usulan namanya ada di
-`KONTRAK-RPC.md`; setelah peleburan jadi 93 RPC. Invarian yang harus ditegakkan
+**134 aksi** beserta izin, invarian, jejak audit, dan usulan namanya ada di
+`KONTRAK-RPC.md`; setelah peleburan jadi 92 RPC. Angkanya dijaga tes yang
+menghitung ulang dari kode, jadi dokumen itu tidak bisa basi diam-diam lagi. Invarian yang harus ditegakkan
 di sisi server didaftar terpisah di `docs/invarian.md`. Urutannya tidak
 boleh berubah: periksa hak akses lebih dulu, lalu validasi, lalu simpan, lalu
 catat ke audit log.
