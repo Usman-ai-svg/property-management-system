@@ -2,8 +2,8 @@
 
 Dokumen ini ditulis supaya bisa dikerjakan orang yang **belum pernah membuka
 repo modul Proyek**. Isinya empat hal: dua jabatan yang perlu dibuat, kebijakan
-centang modul, penegasan soal `profiles.role`, dan satu daftar periksa yang
-jawabannya masih ditunggu.
+centang modul, penegasan soal `profiles.role`, dan langkah mengunci kolom
+jabatan HRIS jadi daftar tertutup.
 
 ---
 
@@ -71,66 +71,69 @@ Dua hal yang perlu diputuskan Umar, bukan dikerjakan sekarang:
 
 ---
 
-## 3. Daftar periksa kolom jabatan di HRIS — **jawabannya ditunggu**
+## 3. Kolom jabatan HRIS dijadikan daftar tertutup
 
-Ini satu-satunya hal yang belum terjawab, dan jawabannya menentukan apakah
-perlu satu langkah tambahan.
+**Keputusan Umar/Usman: nilainya harus persis 18 dan rapi — salah ketik dicegah,
+bukan ditampung.**
 
-Masalahnya: kalau kolom jabatan berupa **teks bebas**, satu salah ketik
-`"Quantity Surveyor Asst"` menjadi `"Quantity Surveyor asst"` membuat orangnya
-kehilangan akses **tanpa pesan apa pun**. Bukan galat, bukan halaman merah —
-cuma menu yang kosong.
+Sebabnya bukan kerapian. Tanpa pembatasan, `"Quantity Surveyor Asst"` masuk ke
+`hris.employees` tanpa keluhan apa pun, dan orangnya kehilangan **seluruh akses
+modul Proyek**: bukan galat, bukan halaman merah, cuma menu yang kosong. Ia akan
+melaporkannya sebagai aplikasi rusak, dan yang dicari orang berikutnya adalah bug
+di tempat yang salah. Dengan constraint, kekeliruan yang sama ditolak saat
+disimpan — oleh orang yang sedang mengetiknya, saat ia masih ingat maksudnya.
 
-Jalankan tiga query ini di Supabase, lalu kirimkan hasilnya:
+Jalankan **`prisma/jabatan-hris.sql`** (dihasilkan `npm run jabatan:sql`).
+Isinya tiga langkah, dan **urutannya tidak boleh dibalik**:
 
-```sql
--- 1. kolom jabatan itu apa namanya, dan tipenya apa
-select column_name, data_type
-  from information_schema.columns
- where table_schema = 'hris' and table_name = 'employees'
-   and (column_name ilike '%jabat%' or column_name ilike '%posi%'
-        or column_name ilike '%title%');
+| Langkah | Isinya | Kenapa urutannya begitu |
+| --- | --- | --- |
+| 1. Periksa | nama kolomnya, nilai yang dipakai sekarang, dan mana yang di luar 18 | constraint yang dipasang di atas data belum bersih akan GAGAL, di tengah pekerjaan lain |
+| 2. Rapikan | satu `UPDATE` menyeragamkan kapital dan spasi; sisanya manual | yang tersisa setelah langkah otomatis benar-benar jabatan lain, bukan beda ejaan |
+| 3. Kunci | `CHECK` constraint 18 nilai | sejak titik ini, salah ketik jadi galat |
 
--- 2. nilai yang benar-benar dipakai sekarang, beserta jumlah orangnya
-select <kolom_jabatan>, count(*)
-  from hris.employees
- group by 1
- order by 2 desc;
+Berkasnya dihasilkan dari `src/lib/domain/jabatan.ts` — sumber yang sama dengan
+matriks hak akses. Ditulis tangan, keduanya akan berbeda dalam sebulan.
 
--- 3. ada constraint yang membatasi nilainya?
-select conname, pg_get_constraintdef(oid)
-  from pg_constraint
- where conrelid = 'hris.employees'::regclass;
-```
+Dua hal yang perlu diketahui sebelum menjalankannya:
 
-### Apa yang dilakukan dengan jawabannya
+- **Kolomnya diasumsikan bernama `jabatan`.** Langkah 1a memastikannya; kalau
+  namanya berbeda, ganti di seluruh berkas.
+- **`NULL` tetap diizinkan.** Karyawan yang jabatannya belum diisi bukan data
+  rusak — ia cuma belum punya akses apa pun di modul Proyek. Yang ditolak adalah
+  nilai yang terisi tapi di luar daftar.
 
-**Sudah aman dari sekarang, apa pun jawabannya.** Matriks di repo tidak pernah
-dikunci ke teks HRIS; ia dikunci ke **kunci baku** (`quantity_surveyor_asst`),
-dan teks HRIS diterjemahkan lebih dulu oleh `jabatanDariHris()`. Terjemahannya
-sudah mengabaikan huruf besar-kecil dan spasi berlebih — dua bentuk salah ketik
-yang paling sering.
+### Menambah jabatan baru, nanti
 
-Yang dikerjakan setelah jawaban datang:
+Constraint ini membuat jabatan baru menuntut dua langkah:
 
-| Kalau ternyata… | Langkahnya |
-| --- | --- |
-| ada CHECK/enum yang membatasi nilainya | cukup samakan ejaan `jabatanHris` di `src/lib/domain/jabatan.ts` dengan daftar itu |
-| teks bebas, dan ada ejaan lain yang dipakai | tambahkan barisnya ke `ALIAS_HRIS` di berkas yang sama — satu baris per ejaan, tanpa menyentuh matriks |
-| ada jabatan yang belum terpetakan | tambahkan entri baru, atau putuskan ia memang tanpa akses |
+1. tambahkan entrinya di `src/lib/domain/jabatan.ts`, lalu `npm run acl:sql` —
+   tanpa ini jabatan baru tidak punya satu baris pun hak akses;
+2. jalankan ulang `npm run jabatan:sql` dan pasang constraint-nya.
 
----
+Terasa merepotkan, dan itu disengaja. Jabatan yang ada di HRIS tapi tidak ada di
+matriks menghasilkan orang yang bisa masuk tetapi tidak melihat apa-apa —
+kegagalan yang sama diamnya dengan salah ketik.
+
+Kalau ternyata jabatan di organisasi sering berubah, ganti `CHECK` dengan tabel
+acuan + foreign key: menambah jabatan jadi `INSERT` satu baris, bukan DDL, dan
+database tetap menolak nilai yang tidak dikenal. Beri tahu kalau itu yang
+dipilih — generatornya tinggal disesuaikan.
 
 ## 4. Yang dibawa dari repo
 
-Dua berkas SQL, dijalankan berurutan di SQL editor, sekali:
+Tiga berkas SQL, dijalankan **berurutan** di SQL editor, sekali:
 
-1. `prisma/proyek.sql` — 60 tabel schema `proyek`, RLS aktif, tanpa policy tulis.
-2. `prisma/acl.sql` — 145 baris matriks hak akses untuk 18 jabatan.
+1. `prisma/jabatan-hris.sql` — merapikan lalu mengunci kolom jabatan HRIS
+   (bagian 3). Dijalankan lebih dulu: sisanya bergantung pada nilai yang bersih.
+2. `prisma/proyek.sql` — 60 tabel schema `proyek`, RLS aktif, tanpa policy tulis.
+3. `prisma/acl.sql` — 145 baris matriks hak akses untuk 18 jabatan.
 
-Keduanya aman dijalankan ulang: tiap baris punya id tetap dan diakhiri
-`on conflict do nothing`, jadi menjalankan dua kali tidak menggandakan apa pun
-dan tidak menimpa penyuntingan yang sudah dilakukan lewat halaman Admin.
+Ketiganya aman dijalankan ulang. `acuan.sql` dan `acl.sql` memberi tiap baris
+id tetap lalu menutupnya dengan `on conflict do nothing`, jadi menjalankan dua
+kali tidak menggandakan apa pun dan tidak menimpa penyuntingan yang sudah
+dilakukan lewat halaman Admin. `jabatan-hris.sql` membuang constraint lamanya
+lebih dulu sebelum memasang yang baru.
 
 Tabelnya `proyek.role_section_permissions`, kolomnya `jabatan`, `section`,
 `bolehLihat`, `bolehUbah`.
@@ -151,7 +154,9 @@ Aturan alur petty cash yang harus ikut ke RPC:
 
 ## 5. Peta jabatan → hak akses
 
-Angka di bawah dihitung dari matriks, bukan diketik tangan.
+Angka di bawah dihitung dari matriks, bukan diketik tangan. Nilai pada kolom
+pertama adalah teks yang harus ada di `hris.employees` — **seragam huruf kecil**,
+supaya tidak ada yang perlu menebak kapan sebuah kata berkapital.
 
 | Jabatan HRIS | Orang | Lihat | Ubah | Catatan |
 | --- | --- | ---: | ---: | --- |
@@ -163,12 +168,12 @@ Angka di bawah dihitung dari matriks, bukan diketik tangan.
 | quantity surveyor asst | Laras | 11 | 5 | QS + Procurement. **Tidak** boleh menyetujui RAB |
 | junior arsitek staff | Sabila | 7 | 1 | Dokumen teknis |
 | consultant finance | *kosong* | 9 | 1 | Petty cash |
-| Finance & Tax | Nisa | 9 | 2 | Keuangan & reimburse |
+| finance & tax | Nisa | 9 | 2 | Keuangan & reimburse |
 | staff administration | Firmanda | 9 | 2 | Keuangan & administrasi |
-| HRD staff | Galih | 6 | 0 | Cakupan luar |
-| Sales & Marketing | Diana | 6 | 0 | Cakupan luar |
+| hrd staff | Galih | 6 | 0 | Cakupan luar |
+| sales & marketing | Diana | 6 | 0 | Cakupan luar |
 | customer service | Arzenico | 6 | 0 | Cakupan luar |
-| Manager marketing | Wahyudi | 6 | 0 | Cakupan luar |
+| manager marketing | Wahyudi | 6 | 0 | Cakupan luar |
 | agent coordinator | Imam Jaka | 6 | 0 | Cakupan luar |
 | copy writer | Intan | 6 | 0 | Cakupan luar |
 | design graphic staff | Gunawan | 6 | 0 | Cakupan luar |

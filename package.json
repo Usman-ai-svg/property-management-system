@@ -25,6 +25,7 @@
     "skema:sql": "tsx scripts/skema-sql.mjs",
     "acuan:sql": "node scripts/acuan-sql.mjs",
     "acl:sql": "tsx scripts/acl-sql.mjs",
+    "jabatan:sql": "tsx scripts/jabatan-hris-sql.mjs",
     "bundel:hitung": "esbuild src/lib/_bundel.ts --bundle --format=iife --global-name=ProyekHitung --target=es2020 --minify --outfile=dist/proyek-hitung.min.js"
   },
   "dependencies": {

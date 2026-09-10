@@ -30,6 +30,7 @@ const HAK_AKSES = JSON.parse(readFileSync("prisma/acuan/hak-akses.json", "utf8")
   akses: { jabatan: string; section: string; bolehLihat: boolean; bolehUbah: boolean }[];
 };
 const SQL = readFileSync("prisma/acl.sql", "utf8");
+const SQL_HRIS = readFileSync("prisma/jabatan-hris.sql", "utf8");
 const require_ = createRequire(import.meta.url);
 
 const punya = (jabatan: string, section: string) =>
@@ -213,5 +214,45 @@ describe("acl.sql", () => {
     assert.match(SQL, /\non conflict \("id"\) do nothing;/);
     assert.match(SQL, /begin;/);
     assert.match(SQL, /commit;/);
+  });
+});
+
+describe("jabatan-hris.sql — kolom jabatan HRIS jadi daftar tertutup", () => {
+  it("mengunci persis 18 nilai, dan seluruhnya dari jabatan.ts", () => {
+    // Keputusan Usman: salah ketik dicegah di hulu, bukan ditampung di hilir.
+    // Kalau daftar di SQL berbeda dari sumbernya, yang terjadi bukan galat
+    // melainkan seseorang yang jabatannya sah ditolak saat disimpan.
+    const blokCheck = SQL_HRIS.slice(SQL_HRIS.indexOf("add constraint"));
+    for (const j of JABATAN) {
+      assert.ok(
+        blokCheck.includes(`'${j.jabatanHris}'`),
+        `${j.jabatanHris} tidak ikut terkunci di constraint`,
+      );
+    }
+    const jumlah = (blokCheck.match(/'/g) ?? []).length / 2;
+    assert.equal(jumlah, JABATAN.length, `constraint mengunci ${jumlah} nilai`);
+  });
+
+  it("teks HRIS-nya seragam huruf kecil", () => {
+    // Daftar yang sebagian bermodal kapital dan sebagian tidak mengundang
+    // kekeliruan yang justru hendak dicegah: orang mengetik yang salah karena
+    // tebakannya wajar.
+    for (const j of JABATAN) {
+      assert.equal(j.jabatanHris, j.jabatanHris.toLowerCase(), `${j.kunci} bercampur kapital`);
+    }
+  });
+
+  it("membiarkan NULL, dan itu disengaja", () => {
+    // Karyawan yang jabatannya belum diisi bukan data rusak — ia cuma belum
+    // punya akses apa pun di modul Proyek.
+    assert.match(SQL_HRIS, /jabatan is null or jabatan in/);
+  });
+
+  it("memeriksa dan merapikan sebelum mengunci", () => {
+    // Urutan yang dibalik membuat constraint gagal dipasang di atas data yang
+    // belum bersih — dan gagalnya di tengah pekerjaan lain.
+    const urut = ["LANGKAH 1", "LANGKAH 2", "LANGKAH 3"].map((s) => SQL_HRIS.indexOf(s));
+    assert.ok(urut.every((i) => i >= 0), "ketiga langkah harus ada");
+    assert.deepEqual(urut, [...urut].sort((a, b) => a - b), "urutan langkahnya terbalik");
   });
 });

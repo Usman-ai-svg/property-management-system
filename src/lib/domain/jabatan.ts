@@ -24,11 +24,19 @@
  * KENAPA KUNCI BAKU, BUKAN TEKS HRIS LANGSUNG
  * ------------------------------------------------------------------------
  * Matriks dikunci ke `kunci` (`quantity_surveyor_asst`), bukan ke `jabatanHris`
- * ("quantity surveyor asst"). Selama belum dipastikan kolom jabatan di HRIS
- * punya daftar tertutup (lihat `docs/jabatan-erp.md`), teksnya harus dianggap
- * bebas — dan satu salah ketik "Quantity Surveyor asst" akan mencabut seluruh
- * akses seseorang TANPA pesan apa pun. Dengan lapisan ini, salah ketik seperti
- * itu berbiaya satu baris di `ALIAS_HRIS`, bukan membangun ulang matriks.
+ * ("quantity surveyor asst"). Dua lapisan, dua pertahanan yang berbeda:
+ *
+ *   1. Di HULU, kolom jabatan HRIS dijadikan DAFTAR TERTUTUP — 18 nilai, dikunci
+ *      CHECK constraint. Keputusan Usman: salah ketik dicegah, bukan ditampung.
+ *      SQL-nya dihasilkan `npm run jabatan:sql`.
+ *   2. Di HILIR, matriks tetap memakai kunci baku. Kalaupun suatu saat teks
+ *      HRIS-nya berubah — organisasi berganti istilah, atau constraint-nya
+ *      dilepas — yang perlu disunting satu baris di sini, bukan 145 baris
+ *      matriks beserta SQL-nya.
+ *
+ * `jabatanHris` sengaja SERAGAM huruf kecil. Daftar yang sebagian bermodal
+ * kapital ("Finance & Tax") dan sebagian tidak justru mengundang kekeliruan
+ * yang hendak dicegah: orang akan mengetik yang salah karena tebakannya wajar.
  *
  * ------------------------------------------------------------------------
  * SATU ORANG BISA LEBIH DARI SATU JABATAN
@@ -172,7 +180,7 @@ export const JABATAN: readonly Jabatan[] = [
   },
   {
     kunci: "finance_tax",
-    jabatanHris: "Finance & Tax",
+    jabatanHris: "finance & tax",
     label: "Finance & Tax",
     grup: "fin",
     cakupan: "proyek",
@@ -188,7 +196,7 @@ export const JABATAN: readonly Jabatan[] = [
   },
   {
     kunci: "hrd_staff",
-    jabatanHris: "HRD staff",
+    jabatanHris: "hrd staff",
     label: "HRD Staff",
     grup: "hr",
     cakupan: "luar",
@@ -196,7 +204,7 @@ export const JABATAN: readonly Jabatan[] = [
   },
   {
     kunci: "sales_marketing",
-    jabatanHris: "Sales & Marketing",
+    jabatanHris: "sales & marketing",
     label: "Sales & Marketing",
     grup: "mkt",
     cakupan: "luar",
@@ -212,7 +220,7 @@ export const JABATAN: readonly Jabatan[] = [
   },
   {
     kunci: "manager_marketing",
-    jabatanHris: "Manager marketing",
+    jabatanHris: "manager marketing",
     label: "Manager Marketing",
     grup: "mkt",
     cakupan: "luar",
@@ -307,12 +315,15 @@ export const JABATAN_LUAR = JABATAN.filter((j) => j.cakupan === "luar").map((j) 
 /**
  * Alias teks HRIS yang menunjuk jabatan yang sama.
  *
- * Tempat menampung kenyataan sebelum ia dirapikan: ejaan lain, singkatan, atau
- * nama lama yang masih terpakai di `hris.employees`. Mengoreksi satu baris di
- * sini lebih murah — dan jauh lebih aman — daripada mengubah matriks.
+ * Jaring pengaman untuk MASA PERALIHAN, bukan cara hidup. Selama kolom jabatan
+ * HRIS belum dikunci (`npm run jabatan:sql`), data lama bisa memuat ejaan lain
+ * atau singkatan; barisnya ditampung di sini supaya orangnya tidak kehilangan
+ * akses sementara datanya dirapikan.
  *
- * Kosong sampai daftar nilai HRIS yang sebenarnya diperiksa; lihat daftar
- * periksa di `docs/jabatan-erp.md`.
+ * Setelah constraint terpasang, daftar ini semestinya tetap KOSONG: nilai di
+ * luar 18 yang resmi sudah ditolak database, jadi tidak ada lagi yang perlu
+ * diterjemahkan. Isinya yang bertambah adalah tanda constraint-nya belum
+ * terpasang, atau sudah dilepas diam-diam.
  */
 export const ALIAS_HRIS: Record<string, string> = {};
 
